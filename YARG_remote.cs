@@ -159,6 +159,9 @@ namespace YargRemoteMod
                     int totalCount = allSongs.Length;
                     int limit = Math.Min(totalCount, 5000);
 
+                    var instruments = (YARG.Core.Instrument[])Enum.GetValues(typeof(YARG.Core.Instrument));
+                    var difficulties = (YARG.Core.Difficulty[])Enum.GetValues(typeof(YARG.Core.Difficulty));
+
                     for (int i = 0; i < limit; i++)
                     {
                         var s = allSongs[i];
@@ -166,6 +169,29 @@ namespace YargRemoteMod
                         // 1. SortString is a struct, so we only use .Name without the '?'
                         // 2. Year and SongLength are inside the game's internal class
                         
+                        var parts = new List<object>();
+                        foreach (var inst in instruments)
+                        {
+                            if (inst == YARG.Core.Instrument.Band) continue;
+
+                            var diffs = new List<string>();
+                            foreach (var diff in difficulties)
+                            {
+                                if (s.HasDifficultyForInstrument(inst, diff))
+                                {
+                                    diffs.Add(diff.ToString());
+                                }
+                            }
+
+                            if (diffs.Count > 0)
+                            {
+                                parts.Add(new {
+                                    icon = inst.ToString(),
+                                    difficulties = diffs
+                                });
+                            }
+                        }
+
                         songDataList.Add(new {
                             id = s.Hash.GetHashCode().ToString(),
                             fullHash = s.Hash.ToString(),
@@ -173,12 +199,14 @@ namespace YargRemoteMod
                             artist = RichTextUtils.StripRichTextTags(s.Artist),
                             album = RichTextUtils.StripRichTextTags(s.Album),
                             genre = RichTextUtils.StripRichTextTags(s.Genre),
+                            subgenre = RichTextUtils.StripRichTextTags(s.Subgenre),
                             charter = RichTextUtils.StripRichTextTags(s.Charter),
-                            // playlist = s.Playlist ?? "",
-                            source = s.Source,
-                            // Year and SongLength are direct properties if SongExport.cs was followed
-                            year = RichTextUtils.StripRichTextTags(s.UnmodifiedYear),
-                            duration = s.SongLengthMilliseconds 
+                            playlist = RichTextUtils.StripRichTextTags(s.Playlist),
+                            source = RichTextUtils.StripRichTextTags(s.Source),
+                            parts = parts,
+                            isMaster = s.IsMaster,
+                            year = s.YearAsNumber == int.MaxValue ? "-" : s.YearAsNumber.ToString(),
+                            duration = $"{(long)(s.SongLengthMilliseconds / 1000 / 60)}:{(long)(s.SongLengthMilliseconds / 1000 % 60):D2}"
                         });
                     }
 
