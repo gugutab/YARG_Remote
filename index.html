@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YARG Remote</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: '#0f172a',
+                        card: '#1e293b',
+                        accent: '#3b82f6',
+                        accentHover: '#2563eb'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        
+        body { background-color: #0f172a; color: #f8fafc; }
+        
+        .modal {
+            display: none;
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px);
+            z-index: 50;
+            align-items: center; justify-content: center;
+        }
+        .modal.open { display: flex; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans">
+
+    <!-- Header -->
+    <header class="bg-card border-b border-slate-700 p-4 sticky top-0 z-40 shadow-md">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <h1 class="text-2xl font-black italic uppercase tracking-tighter flex items-center gap-2">
+                <i data-lucide="gamepad-2" class="text-accent"></i>
+                YARG <span class="text-accent">Remote</span>
+            </h1> 
+            
+            <div class="flex items-center gap-2 w-full md:w-auto">
+                <div class="flex bg-dark rounded-lg border border-slate-600 overflow-hidden px-2 py-1 items-center flex-1 md:w-80">
+                    <i data-lucide="server" class="w-4 h-4 text-slate-400 mr-2"></i>
+                    <input type="text" id="api-url" class="bg-transparent border-none outline-none text-sm w-full text-white" value="http://localhost:8080" placeholder="API URL">
+                </div>
+                <button onclick="fetchSongs()" class="bg-accent hover:bg-accentHover text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
+                    <i data-lucide="refresh-cw" class="w-4 h-4" id="refresh-icon"></i> 
+                    <span class="hidden md:inline">Load</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl mx-auto w-full p-4 flex flex-col gap-4">
+        
+        <!-- Filters -->
+        <div class="bg-card rounded-xl p-4 border border-slate-700 shadow-sm flex flex-col gap-4">
+            <div class="relative">
+                <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400"></i> 
+                <input type="text" id="search-global" oninput="applyFilters()" placeholder="Search by song, artist, or album..." class="w-full bg-dark border border-slate-600 rounded-lg py-2 pl-10 pr-4 outline-none focus:border-accent text-white transition-colors">
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">Artist</label> 
+                    <input type="text" id="search-artist" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-lg p-2 outline-none focus:border-accent text-sm text-white"> 
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">Genre</label> 
+                    <input type="text" id="search-genre" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-lg p-2 outline-none focus:border-accent text-sm text-white"> 
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">Year</label> 
+                    <input type="text" id="search-year" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-lg p-2 outline-none focus:border-accent text-sm text-white"> 
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">Charter</label> 
+                    <input type="text" id="search-charter" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-lg p-2 outline-none focus:border-accent text-sm text-white">
+                </div>
+            </div>
+            
+            <div class="flex justify-between items-center mt-2">
+                <span id="results-count" class="text-xs font-bold text-slate-400 bg-dark px-3 py-1 rounded-full border border-slate-700">0 songs</span> 
+                <button onclick="clearFilters()" class="text-xs font-bold text-slate-400 hover:text-white underline">Clear Filters</button>
+            </div>
+        </div>
+
+        <!-- Table/List -->
+        <div class="bg-card rounded-xl border border-slate-700 shadow-sm overflow-hidden flex-1 flex flex-col min-h-[400px]">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-800/50 text-xs uppercase tracking-widest text-slate-400 border-b border-slate-700"> 
+                            <th class="p-4 font-bold">Song</th> 
+                            <th class="p-4 font-bold">Artist</th> 
+                            <th class="p-4 font-bold hidden md:table-cell">Album</th> 
+                            <th class="p-4 font-bold hidden lg:table-cell">Genre</th> 
+                            <th class="p-4 font-bold hidden sm:table-cell">Year</th> 
+                            <th class="p-4 font-bold text-right">Duration</th> 
+                        </tr>
+                    </thead>
+                    <tbody id="song-list" class="text-sm divide-y divide-slate-700/50">
+                        <tr><td colspan="6" class="p-8 text-center text-slate-500 italic">Enter API URL and click Load.</td></tr> 
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination / Load More -->
+            <div id="pagination-controls" class="p-4 border-t border-slate-700 flex justify-center hidden">
+                <button onclick="loadMore()" class="bg-slate-700 hover:bg-slate-600 px-6 py-2 rounded-lg text-sm font-bold transition-colors">Load More</button>
+            </div> 
+        </div>
+
+    </main>
+
+    <!-- Modal -->
+    <div id="song-modal" class="modal">
+        <div class="bg-card rounded-2xl w-full max-w-lg border border-slate-600 shadow-2xl overflow-hidden transform transition-all scale-95 opacity-0" id="modal-content" style="transition: all 0.2s;">
+            
+            <div class="p-6 border-b border-slate-700 flex justify-between items-start bg-slate-800/30"> 
+                <div> 
+                    <h2 id="modal-title" class="text-2xl font-black italic text-white leading-tight">Song Name</h2> 
+                    <p id="modal-artist" class="text-accent font-bold text-lg mt-1">Artist</p> 
+                </div> 
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white p-1"><i data-lucide="x"></i></button> 
+            </div> 
+            
+            <div class="p-6 grid grid-cols-2 gap-y-4 gap-x-6 text-sm"> 
+                <div> 
+                    <span class="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Album</span> 
+                    <span id="modal-album" class="text-white font-medium">...</span> 
+                </div> 
+                <div> 
+                    <span class="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Year</span> 
+                    <span id="modal-year" class="text-white font-medium">...</span> 
+                </div> 
+                <div> 
+                    <span class="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Genre</span> 
+                    <span id="modal-genre" class="text-white font-medium">...</span> 
+                </div> 
+                <div> 
+                    <span class="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Duration</span> 
+                    <span id="modal-duration" class="text-white font-medium">...</span> 
+                </div> 
+                <div> 
+                    <span class="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Charter</span> 
+                    <span id="modal-charter" class="text-white font-medium">...</span> 
+                </div> 
+                <div> 
+                    <span class="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Source</span> 
+                    <span id="modal-source" class="text-white font-medium">...</span> 
+                </div>
+            </div>
+            
+            <div class="p-6 bg-slate-800/50 border-t border-slate-700 flex justify-end gap-3">
+                <button onclick="closeModal()" class="px-5 py-2 rounded-lg font-bold text-slate-300 hover:bg-slate-700 transition-colors">Close</button>
+                <button id="modal-play-btn" class="bg-accent hover:bg-accentHover text-white px-8 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors shadow-lg shadow-accent/20">
+                    <i data-lucide="play" class="w-5 h-5 fill-current"></i>
+                    PLAY NOW
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-emerald-500 text-white px-4 py-3 rounded-lg shadow-xl font-bold text-sm transform translate-y-20 opacity-0 transition-all z-50 flex items-center gap-2"> 
+        <i data-lucide="check-circle" class="w-5 h-5"></i> 
+        <span id="toast-msg">Success!</span> 
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let allSongs = [];
+        let filteredSongs = [];
+        let currentDisplayCount = 0;
+        const PAGE_SIZE = 100;
+        let currentSongHash = null;
+
+        // Formata milissegundos para mm:ss
+        function formatDuration(ms) { // Formats milliseconds to mm:ss
+            if (!ms) return "--:--";
+            const totalSeconds = Math.floor(ms / 1000);
+            const m = Math.floor(totalSeconds / 60);
+            const s = totalSeconds % 60;
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        }
+
+        async function fetchSongs() {
+            const url = document.getElementById('api-url').value.trim();
+            const icon = document.getElementById('refresh-icon');
+            
+            icon.classList.add('animate-spin');
+            document.getElementById('song-list').innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400"><i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto mb-2"></i>Loading songs...</td></tr>`;
+            lucide.createIcons();
+            
+            try {
+                const response = await fetch(`${url}/songs`);
+                if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+                const data = await response.json();
+
+                allSongs = data;
+                applyFilters();
+                showToast(`Loaded ${allSongs.length} songs.`);
+            } catch (err) {
+                console.error(err);
+                document.getElementById('song-list').innerHTML = `<tr><td colspan="6" class="p-8 text-center text-rose-400 font-bold bg-rose-500/10">Error loading: ${err.message}<br><span class="text-xs font-normal text-slate-400">Check if the server is running and the URL is correct. (CORS issues may also occur)</span></td></tr>`;
+            } finally {
+                icon.classList.remove('animate-spin');
+            }
+        }
+
+        function clearFilters() {
+            document.getElementById('search-global').value = '';
+            document.getElementById('search-artist').value = '';
+            document.getElementById('search-genre').value = '';
+            document.getElementById('search-year').value = '';
+            document.getElementById('search-charter').value = '';
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const global = document.getElementById('search-global').value.toLowerCase();
+            const artist = document.getElementById('search-artist').value.toLowerCase();
+            const genre = document.getElementById('search-genre').value.toLowerCase();
+            const year = document.getElementById('search-year').value.toLowerCase();
+            const charter = document.getElementById('search-charter').value.toLowerCase();
+
+            filteredSongs = allSongs.filter(s => {
+                // Prevents errors with undefined fields
+                const sName = (s.name || '').toLowerCase();
+                const sArtist = (s.artist || '').toLowerCase();
+                const sAlbum = (s.album || '').toLowerCase();
+                const sGenre = (s.genre || '').toLowerCase();
+                const sYear = (s.year || '').toString().toLowerCase();
+                const sCharter = (s.charter || '').toLowerCase();
+
+                if (global && !(sName.includes(global) || sArtist.includes(global) || sAlbum.includes(global))) return false;
+                if (artist && !sArtist.includes(artist)) return false;
+                if (genre && !sGenre.includes(genre)) return false;
+                if (year && !sYear.includes(year)) return false;
+                if (charter && !sCharter.includes(charter)) return false;
+                
+                return true;
+            });
+            
+            document.getElementById('results-count').innerText = `${filteredSongs.length} songs`;
+            
+            currentDisplayCount = 0;
+            document.getElementById('song-list').innerHTML = '';
+            loadMore(); 
+        }
+
+        function loadMore() {
+            const tbody = document.getElementById('song-list');
+            const end = Math.min(currentDisplayCount + PAGE_SIZE, filteredSongs.length);
+            
+            if (filteredSongs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500 italic">No songs found.</td></tr>`;
+                document.getElementById('pagination-controls').classList.add('hidden');
+                return;
+            }
+
+            let html = '';
+            for (let i = currentDisplayCount; i < end; i++) {
+                const s = filteredSongs[i];
+                // Escapar aspas simples/duplas pra nao quebrar o onclick (passando index é mais seguro)
+                html += ` // Escape single/double quotes to avoid breaking onclick (passing index is safer)
+                    <tr class="hover:bg-slate-800/80 cursor-pointer transition-colors group" onclick="openModal(${i})"> 
+                        <td class="p-4"> 
+                            <div class="font-bold text-white group-hover:text-accent transition-colors">${s.name || '-'}</div> 
+                        </td> 
+                        <td class="p-4 text-slate-300">${s.artist || '-'}</td> 
+                        <td class="p-4 text-slate-400 hidden md:table-cell truncate max-w-[150px]" title="${s.album || ''}">${s.album || '-'}</td> 
+                        <td class="p-4 text-slate-400 hidden lg:table-cell"><span class="bg-slate-800 px-2 py-1 rounded text-[10px] uppercase">${s.genre || '-'}</span></td> 
+                        <td class="p-4 text-slate-400 hidden sm:table-cell">${s.year || '-'}</td> 
+                        <td class="p-4 text-slate-400 text-right font-mono text-xs">${formatDuration(s.duration)}</td> 
+                    </tr> 
+                `; 
+            }
+            
+            // Using insertAdjacentHTML instead of appendChild in a loop for performance
+            tbody.insertAdjacentHTML('beforeend', html);
+            currentDisplayCount = end;
+
+            const btnDiv = document.getElementById('pagination-controls');
+            if (currentDisplayCount >= filteredSongs.length) {
+                btnDiv.classList.add('hidden');
+            } else {
+                btnDiv.classList.remove('hidden');
+            }
+        }
+
+        // Modal Logic // Close by clicking outside
+        const modal = document.getElementById('song-modal');
+        const modalContent = document.getElementById('modal-content');
+
+        function openModal(index) {
+            const s = filteredSongs[index];
+            if (!s) return;
+
+            currentSongHash = s.fullHash;
+
+            document.getElementById('modal-title').innerText = s.name || 'Unknown';
+            document.getElementById('modal-artist').innerText = s.artist || 'Unknown';
+            document.getElementById('modal-album').innerText = s.album || '-';
+            document.getElementById('modal-year').innerText = s.year || '-';
+            document.getElementById('modal-genre').innerText = s.genre || '-';
+            document.getElementById('modal-duration').innerText = formatDuration(s.duration); 
+            document.getElementById('modal-charter').innerText = s.charter || '-';
+            
+            let sourceStr = '-';
+            if (s.source) {
+                sourceStr = typeof s.source === 'string' ? s.source : (s.source.Original || JSON.stringify(s.source));
+            }
+            document.getElementById('modal-source').innerText = sourceStr;
+            
+            modal.classList.add('open');
+            // Small delay for transition
+            setTimeout(() => {
+                modalContent.classList.remove('scale-95', 'opacity-0');
+                modalContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function closeModal() {
+            modalContent.classList.remove('scale-100', 'opacity-100');
+            modalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.remove('open');
+                currentSongHash = null;
+            }, 200);
+        }
+
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+        // Play Button Action
+        document.getElementById('modal-play-btn').addEventListener('click', async () => {
+            if (!currentSongHash) return;
+            const btn = document.getElementById('modal-play-btn');
+            const originalContent = btn.innerHTML;
+            
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> SENDING...`;
+            btn.disabled = true;
+            lucide.createIcons();
+            
+            const baseUrl = document.getElementById('api-url').value.trim();
+            try {
+                const response = await fetch(`${baseUrl}/play?song=${currentSongHash}`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) { 
+                    showToast("Song sent to play!");
+                    closeModal(); 
+                } else {
+                    throw new Error(`Error ${response.status}`);
+                }
+            } catch (err) {
+                console.error(err);
+                alert(`Failed to play song: ${err.message}`);
+            } finally {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+                lucide.createIcons();
+            }
+        });
+
+        // Toast Notification
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg; 
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
