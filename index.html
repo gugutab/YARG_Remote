@@ -69,11 +69,13 @@
             
                 <!-- Expanded Search Area -->
                 <div id="advanced-filters" class="hidden absolute top-full left-0 right-0 mt-2 bg-card border border-slate-700 rounded-xl shadow-2xl p-4 z-50 flex flex-col gap-4">
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
                         <div><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Artist</label><input type="text" id="search-artist" list="datalist-artist" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-md px-2 py-1 text-xs text-white focus:border-accent outline-none"></div>
                         <div><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Genre</label><input type="text" id="search-genre" list="datalist-genre" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-md px-2 py-1 text-xs text-white focus:border-accent outline-none"></div>
                         <div><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Year</label><input type="text" id="search-year" list="datalist-year" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-md px-2 py-1 text-xs text-white focus:border-accent outline-none"></div>
                         <div><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Charter</label><input type="text" id="search-charter" list="datalist-charter" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-md px-2 py-1 text-xs text-white focus:border-accent outline-none"></div>
+                        <div><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Playlist</label><input type="text" id="search-playlist" list="datalist-playlist" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-md px-2 py-1 text-xs text-white focus:border-accent outline-none"></div>
+                        <div><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Source</label><input type="text" id="search-source" list="datalist-source" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-md px-2 py-1 text-xs text-white focus:border-accent outline-none"></div>
                     </div>
                     <div class="border-t border-slate-700 pt-3">
                         <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Sort By</label>
@@ -81,9 +83,13 @@
                             <button onclick="toggleSort('name')" class="text-xs bg-dark border border-slate-600 px-2 py-1 rounded hover:border-accent transition-colors" data-sort="name">Song</button>
                             <button onclick="toggleSort('artist')" class="text-xs bg-dark border border-slate-600 px-2 py-1 rounded hover:border-accent transition-colors" data-sort="artist">Artist</button>
                             <button onclick="toggleSort('album')" class="text-xs bg-dark border border-slate-600 px-2 py-1 rounded hover:border-accent transition-colors" data-sort="album">Album</button>
+                            <button onclick="toggleSort('genre')" class="text-xs bg-dark border border-slate-600 px-2 py-1 rounded hover:border-accent transition-colors" data-sort="genre">Genre</button>
                             <button onclick="toggleSort('year')" class="text-xs bg-dark border border-slate-600 px-2 py-1 rounded hover:border-accent transition-colors" data-sort="year">Year</button>
                             <button onclick="toggleSort('duration')" class="text-xs bg-dark border border-slate-600 px-2 py-1 rounded hover:border-accent transition-colors" data-sort="duration">Duration</button>
                             <button onclick="toggleSort('instruments')" class="text-xs bg-dark border border-slate-600 px-2 py-1 rounded hover:border-accent transition-colors" data-sort="instruments">Inst</button>
+                            <button onclick="toggleSort('charter')" class="text-xs bg-dark border border-slate-600 px-2 py-1 rounded hover:border-accent transition-colors" data-sort="charter">Charter</button>
+                            <button onclick="toggleSort('playlist')" class="text-xs bg-dark border border-slate-600 px-2 py-1 rounded hover:border-accent transition-colors" data-sort="playlist">Playlist</button>
+                            <button onclick="toggleSort('source')" class="text-xs bg-dark border border-slate-600 px-2 py-1 rounded hover:border-accent transition-colors" data-sort="source">Source</button>
                         </div>
                     </div>
                 </div>
@@ -131,8 +137,13 @@
                                 <span class="cursor-pointer hover:text-accent" onclick="toggleSort('artist'); event.stopPropagation()" data-sort="artist">Artist</span>
                             </th> 
                             <th class="p-4 font-bold text-center cursor-pointer hover:text-accent select-none transition-colors" onclick="toggleSort('instruments')" data-col="instruments" data-sort="instruments">Instruments</th> 
+                            <th class="p-4 font-bold text-center cursor-pointer hover:text-accent select-none transition-colors" onclick="toggleSort('pro')" data-col="pro" data-sort="pro">Pro</th> 
+                            <th class="p-4 font-bold text-center cursor-pointer hover:text-accent select-none transition-colors" onclick="toggleSort('isMaster')" data-col="isMaster" data-sort="isMaster">Is Master</th> 
                             <th class="p-4 font-bold cursor-pointer hover:text-accent select-none transition-colors hidden md:table-cell" onclick="toggleSort('album')" data-col="album" data-sort="album">Album</th> 
                             <th class="p-4 font-bold cursor-pointer hover:text-accent select-none transition-colors hidden lg:table-cell" onclick="toggleSort('genre')" data-col="genre" data-sort="genre">Genre/Sub</th> 
+                            <th class="p-4 font-bold cursor-pointer hover:text-accent select-none transition-colors hidden xl:table-cell" onclick="toggleSort('charter')" data-col="charter" data-sort="charter">Charter</th> 
+                            <th class="p-4 font-bold cursor-pointer hover:text-accent select-none transition-colors hidden 2xl:table-cell" onclick="toggleSort('playlist')" data-col="playlist" data-sort="playlist">Playlist</th> 
+                            <th class="p-4 font-bold cursor-pointer hover:text-accent select-none transition-colors hidden 2xl:table-cell" onclick="toggleSort('source')" data-col="source" data-sort="source">Source</th> 
                             <th class="p-4 font-bold cursor-pointer hover:text-accent select-none transition-colors hidden sm:table-cell" onclick="toggleSort('year')" data-col="year" data-sort="year">Year</th> 
                             <th class="p-4 font-bold text-right cursor-pointer hover:text-accent select-none transition-colors" onclick="toggleSort('duration')" data-col="duration" data-sort="duration">Duration</th> 
                         </tr>
@@ -153,10 +164,13 @@
         <div class="bg-card rounded-2xl w-full max-w-lg border border-slate-600 shadow-2xl overflow-hidden transform transition-all scale-95 opacity-0" id="modal-content" style="transition: all 0.2s;">
             
             <div class="p-6 border-b border-slate-700 flex justify-between items-start bg-slate-800/30"> 
-                <div> 
+                <div class="flex gap-4 items-center">
+                    <img id="modal-img" src="" class="w-24 h-24 rounded-lg shadow-lg bg-slate-900 object-cover" alt="Album Art" onerror="this.style.display='none'">
+                    <div> 
                     <h2 id="modal-title" class="text-2xl font-black italic text-white leading-tight">Song Name</h2> 
                     <p id="modal-artist" class="text-accent font-bold text-lg mt-1">Artist</p> 
-                </div> 
+                    </div>
+                </div>
                 <button onclick="closeModal()" class="text-slate-400 hover:text-white p-1"><i data-lucide="x"></i></button> 
             </div> 
             
@@ -212,6 +226,8 @@
     <datalist id="datalist-genre"></datalist>
     <datalist id="datalist-year"></datalist>
     <datalist id="datalist-charter"></datalist>
+    <datalist id="datalist-playlist"></datalist>
+    <datalist id="datalist-source"></datalist>
 
     <script>
         lucide.createIcons();
@@ -230,10 +246,15 @@
         let columnState = {
             name: true,
             instruments: true,
+            pro: true,
+            isMaster: false,
             album: true,
             genre: true,
+            charter: true,
+            playlist: false,
+            source: false,
             year: true,
-            duration: true
+            duration: false
         };
 
         function updateConnectionUI(connected) {
@@ -362,6 +383,8 @@
             const genres = new Set();
             const years = new Set();
             const charters = new Set();
+            const playlists = new Set();
+            const sources = new Set();
             const globalTerms = new Set();
 
             allSongs.forEach(s => {
@@ -369,6 +392,8 @@
                 if (s.genre) genres.add(s.genre);
                 if (s.year) years.add(s.year);
                 if (s.charter) charters.add(s.charter);
+                if (s.playlist) playlists.add(s.playlist);
+                if (s.source) sources.add(s.source);
                 if (s.album) globalTerms.add(s.album);
                 // Optionally add song names to global, but might be too large
                 // if (s.name) globalTerms.add(s.name);
@@ -398,6 +423,8 @@
             fillList('datalist-genre', genres);
             fillList('datalist-year', years);
             fillList('datalist-charter', charters);
+            fillList('datalist-playlist', playlists);
+            fillList('datalist-source', sources);
             fillList('datalist-global', globalTerms);
         }
 
@@ -407,6 +434,8 @@
             document.getElementById('search-genre').value = '';
             document.getElementById('search-year').value = '';
             document.getElementById('search-charter').value = '';
+            document.getElementById('search-playlist').value = '';
+            document.getElementById('search-source').value = '';
             applyFilters();
         }
 
@@ -417,6 +446,8 @@
             const genre = document.getElementById('search-genre').value.toLowerCase();
             const year = document.getElementById('search-year').value.toLowerCase();
             const charter = document.getElementById('search-charter').value.toLowerCase();
+            const playlist = document.getElementById('search-playlist').value.toLowerCase();
+            const source = document.getElementById('search-source').value.toLowerCase();
 
             // Use Fuse.js for global search if available and input exists
             let candidates = allSongs;
@@ -432,6 +463,8 @@
                 const sGenre = (s.genre || '').toLowerCase();
                 const sYear = (s.year || '').toString().toLowerCase();
                 const sCharter = (s.charter || '').toLowerCase();
+                const sPlaylist = (s.playlist || '').toLowerCase();
+                const sSource = (s.source || '').toLowerCase();
 
                 // Fallback manual check if fuse failed or not ready (unlikely)
                 if (global && !fuse) {
@@ -444,6 +477,8 @@
                 if (genre && !sGenre.includes(genre)) return false;
                 if (year && !sYear.includes(year)) return false;
                 if (charter && !sCharter.includes(charter)) return false;
+                if (playlist && !sPlaylist.includes(playlist)) return false;
+                if (source && !sSource.includes(source)) return false;
                 
                 return true;
             });
@@ -454,9 +489,20 @@
                 
                 if (sortState.col === 'name') { valA = a.name; valB = b.name; }
                 else if (sortState.col === 'artist') { valA = a.artist; valB = b.artist; }
-                else if (sortState.col === 'instruments') { valA = (a.parts?.length || 0); valB = (b.parts?.length || 0); }
+                else if (sortState.col === 'instruments') { 
+                    valA = (a.parts?.filter(p => !p.icon.toLowerCase().includes('pro')).length || 0); 
+                    valB = (b.parts?.filter(p => !p.icon.toLowerCase().includes('pro')).length || 0); 
+                }
+                else if (sortState.col === 'pro') { 
+                    valA = (a.parts?.filter(p => p.icon.toLowerCase().includes('pro')).length || 0); 
+                    valB = (b.parts?.filter(p => p.icon.toLowerCase().includes('pro')).length || 0); 
+                }
+                else if (sortState.col === 'isMaster') { valA = a.isMaster ? 1 : 0; valB = b.isMaster ? 1 : 0; }
                 else if (sortState.col === 'album') { valA = a.album; valB = b.album; }
                 else if (sortState.col === 'genre') { valA = a.genre; valB = b.genre; }
+                else if (sortState.col === 'charter') { valA = a.charter; valB = b.charter; }
+                else if (sortState.col === 'playlist') { valA = a.playlist; valB = b.playlist; }
+                else if (sortState.col === 'source') { valA = a.source; valB = b.source; }
                 else if (sortState.col === 'year') { valA = parseInt(a.year) || 0; valB = parseInt(b.year) || 0; }
                 else if (sortState.col === 'duration') { 
                     // Duration is string "MM:SS", convert to seconds for sort
@@ -521,6 +567,7 @@
             const menu = document.getElementById('column-menu');
             menu.innerHTML = '';
             Object.keys(columnState).forEach(col => {
+                if (col === 'name') return;
                 const label = col.charAt(0).toUpperCase() + col.slice(1);
                 const div = document.createElement('div');
                 div.className = 'flex items-center gap-2 text-sm text-slate-300';
@@ -571,6 +618,7 @@
         function loadMore() {
             const tbody = document.getElementById('song-list');
             const end = Math.min(currentDisplayCount + PAGE_SIZE, filteredSongs.length);
+            const baseUrl = document.getElementById('api-url').value.trim();
             
             if (filteredSongs.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500 italic">No songs found.</td></tr>`;
@@ -582,31 +630,39 @@
                 const s = filteredSongs[i];
                 
                 // Generate icons HTML
-                let iconsHtml = '';
+                let standardHtml = '';
+                let proHtml = '';
                 if (s.parts && Array.isArray(s.parts)) {
                     const standard = s.parts.filter(p => !p.icon.toLowerCase().includes('pro'));
                     const pro = s.parts.filter(p => p.icon.toLowerCase().includes('pro'));
 
-                    iconsHtml = '<div class="flex flex-col gap-0.5">';
-                    if (standard.length) iconsHtml += `<div class="flex gap-1 justify-center text-slate-500">${standard.map(p => `<i data-lucide="${getInstrumentIcon(p.icon)}" class="w-4 h-4"></i>`).join('')}</div>`;
-                    // Pro instruments: filled and accented color
-                    if (pro.length) iconsHtml += `<div class="flex gap-1 justify-center text-accent/80" title="Pro Instruments">${pro.map(p => `<i data-lucide="${getInstrumentIcon(p.icon)}" class="w-4 h-4 fill-current"></i>`).join('')}</div>`;
-                    iconsHtml += '</div>';
+                    if (standard.length) standardHtml = `<div class="flex gap-1 justify-center text-slate-500">${standard.map(p => `<i data-lucide="${getInstrumentIcon(p.icon)}" class="w-4 h-4"></i>`).join('')}</div>`;
+                    if (pro.length) proHtml = `<div class="flex gap-1 justify-center text-accent/80" title="Pro Instruments">${pro.map(p => `<i data-lucide="${getInstrumentIcon(p.icon)}" class="w-4 h-4 fill-current"></i>`).join('')}</div>`;
                 }
 
                 // Escape single/double quotes to avoid breaking onclick (passing index is safer)
                 html += ` 
                     <tr class="hover:bg-slate-700/50 cursor-pointer transition-colors group border-l-4 border-transparent hover:border-accent" onclick="openModal(${i})"> 
                         <td class="p-4 ${columnState.name ? '' : 'col-hidden'}"> 
-                            <div class="font-bold text-white group-hover:text-accent transition-colors text-base">${s.name || '-'}</div>
-                            <div class="text-slate-400 text-xs font-medium">${s.artist || '-'}</div>
+                            <div class="flex items-center gap-3">
+                                <img src="${baseUrl}/album-art?song=${s.fullHash}" class="w-10 h-10 rounded bg-slate-800 object-cover shadow-sm" loading="lazy" onerror="this.style.display='none'">
+                                <div>
+                                    <div class="font-bold text-white group-hover:text-accent transition-colors text-base">${s.name || '-'}</div>
+                                    <div class="text-slate-400 text-xs font-medium">${s.artist || '-'}</div>
+                                </div>
+                            </div>
                         </td> 
-                        <td class="p-4 ${columnState.instruments ? '' : 'col-hidden'}">${iconsHtml}</td> 
+                        <td class="p-4 ${columnState.instruments ? '' : 'col-hidden'}">${standardHtml}</td> 
+                        <td class="p-4 ${columnState.pro ? '' : 'col-hidden'}">${proHtml}</td> 
+                        <td class="p-4 text-center ${columnState.isMaster ? '' : 'col-hidden'}"><input type="checkbox" disabled ${s.isMaster ? 'checked' : ''} class="accent-accent w-4 h-4 rounded border-slate-600 bg-slate-700"></td> 
                         <td class="p-4 text-slate-400 hidden md:table-cell truncate max-w-[150px] ${columnState.album ? '' : 'col-hidden'}" title="${s.album || ''}">${s.album || '-'}</td> 
                         <td class="p-4 hidden lg:table-cell ${columnState.genre ? '' : 'col-hidden'}">
                             <div class="text-slate-300 text-sm font-medium">${s.genre || '-'}</div>
                             <div class="text-slate-500 text-xs">${s.subgenre || ''}</div>
                         </td> 
+                        <td class="p-4 text-slate-400 hidden xl:table-cell truncate max-w-[150px] ${columnState.charter ? '' : 'col-hidden'}" title="${s.charter || ''}">${s.charter || '-'}</td> 
+                        <td class="p-4 text-slate-400 hidden 2xl:table-cell truncate max-w-[150px] ${columnState.playlist ? '' : 'col-hidden'}" title="${s.playlist || ''}">${s.playlist || '-'}</td> 
+                        <td class="p-4 text-slate-400 hidden 2xl:table-cell truncate max-w-[150px] ${columnState.source ? '' : 'col-hidden'}" title="${s.source || ''}">${s.source || '-'}</td> 
                         <td class="p-4 text-slate-400 hidden sm:table-cell ${columnState.year ? '' : 'col-hidden'}">${s.year || '-'}</td> 
                         <td class="p-4 text-slate-400 text-right font-mono text-xs ${columnState.duration ? '' : 'col-hidden'}">${s.duration}</td> 
                     </tr> 
@@ -626,6 +682,12 @@
         function openModal(index) {
             const s = filteredSongs[index];
             if (!s) return;
+
+            // Setup Image
+            const img = document.getElementById('modal-img');
+            const baseUrl = document.getElementById('api-url').value.trim();
+            img.style.display = 'block';
+            img.src = `${baseUrl}/album-art?song=${s.fullHash}&t=${Date.now()}`; // t param prevents caching issues if needed
 
             currentSongHash = s.fullHash;
 
@@ -669,6 +731,7 @@
         function closeModal() {
             modalContent.classList.remove('scale-100', 'opacity-100');
             modalContent.classList.add('scale-95', 'opacity-0');
+            document.getElementById('modal-img').src = ''; // Clear image
             setTimeout(() => {
                 modal.classList.remove('open');
                 currentSongHash = null;

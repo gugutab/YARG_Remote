@@ -142,6 +142,74 @@ namespace YargRemoteMod
                     
                     SendResponse(response, 200, $"{{\"status\": \"ok\", \"message\": \"Song {songId} sent to game queue!\"}}");
                 }
+                else if (path == "/album-art" && request.HttpMethod == "GET")
+                {
+                    string songId = request.QueryString["song"];
+                    if (string.IsNullOrEmpty(songId)) { SendResponse(response, 400, "Missing song id"); return; }
+
+                    // Enqueue to main thread because we need to use Unity's Texture2D and YARG's loaders safely
+                    _mainThreadActions.Enqueue(() => {
+                        try {
+                            var song = SongContainer.Songs.FirstOrDefault(s => s.Hash.ToString() == songId || s.Hash.GetHashCode().ToString() == songId);
+                            if (song == null) {
+                                SendResponse(response, 404, "Song not found");
+                                return;
+                            }
+
+                            // Use unsafe block for pointer operations
+                            unsafe {
+                                using (var img = song.LoadAlbumData())
+                                {
+                                    if (img == null || img.Data == null) {
+                                        SendResponse(response, 404, "No art");
+                                        return;
+                                    }
+
+                                    // Determine format (assuming 3=RGB, 4=RGBA based on stb_image standard)
+                                    TextureFormat tf = TextureFormat.RGBA32;
+                                    if ((int)img.Format == 3) tf = TextureFormat.RGB24;
+
+                                    // Create temporary texture to convert raw bytes to PNG
+                                    Texture2D tex = new Texture2D(img.Width, img.Height, tf, false);
+                                    tex.LoadRawTextureData((IntPtr)img.Data, img.Width * img.Height * ((int)img.Format));
+                                    tex.Apply();
+
+                                    // Encode to PNG using reflection to avoid missing assembly reference issues
+                                    byte[] pngData = null;
+                                    var encodeMethod = typeof(Texture2D).GetMethod("EncodeToPNG");
+                                    if (encodeMethod != null) {
+                                        pngData = (byte[])encodeMethod.Invoke(tex, null);
+                                    } else {
+                                        // Fallback for newer Unity versions or if extension method is hidden
+                                        var imgConv = Type.GetType("UnityEngine.ImageConversion, UnityEngine.ImageConversionModule");
+                                        if (imgConv != null) {
+                                            var m = imgConv.GetMethod("EncodeToPNG", new[] { typeof(Texture2D) });
+                                            if (m != null) pngData = (byte[])m.Invoke(null, new object[] { tex });
+                                        }
+                                    }
+
+                                    Destroy(tex); // Cleanup Unity texture
+
+                                    if (pngData != null) {
+                                        response.ContentType = "image/png";
+                                        response.ContentLength64 = pngData.Length;
+                                        response.StatusCode = 200;
+                                        using (var outStream = response.OutputStream) {
+                                            outStream.Write(pngData, 0, pngData.Length);
+                                        }
+                                        response.Close();
+                                    } else {
+                                        Logger.LogError("[YARG Remote] EncodeToPNG method not found via reflection.");
+                                        SendResponse(response, 500, "Encoding Error");
+                                    }
+                                }
+                            }
+                        } catch (Exception ex) {
+                            Logger.LogError($"[YARG Remote] Error fetching art: {ex.Message}");
+                            SendResponse(response, 500, "Internal Error");
+                        }
+                    });
+                }
                 else if (path == "/songs" && request.HttpMethod == "GET")
                 {
                     // Usamos SongContainer.Songs que você confirmou existir
