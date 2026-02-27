@@ -6,6 +6,7 @@
     <title>YARG Remote</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -28,7 +29,7 @@
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
         
-        body { background-color: #0f172a; color: #f8fafc; }
+        body { background-color: #0f172a; color: #f8fafc; overflow: hidden; }
         
         .modal {
             display: none;
@@ -39,9 +40,14 @@
             align-items: center; justify-content: center;
         }
         .modal.open { display: flex; }
+        
+        .sort-asc::after { content: " \25B2"; font-size: 0.8em; opacity: 0.7; margin-left: 4px; }
+        .sort-desc::after { content: " \25BC"; font-size: 0.8em; opacity: 0.7; margin-left: 4px; }
+        .sort-active { @apply border-accent text-accent; }
+        .col-hidden { display: none !important; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col font-sans">
+<body class="h-screen flex flex-col font-sans">
 
     <!-- Header -->
     <header class="bg-card border-b border-slate-700 p-4 sticky top-0 z-40 shadow-md">
@@ -50,6 +56,38 @@
                 <i data-lucide="gamepad-2" class="text-accent"></i>
                 YARG <span class="text-accent">Remote</span>
             </h1> 
+            
+            <!-- Search Bar & Filters -->
+            <div class="flex-1 max-w-xl w-full mx-4 relative group">
+                <div class="relative">
+                    <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                    <input type="text" id="search-global" list="datalist-global" oninput="applyFilters()" placeholder="Search song, artist, album..." class="w-full bg-dark border border-slate-600 rounded-lg py-1.5 pl-9 pr-9 text-sm text-white focus:border-accent outline-none transition-colors">
+                    <button onclick="toggleAdvancedFilters()" class="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white p-1 rounded-md hover:bg-slate-700 transition-colors" title="Advanced Filters">
+                        <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            
+                <!-- Expanded Search Area -->
+                <div id="advanced-filters" class="hidden absolute top-full left-0 right-0 mt-2 bg-card border border-slate-700 rounded-xl shadow-2xl p-4 z-50 flex flex-col gap-4">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Artist</label><input type="text" id="search-artist" list="datalist-artist" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-md px-2 py-1 text-xs text-white focus:border-accent outline-none"></div>
+                        <div><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Genre</label><input type="text" id="search-genre" list="datalist-genre" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-md px-2 py-1 text-xs text-white focus:border-accent outline-none"></div>
+                        <div><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Year</label><input type="text" id="search-year" list="datalist-year" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-md px-2 py-1 text-xs text-white focus:border-accent outline-none"></div>
+                        <div><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Charter</label><input type="text" id="search-charter" list="datalist-charter" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-md px-2 py-1 text-xs text-white focus:border-accent outline-none"></div>
+                    </div>
+                    <div class="border-t border-slate-700 pt-3">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Sort By</label>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="toggleSort('name')" class="text-xs bg-dark border border-slate-600 px-2 py-1 rounded hover:border-accent transition-colors" data-sort="name">Song</button>
+                            <button onclick="toggleSort('artist')" class="text-xs bg-dark border border-slate-600 px-2 py-1 rounded hover:border-accent transition-colors" data-sort="artist">Artist</button>
+                            <button onclick="toggleSort('album')" class="text-xs bg-dark border border-slate-600 px-2 py-1 rounded hover:border-accent transition-colors" data-sort="album">Album</button>
+                            <button onclick="toggleSort('year')" class="text-xs bg-dark border border-slate-600 px-2 py-1 rounded hover:border-accent transition-colors" data-sort="year">Year</button>
+                            <button onclick="toggleSort('duration')" class="text-xs bg-dark border border-slate-600 px-2 py-1 rounded hover:border-accent transition-colors" data-sort="duration">Duration</button>
+                            <button onclick="toggleSort('instruments')" class="text-xs bg-dark border border-slate-600 px-2 py-1 rounded hover:border-accent transition-colors" data-sort="instruments">Inst</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
             
             <div class="flex items-center gap-2 w-full md:w-auto">
                 <div class="flex bg-dark rounded-lg border border-slate-600 overflow-hidden px-2 py-1 items-center flex-1 md:w-80">
@@ -64,62 +102,48 @@
     </header>
 
     <!-- Main Content -->
-    <main class="flex-1 max-w-7xl mx-auto w-full p-4 flex flex-col gap-4">
+    <main class="flex-1 max-w-7xl mx-auto w-full p-4 flex flex-col gap-4 overflow-hidden">
         
-        <!-- Filters -->
-        <div class="bg-card rounded-xl p-4 border border-slate-700 shadow-sm flex flex-col gap-4">
-            <div class="relative">
-                <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400"></i> 
-                <input type="text" id="search-global" oninput="applyFilters()" placeholder="Search by song, artist, or album..." class="w-full bg-dark border border-slate-600 rounded-lg py-2 pl-10 pr-4 outline-none focus:border-accent text-white transition-colors">
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">Artist</label> 
-                    <input type="text" id="search-artist" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-lg p-2 outline-none focus:border-accent text-sm text-white"> 
-                </div>
-                <div>
-                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">Genre</label> 
-                    <input type="text" id="search-genre" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-lg p-2 outline-none focus:border-accent text-sm text-white"> 
-                </div>
-                <div>
-                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">Year</label> 
-                    <input type="text" id="search-year" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-lg p-2 outline-none focus:border-accent text-sm text-white"> 
-                </div>
-                <div>
-                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">Charter</label> 
-                    <input type="text" id="search-charter" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-lg p-2 outline-none focus:border-accent text-sm text-white">
-                </div>
-            </div>
-            
-            <div class="flex justify-between items-center mt-2">
+        <!-- Toolbar -->
+        <div class="flex justify-between items-center bg-card rounded-xl p-3 border border-slate-700 shadow-sm">
                 <span id="results-count" class="text-xs font-bold text-slate-400 bg-dark px-3 py-1 rounded-full border border-slate-700">0 songs</span> 
-                <button onclick="clearFilters()" class="text-xs font-bold text-slate-400 hover:text-white underline">Clear Filters</button>
-            </div>
+                <div class="flex gap-4 items-center">
+                    <div class="relative">
+                        <button onclick="toggleColumnMenu()" class="text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1 bg-dark px-2 py-1 rounded border border-slate-700">
+                            <i data-lucide="columns" class="w-3 h-3"></i> Columns
+                        </button>
+                        <div id="column-menu" class="hidden absolute right-0 top-8 bg-card border border-slate-700 p-3 rounded-lg shadow-xl z-50 min-w-[160px] flex-col gap-2">
+                            <!-- Checkboxes injected via JS -->
+                        </div>
+                    </div>
+                    <button onclick="clearFilters()" class="text-xs font-bold text-slate-400 hover:text-white underline">Clear Filters</button>
+                </div>
         </div>
 
         <!-- Table/List -->
-        <div class="bg-card rounded-xl border border-slate-700 shadow-sm overflow-hidden flex-1 flex flex-col min-h-[400px]">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-slate-800/50 text-xs uppercase tracking-widest text-slate-400 border-b border-slate-700"> 
-                            <th class="p-4 font-bold">Song/Artist</th> 
-                            <th class="p-4 font-bold text-center">Instruments</th> 
-                            <th class="p-4 font-bold hidden md:table-cell">Album</th> 
-                            <th class="p-4 font-bold hidden lg:table-cell">Genre/Sub</th> 
-                            <th class="p-4 font-bold hidden sm:table-cell">Year</th> 
-                            <th class="p-4 font-bold text-right">Duration</th> 
+        <div class="bg-card rounded-xl border border-slate-700 shadow-sm flex-1 flex flex-col min-h-0 relative">
+            <div class="overflow-auto flex-1 h-full" id="table-scroll-container">
+                <table class="w-full text-left border-collapse relative">
+                    <thead class="bg-card sticky top-0 z-10 shadow-sm">
+                        <tr class="text-xs uppercase tracking-widest text-slate-400 border-b border-slate-700"> 
+                            <th class="p-4 font-bold select-none transition-colors" data-col="name">
+                                <span class="cursor-pointer hover:text-accent" onclick="toggleSort('name'); event.stopPropagation()" data-sort="name">Song</span> / 
+                                <span class="cursor-pointer hover:text-accent" onclick="toggleSort('artist'); event.stopPropagation()" data-sort="artist">Artist</span>
+                            </th> 
+                            <th class="p-4 font-bold text-center cursor-pointer hover:text-accent select-none transition-colors" onclick="toggleSort('instruments')" data-col="instruments" data-sort="instruments">Instruments</th> 
+                            <th class="p-4 font-bold cursor-pointer hover:text-accent select-none transition-colors hidden md:table-cell" onclick="toggleSort('album')" data-col="album" data-sort="album">Album</th> 
+                            <th class="p-4 font-bold cursor-pointer hover:text-accent select-none transition-colors hidden lg:table-cell" onclick="toggleSort('genre')" data-col="genre" data-sort="genre">Genre/Sub</th> 
+                            <th class="p-4 font-bold cursor-pointer hover:text-accent select-none transition-colors hidden sm:table-cell" onclick="toggleSort('year')" data-col="year" data-sort="year">Year</th> 
+                            <th class="p-4 font-bold text-right cursor-pointer hover:text-accent select-none transition-colors" onclick="toggleSort('duration')" data-col="duration" data-sort="duration">Duration</th> 
                         </tr>
                     </thead>
-                    <tbody id="song-list" class="text-sm divide-y divide-slate-700/50">
+                    <tbody id="song-list" class="text-sm divide-y divide-slate-700/50 bg-card">
                         <tr><td colspan="6" class="p-8 text-center text-slate-500 italic">Enter API URL and click Load.</td></tr> 
                     </tbody>
                 </table>
+                <!-- Infinite Scroll Sentinel inside the scroll container -->
+                <div id="scroll-sentinel" class="h-10 w-full"></div>
             </div>
-            
-            <!-- Infinite Scroll Sentinel -->
-            <div id="scroll-sentinel" class="h-10 w-full"></div>
         </div>
 
     </main>
@@ -182,6 +206,13 @@
         <span id="toast-msg">Success!</span> 
     </div>
 
+    <!-- Datalists for Autocomplete -->
+    <datalist id="datalist-global"></datalist>
+    <datalist id="datalist-artist"></datalist>
+    <datalist id="datalist-genre"></datalist>
+    <datalist id="datalist-year"></datalist>
+    <datalist id="datalist-charter"></datalist>
+
     <script>
         lucide.createIcons();
 
@@ -192,6 +223,18 @@
         let currentSongHash = null;
         let isConnected = false;
         let pingInterval = null;
+        let fuse = null;
+        
+        // Sorting & Columns State
+        let sortState = { col: 'name', dir: 1 }; // 1 = asc, -1 = desc
+        let columnState = {
+            name: true,
+            instruments: true,
+            album: true,
+            genre: true,
+            year: true,
+            duration: true
+        };
 
         function updateConnectionUI(connected) {
             const btn = document.getElementById('action-btn');
@@ -289,6 +332,16 @@
                 const data = await response.json();
 
                 allSongs = data;
+                
+                // Initialize Fuzzy Search
+                fuse = new Fuse(allSongs, {
+                    keys: ['name', 'artist', 'album'],
+                    threshold: 0.3, // 0.0 = exact match, 1.0 = match anything
+                    ignoreLocation: true
+                });
+
+                initColumnMenu();
+                populateAutocomplete();
                 applyFilters();
                 showToast(`Loaded ${allSongs.length} songs.`);
                 
@@ -304,6 +357,50 @@
             }
         }
 
+        function populateAutocomplete() {
+            const artists = new Set();
+            const genres = new Set();
+            const years = new Set();
+            const charters = new Set();
+            const globalTerms = new Set();
+
+            allSongs.forEach(s => {
+                if (s.artist) { artists.add(s.artist); globalTerms.add(s.artist); }
+                if (s.genre) genres.add(s.genre);
+                if (s.year) years.add(s.year);
+                if (s.charter) charters.add(s.charter);
+                if (s.album) globalTerms.add(s.album);
+                // Optionally add song names to global, but might be too large
+                // if (s.name) globalTerms.add(s.name);
+            });
+
+            const fillList = (id, set) => {
+                const list = document.getElementById(id);
+                
+                // Fuzzy Deduplication: Normalize strings to remove punctuation/spacing differences
+                const uniqueItems = [];
+                const seen = new Set();
+                // Sort by length descending to keep the most "complete" version (e.g. "Guns N' Roses" over "Guns N Roses")
+                const sortedCandidates = Array.from(set).filter(Boolean).sort((a, b) => b.length - a.length);
+
+                for (const item of sortedCandidates) {
+                    const norm = item.toLowerCase().replace(/[^a-z0-9]/g, ''); // Remove non-alphanumeric
+                    if (!seen.has(norm)) {
+                        seen.add(norm);
+                        uniqueItems.push(item);
+                    }
+                }
+                
+                list.innerHTML = uniqueItems.sort().map(v => `<option value="${v}">`).join('');
+            };
+
+            fillList('datalist-artist', artists);
+            fillList('datalist-genre', genres);
+            fillList('datalist-year', years);
+            fillList('datalist-charter', charters);
+            fillList('datalist-global', globalTerms);
+        }
+
         function clearFilters() {
             document.getElementById('search-global').value = '';
             document.getElementById('search-artist').value = '';
@@ -314,22 +411,35 @@
         }
 
         function applyFilters() {
-            const global = document.getElementById('search-global').value.toLowerCase();
+            const global = document.getElementById('search-global').value;
+            const globalLower = global.toLowerCase();
             const artist = document.getElementById('search-artist').value.toLowerCase();
             const genre = document.getElementById('search-genre').value.toLowerCase();
             const year = document.getElementById('search-year').value.toLowerCase();
             const charter = document.getElementById('search-charter').value.toLowerCase();
 
-            filteredSongs = allSongs.filter(s => {
+            // Use Fuse.js for global search if available and input exists
+            let candidates = allSongs;
+            if (global && fuse) {
+                candidates = fuse.search(global).map(r => r.item);
+            }
+
+            filteredSongs = candidates.filter(s => {
                 // Prevents errors with undefined fields
-                const sName = (s.name || '').toLowerCase();
+                // const sName = (s.name || '').toLowerCase(); // Handled by Fuse
                 const sArtist = (s.artist || '').toLowerCase();
-                const sAlbum = (s.album || '').toLowerCase();
+                // const sAlbum = (s.album || '').toLowerCase(); // Handled by Fuse
                 const sGenre = (s.genre || '').toLowerCase();
                 const sYear = (s.year || '').toString().toLowerCase();
                 const sCharter = (s.charter || '').toLowerCase();
 
-                if (global && !(sName.includes(global) || sArtist.includes(global) || sAlbum.includes(global))) return false;
+                // Fallback manual check if fuse failed or not ready (unlikely)
+                if (global && !fuse) {
+                    const sName = (s.name || '').toLowerCase();
+                    const sAlbum = (s.album || '').toLowerCase();
+                    if (!(sName.includes(globalLower) || sArtist.includes(globalLower) || sAlbum.includes(globalLower))) return false;
+                }
+
                 if (artist && !sArtist.includes(artist)) return false;
                 if (genre && !sGenre.includes(genre)) return false;
                 if (year && !sYear.includes(year)) return false;
@@ -337,12 +447,108 @@
                 
                 return true;
             });
+
+            // Sorting
+            filteredSongs.sort((a, b) => {
+                let valA, valB;
+                
+                if (sortState.col === 'name') { valA = a.name; valB = b.name; }
+                else if (sortState.col === 'artist') { valA = a.artist; valB = b.artist; }
+                else if (sortState.col === 'instruments') { valA = (a.parts?.length || 0); valB = (b.parts?.length || 0); }
+                else if (sortState.col === 'album') { valA = a.album; valB = b.album; }
+                else if (sortState.col === 'genre') { valA = a.genre; valB = b.genre; }
+                else if (sortState.col === 'year') { valA = parseInt(a.year) || 0; valB = parseInt(b.year) || 0; }
+                else if (sortState.col === 'duration') { 
+                    // Duration is string "MM:SS", convert to seconds for sort
+                    const [mA, sA] = (a.duration || "0:00").split(':').map(Number);
+                    const [mB, sB] = (b.duration || "0:00").split(':').map(Number);
+                    valA = mA * 60 + sA;
+                    valB = mB * 60 + sB;
+                }
+
+                if (valA < valB) return -1 * sortState.dir;
+                if (valA > valB) return 1 * sortState.dir;
+                return 0;
+            });
+            
+            updateHeaderUI();
             
             document.getElementById('results-count').innerText = `${filteredSongs.length} songs`;
             
             currentDisplayCount = 0;
             document.getElementById('song-list').innerHTML = '';
             loadMore(); 
+        }
+
+        function toggleSort(col) {
+            if (sortState.col === col) {
+                sortState.dir *= -1;
+            } else {
+                sortState.col = col;
+                sortState.dir = 1;
+            }
+            applyFilters();
+        }
+
+        function updateHeaderUI() {
+            // Reset sort indicators
+            document.querySelectorAll('[data-sort]').forEach(el => {
+                el.classList.remove('sort-asc', 'sort-desc', 'text-accent', 'sort-active');
+            });
+
+            // Set active sort
+            const activeEls = document.querySelectorAll(`[data-sort="${sortState.col}"]`);
+            activeEls.forEach(activeEl => {
+                activeEl.classList.add(sortState.dir === 1 ? 'sort-asc' : 'sort-desc');
+                activeEl.classList.add('text-accent');
+                if(activeEl.tagName === 'BUTTON') activeEl.classList.add('sort-active');
+            });
+
+            // Visibility
+            document.querySelectorAll('th[data-col]').forEach(th => {
+                const col = th.getAttribute('data-col');
+
+                // Visibility
+                if (columnState[col]) {
+                    th.classList.remove('col-hidden');
+                } else {
+                    th.classList.add('col-hidden');
+                }
+            });
+        }
+
+        function initColumnMenu() {
+            const menu = document.getElementById('column-menu');
+            menu.innerHTML = '';
+            Object.keys(columnState).forEach(col => {
+                const label = col.charAt(0).toUpperCase() + col.slice(1);
+                const div = document.createElement('div');
+                div.className = 'flex items-center gap-2 text-sm text-slate-300';
+                div.innerHTML = `
+                    <input type="checkbox" id="col-chk-${col}" ${columnState[col] ? 'checked' : ''} class="accent-accent cursor-pointer">
+                    <label for="col-chk-${col}" class="cursor-pointer select-none flex-1">${label}</label>
+                `;
+                div.querySelector('input').addEventListener('change', (e) => {
+                    columnState[col] = e.target.checked;
+                    updateHeaderUI();
+                    // Re-render visible rows to apply visibility
+                    document.getElementById('song-list').innerHTML = '';
+                    currentDisplayCount = 0;
+                    loadMore();
+                });
+                menu.appendChild(div);
+            });
+        }
+
+        function toggleColumnMenu() {
+            const menu = document.getElementById('column-menu');
+            menu.classList.toggle('hidden');
+            menu.classList.toggle('flex');
+        }
+
+        function toggleAdvancedFilters() {
+            const el = document.getElementById('advanced-filters');
+            el.classList.toggle('hidden');
         }
 
         function getInstrumentIcon(inst) {
@@ -390,19 +596,19 @@
 
                 // Escape single/double quotes to avoid breaking onclick (passing index is safer)
                 html += ` 
-                    <tr class="hover:bg-slate-800/80 cursor-pointer transition-colors group" onclick="openModal(${i})"> 
-                        <td class="p-4"> 
+                    <tr class="hover:bg-slate-700/50 cursor-pointer transition-colors group border-l-4 border-transparent hover:border-accent" onclick="openModal(${i})"> 
+                        <td class="p-4 ${columnState.name ? '' : 'col-hidden'}"> 
                             <div class="font-bold text-white group-hover:text-accent transition-colors text-base">${s.name || '-'}</div>
                             <div class="text-slate-400 text-xs font-medium">${s.artist || '-'}</div>
                         </td> 
-                        <td class="p-4">${iconsHtml}</td> 
-                        <td class="p-4 text-slate-400 hidden md:table-cell truncate max-w-[150px]" title="${s.album || ''}">${s.album || '-'}</td> 
-                        <td class="p-4 hidden lg:table-cell">
+                        <td class="p-4 ${columnState.instruments ? '' : 'col-hidden'}">${iconsHtml}</td> 
+                        <td class="p-4 text-slate-400 hidden md:table-cell truncate max-w-[150px] ${columnState.album ? '' : 'col-hidden'}" title="${s.album || ''}">${s.album || '-'}</td> 
+                        <td class="p-4 hidden lg:table-cell ${columnState.genre ? '' : 'col-hidden'}">
                             <div class="text-slate-300 text-sm font-medium">${s.genre || '-'}</div>
                             <div class="text-slate-500 text-xs">${s.subgenre || ''}</div>
                         </td> 
-                        <td class="p-4 text-slate-400 hidden sm:table-cell">${s.year || '-'}</td> 
-                        <td class="p-4 text-slate-400 text-right font-mono text-xs">${s.duration}</td> 
+                        <td class="p-4 text-slate-400 hidden sm:table-cell ${columnState.year ? '' : 'col-hidden'}">${s.year || '-'}</td> 
+                        <td class="p-4 text-slate-400 text-right font-mono text-xs ${columnState.duration ? '' : 'col-hidden'}">${s.duration}</td> 
                     </tr> 
                 `; 
             }
@@ -516,6 +722,24 @@
 
         // Initial load and periodic ping
         document.addEventListener('DOMContentLoaded', () => {
+            initColumnMenu();
+            
+            // Close column menu when clicking outside
+            document.addEventListener('click', (e) => {
+                const colMenu = document.getElementById('column-menu');
+                const colBtn = document.querySelector('button[onclick="toggleColumnMenu()"]');
+                if (colMenu && !colMenu.contains(e.target) && !colBtn.contains(e.target)) {
+                    colMenu.classList.add('hidden');
+                    colMenu.classList.remove('flex');
+                }
+                
+                const advMenu = document.getElementById('advanced-filters');
+                const advBtn = document.querySelector('button[onclick="toggleAdvancedFilters()"]');
+                if (advMenu && !advMenu.contains(e.target) && !advBtn.contains(e.target) && !document.getElementById('search-global').contains(e.target)) {
+                    advMenu.classList.add('hidden');
+                }
+            });
+
             pingServer(); // Check immediately
             pingInterval = setInterval(pingServer, 2000); // Check every 2 seconds
             

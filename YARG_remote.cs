@@ -199,7 +199,6 @@ namespace YargRemoteMod
                             artist = RichTextUtils.StripRichTextTags(s.Artist),
                             album = RichTextUtils.StripRichTextTags(s.Album),
                             genre = RichTextUtils.StripRichTextTags(s.Genre),
-                            subgenre = RichTextUtils.StripRichTextTags(s.Subgenre),
                             charter = RichTextUtils.StripRichTextTags(s.Charter),
                             playlist = RichTextUtils.StripRichTextTags(s.Playlist),
                             source = RichTextUtils.StripRichTextTags(s.Source),

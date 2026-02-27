@@ -101,22 +101,6 @@
           }
         }
       },
-      "UnityEngine.VectorGraphicsModule/0.0.0.0": {
-        "runtime": {
-          "UnityEngine.VectorGraphicsModule.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
-      "UnityEngine.SharedInternalsModule/0.0.0.0": {
-        "runtime": {
-          "UnityEngine.SharedInternalsModule.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
       "UnityEngine.DSPGraphModule/0.0.0.0": {
         "runtime": {
           "UnityEngine.DSPGraphModule.dll": {
@@ -141,14 +125,6 @@
           }
         }
       },
-      "UnityEngine.HierarchyModule/0.0.0.0": {
-        "runtime": {
-          "UnityEngine.HierarchyModule.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
       "UnityEngine.HierarchyCoreModule/0.0.0.0": {
         "runtime": {
           "UnityEngine.HierarchyCoreModule.dll": {
@@ -160,14 +136,6 @@
       "UnityEngine.ContentLoadModule/0.0.0.0": {
         "runtime": {
           "UnityEngine.ContentLoadModule.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
-      "UnityEngine.MultiplayerModule/0.0.0.0": {
-        "runtime": {
-          "UnityEngine.MultiplayerModule.dll": {
             "assemblyVersion": "0.0.0.0",
             "fileVersion": "0.0.0.0"
           }
@@ -224,14 +192,6 @@
       "UnityEngine.AccessibilityModule/0.0.0.0": {
         "runtime": {
           "UnityEngine.AccessibilityModule.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
-      "UnityEngine.AdaptivePerformanceModule/0.0.0.0": {
-        "runtime": {
-          "UnityEngine.AdaptivePerformanceModule.dll": {
             "assemblyVersion": "0.0.0.0",
             "fileVersion": "0.0.0.0"
           }
@@ -312,6 +272,14 @@
       "UnityEngine.AssetBundleModule/0.0.0.0": {
         "runtime": {
           "UnityEngine.AssetBundleModule.dll": {
+            "assemblyVersion": "0.0.0.0",
+            "fileVersion": "0.0.0.0"
+          }
+        }
+      },
+      "UnityEngine.SharedInternalsModule/0.0.0.0": {
+        "runtime": {
+          "UnityEngine.SharedInternalsModule.dll": {
             "assemblyVersion": "0.0.0.0",
             "fileVersion": "0.0.0.0"
           }
@@ -461,6 +429,14 @@
           }
         }
       },
+      "UnityEngine.MultiplayerModule/0.0.0.0": {
+        "runtime": {
+          "UnityEngine.MultiplayerModule.dll": {
+            "assemblyVersion": "0.0.0.0",
+            "fileVersion": "0.0.0.0"
+          }
+        }
+      },
       "UnityEngine.UnityWebRequestModule/0.0.0.0": {
         "runtime": {
           "UnityEngine.UnityWebRequestModule.dll": {
@@ -525,14 +501,6 @@
           }
         }
       },
-      "UnityEngine.RenderAs2DModule/0.0.0.0": {
-        "runtime": {
-          "UnityEngine.RenderAs2DModule.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
       "UnityEngine.VirtualTexturingModule/0.0.0.0": {
         "runtime": {
           "UnityEngine.VirtualTexturingModule.dll": {
@@ -544,14 +512,6 @@
       "UnityEngine.ScreenCaptureModule/0.0.0.0": {
         "runtime": {
           "UnityEngine.ScreenCaptureModule.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
-      "UnityEngine.ShaderRuntimeModule/0.0.0.0": {
-        "runtime": {
-          "UnityEngine.ShaderRuntimeModule.dll": {
             "assemblyVersion": "0.0.0.0",
             "fileVersion": "0.0.0.0"
           }
@@ -701,14 +661,6 @@
           }
         }
       },
-      "VRM10/0.0.0.0": {
-        "runtime": {
-          "VRM10.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
       "Unity.ResourceManager/0.0.0.0": {
         "runtime": {
           "Unity.ResourceManager.dll": {
@@ -717,25 +669,17 @@
           }
         }
       },
-      "Unity.InputSystem/1.17.0.0": {
+      "Unity.InputSystem/1.14.2.0": {
         "runtime": {
           "Unity.InputSystem.dll": {
-            "assemblyVersion": "1.17.0.0",
-            "fileVersion": "1.17.0.0"
+            "assemblyVersion": "1.14.2.0",
+            "fileVersion": "1.14.2.0"
           }
         }
       },
       "UnityEngine.UI/1.0.0.0": {
         "runtime": {
           "UnityEngine.UI.dll": {
-            "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.0.0"
-          }
-        }
-      },
-      "DOTween/1.0.0.0": {
-        "runtime": {
-          "DOTween.dll": {
             "assemblyVersion": "1.0.0.0",
             "fileVersion": "1.0.0.0"
           }
@@ -749,6 +693,14 @@
           }
         }
       },
+      "DOTween/1.0.0.0": {
+        "runtime": {
+          "DOTween.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
       "PlasticBand/0.0.0.0": {
         "runtime": {
           "PlasticBand.dll": {
@@ -757,33 +709,9 @@
           }
         }
       },
-      "SimpleFileBrowser.Runtime/0.0.0.0": {
-        "runtime": {
-          "SimpleFileBrowser.Runtime.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
       "Unity.Burst/0.0.0.0": {
         "runtime": {
           "Unity.Burst.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
-      "UniHumanoid/0.0.0.0": {
-        "runtime": {
-          "UniHumanoid.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
-      "Cinemachine/0.0.0.0": {
-        "runtime": {
-          "Cinemachine.dll": {
             "assemblyVersion": "0.0.0.0",
             "fileVersion": "0.0.0.0"
           }
@@ -824,6 +752,14 @@
       "ZString-Ext/0.0.0.0": {
         "runtime": {
           "ZString-Ext.dll": {
+            "assemblyVersion": "0.0.0.0",
+            "fileVersion": "0.0.0.0"
+          }
+        }
+      },
+      "StandaloneFileBrowser/0.0.0.0": {
+        "runtime": {
+          "StandaloneFileBrowser.dll": {
             "assemblyVersion": "0.0.0.0",
             "fileVersion": "0.0.0.0"
           }
@@ -917,70 +853,6 @@
           }
         }
       },
-      "Unity.InternalAPIEngineBridge.004/0.0.0.0": {
-        "runtime": {
-          "Unity.InternalAPIEngineBridge.004.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
-      "UniGLTF/0.0.0.0": {
-        "runtime": {
-          "UniGLTF.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
-      "UniGLTF.Utils/0.0.0.0": {
-        "runtime": {
-          "UniGLTF.Utils.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
-      "SpringBoneJobs/0.0.0.0": {
-        "runtime": {
-          "SpringBoneJobs.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
-      "FastSpringBone10/0.0.0.0": {
-        "runtime": {
-          "FastSpringBone10.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
-      "Unity.Timeline/1.0.0.0": {
-        "runtime": {
-          "Unity.Timeline.dll": {
-            "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.0.0"
-          }
-        }
-      },
-      "VRM10.MToon10/0.0.0.0": {
-        "runtime": {
-          "VRM10.MToon10.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
-      "VrmLib/0.0.0.0": {
-        "runtime": {
-          "VrmLib.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
       "Unity.Burst.Unsafe/4.0.5.0": {
         "runtime": {
           "Unity.Burst.Unsafe.dll": {
@@ -989,11 +861,19 @@
           }
         }
       },
-      "Unity.RenderPipelines.Universal.2D.Runtime/0.0.0.0": {
+      "System.Windows.Forms/4.0.0.0": {
         "runtime": {
-          "Unity.RenderPipelines.Universal.2D.Runtime.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
+          "System.Windows.Forms.dll": {
+            "assemblyVersion": "4.0.0.0",
+            "fileVersion": "4.6.57.0"
+          }
+        }
+      },
+      "Ookii.Dialogs.WinForms/4.0.0.0": {
+        "runtime": {
+          "Ookii.Dialogs.WinForms.dll": {
+            "assemblyVersion": "4.0.0.0",
+            "fileVersion": "4.0.0.0"
           }
         }
       },
@@ -1005,11 +885,67 @@
           }
         }
       },
-      "UniGLTF.UniUnlit/0.0.0.0": {
+      "System.Runtime.Serialization.Formatters.Soap/4.0.0.0": {
         "runtime": {
-          "UniGLTF.UniUnlit.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
+          "System.Runtime.Serialization.Formatters.Soap.dll": {
+            "assemblyVersion": "4.0.0.0",
+            "fileVersion": "4.6.57.0"
+          }
+        }
+      },
+      "Accessibility/4.0.0.0": {
+        "runtime": {
+          "Accessibility.dll": {
+            "assemblyVersion": "4.0.0.0",
+            "fileVersion": "4.6.57.0"
+          }
+        }
+      },
+      "Mono.WebBrowser/4.0.0.0": {
+        "runtime": {
+          "Mono.WebBrowser.dll": {
+            "assemblyVersion": "4.0.0.0",
+            "fileVersion": "4.6.57.0"
+          }
+        }
+      },
+      "System.Configuration/4.0.0.0": {
+        "runtime": {
+          "System.Configuration.dll": {
+            "assemblyVersion": "4.0.0.0",
+            "fileVersion": "4.6.57.0"
+          }
+        }
+      },
+      "Mono.Posix/4.0.0.0": {
+        "runtime": {
+          "Mono.Posix.dll": {
+            "assemblyVersion": "4.0.0.0",
+            "fileVersion": "4.0.0.0"
+          }
+        }
+      },
+      "System.Design/4.0.0.0": {
+        "runtime": {
+          "System.Design.dll": {
+            "assemblyVersion": "4.0.0.0",
+            "fileVersion": "4.6.57.0"
+          }
+        }
+      },
+      "System.Security/4.0.0.0": {
+        "runtime": {
+          "System.Security.dll": {
+            "assemblyVersion": "4.0.0.0",
+            "fileVersion": "4.6.57.0"
+          }
+        }
+      },
+      "System.Drawing.Design/4.0.0.0": {
+        "runtime": {
+          "System.Drawing.Design.dll": {
+            "assemblyVersion": "4.0.0.0",
+            "fileVersion": "4.6.57.0"
           }
         }
       }
@@ -1071,16 +1007,6 @@
       "serviceable": false,
       "sha512": ""
     },
-    "UnityEngine.VectorGraphicsModule/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "UnityEngine.SharedInternalsModule/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
     "UnityEngine.DSPGraphModule/0.0.0.0": {
       "type": "reference",
       "serviceable": false,
@@ -1096,22 +1022,12 @@
       "serviceable": false,
       "sha512": ""
     },
-    "UnityEngine.HierarchyModule/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
     "UnityEngine.HierarchyCoreModule/0.0.0.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""
     },
     "UnityEngine.ContentLoadModule/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "UnityEngine.MultiplayerModule/0.0.0.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""
@@ -1147,11 +1063,6 @@
       "sha512": ""
     },
     "UnityEngine.AccessibilityModule/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "UnityEngine.AdaptivePerformanceModule/0.0.0.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""
@@ -1202,6 +1113,11 @@
       "sha512": ""
     },
     "UnityEngine.AssetBundleModule/0.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "UnityEngine.SharedInternalsModule/0.0.0.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""
@@ -1296,6 +1212,11 @@
       "serviceable": false,
       "sha512": ""
     },
+    "UnityEngine.MultiplayerModule/0.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
     "UnityEngine.UnityWebRequestModule/0.0.0.0": {
       "type": "reference",
       "serviceable": false,
@@ -1336,22 +1257,12 @@
       "serviceable": false,
       "sha512": ""
     },
-    "UnityEngine.RenderAs2DModule/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
     "UnityEngine.VirtualTexturingModule/0.0.0.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""
     },
     "UnityEngine.ScreenCaptureModule/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "UnityEngine.ShaderRuntimeModule/0.0.0.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""
@@ -1446,17 +1357,12 @@
       "serviceable": false,
       "sha512": ""
     },
-    "VRM10/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
     "Unity.ResourceManager/0.0.0.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""
     },
-    "Unity.InputSystem/1.17.0.0": {
+    "Unity.InputSystem/1.14.2.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""
@@ -1466,12 +1372,12 @@
       "serviceable": false,
       "sha512": ""
     },
-    "DOTween/1.0.0.0": {
+    "ZString/2.5.1.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""
     },
-    "ZString/2.5.1.0": {
+    "DOTween/1.0.0.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""
@@ -1481,22 +1387,7 @@
       "serviceable": false,
       "sha512": ""
     },
-    "SimpleFileBrowser.Runtime/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
     "Unity.Burst/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "UniHumanoid/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "Cinemachine/0.0.0.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""
@@ -1522,6 +1413,11 @@
       "sha512": ""
     },
     "ZString-Ext/0.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "StandaloneFileBrowser/0.0.0.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""
@@ -1581,52 +1477,17 @@
       "serviceable": false,
       "sha512": ""
     },
-    "Unity.InternalAPIEngineBridge.004/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "UniGLTF/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "UniGLTF.Utils/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "SpringBoneJobs/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "FastSpringBone10/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "Unity.Timeline/1.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "VRM10.MToon10/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "VrmLib/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
     "Unity.Burst.Unsafe/4.0.5.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""
     },
-    "Unity.RenderPipelines.Universal.2D.Runtime/0.0.0.0": {
+    "System.Windows.Forms/4.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Ookii.Dialogs.WinForms/4.0.0.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""
@@ -1636,7 +1497,42 @@
       "serviceable": false,
       "sha512": ""
     },
-    "UniGLTF.UniUnlit/0.0.0.0": {
+    "System.Runtime.Serialization.Formatters.Soap/4.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Accessibility/4.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Mono.WebBrowser/4.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "System.Configuration/4.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Mono.Posix/4.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "System.Design/4.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "System.Security/4.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "System.Drawing.Design/4.0.0.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""
