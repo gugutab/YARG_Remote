@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("YARG_remote")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+42cee1a9db2259e816fed07ea5f0347f79bfbc7b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+127d31f3b04975661e794bb9524e5bf90578c1e5")]
 [assembly: System.Reflection.AssemblyProductAttribute("YARG_remote")]
 [assembly: System.Reflection.AssemblyTitleAttribute("YARG_remote")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

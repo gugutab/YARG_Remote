@@ -174,6 +174,12 @@ namespace YargRemoteMod
                                     tex.LoadRawTextureData((IntPtr)img.Data, img.Width * img.Height * ((int)img.Format));
                                     tex.Apply();
 
+                                    // Fix mirrored image (flip both vertical and horizontal = 180 deg rotation)
+                                    var pixels = tex.GetPixels32();
+                                    System.Array.Reverse(pixels);
+                                    tex.SetPixels32(pixels);
+                                    tex.Apply();
+
                                     // Encode to PNG using reflection to avoid missing assembly reference issues
                                     byte[] pngData = null;
                                     var encodeMethod = typeof(Texture2D).GetMethod("EncodeToPNG");
@@ -288,7 +294,7 @@ namespace YargRemoteMod
                 }
             }
             catch (Exception ex)
-            { // Method name is already English, keeping it as is.
+            {
                 Logger.LogError($"[YARG Remote] Processing error: {ex}");
                 SendResponse(response, 500, "{\"status\": \"error\", \"message\": \"Internal mod error\"}");
             }

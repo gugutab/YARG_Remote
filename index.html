@@ -165,7 +165,7 @@
             
             <div class="p-6 border-b border-slate-700 flex justify-between items-start bg-slate-800/30"> 
                 <div class="flex gap-4 items-center">
-                    <img id="modal-img" src="" class="w-48 h-48 rounded-lg shadow-lg bg-slate-900 object-cover" alt="Album Art" onerror="this.style.display='none'">
+                    <img id="modal-img" src="" class="w-64 h-64 rounded-lg shadow-lg bg-slate-900 object-cover" alt="Album Art" onerror="this.style.display='none'">
                     <div> 
                     <h2 id="modal-title" class="text-2xl font-black italic text-white leading-tight">Song Name</h2> 
                     <p id="modal-artist" class="text-accent font-bold text-lg mt-1">Artist</p> 
@@ -240,6 +240,7 @@
         let isConnected = false;
         let pingInterval = null;
         let fuse = null;
+        let lastGroupValue = null;
         
         // Sorting & Columns State
         let sortState = { col: 'name', dir: 1 }; // 1 = asc, -1 = desc
@@ -522,6 +523,7 @@
             document.getElementById('results-count').innerText = `${filteredSongs.length} songs`;
             
             currentDisplayCount = 0;
+            lastGroupValue = null;
             document.getElementById('song-list').innerHTML = '';
             loadMore(); 
         }
@@ -615,27 +617,22 @@
             return 'text-emerald-400';
         }
 
-        function getGroupKey(s, col) {
-            if (!s) return null;
-            
+        function getGroupValue(s) {
+            const col = sortState.col;
             if (col === 'name') {
-                const val = (s.name || '').trim();
-                if (!val) return '#';
-                const first = val.charAt(0).toUpperCase();
-                return first.match(/[A-Z]/) ? first : '#';
+                const name = s.name || '#';
+                const char = name.charAt(0).toUpperCase();
+                return /[A-Z]/.test(char) ? char : '#';
             }
             if (col === 'artist') return s.artist || 'Unknown Artist';
-            if (col === 'album') return s.album || 'Unknown Album';
-            if (col === 'genre') return s.genre || 'Unknown Genre';
             if (col === 'year') {
                 const y = parseInt(s.year);
                 if (isNaN(y)) return 'Unknown Year';
                 return Math.floor(y / 10) * 10 + 's';
             }
+            if (col === 'genre') return s.genre || 'Unknown Genre';
             if (col === 'charter') return s.charter || 'Unknown Charter';
-            if (col === 'playlist') return s.playlist || 'Unknown Playlist';
-            if (col === 'source') return (typeof s.source === 'string' ? s.source : (s.source?.Original || 'Unknown Source')) || 'Unknown Source';
-            
+            if (col === 'source') return s.source || 'Unknown Source';
             return null;
         }
 
@@ -645,7 +642,7 @@
             const baseUrl = document.getElementById('api-url').value.trim();
             
             if (filteredSongs.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="11" class="p-8 text-center text-slate-500 italic">No songs found.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500 italic">No songs found.</td></tr>`;
                 return;
             }
 
@@ -653,13 +650,10 @@
             for (let i = currentDisplayCount; i < end; i++) {
                 const s = filteredSongs[i];
                 
-                // Subheader Logic
-                const currentKey = getGroupKey(s, sortState.col);
-                const prev = i > 0 ? filteredSongs[i-1] : null;
-                const prevKey = prev ? getGroupKey(prev, sortState.col) : null;
-                
-                if (currentKey && currentKey !== prevKey) {
-                    html += `<tr class="bg-slate-800/95 text-xs font-bold uppercase tracking-widest text-accent sticky top-[53px] z-0 shadow-sm backdrop-blur-sm"><td colspan="11" class="px-4 py-2 border-b border-slate-700/50">${currentKey}</td></tr>`;
+                const groupVal = getGroupValue(s);
+                if (groupVal !== null && groupVal !== lastGroupValue) {
+                    html += `<tr class="bg-slate-800/50 border-b border-slate-700"><td colspan="11" class="px-4 py-2 text-xs font-bold text-accent uppercase tracking-widest">${groupVal}</td></tr>`;
+                    lastGroupValue = groupVal;
                 }
                 
                 // Generate icons HTML
