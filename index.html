@@ -45,23 +45,45 @@
         .sort-desc::after { content: " \25BC"; font-size: 0.8em; opacity: 0.7; margin-left: 4px; }
         .sort-active { @apply border-accent text-accent; }
         .col-hidden { display: none !important; }
+
+        /* Hide scrollbar for jump bar */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="h-screen flex flex-col font-sans">
 
     <!-- Header -->
-    <header class="bg-card border-b border-slate-700 p-4 sticky top-0 z-40 shadow-md">
-        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-            <h1 class="text-2xl font-black italic uppercase tracking-tighter flex items-center gap-2">
-                <i data-lucide="gamepad-2" class="text-accent"></i>
-                YARG <span class="text-accent">Remote</span>
-            </h1> 
+    <header class="bg-card border-b border-slate-700 p-2 sm:p-4 sticky top-0 z-40 shadow-md">
+        <div class="max-w-7xl mx-auto w-full flex flex-col md:flex-row md:flex-wrap min-[900px]:flex-nowrap items-center gap-2 sm:gap-4">
+            
+            <div class="flex justify-between items-center w-full md:w-auto gap-4 shrink-0">
+                <h1 class="text-2xl font-black italic uppercase tracking-tighter flex items-center gap-2 shrink-0">
+                    <i data-lucide="gamepad-2" class="text-accent"></i>
+                    <span class="hidden min-[450px]:inline">YARG <span class="text-accent">Remote</span></span>
+                </h1> 
+                
+                <div class="flex items-center gap-2 flex-1 md:flex-none">
+                    <div class="flex bg-dark rounded-lg border border-slate-600 overflow-hidden px-2 py-1 items-center flex-1 w-full md:w-56">
+                        <div id="connection-status" class="w-3 h-3 rounded-full bg-rose-500 mr-2 transition-all duration-500 shadow-none" title="Disconnected"></div>
+                        <input type="text" id="api-url" class="bg-transparent border-none outline-none text-sm w-full text-white disabled:text-slate-500 disabled:cursor-not-allowed" value="http://localhost:8080" placeholder="API URL">
+                    </div>
+                    <button id="action-btn" onclick="handleConnectionToggle()" class="text-slate-400 hover:text-white p-2 rounded-lg transition-colors" title="Connecting...">
+                        <i data-lucide="loader-2" class="w-5 h-5 animate-spin" id="action-icon"></i> 
+                    </button>
+                </div>
+            </div>
             
             <!-- Search Bar & Filters -->
-            <div class="flex-1 max-w-xl w-full mx-4 relative group">
+            <div class="flex-1 w-full md:w-auto min-[900px]:mx-4 relative group order-2 md:order-none">
                 <div class="relative">
                     <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400"></i>
-                    <input type="text" id="search-global" list="datalist-global" oninput="applyFilters()" placeholder="Search song, artist, album..." class="w-full bg-dark border border-slate-600 rounded-lg py-1.5 pl-9 pr-9 text-sm text-white focus:border-accent outline-none transition-colors">
+                    <input type="text" id="search-global" list="datalist-global" oninput="applyFilters()" placeholder="Search song, artist, album..." class="w-full bg-dark border border-slate-600 rounded-lg py-1.5 pl-9 pr-16 text-sm text-white focus:border-accent outline-none transition-colors">
+                    
+                    <button id="clear-search-btn" onclick="clearFilters()" class="absolute right-9 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white p-1 hidden" title="Clear Filters">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+
                     <button onclick="toggleAdvancedFilters()" class="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white p-1 rounded-md hover:bg-slate-700 transition-colors" title="Advanced Filters">
                         <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
                     </button>
@@ -94,27 +116,15 @@
                     </div>
                 </div>
             </div>
-            
-            <div class="flex items-center gap-2 w-full md:w-auto">
-                <div class="flex bg-dark rounded-lg border border-slate-600 overflow-hidden px-2 py-1 items-center flex-1 md:w-80">
-                    <div id="connection-status" class="w-3 h-3 rounded-full bg-rose-500 mr-2 transition-all duration-500 shadow-none" title="Disconnected"></div>
-                    <input type="text" id="api-url" class="bg-transparent border-none outline-none text-sm w-full text-white" value="http://localhost:8080" placeholder="API URL">
-                </div>
-                <button id="action-btn" onclick="handleConnectionToggle()" class="text-slate-400 hover:text-white p-2 rounded-lg transition-colors" title="Connecting...">
-                    <i data-lucide="loader-2" class="w-5 h-5 animate-spin" id="action-icon"></i> 
-                </button>
-            </div>
-        </div>
-    </header>
 
-    <!-- Main Content -->
-    <main class="flex-1 max-w-7xl mx-auto w-full p-4 flex flex-col gap-4 overflow-hidden">
-        
-        <!-- Toolbar -->
-        <div class="flex justify-between items-center bg-card rounded-xl p-3 border border-slate-700 shadow-sm">
+            <!-- Toolbar (Aggregated) -->
+            <div class="w-full min-[900px]:w-auto flex justify-between items-center min-[900px]:gap-4 order-3 min-[900px]:order-none pt-1 min-[900px]:pt-0">
                 <span id="results-count" class="text-xs font-bold text-slate-400 bg-dark px-3 py-1 rounded-full border border-slate-700">0 songs</span> 
                 <div class="flex gap-4 items-center">
                     <div class="relative">
+                    <button onclick="toggleViewMode()" class="text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1 bg-dark px-2 py-1 rounded border border-slate-700 mr-2">
+                        <i id="view-toggle-icon" data-lucide="layout-grid" class="w-3 h-3"></i> <span id="view-toggle-text">Grid</span>
+                    </button>
                         <button onclick="toggleColumnMenu()" class="text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1 bg-dark px-2 py-1 rounded border border-slate-700">
                             <i data-lucide="columns" class="w-3 h-3"></i> Columns
                         </button>
@@ -122,17 +132,29 @@
                             <!-- Checkboxes injected via JS -->
                         </div>
                     </div>
-                    <button onclick="clearFilters()" class="text-xs font-bold text-slate-400 hover:text-white underline">Clear Filters</button>
                 </div>
+            </div>
         </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl mx-auto w-full p-4 flex flex-col gap-4 overflow-hidden">
+        
+        <!-- Jump Bar -->
+        <div id="jump-bar" class="flex gap-2 overflow-x-auto pb-1 min-h-[32px] scrollbar-hide hidden empty:hidden shrink-0"></div>
 
         <!-- Table/List -->
         <div class="bg-card rounded-xl border border-slate-700 shadow-sm flex-1 flex flex-col min-h-0 relative">
             <div class="overflow-auto flex-1 h-full" id="table-scroll-container">
+                <!-- Fast Scroller Overlay -->
+                <div id="fast-scroller" class="absolute right-0 top-10 bottom-10 w-8 z-30 flex flex-col justify-between items-center text-[10px] font-bold text-slate-500 select-none touch-none hidden py-2"></div>
+                <div id="scroller-bubble" class="absolute right-12 top-0 w-12 h-12 bg-accent text-white rounded-full flex items-center justify-center font-bold text-xl shadow-lg pointer-events-none opacity-0 transition-opacity z-40">A</div>
+
+                <div id="view-list">
                 <table class="w-full text-left border-collapse relative">
                     <thead class="bg-card sticky top-0 z-10 shadow-sm">
                         <tr class="text-xs uppercase tracking-widest text-slate-400 border-b border-slate-700"> 
-                            <th class="p-4 font-bold select-none transition-colors" data-col="name">
+                            <th class="p-4 font-bold select-none transition-colors min-w-[200px]" data-col="name">
                                 <span class="cursor-pointer hover:text-accent" onclick="toggleSort('name'); event.stopPropagation()" data-sort="name">Song</span> / 
                                 <span class="cursor-pointer hover:text-accent" onclick="toggleSort('artist'); event.stopPropagation()" data-sort="artist">Artist</span>
                             </th> 
@@ -146,12 +168,16 @@
                             <th class="p-4 font-bold cursor-pointer hover:text-accent select-none transition-colors hidden 2xl:table-cell" onclick="toggleSort('source')" data-col="source" data-sort="source">Source</th> 
                             <th class="p-4 font-bold cursor-pointer hover:text-accent select-none transition-colors hidden sm:table-cell" onclick="toggleSort('year')" data-col="year" data-sort="year">Year</th> 
                             <th class="p-4 font-bold text-right cursor-pointer hover:text-accent select-none transition-colors" onclick="toggleSort('duration')" data-col="duration" data-sort="duration">Duration</th> 
+                            <th class="p-4 font-bold text-center select-none transition-colors sticky right-0 bg-card border-l border-slate-700 z-20" data-col="play">Play</th>
                         </tr>
                     </thead>
                     <tbody id="song-list" class="text-sm divide-y divide-slate-700/50 bg-card">
                         <tr><td colspan="6" class="p-8 text-center text-slate-500 italic">Enter API URL and click Load.</td></tr> 
                     </tbody>
                 </table>
+                </div>
+                <!-- Grid View -->
+                <div id="view-grid" class="hidden grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4 pb-10"></div>
                 <!-- Infinite Scroll Sentinel inside the scroll container -->
                 <div id="scroll-sentinel" class="h-10 w-full"></div>
             </div>
@@ -163,53 +189,37 @@
     <div id="song-modal" class="modal">
         <div class="bg-card rounded-2xl w-full max-w-lg border border-slate-600 shadow-2xl overflow-hidden transform transition-all scale-95 opacity-0" id="modal-content" style="transition: all 0.2s;">
             
-            <div class="p-6 border-b border-slate-700 flex justify-between items-start bg-slate-800/30"> 
-                <div class="flex gap-4 items-center">
-                    <img id="modal-img" src="" class="w-64 h-64 rounded-lg shadow-lg bg-slate-900 object-cover" alt="Album Art" onerror="this.style.display='none'">
-                    <div> 
-                    <h2 id="modal-title" class="text-2xl font-black italic text-white leading-tight">Song Name</h2> 
-                    <p id="modal-artist" class="text-accent font-bold text-lg mt-1">Artist</p> 
+            <div class="relative w-full aspect-square group"> 
+                <img id="modal-img" src="" class="w-full h-full object-cover bg-slate-900" alt="Album Art" onerror="this.style.display='none'">
+                <div class="absolute inset-0 bg-gradient-to-t from-card via-black/40 to-transparent"></div>
+                
+                <button onclick="closeModal()" class="absolute right-4 top-4 text-white/80 hover:text-white bg-black/30 hover:bg-black/50 rounded-full p-2 backdrop-blur-sm transition-colors z-10"><i data-lucide="x"></i></button> 
+                
+                <div class="absolute bottom-0 left-0 right-0 p-6 flex items-end justify-between gap-4">
+                    <div>
+                        <h2 id="modal-title" class="text-[1.6rem] font-black italic text-white leading-none drop-shadow-lg">Song Name</h2> 
+                        <p id="modal-artist" class="text-accent font-bold text-xl mt-1 drop-shadow-lg">Artist</p> 
                     </div>
+                    <button id="modal-play-btn" class="bg-blue-700 hover:bg-blue-600 text-white w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-lg shadow-accent/20 shrink-0 mb-1 hover:scale-105">
+                        <i data-lucide="play" class="w-7 h-7 fill-current ml-1"></i>
+                    </button>
                 </div>
-                <button onclick="closeModal()" class="text-slate-400 hover:text-white p-1"><i data-lucide="x"></i></button> 
             </div> 
             
-            <div class="p-6 grid grid-cols-2 gap-y-4 gap-x-6 text-sm"> 
-                <div> 
-                    <span class="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Album</span> 
-                    <span id="modal-album" class="text-white font-medium">...</span> 
-                </div> 
-                <div> 
-                    <span class="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Year</span> 
-                    <span id="modal-year" class="text-white font-medium">...</span> 
-                </div> 
-                <div> 
-                    <span class="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Genre</span> 
-                    <span id="modal-genre" class="text-white font-medium">...</span> 
-                </div> 
-                <div> 
-                    <span class="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Duration</span> 
-                    <span id="modal-duration" class="text-white font-medium">...</span> 
-                </div> 
-                <div> 
-                    <span class="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Charter</span> 
-                    <span id="modal-charter" class="text-white font-medium">...</span> 
-                </div> 
-                <div> 
-                    <span class="block text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">Source</span> 
-                    <span id="modal-source" class="text-white font-medium">...</span> 
+            <div class="px-6 py-4 bg-card/50"> 
+                <div class="flex flex-wrap gap-2 text-sm text-slate-300"> 
+                    <div class="bg-slate-800/50 border border-slate-700 rounded-full px-3 py-1 flex items-center gap-2" title="Album"><i data-lucide="disc" class="w-3 h-3 text-slate-500 shrink-0"></i> <span id="modal-album" class="font-medium text-white truncate max-w-[150px]">...</span></div>
+                    <div class="bg-slate-800/50 border border-slate-700 rounded-full px-3 py-1 flex items-center gap-2" title="Year"><i data-lucide="calendar" class="w-3 h-3 text-slate-500 shrink-0"></i> <span id="modal-year" class="font-medium text-white truncate">...</span></div>
+                    <div class="bg-slate-800/50 border border-slate-700 rounded-full px-3 py-1 flex items-center gap-2" title="Genre"><i data-lucide="music" class="w-3 h-3 text-slate-500 shrink-0"></i> <span id="modal-genre" class="font-medium text-white truncate max-w-[150px]">...</span></div>
+                    <div class="bg-slate-800/50 border border-slate-700 rounded-full px-3 py-1 flex items-center gap-2" title="Duration"><i data-lucide="clock" class="w-3 h-3 text-slate-500 shrink-0"></i> <span id="modal-duration" class="font-medium text-white truncate">...</span></div>
+                    <div class="bg-slate-800/50 border border-slate-700 rounded-full px-3 py-1 flex items-center gap-2" title="Source"><i data-lucide="database" class="w-3 h-3 text-slate-500 shrink-0"></i> <span id="modal-source" class="font-medium text-white truncate max-w-[150px]">...</span></div>
+                    <div class="bg-slate-800/50 border border-slate-700 rounded-full px-3 py-1 flex items-center gap-2" title="Charter"><i data-lucide="user" class="w-3 h-3 text-slate-500 shrink-0"></i> <span id="modal-charter" class="font-medium text-white truncate max-w-[150px]">...</span></div>
+                    <div class="bg-slate-800/50 border border-slate-700 rounded-full px-3 py-1 flex items-center gap-2" title="Is Master"><i data-lucide="check-circle-2" class="w-3 h-3 text-slate-500 shrink-0"></i> <span id="modal-ismaster" class="font-medium text-white truncate">...</span></div>
                 </div>
             </div>
             
-            <div id="modal-parts-container" class="px-6 pb-4 flex flex-wrap gap-2">
+            <div id="modal-parts-container" class="px-6 pb-6 flex flex-wrap gap-2">
                 <!-- Parts injected here via JS -->
-            </div>
-            
-            <div class="p-6 bg-slate-800/50 border-t border-slate-700 flex justify-end gap-3">
-                <button id="modal-play-btn" class="bg-accent hover:bg-accentHover text-white px-8 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors shadow-lg shadow-accent/20">
-                    <i data-lucide="play" class="w-5 h-5 fill-current"></i>
-                    PLAY NOW
-                </button>
             </div>
         </div>
     </div>
@@ -241,6 +251,8 @@
         let pingInterval = null;
         let fuse = null;
         let lastGroupValue = null;
+        let currentGroups = [];
+        let viewMode = 'list'; // 'list' or 'grid'
         
         // Sorting & Columns State
         let sortState = { col: 'name', dir: 1 }; // 1 = asc, -1 = desc
@@ -255,12 +267,14 @@
             playlist: false,
             source: false,
             year: true,
-            duration: false
+            duration: false,
+            play: true
         };
 
         function updateConnectionUI(connected) {
             const btn = document.getElementById('action-btn');
             const statusDot = document.getElementById('connection-status');
+            const urlInput = document.getElementById('api-url');
 
             if (connected) {
                 statusDot.classList.remove('bg-rose-500', 'shadow-none');
@@ -270,6 +284,7 @@
                 btn.className = "text-rose-500 hover:text-rose-400 p-2 rounded-lg transition-colors";
                 btn.title = "Disconnect";
                 btn.innerHTML = `<i data-lucide="log-out" class="w-5 h-5" id="action-icon"></i>`;
+                urlInput.disabled = true;
             } else {
                 statusDot.classList.remove('bg-emerald-500', 'shadow-[0_0_10px_#10b981]');
                 statusDot.classList.add('bg-rose-500', 'shadow-none');
@@ -278,8 +293,37 @@
                 btn.className = "text-slate-400 hover:text-white p-2 rounded-lg transition-colors";
                 btn.title = "Connect";
                 btn.innerHTML = `<i data-lucide="log-in" class="w-5 h-5" id="action-icon"></i>`;
+                urlInput.disabled = false;
             }
             lucide.createIcons();
+        }
+
+        function toggleViewMode() {
+            viewMode = viewMode === 'list' ? 'grid' : 'list';
+            const listEl = document.getElementById('view-list');
+            const gridEl = document.getElementById('view-grid');
+            const icon = document.getElementById('view-toggle-icon');
+            const text = document.getElementById('view-toggle-text');
+            
+            if (viewMode === 'list') {
+                listEl.classList.remove('hidden');
+                gridEl.classList.add('hidden');
+                icon.setAttribute('data-lucide', 'layout-grid');
+                text.innerText = 'Grid';
+            } else {
+                listEl.classList.add('hidden');
+                gridEl.classList.remove('hidden');
+                icon.setAttribute('data-lucide', 'list');
+                text.innerText = 'List';
+            }
+            lucide.createIcons();
+            
+            // Re-render
+            currentDisplayCount = 0;
+            lastGroupValue = null;
+            document.getElementById('song-list').innerHTML = '';
+            document.getElementById('view-grid').innerHTML = '';
+            loadMore();
         }
 
         function handleConnectionToggle() {
@@ -295,6 +339,7 @@
                 allSongs = [];
                 filteredSongs = [];
                 document.getElementById('song-list').innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500 italic">Disconnected.</td></tr>`;
+                document.getElementById('view-grid').innerHTML = '';
                 document.getElementById('results-count').innerText = '0 songs';
 
                 updateConnectionUI(false);
@@ -438,6 +483,7 @@
             document.getElementById('search-playlist').value = '';
             document.getElementById('search-source').value = '';
             applyFilters();
+            updateJumpBar();
         }
 
         function applyFilters() {
@@ -520,11 +566,27 @@
             
             updateHeaderUI();
             
-            document.getElementById('results-count').innerText = `${filteredSongs.length} songs`;
+            // Update Results Count
+            const countEl = document.getElementById('results-count');
+            if (filteredSongs.length !== allSongs.length) {
+                countEl.innerText = `${filteredSongs.length} songs of ${allSongs.length}`;
+            } else {
+                countEl.innerText = `${filteredSongs.length} songs`;
+            }
+
+            // Toggle Clear Button
+            const hasFilters = global || artist || genre || year || charter || playlist || source;
+            const clearBtn = document.getElementById('clear-search-btn');
+            if (clearBtn) {
+                if (hasFilters) clearBtn.classList.remove('hidden');
+                else clearBtn.classList.add('hidden');
+            }
             
             currentDisplayCount = 0;
             lastGroupValue = null;
+            updateJumpBar();
             document.getElementById('song-list').innerHTML = '';
+            document.getElementById('view-grid').innerHTML = '';
             loadMore(); 
         }
 
@@ -565,6 +627,59 @@
             });
         }
 
+        function updateJumpBar() {
+            const bar = document.getElementById('jump-bar');
+            const scroller = document.getElementById('fast-scroller');
+            const groups = [];
+            let last = null;
+
+            // Only generate if we have a valid grouping column
+            if (['name', 'artist', 'year', 'genre', 'charter', 'source'].includes(sortState.col)) {
+                filteredSongs.forEach((s, i) => {
+                    const g = getGroupValue(s);
+                    if (g !== null && g !== last) {
+                        groups.push({ label: g, index: i });
+                        last = g;
+                    }
+                });
+            }
+            currentGroups = groups;
+
+            if (groups.length < 2) {
+                bar.innerHTML = '';
+                bar.classList.add('hidden');
+                scroller.classList.add('hidden');
+                return;
+            }
+
+            bar.classList.remove('hidden');
+            bar.innerHTML = groups.map(g => 
+                `<button onclick="jumpTo(${g.index})" class="px-3 py-1 bg-slate-800 hover:bg-accent hover:text-white rounded-full text-xs font-bold text-slate-400 whitespace-nowrap transition-colors border border-slate-700">${g.label}</button>`
+            ).join('');
+            
+            // Update Fast Scroller
+            scroller.classList.remove('hidden');
+            // Sample groups if too many to fit visually, but logic uses all
+            const maxVisual = 30; 
+            let visualGroups = groups;
+            if (groups.length > maxVisual) {
+                visualGroups = groups.filter((_, i) => i % Math.ceil(groups.length / maxVisual) === 0);
+            }
+            
+            scroller.innerHTML = visualGroups.map(g => 
+                `<div class="flex-1 flex items-center justify-center w-full hover:text-white transition-colors cursor-pointer" onclick="jumpTo(${g.index})">${g.label.substring(0,1)}</div>`
+            ).join('');
+        }
+
+        function jumpTo(index) {
+            currentDisplayCount = index;
+            lastGroupValue = null; // Reset so the header for this group renders immediately
+            document.getElementById('song-list').innerHTML = '';
+            document.getElementById('view-grid').innerHTML = '';
+            document.getElementById('table-scroll-container').scrollTop = 0;
+            loadMore();
+        }
+
         function initColumnMenu() {
             const menu = document.getElementById('column-menu');
             menu.innerHTML = '';
@@ -582,6 +697,7 @@
                     updateHeaderUI();
                     // Re-render visible rows to apply visibility
                     document.getElementById('song-list').innerHTML = '';
+                    document.getElementById('view-grid').innerHTML = '';
                     currentDisplayCount = 0;
                     loadMore();
                 });
@@ -611,10 +727,8 @@
         }
 
         function getDifficultyColor(diff) {
-            if (diff === 'Expert' || diff === 'ExpertPlus') return 'text-rose-400';
-            if (diff === 'Hard') return 'text-orange-400';
-            if (diff === 'Medium') return 'text-yellow-400';
-            return 'text-emerald-400';
+            if (diff === 'Expert' || diff === 'ExpertPlus') return 'text-accent';
+            return 'text-slate-500';
         }
 
         function getGroupValue(s) {
@@ -637,12 +751,16 @@
         }
 
         function loadMore() {
-            const tbody = document.getElementById('song-list');
+            const container = viewMode === 'list' ? document.getElementById('song-list') : document.getElementById('view-grid');
             const end = Math.min(currentDisplayCount + PAGE_SIZE, filteredSongs.length);
             const baseUrl = document.getElementById('api-url').value.trim();
             
             if (filteredSongs.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500 italic">No songs found.</td></tr>`;
+                if (viewMode === 'list') {
+                    container.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500 italic">No songs found.</td></tr>`;
+                } else {
+                    container.innerHTML = `<div class="col-span-full p-8 text-center text-slate-500 italic">No songs found.</div>`;
+                }
                 return;
             }
 
@@ -651,8 +769,11 @@
                 const s = filteredSongs[i];
                 
                 const groupVal = getGroupValue(s);
-                if (groupVal !== null && groupVal !== lastGroupValue) {
-                    html += `<tr class="bg-slate-800/50 border-b border-slate-700"><td colspan="11" class="px-4 py-2 text-xs font-bold text-accent uppercase tracking-widest">${groupVal}</td></tr>`;
+                if (groupVal !== null && groupVal !== lastGroupValue && viewMode === 'list') {
+                    html += `<tr class="bg-slate-900 border-b border-slate-700"><td colspan="12" class="px-4 py-2 text-xs font-bold text-accent uppercase tracking-widest">${groupVal}</td></tr>`;
+                    lastGroupValue = groupVal;
+                } else if (groupVal !== null && groupVal !== lastGroupValue && viewMode === 'grid') {
+                    html += `<div class="col-span-full bg-slate-900/50 border-b border-slate-700 px-4 py-2 text-xs font-bold text-accent uppercase tracking-widest rounded-lg mt-4">${groupVal}</div>`;
                     lastGroupValue = groupVal;
                 }
                 
@@ -663,14 +784,14 @@
                     const standard = s.parts.filter(p => !p.icon.toLowerCase().includes('pro'));
                     const pro = s.parts.filter(p => p.icon.toLowerCase().includes('pro'));
 
-                    if (standard.length) standardHtml = `<div class="flex gap-1 justify-center text-slate-500">${standard.map(p => `<i data-lucide="${getInstrumentIcon(p.icon)}" class="w-4 h-4"></i>`).join('')}</div>`;
-                    if (pro.length) proHtml = `<div class="flex gap-1 justify-center text-accent/80" title="Pro Instruments">${pro.map(p => `<i data-lucide="${getInstrumentIcon(p.icon)}" class="w-4 h-4 fill-current"></i>`).join('')}</div>`;
+                    if (standard.length) standardHtml = `<div class="flex gap-1 justify-center text-slate-500">${standard.map(p => `<span title="${p.icon}"><i data-lucide="${getInstrumentIcon(p.icon)}" class="w-4 h-4"></i></span>`).join('')}</div>`;
+                    if (pro.length) proHtml = `<div class="flex gap-1 justify-center text-accent/80">${pro.map(p => `<span title="${p.icon}"><i data-lucide="${getInstrumentIcon(p.icon)}" class="w-4 h-4 fill-current"></i></span>`).join('')}</div>`;
                 }
 
-                // Escape single/double quotes to avoid breaking onclick (passing index is safer)
+                if (viewMode === 'list') {
                 html += ` 
                     <tr class="hover:bg-slate-700/50 cursor-pointer transition-colors group border-l-4 border-transparent hover:border-accent" onclick="openModal(${i})"> 
-                        <td class="p-4 ${columnState.name ? '' : 'col-hidden'}"> 
+                        <td class="p-2 sm:p-4 ${columnState.name ? '' : 'col-hidden'}"> 
                             <div class="flex items-center gap-3">
                                 <img src="${baseUrl}/album-art?song=${s.fullHash}" class="w-16 h-16 rounded bg-slate-800 object-cover shadow-sm" loading="lazy" onerror="this.style.display='none'">
                                 <div>
@@ -692,12 +813,57 @@
                         <td class="p-4 text-slate-400 hidden 2xl:table-cell truncate max-w-[150px] ${columnState.source ? '' : 'col-hidden'}" title="${s.source || ''}">${s.source || '-'}</td> 
                         <td class="p-4 text-slate-400 hidden sm:table-cell ${columnState.year ? '' : 'col-hidden'}">${s.year || '-'}</td> 
                         <td class="p-4 text-slate-400 text-right font-mono text-xs ${columnState.duration ? '' : 'col-hidden'}">${s.duration}</td> 
+                        <td class="p-2 text-center sticky right-0 bg-slate-900 group-hover:bg-slate-800 transition-colors border-l border-slate-700 ${columnState.play ? '' : 'col-hidden'}">
+                            <button onclick="playSong(event, '${s.fullHash}')" class="text-accent hover:text-white p-2 rounded-full hover:bg-accent/20 transition-colors" title="Play Now">
+                                <i data-lucide="play" class="w-5 h-5 fill-current"></i>
+                            </button>
+                        </td>
                     </tr> 
                 `; 
+                } else {
+                    // Grid View Card
+                    const infoParts = [];
+                    if (columnState.year && s.year) infoParts.push(s.year);
+                    if (columnState.album && s.album) infoParts.push(s.album);
+                    if (columnState.genre && s.genre) infoParts.push(s.genre);
+                    if (columnState.charter && s.charter) infoParts.push(s.charter);
+                    if (columnState.playlist && s.playlist) infoParts.push(s.playlist);
+                    if (columnState.source && s.source) infoParts.push(s.source);
+                    if (columnState.duration) infoParts.push(s.duration);
+                    if (columnState.isMaster) infoParts.push(s.isMaster ? 'Master' : 'Not Master');
+                    const infoString = infoParts.join(' <span class="text-slate-600 mx-1">&bull;</span> ');
+
+                    html += `
+                    <div class="bg-card rounded-xl border border-slate-700 overflow-hidden hover:border-accent transition-all group relative flex flex-row shadow-sm hover:shadow-lg hover:-translate-y-1 cursor-pointer h-36" onclick="openModal(${i})">
+                        <div class="relative w-36 h-full shrink-0 bg-slate-900">
+                            <img src="${baseUrl}/album-art?song=${s.fullHash}" class="w-full h-full object-cover" loading="lazy" onerror="this.style.display='none'">
+                            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors"></div>
+                            <button onclick="playSong(event, '${s.fullHash}')" class="absolute inset-0 m-auto bg-blue-700 hover:bg-blue-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all scale-0 group-hover:scale-100 opacity-0 group-hover:opacity-100 z-10">
+                                <i data-lucide="play" class="w-5 h-5 fill-current ml-0.5"></i>
+                            </button>
+                        </div>
+                        <div class="p-3 flex-1 flex flex-col min-w-0 overflow-hidden">
+                            <div class="mb-1">
+                                <div class="font-bold text-white text-base leading-tight truncate" title="${s.name || ''}">${s.name || '-'}</div>
+                                <div class="text-accent text-xs font-bold truncate" title="${s.artist || ''}">${s.artist || '-'}</div>
+                            </div>
+                            
+                            <div class="flex-1 flex flex-col gap-1 text-[10px] text-slate-300 overflow-hidden">
+                                <div class="text-xs text-slate-400 leading-snug line-clamp-3 mb-1">
+                                    ${infoString}
+                                </div>
+                                <div class="${columnState.instruments ? '' : 'col-hidden'} w-full flex items-center gap-2 border-t border-slate-700/50 pt-1">
+                                    ${standardHtml} ${proHtml}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+                }
             }
             
             // Using insertAdjacentHTML instead of appendChild in a loop for performance
-            tbody.insertAdjacentHTML('beforeend', html);
+            container.insertAdjacentHTML('beforeend', html);
             currentDisplayCount = end;
             lucide.createIcons();
         }
@@ -725,12 +891,10 @@
             document.getElementById('modal-genre').innerText = s.genre || '-';
             document.getElementById('modal-duration').innerText = s.duration; 
             document.getElementById('modal-charter').innerText = s.charter || '-';
+            document.getElementById('modal-ismaster').innerText = s.isMaster ? 'Master' : 'Not Master';
             
-            let sourceStr = '-';
-            if (s.source) {
-                sourceStr = typeof s.source === 'string' ? s.source : (s.source.Original || JSON.stringify(s.source));
-            }
-            document.getElementById('modal-source').innerText = sourceStr;
+            // We display Playlist in the Source field to match in-game UI behavior
+            document.getElementById('modal-source').innerText = s.playlist || '-';
             
             // Render Parts & Difficulties
             const partsContainer = document.getElementById('modal-parts-container');
@@ -742,11 +906,13 @@
                     
                     const badge = document.createElement('div');
                     badge.className = 'bg-slate-700/50 border border-slate-600 rounded px-2 py-1 flex items-center gap-2 text-xs';
+                    badge.title = p.icon;
                     badge.innerHTML = `<i data-lucide="${icon}" class="w-3 h-3 text-slate-300"></i> <span class="font-mono font-bold tracking-widest">${diffsHtml}</span>`;
                     partsContainer.appendChild(badge);
                 });
             }
 
+            lucide.createIcons();
             modal.classList.add('open');
             // Small delay for transition
             setTimeout(() => {
@@ -773,7 +939,7 @@
             const btn = document.getElementById('modal-play-btn');
             const originalContent = btn.innerHTML;
             
-            btn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> SENDING...`;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-7 h-7 animate-spin"></i>`;
             btn.disabled = true;
             lucide.createIcons();
             
@@ -798,6 +964,37 @@
                 lucide.createIcons();
             }
         });
+
+        async function playSong(e, hash) {
+            e.stopPropagation();
+            if (!hash) return;
+            
+            const btn = e.currentTarget;
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i>`;
+            btn.disabled = true;
+            lucide.createIcons();
+
+            const baseUrl = document.getElementById('api-url').value.trim();
+            try {
+                const response = await fetch(`${baseUrl}/play?song=${hash}`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) { 
+                    showToast("Song sent to play!");
+                } else {
+                    throw new Error(`Error ${response.status}`);
+                }
+            } catch (err) {
+                console.error(err);
+                showToast(`Failed: ${err.message}`);
+            } finally {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+                lucide.createIcons();
+            }
+        }
 
         // Toast Notification
         function showToast(msg) {

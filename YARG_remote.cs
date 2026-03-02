@@ -15,6 +15,7 @@ using YARG.Core.Song;
 using YARG.Menu;
 using YARG.Core.Utility;
 
+
 namespace YargRemoteMod
 { // Namespace name is already English-like, keeping it as is.
     [BepInPlugin("com.gugutab.yarg.remote", "YARG Remote", "1.1.0")]
@@ -174,10 +175,13 @@ namespace YargRemoteMod
                                     tex.LoadRawTextureData((IntPtr)img.Data, img.Width * img.Height * ((int)img.Format));
                                     tex.Apply();
 
-                                    // Fix mirrored image (flip both vertical and horizontal = 180 deg rotation)
+                                    // Fix upside down image (Flip Y only)
                                     var pixels = tex.GetPixels32();
-                                    System.Array.Reverse(pixels);
-                                    tex.SetPixels32(pixels);
+                                    int w = tex.width;
+                                    int h = tex.height;
+                                    var newPixels = new Color32[pixels.Length];
+                                    for (int y = 0; y < h; y++) Array.Copy(pixels, y * w, newPixels, (h - y - 1) * w, w);
+                                    tex.SetPixels32(newPixels);
                                     tex.Apply();
 
                                     // Encode to PNG using reflection to avoid missing assembly reference issues

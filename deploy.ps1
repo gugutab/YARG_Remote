@@ -7,7 +7,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Definição de caminhos
-$targetDir = "C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\0eb8f386-1d56-406c-8367-76a5f84426a5\installation\BepInEx\plugin"
+$targetDir = "C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\0eb8f386-1d56-406c-8367-76a5f84426a5\installation\BepInEx\plugins"
 $exePath = "C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\0eb8f386-1d56-406c-8367-76a5f84426a5\installation\YARG.exe"
 
 # 2. Finaliza o processo do YARG se estiver rodando
@@ -26,8 +26,7 @@ if (!(Test-Path $targetDir)) {
     New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
 }
 Copy-Item ".\index.html" -Destination "$targetDir\index.html" -Force
-Copy-Item ".\bin\Debug
-etstandard2.1\YARG_remote.dll" -Destination "$targetDir\YARG_remote.dll" -Force
+Copy-Item ".\bin\Debug\netstandard2.1\YARG_remote.dll" -Destination "$targetDir\YARG_remote.dll" -Force
 
 # 4. Inicia o YARG.exe
 Write-Host "Iniciando YARG..." -ForegroundColor Green
