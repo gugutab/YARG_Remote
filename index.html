@@ -621,7 +621,6 @@
             }
 
             // Toggle Clear Button
-            const hasFilters = global || song || artist || album || genre || year || charter || source;
             const hasFilters = global || song || artist || album || genre || year || charter || source || !selectedInstruments.has('ALL');
             const clearBtn = document.getElementById('clear-search-btn');
             if (clearBtn) {

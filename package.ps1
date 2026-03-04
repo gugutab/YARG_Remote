@@ -5,7 +5,7 @@ $distDir = "dist"
 # Standard BepInEx structure: BepInEx/plugins/ModName
 $pluginDir = "$distDir\BepInEx\plugins\YARGRemote"
 # Game installation path to copy BepInEx from (Based on your deploy.ps1)
-$gameDir = "C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\a7a5552a-a374-4cda-a648-22af1d24ec09\installation"
+$gameDir = "$env:LOCALAPPDATA\YARC\YARG Installs\a7a5552a-a374-4cda-a648-22af1d24ec09\installation"
 
 # 1. Clean previous builds
 Write-Host "Cleaning old files..." -ForegroundColor Yellow

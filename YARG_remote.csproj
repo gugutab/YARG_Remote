@@ -11,7 +11,7 @@
 
   <PropertyGroup>
     <!-- CAMINHO DO JOGO: Centralizado aqui para facilitar alterações futuras -->
-    <GameDir>C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\a7a5552a-a374-4cda-a648-22af1d24ec09\installation</GameDir>
+    <GameDir>$(LOCALAPPDATA)\YARC\YARG Installs\a7a5552a-a374-4cda-a648-22af1d24ec09\installation</GameDir>
     <ManagedDir>$(GameDir)\YARG_Data\Managed</ManagedDir>
     <BepInExDir>$(GameDir)\BepInEx\core</BepInExDir>
   </PropertyGroup>

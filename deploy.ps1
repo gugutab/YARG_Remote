@@ -7,8 +7,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Path definitions
-$targetDir = "C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\a7a5552a-a374-4cda-a648-22af1d24ec09\installation\BepInEx\plugins"
-$exePath = "C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\a7a5552a-a374-4cda-a648-22af1d24ec09\installation\YARG.exe"
+$gameDir = "$env:LOCALAPPDATA\YARC\YARG Installs\a7a5552a-a374-4cda-a648-22af1d24ec09\installation"
+$targetDir = "$gameDir\BepInEx\plugins"
+$exePath = "$gameDir\YARG.exe"
 
 # 2. Kill YARG process if running
 Write-Host "Checking if YARG is running..." -ForegroundColor Cyan
