@@ -281,11 +281,11 @@
             name: true,
             instruments: true,
             isMaster: false,
-            album: true,
+            album: true, 
             genre: true,
             charter: true,
-            source: false,
-            year: true,
+            source: true,
+            year: false,
             duration: false,
             play: true
         };
@@ -939,9 +939,12 @@
                         <td class="p-4 hidden lg:table-cell ${columnState.genre ? '' : 'col-hidden'}">
                             <div class="text-slate-300 text-sm font-medium">${s.genre || '-'}</div>
                             <div class="text-slate-500 text-xs">${s.subgenre || ''}</div>
-                        </td> 
+                        </td>
                         <td class="p-4 text-slate-400 hidden xl:table-cell truncate max-w-[150px] ${columnState.charter ? '' : 'col-hidden'}" title="${s.charter || ''}">${s.charter || '-'}</td> 
-                        <td class="p-4 text-slate-400 hidden 2xl:table-cell truncate max-w-[150px] ${columnState.source ? '' : 'col-hidden'}" title="${s.playlist || ''}">${s.playlist || '-'}</td> 
+                        <td class="p-4 text-slate-400 hidden 2xl:table-cell truncate max-w-[150px] ${columnState.source ? '' : 'col-hidden'}" title="${s.playlist || ''}">
+                            <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="${s.sourceIconUrl}" class="lazy-img inline-block w-5 h-5 mr-2 align-middle" onerror="this.style.display='none'">
+                            ${s.playlist || '-'}
+                        </td>
                         <td class="p-4 text-slate-400 hidden sm:table-cell ${columnState.year ? '' : 'col-hidden'}">${s.year || '-'}</td> 
                         <td class="p-4 text-slate-400 text-right font-mono text-xs ${columnState.duration ? '' : 'col-hidden'}">${s.duration}</td> 
                         <td class="p-2 text-center sticky right-0 bg-slate-900 group-hover:bg-slate-800 transition-colors border-l border-slate-700 ${columnState.play ? '' : 'col-hidden'}">
@@ -983,7 +986,10 @@
                                     ${infoString}
                                 </div>
                                 <div class="${columnState.instruments ? '' : 'col-hidden'} w-full flex items-center gap-2 border-t border-slate-700/50 pt-1">
-                                    ${standardHtml} ${proHtml}
+                                    ${standardHtml} ${proHtml} 
+                                    <div class="ml-auto flex items-center">
+                                        <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="${s.sourceIconUrl}" class="lazy-img inline-block w-4 h-4 mr-1 align-middle" onerror="this.style.display='none'">
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1091,8 +1097,10 @@
             document.getElementById('modal-charter').innerText = s.charter || '-';
             document.getElementById('modal-ismaster').innerText = s.isMaster ? 'Master' : 'Not Master';
             
-            // We display Playlist in the Source field to match in-game UI behavior
-            document.getElementById('modal-source').innerText = s.playlist || '-';
+            // Display Source Icon and Playlist in the Source field
+            const sourceElement = document.getElementById('modal-source');
+            sourceElement.innerHTML = `<img src="${s.sourceIconUrl}" class="inline-block w-4 h-4 mr-2 align-middle" onerror="this.style.display='none'"> ${s.playlist || '-'}`;
+
             
             // Render Parts & Difficulties
             const partsContainer = document.getElementById('modal-parts-container');

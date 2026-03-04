@@ -80,6 +80,30 @@ namespace YargRemoteMod
             }
         }
 
+        public static string GetLocalIPAddress()
+        {
+            try
+            {
+                var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
+                
+                var addresses = host.AddressList
+                    .Where(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                    .Select(ip => ip.ToString())
+                    .ToList();
+
+                string preferred = addresses.FirstOrDefault(ip => ip.StartsWith("192.168.0."));
+                if (preferred != null) return preferred;
+
+                string fallback = addresses.FirstOrDefault(ip => ip.StartsWith("192.168.") && !ip.StartsWith("192.168.56."));
+                if (fallback != null) return fallback;
+
+                return addresses.FirstOrDefault() ?? "127.0.0.1";
+            }
+            catch 
+            {
+                return "127.0.0.1";
+            }
+        }
         private void ServerLoop()
         {
             while (_isRunning && _listener.IsListening)
@@ -101,6 +125,39 @@ namespace YargRemoteMod
                 }
             }
         }
+
+        private void ProcessImageRequest(HttpListenerContext context, string imageType, string idParamName, Func<string, Tuple<byte[], string, int>> imageLoader)
+        {
+            var request = context.Request;
+            var response = context.Response;
+            string id = request.QueryString[idParamName];
+
+            if (string.IsNullOrEmpty(id))
+            {
+                SendResponse(response, 400, $"{{\"status\": \"error\", \"message\": \"Missing parameter ?{idParamName}=id\"}}");
+                return;
+            }
+
+            using (var mre = new ManualResetEvent(false))
+            {
+                byte[] imageData = null;
+                string contentType = "application/json";
+                int statusCode = 500;
+
+                _mainThreadActions.Enqueue(() =>
+                {
+                    try { var result = imageLoader.Invoke(id); imageData = result.Item1; contentType = result.Item2; statusCode = result.Item3; }
+                    catch (Exception ex) { Logger.LogError($"[YARG Remote] Error processing {imageType} request for ID {id}: {ex.Message}"); imageData = Encoding.UTF8.GetBytes($"{{\"status\": \"error\", \"message\": \"Internal Error processing {imageType}\"}}"); contentType = "application/json"; statusCode = 500; }
+                    finally { mre.Set(); }
+                });
+
+                mre.WaitOne();
+
+                if (imageData != null) { response.ContentType = contentType; response.ContentLength64 = imageData.Length; response.StatusCode = statusCode; using (var outStream = response.OutputStream) { outStream.Write(imageData, 0, imageData.Length); } response.Close(); }
+                else { SendResponse(response, 500, "{\"status\": \"error\", \"message\": \"Unexpected error processing image request\"}"); }
+            }
+        }
+
 
         private void ProcessRequest(HttpListenerContext context) // Method name is already English, keeping it as is.
         {
@@ -144,96 +201,12 @@ namespace YargRemoteMod
                     SendResponse(response, 200, "{\"status\": \"ok\", \"game\": \"YARG\", \"mod\": \"YARG Remote Server\"}");
                 }
                 else if (path == "/play" && request.HttpMethod == "POST")
-                {
-                    string songId = request.QueryString["song"];
-                    if (string.IsNullOrEmpty(songId))
-                    {
-                        SendResponse(response, 400, "{\"status\": \"error\", \"message\": \"Missing parameter ?song=id\"}");
-                        return;
-                    }
-                    
-                    // THE MAGIC HAPPENS HERE: Instead of running the command here (which would crash Unity),
-                    // we enqueue the action for the game's main thread (Update) to execute.
-                    _mainThreadActions.Enqueue(() => PlaySong(songId));
-                    
-                    SendResponse(response, 200, $"{{\"status\": \"ok\", \"message\": \"Song {songId} sent to game queue!\"}}");
-                }
+                { string songId = request.QueryString["song"]; if (string.IsNullOrEmpty(songId)) { SendResponse(response, 400, "{\"status\": \"error\", \"message\": \"Missing parameter ?song=id\"}"); return; } _mainThreadActions.Enqueue(() => PlaySong(songId)); SendResponse(response, 200, $"{{\"status\": \"ok\", \"message\": \"Song {songId} sent to game queue!\"}}"); }
                 else if (path == "/album-art" && request.HttpMethod == "GET")
                 {
-                    string songId = request.QueryString["song"];
-                    if (string.IsNullOrEmpty(songId)) { SendResponse(response, 400, "Missing song id"); return; }
-
-                    // Enqueue to main thread because we need to use Unity's Texture2D and YARG's loaders safely
-                    _mainThreadActions.Enqueue(() => {
-                        try {
-                            var song = SongContainer.Songs.FirstOrDefault(s => s.Hash.ToString() == songId || s.Hash.GetHashCode().ToString() == songId);
-                            if (song == null) {
-                                SendResponse(response, 404, "Song not found");
-                                return;
-                            }
-
-                            // Use unsafe block for pointer operations
-                            unsafe {
-                                using (var img = song.LoadAlbumData())
-                                {
-                                    if (img == null || img.Data == null) {
-                                        SendResponse(response, 404, "No art");
-                                        return;
-                                    }
-
-                                    // Determine format (assuming 3=RGB, 4=RGBA based on stb_image standard)
-                                    TextureFormat tf = TextureFormat.RGBA32;
-                                    if ((int)img.Format == 3) tf = TextureFormat.RGB24;
-
-                                    // Create temporary texture to convert raw bytes to PNG
-                                    Texture2D tex = new Texture2D(img.Width, img.Height, tf, false);
-                                    tex.LoadRawTextureData((IntPtr)img.Data, img.Width * img.Height * ((int)img.Format));
-                                    tex.Apply();
-
-                                    // Fix upside down image (Flip Y only)
-                                    var pixels = tex.GetPixels32();
-                                    int w = tex.width;
-                                    int h = tex.height;
-                                    var newPixels = new Color32[pixels.Length];
-                                    for (int y = 0; y < h; y++) Array.Copy(pixels, y * w, newPixels, (h - y - 1) * w, w);
-                                    tex.SetPixels32(newPixels);
-                                    tex.Apply();
-
-                                    // Encode to PNG using reflection to avoid missing assembly reference issues
-                                    byte[] pngData = null;
-                                    var encodeMethod = typeof(Texture2D).GetMethod("EncodeToPNG");
-                                    if (encodeMethod != null) {
-                                        pngData = (byte[])encodeMethod.Invoke(tex, null);
-                                    } else {
-                                        // Fallback for newer Unity versions or if extension method is hidden
-                                        var imgConv = Type.GetType("UnityEngine.ImageConversion, UnityEngine.ImageConversionModule");
-                                        if (imgConv != null) {
-                                            var m = imgConv.GetMethod("EncodeToPNG", new[] { typeof(Texture2D) });
-                                            if (m != null) pngData = (byte[])m.Invoke(null, new object[] { tex });
-                                        }
-                                    }
-
-                                    Destroy(tex); // Cleanup Unity texture
-
-                                    if (pngData != null) {
-                                        response.ContentType = "image/png";
-                                        response.ContentLength64 = pngData.Length;
-                                        response.StatusCode = 200;
-                                        using (var outStream = response.OutputStream) {
-                                            outStream.Write(pngData, 0, pngData.Length);
-                                        }
-                                        response.Close();
-                                    } else {
-                                        Logger.LogError("[YARG Remote] EncodeToPNG method not found via reflection.");
-                                        SendResponse(response, 500, "Encoding Error");
-                                    }
-                                }
-                            }
-                        } catch (Exception ex) {
-                            Logger.LogError($"[YARG Remote] Error fetching art: {ex.Message}");
-                            SendResponse(response, 500, "Internal Error");
-                        }
-                    });
+                    ProcessImageRequest(context, "album art", "song", LoadAlbumArtOnMainThread);
+                } else if (path == "/source-icon" && request.HttpMethod == "GET") {
+                    ProcessImageRequest(context, "source icon", "source", LoadSourceIconOnMainThread);
                 }
                 else if (path == "/songs" && request.HttpMethod == "GET")
                 {
@@ -304,6 +277,7 @@ namespace YargRemoteMod
                         sb.Append($"\"album\":\"{EscapeJson(RichTextUtils.StripRichTextTags(s.Album))}\",");
                         sb.Append($"\"genre\":\"{EscapeJson(RichTextUtils.StripRichTextTags(s.Genre))}\",");
                         sb.Append($"\"charter\":\"{EscapeJson(RichTextUtils.StripRichTextTags(s.Charter))}\",");
+                        sb.Append($"\"sourceIconUrl\":\"http://{GetLocalIPAddress()}:{Port}/source-icon?source={Uri.EscapeDataString(s.Source)}\",");
                         sb.Append($"\"playlist\":\"{EscapeJson(RichTextUtils.StripRichTextTags(s.Playlist))}\",");
                         sb.Append($"\"source\":\"{EscapeJson(RichTextUtils.StripRichTextTags(s.Source))}\",");
                         sb.Append($"\"isMaster\":{(s.IsMaster ? "true" : "false")},");
@@ -347,6 +321,93 @@ namespace YargRemoteMod
         // ========================================================================= //
         // MAIN THREAD METHODS (UNITY AND YARG NATIVE CODE) //
         // ========================================================================= //
+
+        private byte[] EncodeTextureToPNG(Texture2D tex)
+        {
+            byte[] pngData = null;
+            var encodeMethod = typeof(Texture2D).GetMethod("EncodeToPNG");
+            if (encodeMethod != null)
+            {
+                pngData = (byte[])encodeMethod.Invoke(tex, null);
+            }
+            else
+            {
+                var imgConv = Type.GetType("UnityEngine.ImageConversion, UnityEngine.ImageConversionModule");
+                if (imgConv != null)
+                {
+                    var m = imgConv.GetMethod("EncodeToPNG", new[] { typeof(Texture2D) });
+                    if (m != null) pngData = (byte[])m.Invoke(null, new object[] { tex });
+                }
+            }
+            return pngData;
+        }
+
+        private Tuple<byte[], string, int> LoadAlbumArtOnMainThread(string songId)
+        {
+            var song = SongContainer.Songs.FirstOrDefault(s => s.Hash.ToString() == songId || s.Hash.GetHashCode().ToString() == songId);
+            if (song == null)
+            {
+                return Tuple.Create(Encoding.UTF8.GetBytes("{\"status\": \"error\", \"message\": \"Song not found\"}"), "application/json", 404);
+            }
+
+            unsafe
+            {
+                using (var img = song.LoadAlbumData())
+                {
+                    if (img == null || img.Data == null)
+                    {
+                        return Tuple.Create(Encoding.UTF8.GetBytes("{\"status\": \"error\", \"message\": \"No album art found\"}"), "application/json", 404);
+                    }
+
+                    TextureFormat tf = TextureFormat.RGBA32;
+                    if ((int)img.Format == 3) tf = TextureFormat.RGB24;
+
+                    Texture2D tex = new Texture2D(img.Width, img.Height, tf, false);
+                    tex.LoadRawTextureData((IntPtr)img.Data, img.Width * img.Height * ((int)img.Format));
+                    tex.Apply();
+
+                    var pixels = tex.GetPixels32();
+                    int w = tex.width;
+                    int h = tex.height;
+                    var newPixels = new Color32[pixels.Length];
+                    for (int y = 0; y < h; y++) Array.Copy(pixels, y * w, newPixels, (h - y - 1) * w, w);
+                    tex.SetPixels32(newPixels);
+                    tex.Apply();
+
+                    byte[] pngData = EncodeTextureToPNG(tex);
+                    Destroy(tex);
+
+                    if (pngData != null) { return Tuple.Create(pngData, "image/png", 200); }
+                    else { Logger.LogError("[YARG Remote] EncodeToPNG failed for album art."); return Tuple.Create(Encoding.UTF8.GetBytes("{\"status\": \"error\", \"message\": \"Encoding Error for album art\"}"), "application/json", 500); }
+                }
+            }
+        }
+
+        private Tuple<byte[], string, int> LoadSourceIconOnMainThread(string sourceName)
+        {
+            var songSourcesType = typeof(YARG.Song.SongSources);
+            var sourceToIconMethod = songSourcesType.GetMethod("SourceToIcon", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+
+            if (sourceToIconMethod == null) { Logger.LogError("[YARG Remote] YARG.Song.SongSources.SourceToIcon method not found via reflection."); return Tuple.Create(Encoding.UTF8.GetBytes("{\"status\": \"error\", \"message\": \"Internal mod error: SourceToIcon method not found\"}"), "application/json", 500); }
+
+            Sprite sprite = (Sprite)sourceToIconMethod.Invoke(null, new object[] { sourceName });
+
+            if (sprite == null) { return Tuple.Create(Encoding.UTF8.GetBytes("{\"status\": \"error\", \"message\": \"Source icon not found for " + sourceName + "\"}"), "application/json", 404); }
+
+            Texture2D originalTexture = sprite.texture;
+            Rect rect = sprite.textureRect;
+
+            Texture2D tex = new Texture2D((int)rect.width, (int)rect.height, TextureFormat.RGBA32, false);
+            RenderTexture currentRT = RenderTexture.active; RenderTexture renderTex = RenderTexture.GetTemporary(originalTexture.width, originalTexture.height, 0, RenderTextureFormat.Default, RenderTextureReadWrite.Linear); Graphics.Blit(originalTexture, renderTex); RenderTexture.active = renderTex;
+            tex.ReadPixels(rect, 0, 0); tex.Apply();
+            RenderTexture.active = currentRT; RenderTexture.ReleaseTemporary(renderTex);
+
+            byte[] pngData = EncodeTextureToPNG(tex);
+            Destroy(tex);
+
+            if (pngData != null) { return Tuple.Create(pngData, "image/png", 200); }
+            else { Logger.LogError("[YARG Remote] EncodeToPNG failed for source icon."); return Tuple.Create(Encoding.UTF8.GetBytes("{\"status\": \"error\", \"message\": \"Encoding Error for source icon\"}"), "application/json", 500); }
+        }
 
         private void Update() // Method name is already English, keeping it as is.
         {
@@ -464,45 +525,10 @@ private void PlaySong(string songId) // Method name is already English, keeping 
 
             string versionLine = $"<b>YARG {version}</b> {buildType} ({graphics})";
 
-            // 3. Dados do WebServer
-            int port = YargRemotePlugin.Instance.Port;
-            string status = YargRemotePlugin.Instance.IsServerRunning ? "<color=green>Online</color>" : "<color=red>Offline</color>";
-            string ip = GetLocalIPAddress();
-            
-            // 4. Combina as linhas (Segunda linha com 50% do tamanho)
-            ____watermarkText.text = $"<size=80%>{versionLine}</size>\n<size=60%>Remote [{status}]: http://{ip}:{port}/</size>";
-
-            // Bloqueia o Start original para não desativar o objeto ou sobrescrever o texto
-            return false;
-        }
-
-        private static string GetLocalIPAddress()
-        {
-            try
-            {
-                var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
-                
-                // Converte para lista para facilitar a busca
-                var addresses = host.AddressList
-                    .Where(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-                    .Select(ip => ip.ToString())
-                    .ToList();
-
-                // 1. Tenta encontrar especificamente o IP que começa com a sua faixa de rede real
-                string preferred = addresses.FirstOrDefault(ip => ip.StartsWith("192.168.0."));
-                if (preferred != null) return preferred;
-
-                // 2. Se não achar, tenta qualquer 192.168.x.x que NÃO seja o da rede virtual (56.x costuma ser VirtualBox)
-                string fallback = addresses.FirstOrDefault(ip => ip.StartsWith("192.168.") && !ip.StartsWith("192.168.56."));
-                if (fallback != null) return fallback;
-
-                // 3. Se ainda assim não achar nada específico, pega o primeiro da lista ou localhost
-                return addresses.FirstOrDefault() ?? "127.0.0.1";
-            }
-            catch 
-            {
-                return "127.0.0.1";
-            }
+            // 3. WebServer Data
+            int port = YargRemotePlugin.Instance.Port; string status = YargRemotePlugin.Instance.IsServerRunning ? "<color=green>Online</color>" : "<color=red>Offline</color>"; string ip = YargRemotePlugin.GetLocalIPAddress();
+            // 4. Combine lines (Second line 50% size)
+            ____watermarkText.text = $"<size=80%>{versionLine}</size>\n<size=60%>Remote [{status}]: http://{ip}:{port}/</size>"; return false;
         }
     }
     
