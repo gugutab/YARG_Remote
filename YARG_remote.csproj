@@ -40,6 +40,10 @@
       <HintPath>$(ManagedDir)\UnityEngine.ImageConversionModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(ManagedDir)\Unity.TextMeshPro.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
 
     <!-- YARG -->
     <Reference Include="Assembly-CSharp">

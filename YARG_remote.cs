@@ -13,13 +13,19 @@ using YARG.Song;
 using YARG.Core.Song;
 using YARG.Menu;
 using YARG.Core.Utility;
-
+using HarmonyLib;
+using TMPro;
+using YARG.Menu.Persistent;
 
 namespace YargRemoteMod
 { 
     [BepInPlugin("com.gugutab.yarg.remote", "YARG Remote", "1.1.0")]
     public class YargRemotePlugin : BaseUnityPlugin
     {
+        public static YargRemotePlugin Instance { get; private set; }
+        public int Port => _portConfig.Value;
+        public bool IsServerRunning => _isRunning;
+        
         private ConfigEntry<int> _portConfig;
         private HttpListener _listener;
         private Thread _serverThread;
@@ -30,6 +36,12 @@ namespace YargRemoteMod
 
         private void Awake()
         {
+            Instance = this;
+
+            // Inicializa o Harmony para aplicar os patches
+            var harmony = new Harmony("com.gugutab.yarg.remote");
+            harmony.PatchAll();
+
             Logger.LogInfo("=======================================");
             Logger.LogInfo("YARG Remote Server Starting...");
             Logger.LogInfo("=======================================");
@@ -427,4 +439,71 @@ private void PlaySong(string songId) // Method name is already English, keeping 
                     .Replace("\t", "\\t");
         }
     };
+
+
+[HarmonyPatch(typeof(YARG.Menu.Persistent.DevWatermark), "Start")]
+    public static class DevWatermark_Start_Patch
+    {
+        // Usamos Prefix retornando false para cancelar a execução do Start() original
+        // O campo _watermarkText ganha 3 underlines a mais (____watermarkText) por exigência do Harmony
+        public static bool Prefix(YARG.Menu.Persistent.DevWatermark __instance, ref TextMeshProUGUI ____watermarkText)
+        {
+            // 1. Força a ativação para que apareça em builds de release/estáveis
+            __instance.gameObject.SetActive(true);
+
+            // 2. Reconstrói o texto de versão seguindo a lógica original do jogo
+            string version = YARG.GlobalVariables.Instance.CurrentVersion;
+            string graphics = SystemInfo.graphicsDeviceType.ToString();
+            string buildType = "Development Build"; // Padrão para mods
+
+            if (Application.isEditor) {
+                buildType = "Unity Editor";
+            } else if (version.Contains("nightly")) {
+                buildType = "Nightly Build";
+            }
+
+            string versionLine = $"<b>YARG {version}</b> {buildType} ({graphics})";
+
+            // 3. Dados do WebServer
+            int port = YargRemotePlugin.Instance.Port;
+            string status = YargRemotePlugin.Instance.IsServerRunning ? "<color=green>Online</color>" : "<color=red>Offline</color>";
+            string ip = GetLocalIPAddress();
+            
+            // 4. Combina as linhas (Segunda linha com 50% do tamanho)
+            ____watermarkText.text = $"<size=80%>{versionLine}</size>\n<size=60%>Remote [{status}]: http://{ip}:{port}/</size>";
+
+            // Bloqueia o Start original para não desativar o objeto ou sobrescrever o texto
+            return false;
+        }
+
+        private static string GetLocalIPAddress()
+        {
+            try
+            {
+                var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
+                
+                // Converte para lista para facilitar a busca
+                var addresses = host.AddressList
+                    .Where(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                    .Select(ip => ip.ToString())
+                    .ToList();
+
+                // 1. Tenta encontrar especificamente o IP que começa com a sua faixa de rede real
+                string preferred = addresses.FirstOrDefault(ip => ip.StartsWith("192.168.0."));
+                if (preferred != null) return preferred;
+
+                // 2. Se não achar, tenta qualquer 192.168.x.x que NÃO seja o da rede virtual (56.x costuma ser VirtualBox)
+                string fallback = addresses.FirstOrDefault(ip => ip.StartsWith("192.168.") && !ip.StartsWith("192.168.56."));
+                if (fallback != null) return fallback;
+
+                // 3. Se ainda assim não achar nada específico, pega o primeiro da lista ou localhost
+                return addresses.FirstOrDefault() ?? "127.0.0.1";
+            }
+            catch 
+            {
+                return "127.0.0.1";
+            }
+        }
+    }
+    
 }
