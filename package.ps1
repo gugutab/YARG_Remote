@@ -56,6 +56,13 @@ CONFIGURATION:
 - If you need to change the port (default 8888), start the game once and then edit the file:
   BepInEx/config/com.gugutab.yarg.remote.cfg
 
+HOW TO DEBUG:
+Step 1: Activate the terminal window
+  - Navigate to the BepInEx config folder: \BepInEx\config\
+  - Open the file BepInEx.cfg in VS Code or Notepad.
+  - Press Ctrl + F and search for [Logging.Console].
+  - Set Enabled = true
+
 SOURCE CODE:
 https://github.com/gugutab/YARG_Remote
 "@

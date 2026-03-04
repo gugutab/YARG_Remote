@@ -7,8 +7,6 @@
     <Version>1.1.0</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
-    <!-- Ignora avisos de versão de assembly que são comuns em mods -->
-    <NoWarn>MSB3277</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -43,7 +41,7 @@
       <Private>False</Private>
     </Reference>
 
-    <!-- YARG & Dependências -->
+    <!-- YARG -->
     <Reference Include="Assembly-CSharp">
       <HintPath>$(ManagedDir)\Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
@@ -52,12 +50,10 @@
       <HintPath>$(ManagedDir)\Assembly-CSharp-firstpass.dll</HintPath>
       <Private>False</Private>
     </Reference>
+
+    <!-- YARG -->
     <Reference Include="YARG.Core">
       <HintPath>$(ManagedDir)\YARG.Core.Package.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>$(ManagedDir)\Newtonsoft.Json.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>

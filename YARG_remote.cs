@@ -9,7 +9,6 @@ using BepInEx;
 using BepInEx.Configuration;
 using UnityEngine;
 
-using Newtonsoft.Json;
 using YARG.Song;
 using YARG.Core.Song;
 using YARG.Menu;
@@ -234,8 +233,9 @@ namespace YargRemoteMod
                         return;
                     }
 
-                    // We create the list of objects before the loop
-                    var songDataList = new List<object>();
+                    // Manual JSON construction to avoid Newtonsoft.Json dependency
+                    var sb = new StringBuilder();
+                    sb.Append("[");
                     
                     // We get the count of the original Array
                     int totalCount = allSongs.Length;
@@ -246,53 +246,63 @@ namespace YargRemoteMod
 
                     for (int i = 0; i < limit; i++)
                     {
+                        if (i > 0) sb.Append(",");
+
                         var s = allSongs[i];
-                        // TECHNICAL CORRECTION:
-                        // 1. SortString is a struct, so we only use .Name without the '?'
-                        // 2. Year and SongLength are inside the game's internal class
                         
-                        var parts = new List<object>();
+                        // Build Parts JSON
+                        var partsSb = new StringBuilder();
+                        partsSb.Append("[");
+                        bool firstPart = true;
+
                         foreach (var inst in instruments)
                         {
                             if (inst == YARG.Core.Instrument.Band) continue;
 
-                            var diffs = new List<string>();
+                            var diffsSb = new StringBuilder();
+                            bool firstDiff = true;
+                            bool hasDiffs = false;
+
                             foreach (var diff in difficulties)
                             {
                                 if (s.HasDifficultyForInstrument(inst, diff))
                                 {
-                                    diffs.Add(diff.ToString());
+                                    if (!firstDiff) diffsSb.Append(",");
+                                    diffsSb.Append($"\"{diff}\"");
+                                    firstDiff = false;
+                                    hasDiffs = true;
                                 }
                             }
 
-                            if (diffs.Count > 0)
+                            if (hasDiffs)
                             {
-                                parts.Add(new {
-                                    icon = inst.ToString(),
-                                    difficulties = diffs
-                                });
+                                if (!firstPart) partsSb.Append(",");
+                                partsSb.Append($"{{\"icon\":\"{inst}\",\"difficulties\":[{diffsSb}]}}");
+                                firstPart = false;
                             }
                         }
+                        partsSb.Append("]");
 
-                        songDataList.Add(new {
-                            id = s.Hash.GetHashCode().ToString(),
-                            fullHash = s.Hash.ToString(),
-                            name = RichTextUtils.StripRichTextTags(s.Name),
-                            artist = RichTextUtils.StripRichTextTags(s.Artist),
-                            album = RichTextUtils.StripRichTextTags(s.Album),
-                            genre = RichTextUtils.StripRichTextTags(s.Genre),
-                            charter = RichTextUtils.StripRichTextTags(s.Charter),
-                            playlist = RichTextUtils.StripRichTextTags(s.Playlist),
-                            source = RichTextUtils.StripRichTextTags(s.Source),
-                            parts = parts,
-                            isMaster = s.IsMaster,
-                            year = s.YearAsNumber == int.MaxValue ? "-" : s.YearAsNumber.ToString(),
-                            duration = $"{(long)(s.SongLengthMilliseconds / 1000 / 60)}:{(long)(s.SongLengthMilliseconds / 1000 % 60):D2}"
-                        });
+                        // Build Song JSON
+                        sb.Append("{");
+                        sb.Append($"\"id\":\"{s.Hash.GetHashCode()}\",");
+                        sb.Append($"\"fullHash\":\"{s.Hash}\",");
+                        sb.Append($"\"name\":\"{EscapeJson(RichTextUtils.StripRichTextTags(s.Name))}\",");
+                        sb.Append($"\"artist\":\"{EscapeJson(RichTextUtils.StripRichTextTags(s.Artist))}\",");
+                        sb.Append($"\"album\":\"{EscapeJson(RichTextUtils.StripRichTextTags(s.Album))}\",");
+                        sb.Append($"\"genre\":\"{EscapeJson(RichTextUtils.StripRichTextTags(s.Genre))}\",");
+                        sb.Append($"\"charter\":\"{EscapeJson(RichTextUtils.StripRichTextTags(s.Charter))}\",");
+                        sb.Append($"\"playlist\":\"{EscapeJson(RichTextUtils.StripRichTextTags(s.Playlist))}\",");
+                        sb.Append($"\"source\":\"{EscapeJson(RichTextUtils.StripRichTextTags(s.Source))}\",");
+                        sb.Append($"\"isMaster\":{(s.IsMaster ? "true" : "false")},");
+                        sb.Append($"\"year\":\"{(s.YearAsNumber == int.MaxValue ? "-" : s.YearAsNumber.ToString())}\",");
+                        sb.Append($"\"duration\":\"{(long)(s.SongLengthMilliseconds / 1000 / 60)}:{(long)(s.SongLengthMilliseconds / 1000 % 60):D2}\",");
+                        sb.Append($"\"parts\":{partsSb}");
+                        sb.Append("}");
                     }
-
-                    // Serializes the list that was populated in the loop
-                    string json = JsonConvert.SerializeObject(songDataList);
+                    sb.Append("]");
+                    
+                    string json = sb.ToString();
 
                     SendResponse(response, 200, json);
                 }
