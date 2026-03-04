@@ -6,10 +6,10 @@ using System.Text;
 using System.Threading;
 using System.Linq;
 using BepInEx;
+using BepInEx.Configuration;
 using UnityEngine;
 
-// Namespaces confirmados nos ficheiros do jogo
-using Newtonsoft.Json; // Adicione este
+using Newtonsoft.Json;
 using YARG.Song;
 using YARG.Core.Song;
 using YARG.Menu;
@@ -17,25 +17,29 @@ using YARG.Core.Utility;
 
 
 namespace YargRemoteMod
-{ // Namespace name is already English-like, keeping it as is.
+{ 
     [BepInPlugin("com.gugutab.yarg.remote", "YARG Remote", "1.1.0")]
     public class YargRemotePlugin : BaseUnityPlugin
     {
+        private ConfigEntry<int> _portConfig;
         private HttpListener _listener;
         private Thread _serverThread;
         private bool _isRunning;
         
-        // Fila segura para transferir ações do Servidor HTTP para a Thread Principal do Unity
+        // Safe queue to transfer actions from HTTP Server to Unity Main Thread
         private readonly ConcurrentQueue<Action> _mainThreadActions = new ConcurrentQueue<Action>();
 
         private void Awake()
         {
             Logger.LogInfo("=======================================");
-            Logger.LogInfo("YARG Remote Server Iniciando...");
+            Logger.LogInfo("YARG Remote Server Starting...");
             Logger.LogInfo("=======================================");
             
-            // Inicia o servidor na porta 8080 (pode alterar se quiser)
-            StartServer(8080); 
+            // Port configuration (allows user to change in BepInEx config file)
+            _portConfig = Config.Bind("Server", "Port", 8888, "TCP port for the YARG Remote web server.");
+
+            // Starts the server on the configured port
+            StartServer(_portConfig.Value); 
         }
 
         private void StartServer(int port)
@@ -43,12 +47,12 @@ namespace YargRemoteMod
             try
             {
                 _listener = new HttpListener();
-                // O prefixo "+" permite conexões de qualquer IP da sua rede LAN
+                // The "+" prefix allows connections from any IP on your LAN
                 _listener.Prefixes.Add($"http://+:{port}/"); 
                 _listener.Start();
                 _isRunning = true;
 
-                // Inicia o servidor em uma Thread separada para não travar o jogo
+                // Starts the server in a separate Thread to avoid freezing the game
                 _serverThread = new Thread(ServerLoop)
                 {
                     IsBackground = true,
@@ -56,12 +60,12 @@ namespace YargRemoteMod
                 };
                 _serverThread.Start();
 
-                Logger.LogInfo($"[YARG Remote] Escutando comandos na rede em http://localhost:{port}/");
+                Logger.LogInfo($"[YARG Remote] Listening for commands on network at http://localhost:{port}/");
             }
             catch (Exception ex)
             {
-                Logger.LogError($"[YARG Remote] Erro crítico ao iniciar porta {port}: {ex.Message}");
-                Logger.LogError("DICA: Inicie o jogo como Administrador se a porta estiver sendo negada pelo Windows.");
+                Logger.LogError($"[YARG Remote] Critical error starting port {port}: {ex.Message}");
+                Logger.LogError("TIP: Run the game as Administrator if the port is being denied by Windows.");
             }
         }
 
@@ -71,13 +75,13 @@ namespace YargRemoteMod
             {
                 try
                 {
-                    // Pausa a thread até receber uma requisição HTTP
+                    // Pauses the thread until an HTTP request is received
                     var context = _listener.GetContext();
                     ProcessRequest(context);
                 }
                 catch (HttpListenerException)
                 {
-                    // Exceção normal disparada quando forçamos o _listener a parar no OnDestroy()
+                    // Normal exception thrown when we force _listener to stop in OnDestroy()
                     break;
                 }
                 catch (Exception ex)

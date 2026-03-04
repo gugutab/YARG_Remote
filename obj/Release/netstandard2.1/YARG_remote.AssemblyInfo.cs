@@ -11,7 +11,7 @@ using System;
 using System.Reflection;
 
 [assembly: System.Reflection.AssemblyCompanyAttribute("YARG_remote")]
-[assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
+[assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.1.0.0")]
 [assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.1.0+37200dbb1cf594528c370855983693568197e743")]
 [assembly: System.Reflection.AssemblyProductAttribute("YARG Remote")]

@@ -1,0 +1,10 @@
+C:\Users\GuguTab\Documents\Work\YARG_remote\obj\Release\netstandard2.1\YARG_remote.csproj.AssemblyReference.cache
+C:\Users\GuguTab\Documents\Work\YARG_remote\obj\Release\netstandard2.1\YARG_remote.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\GuguTab\Documents\Work\YARG_remote\obj\Release\netstandard2.1\YARG_remote.AssemblyInfoInputs.cache
+C:\Users\GuguTab\Documents\Work\YARG_remote\obj\Release\netstandard2.1\YARG_remote.AssemblyInfo.cs
+C:\Users\GuguTab\Documents\Work\YARG_remote\obj\Release\netstandard2.1\YARG_remote.csproj.CoreCompileInputs.cache
+C:\Users\GuguTab\Documents\Work\YARG_remote\bin\Release\netstandard2.1\YARG_remote.deps.json
+C:\Users\GuguTab\Documents\Work\YARG_remote\bin\Release\netstandard2.1\YARG_remote.dll
+C:\Users\GuguTab\Documents\Work\YARG_remote\bin\Release\netstandard2.1\YARG_remote.pdb
+C:\Users\GuguTab\Documents\Work\YARG_remote\obj\Release\netstandard2.1\YARG_remote.dll
+C:\Users\GuguTab\Documents\Work\YARG_remote\obj\Release\netstandard2.1\YARG_remote.pdb

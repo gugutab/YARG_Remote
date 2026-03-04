@@ -1,72 +1,64 @@
-﻿<!-- <Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
-    <ImplicitUsings>disable</ImplicitUsings>
-    <Nullable>disable</Nullable>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <Reference Include="BepInEx">
-      <HintPath>C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\0eb8f386-1d56-406c-8367-76a5f84426a5\installation\BepInEx\core\BepInEx.dll</HintPath>
-    </Reference>
-    
-    <Reference Include="UnityEngine">
-      <HintPath>C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\0eb8f386-1d56-406c-8367-76a5f84426a5\installation\YARG_Data\Managed\UnityEngine.dll</HintPath>
-    </Reference>
-
-    <Reference Include="UnityEngine.CoreModule">
-      <HintPath>C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\0eb8f386-1d56-406c-8367-76a5f84426a5\installation\YARG_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
-    </Reference>
-
-    <Reference Include="Assembly-CSharp">
-      <HintPath>C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\0eb8f386-1d56-406c-8367-76a5f84426a5\installation\YARG_Data\Managed\Assembly-CSharp.dll</HintPath>
-    </Reference>
-
-    <Reference Include="YARG.Core">
-      <HintPath>C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\0eb8f386-1d56-406c-8367-76a5f84426a5\installation\YARG_Data\Managed\YARG.Core.dll</HintPath>
-      <Aliases>YargCore</Aliases>
-    </Reference>
-
-    <Reference Include="Unity.TextMeshPro">
-      <HintPath>C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\0eb8f386-1d56-406c-8367-76a5f84426a5\installation\YARG_Data\Managed\Unity.TextMeshPro.dll</HintPath>
-    </Reference>
-    
-  </ItemGroup>
-
-</Project> -->
-
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <TargetFramework>netstandard2.1</TargetFramework>
-    <ImplicitUsings>disable</ImplicitUsings>
-    <Nullable>disable</Nullable>
-    <NoWarn>MSB3277</NoWarn>
+    <AssemblyName>YARG_remote</AssemblyName>
+    <Product>YARG Remote</Product>
+    <Version>1.1.0</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+    <!-- Ignora avisos de versão de assembly que são comuns em mods -->
+    <NoWarn>MSB3277</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- CAMINHO DO JOGO: Centralizado aqui para facilitar alterações futuras -->
+    <GameDir>C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\a7a5552a-a374-4cda-a648-22af1d24ec09\installation</GameDir>
+    <ManagedDir>$(GameDir)\YARG_Data\Managed</ManagedDir>
+    <BepInExDir>$(GameDir)\BepInEx\core</BepInExDir>
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- BepInEx -->
     <Reference Include="BepInEx">
-      <HintPath>C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\0eb8f386-1d56-406c-8367-76a5f84426a5\installation\BepInEx\core\BepInEx.dll</HintPath>
+      <HintPath>$(BepInExDir)\BepInEx.dll</HintPath>
+      <Private>False</Private>
     </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(BepInExDir)\0Harmony.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+
+    <!-- Unity -->
     <Reference Include="UnityEngine">
-      <HintPath>C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\0eb8f386-1d56-406c-8367-76a5f84426a5\installation\YARG_Data\Managed\UnityEngine.dll</HintPath>
+      <HintPath>$(ManagedDir)\UnityEngine.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\0eb8f386-1d56-406c-8367-76a5f84426a5\installation\YARG_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>$(ManagedDir)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>False</Private>
     </Reference>
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>$(ManagedDir)\UnityEngine.ImageConversionModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+
+    <!-- YARG & Dependências -->
     <Reference Include="Assembly-CSharp">
-      <HintPath>C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\0eb8f386-1d56-406c-8367-76a5f84426a5\installation\YARG_Data\Managed\Assembly-CSharp.dll</HintPath>
-    </Reference>
-    <Reference Include="YARG.Core">
-      <HintPath>C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\0eb8f386-1d56-406c-8367-76a5f84426a5\installation\YARG_Data\Managed\YARG.Core.Package.dll</HintPath>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\0eb8f386-1d56-406c-8367-76a5f84426a5\installation\YARG_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <HintPath>$(ManagedDir)\Assembly-CSharp.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="Assembly-CSharp-firstpass">
-      <HintPath>C:\Users\GuguTab\AppData\Local\YARC\YARG Installs\0eb8f386-1d56-406c-8367-76a5f84426a5\installation\YARG_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
+      <HintPath>$(ManagedDir)\Assembly-CSharp-firstpass.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="YARG.Core">
+      <HintPath>$(ManagedDir)\YARG.Core.Package.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(ManagedDir)\Newtonsoft.Json.dll</HintPath>
+      <Private>False</Private>
     </Reference>
   </ItemGroup>
 

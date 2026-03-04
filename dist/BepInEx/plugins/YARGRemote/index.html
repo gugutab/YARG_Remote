@@ -679,7 +679,6 @@
                 { id: 'search-source', label: 'Source' }
             ];
 
-            container.innerHTML = filters.map(f => {
             let html = '';
             
             if (!selectedInstruments.has('ALL')) {
@@ -1174,89 +1173,6 @@
             btn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i>`;
             btn.disabled = true;
             lucide.createIcons();
-
-            const baseUrl = document.getElementById('api-url').value.trim();
-            try {
-                const response = await fetch(`${baseUrl}/play?song=${hash}`, {
-                    method: 'POST'
-                });
-                
-                if (response.ok) { 
-                    showToast("Song sent to play!");
-                } else {
-                    throw new Error(`Error ${response.status}`);
-                }
-            } catch (err) {
-                console.error(err);
-                showToast(`Failed: ${err.message}`);
-            } finally {
-                btn.innerHTML = originalContent;
-                btn.disabled = false;
-                lucide.createIcons();
-            }
-        }
-
-        // Toast Notification
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            document.getElementById('toast-msg').innerText = msg; 
-            toast.classList.remove('translate-y-20', 'opacity-0');
-            
-            setTimeout(() => {
-                toast.classList.add('translate-y-20', 'opacity-0');
-            }, 3000);
-        }
-
-        // Initial load and periodic ping
-        document.addEventListener('DOMContentLoaded', () => {
-            initColumnMenu();
-            
-            // Close column menu when clicking outside
-            document.addEventListener('click', (e) => {
-                const colMenu = document.getElementById('column-menu');
-                const colBtn = document.querySelector('button[onclick="toggleColumnMenu()"]');
-                if (colMenu && !colMenu.contains(e.target) && !colBtn.contains(e.target)) {
-                    colMenu.classList.add('hidden');
-                    colMenu.classList.remove('flex');
-                }
-                
-                const advMenu = document.getElementById('advanced-filters');
-                const advBtn = document.querySelector('button[onclick="toggleAdvancedFilters()"]');
-                if (advMenu && !advMenu.contains(e.target) && !advBtn.contains(e.target) && !document.getElementById('search-global').contains(e.target)) {
-                    advMenu.classList.add('hidden');
-                }
-            });
-
-            pingServer(); // Check immediately
-            pingInterval = setInterval(pingServer, 2000); // Check every 2 seconds
-            
-            // Infinite Scroll
-            const sentinel = document.getElementById('scroll-sentinel');
-            const observer = new IntersectionObserver((entries) => {
-                if (entries[0].isIntersecting) {
-                    loadMore();
-                }
-            }, { rootMargin: '200px' });
-            if (sentinel) observer.observe(sentinel);
-
-            // Image Observer
-            imageObserver = new IntersectionObserver((entries, observer) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        const img = entry.target;
-                        if (img.dataset.src) {
-                            img.src = img.dataset.src;
-                            img.removeAttribute('data-src');
-                            img.classList.remove('lazy-img');
-                            observer.unobserve(img);
-                        }
-                    }
-                });
-            }, { rootMargin: '500px' });
-        });
-    </script>
-</body>
-</html>
 
             const baseUrl = document.getElementById('api-url').value.trim();
             try {
