@@ -1208,6 +1208,7 @@
         // Initial load and periodic ping
         document.addEventListener('DOMContentLoaded', () => {
             initColumnMenu();
+            document.getElementById('api-url').value = window.location.origin;
             
             // Close column menu when clicking outside
             document.addEventListener('click', (e) => {
