@@ -113,7 +113,7 @@ function buildDrumChart(midi, track, difficulty, timed, toSec) {
     const cymbal = cymbalSpans !== null && isCymbal(cymbalSpans, offset, n.tick);
     notes.push({ ...timed(n), lane: offset, cymbal });
   }
-  return { mode: 'lanes', lanes, laneColors, drumKind: kind, notes, ...commonParts(midi, track, toSec) };
+  return { mode: 'lanes', lanes, laneColors, drumKind: kind, kickLane: 0, notes, ...commonParts(midi, track, toSec) };
 }
 
 // Tick ranges during which each cymbal flag (110/111/112) is on.

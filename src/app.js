@@ -22,6 +22,8 @@ const els = {
   play: $('play'),
   seek: $('seek'),
   time: $('time'),
+  speed: $('speed'),
+  speedVal: $('speedVal'),
   loading: $('loading'),
   mixer: $('mixer'),
   highway: $('highway'),
@@ -41,6 +43,11 @@ els.difficulty.addEventListener('change', updateChart);
 els.play.addEventListener('click', togglePlay);
 els.seek.addEventListener('input', () => { seeking = true; });
 els.seek.addEventListener('change', () => { player.seek(Number(els.seek.value)); seeking = false; });
+els.speed.addEventListener('input', () => {
+  const rate = Number(els.speed.value);
+  player.setRate(rate);
+  els.speedVal.textContent = `${rate.toFixed(2)}×`;
+});
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space' && current && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
     e.preventDefault();

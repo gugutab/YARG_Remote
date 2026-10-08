@@ -1,6 +1,9 @@
 // Canvas renderer for a chart. Drawing is a pure function of the playback time,
 // so seek/pause just means re-rendering at a different `t`.
 const GUITAR_LANE_COLORS = ['#3fbf3f', '#e5392b', '#f5c518', '#2f80ed', '#f2861e'];
+const KICK_COLOR = '#f2861e';
+const KICK_BAR_HALF_H = 3;
+const FADE_SEC = 0.25; // how long a note takes to fade out after the hit line
 const LOOKAHEAD_SEC = 2.5; // how far ahead the highway shows notes
 const HIT_Y = 0.88; // hit line position as a fraction of canvas height
 
@@ -79,20 +82,33 @@ export class Highway {
     }
     const radius = Math.min(laneW * 0.36, 26);
     const colors = chart.laneColors || GUITAR_LANE_COLORS;
+    const kickLane = chart.kickLane ?? -1;
     for (const n of visible) {
-      if (!n.length) continue;
+      if (!n.length || n.lane === kickLane) continue;
       const cx = x0 + (n.lane + 0.5) * laneW;
       const yTop = yOf(n.time + n.length);
       const yBot = yOf(Math.max(n.time, t));
       g.fillStyle = withAlpha(colors[n.lane], 0.55);
       g.fillRect(cx - radius * 0.35, yTop, radius * 0.7, Math.max(0, yBot - yTop));
     }
+
+    // Heads. A note fades and grows for FADE_SEC after it crosses the hit line, instead of vanishing.
     for (const n of visible) {
-      if (n.time < t - 0.05) continue;
-      const cx = x0 + (n.lane + 0.5) * laneW;
+      const past = t - n.time;
+      if (past > FADE_SEC) continue;
+      const k = Math.max(0, past) / FADE_SEC; // 0 at the hit line, 1 when gone
       const cy = yOf(n.time);
+      g.globalAlpha = 1 - k;
+      if (n.lane === kickLane) {
+        // Bass pedal: orange bar across the whole lane area
+        g.fillStyle = KICK_COLOR;
+        g.fillRect(x0, cy - KICK_BAR_HALF_H, laneW * chart.lanes, KICK_BAR_HALF_H * 2);
+        continue;
+      }
+      const cx = x0 + (n.lane + 0.5) * laneW;
+      const r = radius * (1 + 0.4 * k);
       g.beginPath();
-      g.arc(cx, cy, radius, 0, Math.PI * 2);
+      g.arc(cx, cy, r, 0, Math.PI * 2);
       g.fillStyle = colors[n.lane];
       g.fill();
       g.lineWidth = 2;
@@ -100,7 +116,7 @@ export class Highway {
       g.stroke();
       if (n.cymbal) { // pro drums: cymbal = ring with a white outline, tom = solid pad
         g.beginPath();
-        g.arc(cx, cy, radius * 0.55, 0, Math.PI * 2);
+        g.arc(cx, cy, r * 0.55, 0, Math.PI * 2);
         g.fillStyle = '#0d1117';
         g.fill();
         g.lineWidth = 3;
@@ -108,6 +124,7 @@ export class Highway {
         g.stroke();
       }
     }
+    g.globalAlpha = 1;
 
     // hit line
     g.fillStyle = 'rgba(255,255,255,0.7)';

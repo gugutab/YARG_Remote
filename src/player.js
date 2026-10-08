@@ -22,6 +22,7 @@ export class MultiTrackPlayer {
     this.sources = [];
     this.duration = 0;
     this.delay = 0; // seconds; audio file position = chart time + delay
+    this.rate = 1; // playback speed; chart time advances rate× faster than real time
     this.playing = false;
     this.offset = 0; // position (s) when paused / at last start
     this.startedAt = 0; // ctx.currentTime when the last play started
@@ -56,7 +57,18 @@ export class MultiTrackPlayer {
 
   currentTime() {
     if (!this.playing) return this.offset;
-    return Math.min(this.duration, this.offset + (this.ctx.currentTime - this.startedAt));
+    return Math.min(this.duration, this.offset + (this.ctx.currentTime - this.startedAt) * this.rate);
+  }
+
+  // Speed change while playing: re-anchor the clock at the current position, then retime the sources.
+  // Web Audio resamples, so pitch moves with speed.
+  setRate(rate) {
+    if (this.playing) {
+      this.offset = this.currentTime();
+      this.startedAt = this.ctx.currentTime;
+    }
+    this.rate = rate;
+    for (const src of this.sources) src.playbackRate.value = rate;
   }
 
   async play() {
@@ -95,6 +107,7 @@ export class MultiTrackPlayer {
       if (!plan) continue;
       const src = this.ctx.createBufferSource();
       src.buffer = stem.buffer;
+      src.playbackRate.value = this.rate;
       src.connect(stem.gain);
       src.start(when + plan.startDelay, plan.offset);
       this.sources.push(src);
