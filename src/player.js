@@ -1,5 +1,18 @@
 // Multitrack player: every stem is decoded into an AudioBuffer and played through its own GainNode,
 // so all stems share one AudioContext clock (sample-accurate sync, per-track volume, seek, pause).
+//
+// Timeline: `currentTime()` is the chart clock. The audio file position for chart time t is t + delay
+// (YARG: SongRunner.AudioTime = AudioPlaybackTime + SongOffset, with SongOffset = -delay).
+
+// Where to start a stem so it lines up with chart time `chartTime`.
+// Returns { offset, startDelay } in seconds, or null when the stem has already ended.
+export function stemStartPlan(chartTime, delay, bufferDuration) {
+  const filePos = chartTime + delay;
+  if (filePos >= bufferDuration) return null;
+  if (filePos >= 0) return { offset: filePos, startDelay: 0 };
+  return { offset: 0, startDelay: -filePos }; // audio file has not started yet at this chart time
+}
+
 export class MultiTrackPlayer {
   constructor() {
     this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -8,15 +21,17 @@ export class MultiTrackPlayer {
     this.stems = new Map(); // id -> { label, buffer, gain }
     this.sources = [];
     this.duration = 0;
+    this.delay = 0; // seconds; audio file position = chart time + delay
     this.playing = false;
     this.offset = 0; // position (s) when paused / at last start
     this.startedAt = 0; // ctx.currentTime when the last play started
   }
 
-  // stems: [{ id, label, getFile }]
-  async load(stems, onProgress = () => {}) {
+  // stems: [{ id, label, getFile }]; delay in seconds (see songDelaySeconds)
+  async load(stems, { delay = 0, onProgress = () => {} } = {}) {
     this.stop();
     this.stems.clear();
+    this.delay = delay;
     let done = 0;
     for (const s of stems) {
       const file = await s.getFile();
@@ -27,7 +42,8 @@ export class MultiTrackPlayer {
       this.stems.set(s.id, { label: s.label, buffer, gain, volume: 1 });
       onProgress(++done / stems.length);
     }
-    this.duration = Math.max(0, ...[...this.stems.values()].map((s) => s.buffer.duration));
+    // Chart time reaches the end of the audio file at (length - delay).
+    this.duration = Math.max(0, ...[...this.stems.values()].map((s) => s.buffer.duration - this.delay));
     this.offset = 0;
   }
 
@@ -75,11 +91,12 @@ export class MultiTrackPlayer {
   startSources(at) {
     const when = this.ctx.currentTime + 0.05; // small lead so every source starts on the same tick
     for (const stem of this.stems.values()) {
-      if (at >= stem.buffer.duration) continue;
+      const plan = stemStartPlan(at, this.delay, stem.buffer.duration);
+      if (!plan) continue;
       const src = this.ctx.createBufferSource();
       src.buffer = stem.buffer;
       src.connect(stem.gain);
-      src.start(when, at);
+      src.start(when + plan.startDelay, plan.offset);
       this.sources.push(src);
     }
     this.offset = at;

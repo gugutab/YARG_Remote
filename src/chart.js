@@ -9,7 +9,7 @@ export const INSTRUMENTS = [
   { id: 'bass', label: 'Baixo', tracks: ['PART BASS'], mode: 'lanes' },
   { id: 'rhythm', label: 'Rhythm', tracks: ['PART RHYTHM'], mode: 'lanes' },
   { id: 'keys', label: 'Teclado', tracks: ['PART KEYS'], mode: 'lanes' },
-  { id: 'drums', label: 'Bateria', tracks: ['PART DRUMS', 'PART DRUM'], mode: 'lanes' },
+  { id: 'drums', label: 'Bateria', tracks: ['PART DRUMS', 'PART DRUM'], mode: 'drums' },
   { id: 'vocals', label: 'Vocal', tracks: ['PART VOCALS'], mode: 'vocals' },
 ];
 
@@ -22,6 +22,16 @@ export const DIFFICULTIES = [
 
 const LANES = 5;
 const SOLO_NOTE = 103;
+// Drums (YARG.Core MidiDrumsPreparser.cs / MidIOHelper.cs PAD_TO_CYMBAL_LOOKUP):
+//   offset 0..4 = kick, red, yellow, blue, green (4-lane) or orange (5-lane)
+//   offset 5 = green in 5-lane; its presence (pitch 101) means 5-lane drums
+//   pitches 110/111/112 are pro cymbal flags for yellow/blue/green (offsets 2/3/4)
+const FIVE_LANE_GREEN_NOTE = 101;
+const CYMBAL_FLAG_FOR_OFFSET = { 2: 110, 3: 111, 4: 112 };
+const DRUM_CYMBAL_FLAGS = [110, 111, 112];
+const DRUM_LANE_COLORS_4 = ['#b07cff', '#e5392b', '#f5c518', '#2f80ed', '#3fbf3f'];
+const DRUM_LANE_COLORS_5 = ['#b07cff', '#e5392b', '#f5c518', '#2f80ed', '#f2861e', '#3fbf3f'];
+const GUITAR_LANE_COLORS = ['#3fbf3f', '#e5392b', '#f5c518', '#2f80ed', '#f2861e'];
 const STAR_POWER_NOTE = 116;
 const MEASURE_NOTE = 12;
 const BEAT_NOTE = 13;
@@ -39,8 +49,22 @@ export function availableDifficulties(midi, instrument) {
   if (instrument.mode === 'vocals') {
     return track.notes.some((n) => inRange(n.pitch, VOCAL_RANGE)) ? [DIFFICULTIES[3]] : [];
   }
+  const span = drumSpan(track, instrument);
   return DIFFICULTIES.filter((d) =>
-    track.notes.some((n) => n.pitch >= d.base && n.pitch < d.base + LANES));
+    track.notes.some((n) => n.pitch >= d.base && n.pitch < d.base + span));
+}
+
+// Number of pitch offsets a difficulty uses: 5 for guitar, 6 for 5-lane drums (offset 5 = green).
+function drumSpan(track, instrument) {
+  if (instrument.mode !== 'drums') return LANES;
+  return drumKind(track) === 'five' ? 6 : LANES;
+}
+
+// Same rule as YARG.Core: 101 => five lane; any 110-112 pro flag => pro; otherwise four lane.
+export function drumKind(track) {
+  if (track.notes.some((n) => n.pitch === FIVE_LANE_GREEN_NOTE)) return 'five';
+  if (track.notes.some((n) => DRUM_CYMBAL_FLAGS.includes(n.pitch))) return 'pro';
+  return 'four';
 }
 
 export function buildChart(midi, instrument, difficulty) {
@@ -63,13 +87,48 @@ export function buildChart(midi, instrument, difficulty) {
     return { mode: 'vocals', notes, lyrics, ...commonParts(midi, track, toSec) };
   }
 
+  if (instrument.mode === 'drums') {
+    return buildDrumChart(midi, track, difficulty, timed, toSec);
+  }
+
   const notes = [];
   for (const n of track.notes) {
     const lane = n.pitch - difficulty.base;
     if (lane < 0 || lane >= LANES) continue;
-    notes.push({ ...timed(n), lane });
+    notes.push({ ...timed(n), lane, cymbal: false });
   }
-  return { mode: 'lanes', lanes: LANES, notes, ...commonParts(midi, track, toSec) };
+  return { mode: 'lanes', lanes: LANES, laneColors: GUITAR_LANE_COLORS, notes, ...commonParts(midi, track, toSec) };
+}
+
+function buildDrumChart(midi, track, difficulty, timed, toSec) {
+  const kind = drumKind(track);
+  const lanes = kind === 'five' ? 6 : LANES;
+  const laneColors = kind === 'five' ? DRUM_LANE_COLORS_5 : DRUM_LANE_COLORS_4;
+  const cymbalSpans = kind === 'pro' ? cymbalFlagSpans(track) : null;
+
+  const notes = [];
+  for (const n of track.notes) {
+    const offset = n.pitch - difficulty.base;
+    if (offset < 0 || offset >= lanes) continue;
+    const cymbal = cymbalSpans !== null && isCymbal(cymbalSpans, offset, n.tick);
+    notes.push({ ...timed(n), lane: offset, cymbal });
+  }
+  return { mode: 'lanes', lanes, laneColors, drumKind: kind, notes, ...commonParts(midi, track, toSec) };
+}
+
+// Tick ranges during which each cymbal flag (110/111/112) is on.
+function cymbalFlagSpans(track) {
+  const spans = new Map(DRUM_CYMBAL_FLAGS.map((p) => [p, []]));
+  for (const n of track.notes) {
+    if (spans.has(n.pitch)) spans.get(n.pitch).push({ start: n.tick, end: n.endTick });
+  }
+  return spans;
+}
+
+function isCymbal(spans, offset, tick) {
+  const flag = CYMBAL_FLAG_FOR_OFFSET[offset];
+  if (flag === undefined) return false;
+  return (spans.get(flag) || []).some((s) => tick >= s.start && tick <= s.end);
 }
 
 function commonParts(midi, track, toSec) {

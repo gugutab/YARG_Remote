@@ -1,6 +1,6 @@
 // Canvas renderer for a chart. Drawing is a pure function of the playback time,
 // so seek/pause just means re-rendering at a different `t`.
-const LANE_COLORS = ['#3fbf3f', '#e5392b', '#f5c518', '#2f80ed', '#f2861e'];
+const GUITAR_LANE_COLORS = ['#3fbf3f', '#e5392b', '#f5c518', '#2f80ed', '#f2861e'];
 const LOOKAHEAD_SEC = 2.5; // how far ahead the highway shows notes
 const HIT_Y = 0.88; // hit line position as a fraction of canvas height
 
@@ -78,12 +78,13 @@ export class Highway {
       visible.push(chart.notes[i]);
     }
     const radius = Math.min(laneW * 0.36, 26);
+    const colors = chart.laneColors || GUITAR_LANE_COLORS;
     for (const n of visible) {
       if (!n.length) continue;
       const cx = x0 + (n.lane + 0.5) * laneW;
       const yTop = yOf(n.time + n.length);
       const yBot = yOf(Math.max(n.time, t));
-      g.fillStyle = withAlpha(LANE_COLORS[n.lane], 0.55);
+      g.fillStyle = withAlpha(colors[n.lane], 0.55);
       g.fillRect(cx - radius * 0.35, yTop, radius * 0.7, Math.max(0, yBot - yTop));
     }
     for (const n of visible) {
@@ -92,11 +93,20 @@ export class Highway {
       const cy = yOf(n.time);
       g.beginPath();
       g.arc(cx, cy, radius, 0, Math.PI * 2);
-      g.fillStyle = LANE_COLORS[n.lane];
+      g.fillStyle = colors[n.lane];
       g.fill();
       g.lineWidth = 2;
       g.strokeStyle = 'rgba(0,0,0,0.5)';
       g.stroke();
+      if (n.cymbal) { // pro drums: cymbal = ring with a white outline, tom = solid pad
+        g.beginPath();
+        g.arc(cx, cy, radius * 0.55, 0, Math.PI * 2);
+        g.fillStyle = '#0d1117';
+        g.fill();
+        g.lineWidth = 3;
+        g.strokeStyle = '#ffffff';
+        g.stroke();
+      }
     }
 
     // hit line

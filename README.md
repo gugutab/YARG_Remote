@@ -41,15 +41,18 @@ Conferido no código do YARG.Core (`github.com/YARC-Official/YARG.Core`, também
   Fácil 60–64, Médio 72–76, Difícil 84–88, Especialista 96–100. Offset 0..4 = lane verde→laranja.
 - **Guitarra/baixo** — `Song/MidiPreparsers/MidiFiveFretPreparser.cs`: `FIVEFRET_MIN = 59`; offset 0 é a
   lane verde. Notas de *open* usam o sysex `PS` (`ENHANCED_OPENS`), que este MVP ainda não trata.
-- **Bateria** — `Song/MidiPreparsers/MidiDrumsPreparser.cs`: mesma faixa de pitch; 110–112 são flags de
-  pratos (bateria Pro), que o MVP ignora. A 5ª lane (101) também não está no MVP.
+- **Bateria** — `Song/MidiPreparsers/MidiDrumsPreparser.cs` e `MidReader.ProcessLists.cs`: 101 = bateria de
+  5 lanes (100 = laranja, 101 = verde); 110/111/112 = flags de prato para amarelo/azul/verde (pitch 98/99/100),
+  ligadas entre note-on e note-off. Sem 101 e com 110–112 = Pro; sem nenhum dos dois = 4 lanes.
 - **Especiais** — `MidIOHelper.cs`: `103` = solo, `116` = star power, `12`/`13` = compasso/tempo na
   trilha `BEAT`, `105` = frase de letra em vocal.
 - **Vocal** — faixa 36–84 são as notas; texto que não começa com `[` é letra.
 - **Tempo** — `Chart/Sync/SyncTrack.cs`: mudanças de tempo (meta `0x51`) integradas tick a tick
   (`midi.js` faz o mesmo em `createTickToSeconds`).
 - **song.ini** — `IO/Ini/SongIniHandler.cs`: lista de chaves (`name`, `artist`, `song_length`,
-  `diff_*`, `delay`…). O MVP lê `name`, `artist`, `album` e os valores crus de `diff_*` ficam disponíveis.
+  `diff_*`, `delay`…). O MVP lê `name`, `artist`, `album`, `delay`/`delay_seconds` e os valores crus de `diff_*`.
+- **Delay** — `SongMetadata.cs` e `SongRunner.cs`: a posição do áudio é `tempo_do_chart + delay`. O player aplica
+  isso com `stemStartPlan` (`src/player.js`): delay positivo começa o stem adiantado no arquivo, negativo atrasa o início.
 
 ### Verificação com o arquivo de exemplo
 
@@ -75,9 +78,9 @@ O YARG.Core serve como referência de formato, não como dependência.
 ## Limitações do MVP
 
 - Só `notes.mid`; `notes.chart` (formato .chart) não é lido ainda.
-- Sem `open` notes (sysex `PS`), sem Pro Guitar/Keys, sem bateria 5 lanes e sem flags de pratos.
+- Sem `open` notes (sysex `PS`) e sem Pro Guitar/Keys. Bateria 4 lanes, Pro (flags de prato, mostrados como anel)
+  e 5 lanes são suportadas.
 - Vocal é um visualizador de pitch com letra, sem sílabas nem fases.
-- `delay` do `song.ini` não é aplicado. Se o áudio estiver deslocado, esse é o primeiro ponto a checar.
 - Áudio é decodificado inteiro na memória: um conjunto de stems de 3 min costuma ocupar algumas centenas
   de MB no navegador.
 - Não há persistência da pasta escolhida. Ao recarregar a página é preciso escolher de novo.
@@ -86,7 +89,7 @@ O YARG.Core serve como referência de formato, não como dependência.
 
 ## Próximos passos sugeridos
 
-1. Testar a sincronia de áudio com um conjunto real de stems (o `delay` do `song.ini` entra aqui).
+1. Testar a sincronia de áudio com um conjunto real de stems.
 2. Ler `notes.chart`.
 3. Sustains com cauda contínua e `open` notes.
 4. Persistir o handle da pasta com IndexedDB (`FileSystemDirectoryHandle` é serializável).

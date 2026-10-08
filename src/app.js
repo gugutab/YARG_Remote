@@ -2,7 +2,8 @@ import { parseMidi } from './midi.js';
 import { INSTRUMENTS, DIFFICULTIES, findTrack, availableDifficulties, buildChart } from './chart.js';
 import { MultiTrackPlayer } from './player.js';
 import { Highway } from './highway.js';
-import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, readBytes, readText } from './library.js';
+import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, readBytes } from './library.js';
+import { songDelaySeconds } from './ini.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -110,8 +111,11 @@ async function selectSong(song) {
   buildMixer(audioStemsOf(song));
 
   try {
-    await player.load(audioStemsOf(song), (p) => {
-      els.loading.textContent = `Carregando áudio… ${Math.round(p * 100)}%`;
+    await player.load(audioStemsOf(song), {
+      delay: songDelaySeconds(song.ini),
+      onProgress: (p) => {
+        els.loading.textContent = `Carregando áudio… ${Math.round(p * 100)}%`;
+      },
     });
   } catch (err) {
     setStatus(`Falha ao decodificar áudio: ${err.message}`);

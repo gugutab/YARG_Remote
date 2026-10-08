@@ -19,3 +19,12 @@ export function parseSongIni(text) {
   }
   return out;
 }
+
+// Audio delay in seconds, as YARG reads it (SongMetadata.cs): `delay` in ms wins when it is
+// non-zero, otherwise `delay_seconds`. Positive = audio sits later in the file than the chart clock.
+export function songDelaySeconds(ini) {
+  const ms = Number(ini.delay);
+  if (ini.delay !== undefined && ms !== 0 && Number.isFinite(ms)) return ms / 1000;
+  const s = Number(ini.delay_seconds);
+  return Number.isFinite(s) ? s : 0;
+}
