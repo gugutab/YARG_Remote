@@ -97,3 +97,14 @@ test('a 4-lane chart offers one drum option and a 5-lane chart offers 5-lanes', 
   const five = drumsMidi([{ tick: 0, pitch: 101, len: 120 }]);
   assert.deepEqual(instrumentOptions(five).map((o) => o.label), ['Bateria (5-lanes)']);
 });
+
+test('cymbal flags toggle like YARG: a note inside two overlapping flag windows is not a cymbal', () => {
+  const midi = drumsMidi([
+    { tick: 100, pitch: 98, len: 60 },  // inside one window => cymbal
+    { tick: 400, pitch: 98, len: 60 },  // inside two overlapping windows => toggled off
+    { tick: 0, pitch: 110, len: 600 },  // window [0, 600)
+    { tick: 300, pitch: 110, len: 600 }, // window [300, 900)
+  ]);
+  const chart = buildChart(midi, DRUMS, EXPERT);
+  assert.deepEqual(chart.notes.map((n) => [n.lane, n.cymbal]), [[2, true], [2, false]]);
+});

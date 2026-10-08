@@ -152,10 +152,13 @@ function cymbalFlagSpans(track) {
   return spans;
 }
 
+// YARG toggles the cymbal flag with XOR (MidReader.cs: note.flags ^= flags) over each flag note's window
+// [start, end). So a note inside two overlapping windows is not a cymbal. Parity matches that.
 function isCymbal(spans, offset, tick) {
   const flag = CYMBAL_FLAG_FOR_OFFSET[offset];
   if (flag === undefined) return false;
-  return (spans.get(flag) || []).some((s) => tick >= s.start && tick <= s.end);
+  const covering = (spans.get(flag) || []).filter((s) => tick >= s.start && tick < s.end).length;
+  return covering % 2 === 1;
 }
 
 function commonParts(midi, track, toSec) {
