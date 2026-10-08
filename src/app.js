@@ -28,6 +28,8 @@ let chart = null; // chart for the selected instrument and difficulty
 let seeking = false;
 let loadToken = 0; // bumped on every song selection, so a slow load cannot overwrite a newer one
 let sortDesc = false;
+let detached = false; // list restored from storage without file access (browsers without showDirectoryPicker)
+let pendingSongId = null; // song clicked while detached; opened once the folder is picked again
 
 const store = {
   get(key) { try { return localStorage.getItem(`yargremote.${key}`); } catch { return null; } },
@@ -65,7 +67,9 @@ offerSavedFolder();
 
 // Folder selection: File System Access API when available, <input webkitdirectory> otherwise.
 async function pickFolder() {
+  pendingSongId = null;
   if (!window.showDirectoryPicker) {
+    els.folderInput.value = '';
     els.folderInput.click();
     return;
   }
@@ -126,8 +130,15 @@ async function rescanFolder() {
 async function loadEntries(entries) {
   setStatus('Procurando músicas…');
   songs = await scanSongs(entries);
-  setStatus('');
+  detached = false;
+  // Without a folder handle only the song index can be remembered; files need the folder picked again.
+  const rootName = entries[0]?.path.split('/')[0] || '';
+  await saveLibrary({ root: null, rootName, index: serializeSongs(songs), savedAt: Date.now() });
+  setStatus(`"${rootName}"`);
   afterLibraryLoaded();
+  const pending = songs.find((s) => s.id === pendingSongId);
+  pendingSongId = null;
+  if (pending) selectSong(pending);
 }
 
 function afterLibraryLoaded() {
@@ -141,7 +152,15 @@ function afterLibraryLoaded() {
 // On the first load, offer to reopen the folder from the last visit (no picker, one click).
 async function offerSavedFolder() {
   savedRecord = await loadLibrary();
-  if (!savedRecord?.root) return;
+  if (!savedRecord) return;
+  if (!savedRecord.root) {
+    // No handle was stored: show the saved list now; the files are asked for when a song is opened.
+    songs = savedRecord.index.map((s) => ({ ...s, files: new Map() }));
+    detached = true;
+    setStatus(`Lista guardada de "${savedRecord.rootName}". Escolha a pasta de novo ao abrir uma música.`);
+    afterLibraryLoaded();
+    return;
+  }
   els.resume.querySelector('span').textContent = `Reabrir "${savedRecord.rootName}" (${savedRecord.index.length})`;
   els.resume.hidden = false;
 }
@@ -170,6 +189,13 @@ function setStatus(text) {
 
 // ---------- Song and chart selection ----------
 async function selectSong(song) {
+  if (detached) {
+    pendingSongId = song.id;
+    setStatus('Escolha a pasta de músicas para abrir esta música.');
+    els.folderInput.value = '';
+    els.folderInput.click();
+    return;
+  }
   const token = ++loadToken;
   player.pause();
   syncPlayButton();

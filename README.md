@@ -111,4 +111,4 @@ No fim, um resumo com o total de cada categoria. Sem `--only`, lista todas as ca
 
 ## Acesso pela rede local
 
-`npm start` escuta em todas as interfaces (`--bind 0.0.0.0`). Em outro aparelho da LAN, abra `http://<IP-do-PC>:8080`. Por não ser HTTPS nem `localhost`, o Chrome não libera `showDirectoryPicker`: o app usa o seletor de pasta comum (`webkitdirectory`), sem guardar a pasta entre visitas. Para ter a pasta guardada, use `localhost` no próprio PC ou sirva por HTTPS.
+`npm start` escuta em todas as interfaces (`--bind 0.0.0.0`). Em outro aparelho da LAN, abra `http://<IP-do-PC>:8080`. Por não ser HTTPS nem `localhost`, o Chrome não libera `showDirectoryPicker`: o app usa o seletor de pasta comum (`webkitdirectory`), e só a lista de músicas é guardada entre visitas: ao abrir uma música depois de recarregar, o navegador pede a pasta de novo (Firefox também funciona assim). Para ter a pasta guardada, use `localhost` no próprio PC ou sirva por HTTPS.
