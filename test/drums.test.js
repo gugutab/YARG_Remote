@@ -24,13 +24,13 @@ function drumsMidi(notes) {
   return parseMidi(buildMidi(480, [events]));
 }
 
-test('4-lane drums: kick..green map to columns 0..4, no cymbals', () => {
+test('4-lane drums: 4 columns (red..green); the kick is a bar, lane -1; no cymbals', () => {
   const midi = drumsMidi([96, 97, 98, 99, 100].map((pitch, i) => ({ tick: i * 480, pitch, len: 240 })));
   assert.equal(drumKind(midi.tracks[0]), 'four');
   const chart = buildChart(midi, DRUMS, EXPERT);
-  assert.equal(chart.lanes, 5);
-  assert.equal(chart.laneColors.length, 5);
-  assert.deepEqual(chart.notes.map((n) => n.lane), [0, 1, 2, 3, 4]);
+  assert.equal(chart.lanes, 4);
+  assert.equal(chart.laneColors.length, 4);
+  assert.deepEqual(chart.notes.map((n) => n.lane), [-1, 0, 1, 2, 3]);
   assert.ok(chart.notes.every((n) => n.cymbal === false));
 });
 
@@ -43,9 +43,9 @@ test('5-lane drums: 100 is orange (column 4), 101 is green (column 5)', () => {
   assert.equal(drumKind(midi.tracks[0]), 'five');
   assert.ok(availableDifficulties(midi, DRUMS).includes(EXPERT));
   const chart = buildChart(midi, DRUMS, EXPERT);
-  assert.equal(chart.lanes, 6);
-  assert.equal(chart.laneColors.length, 6);
-  assert.deepEqual(chart.notes.map((n) => n.lane), [0, 4, 5]);
+  assert.equal(chart.lanes, 5);
+  assert.equal(chart.laneColors.length, 5);
+  assert.deepEqual(chart.notes.map((n) => n.lane), [-1, 3, 4]);
 });
 
 test('pro drums: yellow and green are cymbals by default; a tom marker turns them into toms', () => {
@@ -57,8 +57,8 @@ test('pro drums: yellow and green are cymbals by default; a tom marker turns the
   ]);
   assert.equal(drumKind(midi.tracks[0]), 'pro');
   const chart = buildChart(midi, DRUMS, EXPERT);
-  assert.equal(chart.lanes, 5);
-  assert.deepEqual(chart.notes.map((n) => [n.lane, n.cymbal]), [[2, true], [2, false], [4, true]]);
+  assert.equal(chart.lanes, 4);
+  assert.deepEqual(chart.notes.map((n) => [n.lane, n.cymbal]), [[1, true], [1, false], [3, true]]);
 });
 
 test('5-lane: yellow, orange cymbal by default, toms under a marker; green is never a cymbal', () => {
@@ -72,8 +72,8 @@ test('5-lane: yellow, orange cymbal by default, toms under a marker; green is ne
   ]);
   assert.equal(drumKind(midi.tracks[0]), 'five');
   const chart = buildChart(midi, DRUMS, EXPERT);
-  assert.equal(chart.lanes, 6);
-  assert.deepEqual(chart.notes.map((n) => [n.lane, n.cymbal]), [[2, false], [4, false], [4, true], [5, false]]);
+  assert.equal(chart.lanes, 5);
+  assert.deepEqual(chart.notes.map((n) => [n.lane, n.cymbal]), [[1, false], [3, false], [3, true], [4, false]]);
 });
 
 test('a pro chart offers Pro and 4-lane drum options; 4-lane mode draws no cymbals', () => {
@@ -88,8 +88,8 @@ test('a pro chart offers Pro and 4-lane drum options; 4-lane mode draws no cymba
   const pro = buildChart(midi, instrumentOptions(midi)[0], EXPERT);
   assert.deepEqual(pro.notes.map((n) => n.cymbal), [false]);
   const four = buildChart(midi, instrumentOptions(midi)[1], EXPERT);
-  assert.equal(four.lanes, 5);
-  assert.deepEqual(four.notes.map((n) => [n.lane, n.cymbal]), [[2, false]]);
+  assert.equal(four.lanes, 4);
+  assert.deepEqual(four.notes.map((n) => [n.lane, n.cymbal]), [[1, false]]);
 });
 
 test('a 4-lane chart offers one drum option and a 5-lane chart offers 5-lanes', () => {
@@ -107,5 +107,5 @@ test('tom markers toggle like YARG: under one marker is a tom, under two overlap
     { tick: 300, pitch: 110, len: 600 }, // window [300, 900)
   ]);
   const chart = buildChart(midi, DRUMS, EXPERT);
-  assert.deepEqual(chart.notes.map((n) => [n.lane, n.cymbal]), [[2, false], [2, true]]);
+  assert.deepEqual(chart.notes.map((n) => [n.lane, n.cymbal]), [[1, false], [1, true]]);
 });

@@ -97,9 +97,9 @@ export class Highway {
     }
     const radius = Math.min(laneW * 0.36, 26);
     const colors = chart.laneColors || GUITAR_LANE_COLORS;
-    const kickLane = chart.kickLane ?? -1;
+    // kick (lane -1) is a bar across all columns, not a column
     for (const n of visible) {
-      if (!n.length || n.lane === kickLane) continue;
+      if (!n.length || n.lane < 0) continue;
       const cx = x0 + (n.lane + 0.5) * laneW;
       const yTop = yOf(n.time + n.length);
       const yBot = yOf(Math.max(n.time, t));
@@ -116,7 +116,7 @@ export class Highway {
       const cy = yOf(Math.max(n.time, t)); // parked on the hit line during the exit
       const white = k;
       g.globalAlpha = 1 - k;
-      if (n.lane === kickLane) {
+      if (n.lane < 0) {
         // Bass pedal: orange bar across the lane area, growing in height as it fades
         const full = laneW * chart.lanes;
         const height = KICK_BAR_HALF_H * 2 * (1 + 0.4 * k);

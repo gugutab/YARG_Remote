@@ -30,8 +30,8 @@ const SOLO_NOTE = 103;
 const FIVE_LANE_GREEN_NOTE = 101;
 const CYMBAL_FLAG_FOR_OFFSET = { 2: 110, 3: 111, 4: 112 };
 const DRUM_CYMBAL_FLAGS = [110, 111, 112];
-const DRUM_LANE_COLORS_4 = ['#b07cff', '#e5392b', '#f5c518', '#2f80ed', '#3fbf3f'];
-const DRUM_LANE_COLORS_5 = ['#b07cff', '#e5392b', '#f5c518', '#2f80ed', '#f2861e', '#3fbf3f'];
+const DRUM_LANE_COLORS_4 = ['#e5392b', '#f5c518', '#2f80ed', '#3fbf3f']; // red, yellow, blue, green
+const DRUM_LANE_COLORS_5 = ['#e5392b', '#f5c518', '#2f80ed', '#f2861e', '#3fbf3f']; // + orange
 const GUITAR_LANE_COLORS = ['#3fbf3f', '#e5392b', '#f5c518', '#2f80ed', '#f2861e'];
 const STAR_POWER_NOTE = 116;
 const MEASURE_NOTE = 12;
@@ -128,20 +128,22 @@ export function buildChart(midi, instrument, difficulty) {
   return { mode: 'lanes', lanes: LANES, laneColors: GUITAR_LANE_COLORS, notes, ...commonParts(midi, track, toSec) };
 }
 
+// Columns are the pads only: 4 (red, yellow, blue, green) or 5 (5-lane adds orange before green).
+// The kick is not a column; it is a bar across all columns, so its lane is -1.
 function buildDrumChart(midi, track, kind, difficulty, timed, toSec) {
-  const lanes = kind === 'five' ? 6 : LANES;
+  const lanes = kind === 'five' ? 5 : 4;
   const laneColors = kind === 'five' ? DRUM_LANE_COLORS_5 : DRUM_LANE_COLORS_4;
   // Cymbal flags apply to Pro and 5-lane modes; 4-lane mode plays the same notes with no cymbals.
   const cymbalSpans = kind === 'four' ? null : cymbalFlagSpans(track);
 
   const notes = [];
   for (const n of track.notes) {
-    const offset = n.pitch - difficulty.base;
-    if (offset < 0 || offset >= lanes) continue;
+    const offset = n.pitch - difficulty.base; // 0 kick, 1 red, 2 yellow, 3 blue, 4 orange/green, 5 green
+    if (offset < 0 || offset > lanes) continue;
     const cymbal = cymbalSpans !== null && isCymbal(cymbalSpans, offset, n.tick);
-    notes.push({ ...timed(n), lane: offset, cymbal });
+    notes.push({ ...timed(n), lane: offset - 1, cymbal });
   }
-  return { mode: 'lanes', lanes, laneColors, drumKind: kind, kickLane: 0, notes, ...commonParts(midi, track, toSec) };
+  return { mode: 'lanes', lanes, laneColors, drumKind: kind, notes, ...commonParts(midi, track, toSec) };
 }
 
 // Tick ranges during which each cymbal flag (110/111/112) is on.
