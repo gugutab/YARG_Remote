@@ -2,7 +2,7 @@ import { parseMidi } from './midi.js';
 import { DIFFICULTIES, instrumentOptions, availableDifficulties, buildChart, sectionIndexAt } from './chart.js';
 import { MultiTrackPlayer } from './player.js';
 import { Highway } from './highway.js';
-import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, readBytes, serializeSongs, restoreSongs } from './library.js';
+import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, readBytes, serializeSongs, restoreSongs, restoreRemoteSongs } from './library.js';
 import { songDelaySeconds } from './ini.js';
 import { saveLibrary, loadLibrary } from './store.js';
 import { filterSongs, sortSongs, genresOf } from './songlist.js';
@@ -28,6 +28,7 @@ let chart = null; // chart for the selected instrument and difficulty
 let seeking = false;
 let loadToken = 0; // bumped on every song selection, so a slow load cannot overwrite a newer one
 let sortDesc = false;
+let remote = false; // library comes from server.mjs (/api/library); no folder permission needed
 let detached = false; // list restored from storage without file access (browsers without showDirectoryPicker)
 let pendingSongId = null; // song clicked while detached; opened once the folder is picked again
 
@@ -63,7 +64,7 @@ els.sortDir.addEventListener('click', () => {
   sortDesc = !sortDesc;
   renderList();
 });
-offerSavedFolder();
+startLibrary();
 
 // Folder selection: File System Access API when available, <input webkitdirectory> otherwise.
 async function pickFolder() {
@@ -113,7 +114,36 @@ async function reopenFolder() {
   afterLibraryLoaded();
 }
 
+// Prefers the server's library (server.mjs); falls back to the browser folder flow when there is none.
+async function startLibrary() {
+  if (await loadRemoteLibrary(false)) return;
+  await offerSavedFolder();
+}
+
+async function loadRemoteLibrary(refresh) {
+  try {
+    const res = await fetch(`/api/library${refresh ? '?refresh' : ''}`, { cache: 'no-store' });
+    if (!res.ok || !(res.headers.get('content-type') || '').includes('json')) return false;
+    const data = await res.json();
+    songs = restoreRemoteSongs(data.songs);
+    remote = true;
+    detached = false;
+    els.pick.hidden = true;
+    els.resume.hidden = true;
+    setStatus(`"${data.rootName}" no servidor`);
+    afterLibraryLoaded();
+    return true;
+  } catch {
+    return false; // static hosting: no API
+  }
+}
+
 async function rescanFolder() {
+  if (remote) {
+    setStatus('Atualizando…');
+    await loadRemoteLibrary(true);
+    return;
+  }
   if (!connectedRoot) return;
   try {
     const permission = await connectedRoot.requestPermission({ mode: 'read' });
@@ -142,7 +172,7 @@ async function loadEntries(entries) {
 }
 
 function afterLibraryLoaded() {
-  els.rescan.hidden = !connectedRoot;
+  els.rescan.hidden = !connectedRoot && !remote;
   const genres = genresOf(songs);
   els.filterGenre.replaceChildren(new Option('Gêneros', ''), ...genres.map((g) => new Option(g, g)));
   els.filterGenre.closest('label').hidden = genres.length === 0;

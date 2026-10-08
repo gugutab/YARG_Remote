@@ -44,9 +44,9 @@ export async function scanSongs(entries) {
     songs.push({
       id: dir,
       folder: dir,
-      title: ini.name || folderName,
-      artist: ini.artist || '',
-      album: ini.album || '',
+      title: String(ini.name || folderName), // song.ini values like "1999" are parsed as numbers
+      artist: String(ini.artist || ''),
+      album: String(ini.album || ''),
       ini,
       files,
     });
@@ -75,6 +75,29 @@ export function restoreSongs(index, root) {
     files: new Map(s.files.map((f) => [
       f.name.toLowerCase(),
       { name: f.name, path: f.path, getFile: () => resolveFile(root, f.path) },
+    ])),
+  }));
+}
+
+// Songs served by server.mjs: the index comes from /api/library and files are fetched from /songs/<path>.
+export function remoteFileUrl(path) {
+  return `/songs/${path.split('/').map(encodeURIComponent).join('/')}`;
+}
+
+export function restoreRemoteSongs(index) {
+  return index.map((s) => ({
+    ...s,
+    files: new Map(s.files.map((f) => [
+      f.name.toLowerCase(),
+      {
+        name: f.name,
+        path: f.path,
+        getFile: async () => {
+          const res = await fetch(remoteFileUrl(f.path));
+          if (!res.ok) throw new Error(`${f.name}: HTTP ${res.status}`);
+          return res.blob(); // Blob has arrayBuffer() and text(), like File
+        },
+      },
     ])),
   }));
 }

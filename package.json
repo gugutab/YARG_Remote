@@ -5,7 +5,8 @@
   "description": "Visualizador web de músicas no formato Rock Band/YARG (notes.mid + song.ini + stems de áudio)",
   "type": "module",
   "scripts": {
-    "start": "python -m http.server 8080 --bind 0.0.0.0",
+    "start": "node server.mjs",
+    "start:static": "python -m http.server 8080 --bind 0.0.0.0",
     "test": "node --test test/*.test.js"
   }
 }
