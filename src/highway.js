@@ -196,8 +196,8 @@ export class Highway {
     const top = h * 0.08; // pitch area: top 8% to 76% of the canvas
     const bottom = h * 0.76;
     const yOfPitch = (p) => bottom - ((p - lo) / (hi - lo)) * (bottom - top);
-    const percussionY = h * 0.84;
-    const lyricY = h * 0.94;
+    const lyricY = bottom + h * 0.04; // lyrics sit right under the note area
+    const percussionY = h * 0.92;
     const xOf = (time) => hitX + (time - t) * pxPerSec;
     const ahead = BASE_LOOKAHEAD_SEC + ENTRY_MARGIN_SEC;
 

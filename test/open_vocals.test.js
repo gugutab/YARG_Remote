@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseMidi } from '../src/midi.js';
-import { buildChart, INSTRUMENTS, DIFFICULTIES } from '../src/chart.js';
+import { buildChart, displayLyric, INSTRUMENTS, DIFFICULTIES } from '../src/chart.js';
 import { buildMidi, tempo120, trackName, text, event, meta } from './smf.js';
 
 const GUITAR = INSTRUMENTS.find((i) => i.id === 'guitar');
@@ -64,4 +64,13 @@ test('vocals: harmonies, percussion and lyrics are read from their tracks', () =
   assert.deepEqual(chart.harmonies.map((h) => [h.part, h.notes.map((n) => n.pitch)]), [[1, [64]]]);
   assert.deepEqual(chart.percussion.map((p) => p.played), [true, false]);
   assert.deepEqual(chart.lyrics.map((l) => l.text), ['Hel-']);
+});
+
+test('lyric symbols: timing and scoring markers are not shown; = is a hyphen; § joins syllables', () => {
+  assert.equal(displayLyric("it's#"), "it's");
+  assert.equal(displayLyric('+'), '');
+  assert.equal(displayLyric('bod-'), 'bod-');
+  assert.equal(displayLyric('go=ing'), 'go-ing');
+  assert.equal(displayLyric('a§b'), 'a‿b');
+  assert.equal(displayLyric('ca^t*'), 'cat');
 });

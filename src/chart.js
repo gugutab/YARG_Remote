@@ -157,7 +157,11 @@ export function buildChart(midi, instrument, difficulty) {
     const lyricEvents = track.lyrics.length > 0
       ? track.lyrics
       : track.texts.filter((t) => !t.text.startsWith('['));
-    const lyrics = lyricEvents.map((t) => ({ time: toSec(t.tick), text: t.text }));
+    // Symbols that only mark timing or scoring are not shown (YARG.Core LyricSymbols.cs). Events left
+    // empty by that (a lone '+', say) are dropped.
+    const lyrics = lyricEvents
+      .map((t) => ({ time: toSec(t.tick), text: displayLyric(t.text) }))
+      .filter((l) => l.text !== '');
     // Harmony parts HARM1..HARM3 (or PART HARM1..3), drawn beside the lead.
     const harmonies = harmonyTracks(midi).map((h) => ({ part: h.part, notes: vocalNotes(h.track) }));
     return { mode: 'vocals', notes, harmonies, percussion, lyrics, ...commonParts(midi, track, toSec) };
@@ -285,6 +289,12 @@ function isCymbal(spans, offset, tick) {
   if (flag === undefined) return false;
   const markers = (spans.get(flag) || []).filter((s) => tick >= s.start && tick < s.end).length;
   return markers % 2 === 0;
+}
+
+// Text shown for a lyric syllable: markers are removed, '=' is a hyphen and '§' joins two syllables.
+const LYRIC_MARKERS = /[+#^*%/\$]/g;
+export function displayLyric(text) {
+  return text.replace(LYRIC_MARKERS, '').replace(/=/g, '-').replace(/§/g, '‿').trim();
 }
 
 function commonParts(midi, track, toSec) {
