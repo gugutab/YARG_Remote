@@ -22,13 +22,19 @@ npm test             # testes do parser MIDI / song.ini / chart
 
 | Arquivo | Responsabilidade |
 | --- | --- |
-| `src/midi.js` | Parser SMF: trilhas, pares note-on/note-off (duração), letras/eventos de texto, mapa de tempo e conversão tick→segundo. |
-| `src/ini.js` | Parser do `song.ini` (seção `[song]`, números viram `number`). |
-| `src/chart.js` | Monta o chart de um instrumento/dificuldade: notas com `time`/`length` em segundos, solos, star power, linhas de compasso, seções e letra. |
-| `src/library.js` | Varre a pasta (FSA ou `webkitdirectory`) e agrupa em músicas (pasta com `song.ini`/`notes.mid`/`notes.chart`). |
-| `src/player.js` | Multitrack com Web Audio: cada stem é decodificado e tocado por um `GainNode` próprio, todos no mesmo relógio do `AudioContext` (sincronia sample-accurate, pause, seek, volume por track). |
-| `src/highway.js` | Renderização em canvas em função do tempo de reprodução (seek/pause só mudam o `t`). |
-| `src/app.js` | UI: lista, seleção, instrumento/dificuldade, mixer, barra de progresso. |
+| `src/midi.js` | Parser SMF: notas com duração, textos, letras (meta 0x05), SysEx, mapa de tempo. |
+| `src/ini.js` | Parser do `song.ini` e leitura do delay. |
+| `src/chart.js` | Regras do YARG: instrumentos e modos de bateria, notas especiais, seções, letra, harmonias e percussão. |
+| `src/library.js` | Varre a pasta (FSA ou `webkitdirectory`), monta o índice e resolve arquivos. |
+| `src/store.js` | Guarda a pasta e o índice no IndexedDB entre visitas. |
+| `src/player.js` | Multitrack com alinhamento ao chart, velocidade sem mudar o tom (SoundTouch), volume por stem. |
+| `src/highway.js` | Desenho em canvas (notas, sustains, pedais, rolls, vocal com letra). |
+| `src/app.js` | Interface, seleção, seções, delays e loop de desenho. |
+| `vendor/` | SoundTouchJS (LGPL-2.1), sem build. |
+| `scripts/find-special-notes.mjs` | Busca notas especiais num catálogo de MIDIs. |
+
+Para quem vai continuar o projeto, o arquivo `CLAUDE.md` tem o estado atual, as regras do YARG com referências
+e as convenções de trabalho.
 
 ## Como o `.mid` é interpretado (referências)
 
@@ -76,24 +82,21 @@ Unity/C# (pasta `Assets/`) e o parsing vive no YARG.Core em C#, que não roda no
 de chart (o que este projeto faz em `src/chart.js`) é mais simples do que embutir o cliente inteiro.
 O YARG.Core serve como referência de formato, não como dependência.
 
-## Limitações do MVP
+## Limitações
 
-- Só `notes.mid`; `notes.chart` (formato .chart) não é lido ainda.
-- Sem `open` notes (sysex `PS`) e sem Pro Guitar/Keys. Bateria 4 lanes, Pro (flags de prato, mostrados como anel)
-  e 5 lanes são suportadas, ambas com tags de prato.
-- Vocal é um visualizador de pitch com letra, sem sílabas nem fases.
-- Áudio é decodificado inteiro na memória: um conjunto de stems de 3 min costuma ocupar algumas centenas
-  de MB no navegador.
-- Não há persistência da pasta escolhida. Ao recarregar a página é preciso escolher de novo.
-- Os stems (`guitar.ogg`, `song.ogg`…) entram todos com volume 100%; não há regra automática para evitar
-  dobrar o áudio quando `song.ogg` já tem os instrumentos. Ajuste no mixer.
+- Só `notes.mid`; arquivos `.chart` não são lidos.
+- Guitarra e baixo Pro, teclado Pro e Elite Drums não são desenhados.
+- Open pelo modo "enhanced opens" (texto) não é tratado; open pelo SysEx é.
+- Fills de bateria, BRE e coda não são desenhados; venue e luzes também não.
+- Star power e solo aparecem como faixa de fundo, não por nota.
+- Áudio e delays não foram conferidos por ouvido com stems reais.
 
 ## Próximos passos sugeridos
 
-1. Testar a sincronia de áudio com um conjunto real de stems.
-2. Ler `notes.chart`.
-3. Sustains com cauda contínua e `open` notes.
-4. Persistir o handle da pasta com IndexedDB (`FileSystemDirectoryHandle` é serializável).
+1. Conferir a sincronia com stems reais, e o delay do `song.ini`.
+2. Guitarra e baixo Pro (`PART REAL_GUITAR`, `PART REAL_BASS`).
+3. Arquivos `.chart`.
+4. Star power e solo por nota.
 
 ## Achar exemplos de notas especiais no catálogo
 
