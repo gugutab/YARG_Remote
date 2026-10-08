@@ -40,6 +40,39 @@ const TAP_NOTE = 104;
 const VELOCITY_ACCENT = 127; // drum pads: accent (bigger) and ghost (dim), as YARG.Core MidIOHelper.cs
 const VELOCITY_GHOST = 1;
 const VOCAL_RANGE = [36, 84];
+const PERCUSSION_NOTE = 96;
+const NONPLAYED_PERCUSSION_NOTE = 97;
+const PHRASE_OPEN = 0x01; // PhaseShift SysEx phrase codes (YARG.Core PhaseShiftSysEx.cs)
+
+// [start, end) tick windows for one phrase code, per difficulty index 0..3.
+// SysEx layout: "PS\0", type, difficulty (0..3, 0xFF = all), code, value (1 start, 0 end), F7.
+export function phraseWindows(track, code) {
+  const windows = [[], [], [], []];
+  const starts = [undefined, undefined, undefined, undefined];
+  const events = track.sysex
+    .filter((e) => e.data[0] === 0x50 && e.data[1] === 0x53 && e.data[2] === 0 && e.data[5] === code)
+    .sort((a, b) => a.tick - b.tick);
+  for (const e of events) {
+    const diffs = e.data[4] === 0xff ? [0, 1, 2, 3] : [e.data[4]];
+    for (const d of diffs) {
+      if (e.data[6] === 1) {
+        starts[d] = e.tick;
+      } else if (starts[d] !== undefined) {
+        windows[d].push([starts[d], e.tick]);
+        starts[d] = undefined;
+      }
+    }
+  }
+  return windows;
+}
+
+// Harmony vocal tracks: HARM1..HARM3 or PART HARM1..HARM3.
+function harmonyTracks(midi) {
+  return midi.tracks
+    .map((t) => ({ track: t, match: /^(?:PART )?HARM([1-3])$/i.exec(t.name) }))
+    .filter((h) => h.match)
+    .map((h) => ({ part: Number(h.match[1]), track: h.track }));
+}
 // YARG.Core MidReader.cs: notes shorter than resolution / 3 ticks have no sustain (SustainCutoffThreshold).
 
 export function findTrack(midi, instrument) {
@@ -111,13 +144,20 @@ export function buildChart(midi, instrument, difficulty) {
   };
 
   if (instrument.mode === 'vocals') {
-    const notes = track.notes
+    const vocalNotes = (vocalTrack) => vocalTrack.notes
       .filter((n) => inRange(n.pitch, VOCAL_RANGE))
       .map((n) => ({ ...timed(n), pitch: n.pitch }));
+    const notes = vocalNotes(track);
+    // Percussion (YARG.Core VocalsTrack): 96 is played, 97 is not played.
+    const percussion = track.notes
+      .filter((n) => n.pitch === PERCUSSION_NOTE || n.pitch === NONPLAYED_PERCUSSION_NOTE)
+      .map((n) => ({ time: toSec(n.tick), played: n.pitch === PERCUSSION_NOTE }));
     const lyrics = track.texts
       .filter((t) => !t.text.startsWith('['))
       .map((t) => ({ time: toSec(t.tick), text: t.text }));
-    return { mode: 'vocals', notes, lyrics, ...commonParts(midi, track, toSec) };
+    // Harmony parts HARM1..HARM3 (or PART HARM1..3), drawn beside the lead.
+    const harmonies = harmonyTracks(midi).map((h) => ({ part: h.part, notes: vocalNotes(h.track) }));
+    return { mode: 'vocals', notes, harmonies, percussion, lyrics, ...commonParts(midi, track, toSec) };
   }
 
   if (instrument.mode === 'drums') {
@@ -131,15 +171,19 @@ export function buildChart(midi, instrument, difficulty) {
   const strumWindows = windowsOf(track.notes.filter((n) => n.pitch === difficulty.base + 6));
   const fretNotes = track.notes.filter((n) => n.pitch - difficulty.base >= 0 && n.pitch - difficulty.base < LANES);
   const natural = naturalHopo(fretNotes, midi.division);
+  // Open notes: SysEx phrase 1 marks a window in which the notes are open (YARG.Core
+  // ProcessSysExEventPairAsOpenNoteModifier). Open notes are drawn as a bar across the lanes.
+  const openWindowsHere = phraseWindows(track, PHRASE_OPEN)[DIFFICULTIES.indexOf(difficulty)];
   const notes = [];
   for (const n of track.notes) {
     const lane = n.pitch - difficulty.base;
     if (lane < 0 || lane >= LANES) continue;
+    const open = inWindows(openWindowsHere, n.tick);
     const tap = inWindows(tapWindows, n.tick);
     // A forced strum wins over a forced HOPO; without either, the note is a HOPO only if it is natural.
     const hopo = !tap && (inWindows(strumWindows, n.tick) ? false
       : inWindows(hopoWindows, n.tick) ? true : natural.get(n));
-    notes.push({ ...timed(n), lane, cymbal: false, tap, hopo: Boolean(hopo) });
+    notes.push({ ...timed(n), lane, cymbal: false, tap, hopo: Boolean(hopo), open });
   }
   return { mode: 'lanes', lanes: LANES, laneColors: GUITAR_LANE_COLORS, notes, ...commonParts(midi, track, toSec) };
 }

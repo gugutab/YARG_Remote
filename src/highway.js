@@ -2,6 +2,8 @@
 // so seek/pause just means re-rendering at a different `t`.
 const GUITAR_LANE_COLORS = ['#3fbf3f', '#e5392b', '#f5c518', '#2f80ed', '#f2861e'];
 const KICK_COLOR = '#f2861e';
+const OPEN_COLOR = '#a66cff';
+const HARMONY_COLORS = { 1: '#3fbf9f', 2: '#2fa8a8', 3: '#8fd6c4' }; // harmony parts 1..3, behind the lead
 const KICK_BAR_HALF_H = 6; // pedal bar is 12 px tall at rest
 const DOUBLE_KICK_GAP = 4; // px between the two bars of a double kick
 const TAP_COLOR = '#b25cff';
@@ -114,7 +116,7 @@ export class Highway {
     // kick (lane -1) is a bar across all columns, not a column
     // pedal bars go behind the other notes and sustains
     for (const n of visible) {
-      if (n.lane >= 0) continue;
+      if (n.lane >= 0 && !n.open) continue;
       const past = t - n.time;
       if (past > FADE_SEC) continue;
       const k = Math.max(0, past) / FADE_SEC; // same exit animation as the other heads
@@ -122,7 +124,7 @@ export class Highway {
       const full = laneW * chart.lanes;
       const height = KICK_BAR_HALF_H * 2 * (1 + 0.4 * k);
       g.globalAlpha = 1 - k;
-      g.fillStyle = tintWhite(KICK_COLOR, k);
+      g.fillStyle = tintWhite(n.open ? OPEN_COLOR : KICK_COLOR, k);
       // double kick: a second bar stacked above the first
       const bars = n.doubleKick ? [0, -(height + DOUBLE_KICK_GAP)] : [0];
       for (const dy of bars) g.fillRect(x0, cy + dy - height / 2, full, height);
@@ -131,9 +133,14 @@ export class Highway {
 
     for (const n of visible) {
       if (!n.length || n.lane < 0) continue;
-      const cx = x0 + (n.lane + 0.5) * laneW;
       const yTop = yOf(n.time + n.length);
       const yBot = yOf(Math.max(n.time, t));
+      if (n.open) {
+        g.fillStyle = withAlpha(OPEN_COLOR, 0.35);
+        g.fillRect(x0, yTop, laneW * chart.lanes, Math.max(0, yBot - yTop));
+        continue;
+      }
+      const cx = x0 + (n.lane + 0.5) * laneW;
       g.fillStyle = withAlpha(colors[n.lane], 0.55);
       g.fillRect(cx - radius * 0.35, yTop, radius * 0.7, Math.max(0, yBot - yTop));
     }
@@ -141,7 +148,7 @@ export class Highway {
     // Heads. Once a note reaches the hit line it stops moving and plays its exit animation:
     // it grows, fades and turns white over FADE_SEC, for pedals too.
     for (const n of visible) {
-      if (n.lane < 0) continue; // pedals are drawn above, behind the other notes
+      if (n.lane < 0 || n.open) continue; // pedals and open notes are drawn above, behind the other notes
       const past = t - n.time;
       if (past > FADE_SEC) continue;
       const k = Math.max(0, past) / FADE_SEC; // 0 at the hit line, 1 when gone
@@ -178,38 +185,70 @@ export class Highway {
     g.globalAlpha = 1;
   }
 
+  // Vocals: pitch on the vertical axis, time on the horizontal axis. Lead notes are bars, harmonies
+  // are lighter bars behind them, percussion is a row of diamonds, and lyrics sit under the notes.
   renderVocals(t, w, h) {
     const g = this.g;
     const chart = this.chart;
     const hitX = w * 0.15;
     const pxPerSec = (w * 0.85) / BASE_LOOKAHEAD_SEC;
     const [lo, hi] = [36, 84];
-    const yOfPitch = (p) => h * 0.9 - ((p - lo) / (hi - lo)) * h * 0.8;
+    const top = h * 0.08; // pitch area: top 8% to 76% of the canvas
+    const bottom = h * 0.76;
+    const yOfPitch = (p) => bottom - ((p - lo) / (hi - lo)) * (bottom - top);
+    const percussionY = h * 0.84;
+    const lyricY = h * 0.94;
     const xOf = (time) => hitX + (time - t) * pxPerSec;
+    const ahead = BASE_LOOKAHEAD_SEC + ENTRY_MARGIN_SEC;
 
     g.fillStyle = 'rgba(255,255,255,0.7)';
     g.fillRect(hitX - 2, 0, 3, h);
 
+    // harmonies first, so the lead is drawn on top
+    for (const harmony of chart.harmonies || []) {
+      g.fillStyle = HARMONY_COLORS[harmony.part] || HARMONY_COLORS[1];
+      for (const n of harmony.notes) {
+        if (n.end < t - 0.2 || n.time > t + ahead) continue;
+        const x1 = xOf(n.time);
+        const x2 = Math.max(x1 + 6, xOf(n.end));
+        g.fillRect(x1, yOfPitch(n.pitch) - 4, x2 - x1, 8);
+      }
+    }
+
     for (const n of chart.notes) {
-      if (n.end < t - 0.2 || n.time > t + BASE_LOOKAHEAD_SEC + ENTRY_MARGIN_SEC) continue;
+      if (n.end < t - 0.2 || n.time > t + ahead) continue;
       const x1 = xOf(n.time);
       const x2 = Math.max(x1 + 6, xOf(n.end));
       g.fillStyle = n.time <= t && n.end >= t ? '#f5c518' : '#5b8def';
       g.fillRect(x1, yOfPitch(n.pitch) - 6, x2 - x1, 12);
     }
 
+    // percussion: a diamond per hit, white when played, grey when not
+    for (const p of chart.percussion || []) {
+      if (p.time < t - 0.2 || p.time > t + ahead) continue;
+      const x = xOf(p.time);
+      g.beginPath();
+      g.moveTo(x, percussionY - 7);
+      g.lineTo(x + 6, percussionY);
+      g.lineTo(x, percussionY + 7);
+      g.lineTo(x - 6, percussionY);
+      g.closePath();
+      g.fillStyle = p.played ? '#e6edf3' : '#6e7681';
+      g.fill();
+    }
+
+    // lyrics under the notes, each at its start time
     g.font = '18px system-ui';
     g.textAlign = 'left';
-    g.fillStyle = '#e6edf3';
+    g.textBaseline = 'middle';
     for (const l of chart.lyrics) {
-      if (l.time < t - 0.3 || l.time > t + BASE_LOOKAHEAD_SEC + ENTRY_MARGIN_SEC) continue;
-      g.fillText(l.text, xOf(l.time), h * 0.06);
+      if (l.time < t - 0.3 || l.time > t + ahead) continue;
+      g.fillStyle = l.time <= t ? '#f5c518' : '#e6edf3';
+      g.fillText(l.text, xOf(l.time), lyricY);
     }
+    g.textBaseline = 'alphabetic';
   }
 
-  // Bands are drawn at their real position and the canvas clips the part outside the screen,
-  // so a band slides in from the top edge instead of growing there. Culling uses screen position,
-  // not time, so a band never vanishes while it is still on screen.
   fillSpans(spans, t, ahead, yOf, x0, width, h, color) {
     this.g.fillStyle = color;
     for (const s of spans) {

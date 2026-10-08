@@ -30,7 +30,7 @@ export function parseMidi(input) {
 }
 
 function parseTrack(bytes, start, end) {
-  const track = { name: '', notes: [], texts: [] };
+  const track = { name: '', notes: [], texts: [], sysex: [] };
   const tempos = [];
   const open = new Map(); // channel/pitch -> note-ons waiting for their note-off
   let pos = start;
@@ -55,8 +55,9 @@ function parseTrack(bytes, start, end) {
       continue;
     }
 
-    if (byte === 0xf0 || byte === 0xf7) { // sysex: skip
+    if (byte === 0xf0 || byte === 0xf7) { // sysex: kept for PhaseShift phrases (open, tap), see chart.js
       const [len, dataPos] = readVlq(bytes, pos + 1);
+      track.sysex.push({ tick, data: bytes.subarray(dataPos, dataPos + len) });
       pos = dataPos + len;
       continue;
     }
