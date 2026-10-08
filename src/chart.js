@@ -36,6 +36,9 @@ const GUITAR_LANE_COLORS = ['#3fbf3f', '#e5392b', '#f5c518', '#2f80ed', '#f2861e
 const STAR_POWER_NOTE = 116;
 const MEASURE_NOTE = 12;
 const BEAT_NOTE = 13;
+const TAP_NOTE = 104;
+const VELOCITY_ACCENT = 127; // drum pads: accent (bigger) and ghost (dim), as YARG.Core MidIOHelper.cs
+const VELOCITY_GHOST = 1;
 const VOCAL_RANGE = [36, 84];
 const MIN_SUSTAIN_SEC = 0.12; // shorter notes are taps, not sustains
 
@@ -119,11 +122,14 @@ export function buildChart(midi, instrument, difficulty) {
     return buildDrumChart(midi, track, instrument.drumMode ?? drumKind(track), difficulty, timed, toSec);
   }
 
+  // Tap: note 104 marks a window [start, end) in which every note of the guitar is a tap (MidReader.cs).
+  const tapWindows = track.notes.filter((n) => n.pitch === TAP_NOTE).map((n) => [n.tick, n.endTick]);
   const notes = [];
   for (const n of track.notes) {
     const lane = n.pitch - difficulty.base;
     if (lane < 0 || lane >= LANES) continue;
-    notes.push({ ...timed(n), lane, cymbal: false });
+    const tap = tapWindows.some(([start, end]) => n.tick >= start && n.tick < end);
+    notes.push({ ...timed(n), lane, cymbal: false, tap });
   }
   return { mode: 'lanes', lanes: LANES, laneColors: GUITAR_LANE_COLORS, notes, ...commonParts(midi, track, toSec) };
 }
@@ -136,12 +142,22 @@ function buildDrumChart(midi, track, kind, difficulty, timed, toSec) {
   // Cymbal flags apply to Pro and 5-lane modes; 4-lane mode plays the same notes with no cymbals.
   const cymbalSpans = kind === 'four' ? null : cymbalFlagSpans(track);
 
+  // Double kick: the note one below the difficulty's kick (95 in Expert) at the same tick (MidReader.cs).
+  const doubleKickTicks = new Set(track.notes.filter((n) => n.pitch === difficulty.base - 1).map((n) => n.tick));
   const notes = [];
   for (const n of track.notes) {
     const offset = n.pitch - difficulty.base; // 0 kick, 1 red, 2 yellow, 3 blue, 4 orange/green, 5 green
     if (offset < 0 || offset > lanes) continue;
     const cymbal = cymbalSpans !== null && isCymbal(cymbalSpans, offset, n.tick);
-    notes.push({ ...timed(n), lane: offset - 1, cymbal });
+    const note = { ...timed(n), lane: offset - 1, cymbal, accent: false, ghost: false, doubleKick: false };
+    if (note.lane < 0) {
+      note.doubleKick = doubleKickTicks.has(n.tick);
+    } else {
+      // Velocity marks dynamics on pads, not the kick (YARG.Core MidReader.ProcessLists.cs, VELOCITY_*).
+      note.accent = n.velocity === VELOCITY_ACCENT;
+      note.ghost = n.velocity === VELOCITY_GHOST;
+    }
+    notes.push(note);
   }
   return { mode: 'lanes', lanes, laneColors, drumKind: kind, notes, ...commonParts(midi, track, toSec) };
 }

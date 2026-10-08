@@ -3,6 +3,10 @@
 const GUITAR_LANE_COLORS = ['#3fbf3f', '#e5392b', '#f5c518', '#2f80ed', '#f2861e'];
 const KICK_COLOR = '#f2861e';
 const KICK_BAR_HALF_H = 6; // pedal bar is 12 px tall at rest
+const DOUBLE_KICK_GAP = 4; // px between the two bars of a double kick
+const TAP_COLOR = '#b25cff';
+const ACCENT_SCALE = 1.25;
+const GHOST_ALPHA = 0.45;
 const FADE_SEC = 0.25; // how long a note takes to fade out after the hit line
 const BASE_LOOKAHEAD_SEC = 2.5; // time from the top edge to the hit line at neck speed 1
 const ENTRY_MARGIN_SEC = 0.3; // extra window above the top edge, so notes are already moving when they enter
@@ -109,7 +113,9 @@ export class Highway {
       const height = KICK_BAR_HALF_H * 2 * (1 + 0.4 * k);
       g.globalAlpha = 1 - k;
       g.fillStyle = tintWhite(KICK_COLOR, k);
-      g.fillRect(x0, cy - height / 2, full, height);
+      // double kick: a second bar stacked above the first
+      const bars = n.doubleKick ? [0, -(height + DOUBLE_KICK_GAP)] : [0];
+      for (const dy of bars) g.fillRect(x0, cy + dy - height / 2, full, height);
     }
     g.globalAlpha = 1;
 
@@ -131,12 +137,13 @@ export class Highway {
       const k = Math.max(0, past) / FADE_SEC; // 0 at the hit line, 1 when gone
       const cy = yOf(Math.max(n.time, t)); // parked on the hit line during the exit
       const white = k;
-      g.globalAlpha = 1 - k;
+      // ghost notes are dimmed, accents are larger (YARG draws them the same way)
+      g.globalAlpha = (1 - k) * (n.ghost ? GHOST_ALPHA : 1);
       const cx = x0 + (n.lane + 0.5) * laneW;
-      const r = radius * (1 + 0.4 * k);
+      const r = radius * (1 + 0.4 * k) * (n.accent ? ACCENT_SCALE : 1);
       g.beginPath();
       g.arc(cx, cy, r, 0, Math.PI * 2);
-      g.fillStyle = tintWhite(colors[n.lane], white);
+      g.fillStyle = tintWhite(n.tap ? TAP_COLOR : colors[n.lane], white);
       g.fill();
       g.lineWidth = 2;
       g.strokeStyle = 'rgba(0,0,0,0.5)';
