@@ -28,3 +28,8 @@ export function songDelaySeconds(ini) {
   const s = Number(ini.delay_seconds);
   return Number.isFinite(s) ? s : 0;
 }
+
+// song.ini text often carries Unity rich text such as <color=#0072bc>o</color>; show it as plain text.
+export function plainText(value) {
+  return String(value ?? '').replace(/<\/?[a-z][^>]*>/gi, '').trim();
+}

@@ -3,7 +3,8 @@ import { DIFFICULTIES, instrumentOptions, availableDifficulties, buildChart, sec
 import { MultiTrackPlayer } from './player.js';
 import { Highway } from './highway.js';
 import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, readBytes, serializeSongs, restoreSongs, restoreRemoteSongs } from './library.js';
-import { songDelaySeconds } from './ini.js';
+import { songDelaySeconds, plainText } from './ini.js';
+import { metaRows, difficultyLevels, extraRows, chartStats } from './songinfo.js';
 import { saveLibrary, loadLibrary } from './store.js';
 import { filterSongs, sortSongs, genresOf } from './songlist.js';
 
@@ -14,7 +15,8 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'mixer', 'settingsBtn', 'settingsPop',
-  'speed', 'speedVal', 'neck', 'neckVal', 'chartDelay', 'chartDelayVal', 'fullscreen',
+  'fullscreen', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'difficultyCards', 'chartStats', 'mixerInfo', 'levels', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoClose', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
 ].map((id) => [id, $(id)]));
 
@@ -28,6 +30,10 @@ let chart = null; // chart for the selected instrument and difficulty
 let seeking = false;
 let loadToken = 0; // bumped on every song selection, so a slow load cannot overwrite a newer one
 let sortDesc = false;
+let ready = false; // audio decoded and a chart built: playback is allowed
+let infoOpen = false;
+let loadInfo = { state: 'idle', text: '', fraction: 0 };
+const settings = { speed: 1, neck: 1, chartDelay: 0 };
 let remote = false; // library comes from server.mjs (/api/library); no folder permission needed
 let detached = false; // list restored from storage without file access (browsers without showDirectoryPicker)
 let pendingSongId = null; // song clicked while detached; opened once the folder is picked again
@@ -204,8 +210,8 @@ function renderList() {
     li.className = current?.song === song ? 'active' : '';
     li.setAttribute('role', 'option');
     li.innerHTML = '<div class="song-title"></div><div class="song-artist"></div>';
-    li.querySelector('.song-title').textContent = song.title;
-    li.querySelector('.song-artist').textContent = song.artist;
+    li.querySelector('.song-title').textContent = plainText(song.title);
+    li.querySelector('.song-artist').textContent = plainText(song.artist);
     li.addEventListener('click', () => selectSong(song));
     return li;
   }));
@@ -229,6 +235,7 @@ async function selectSong(song) {
   const token = ++loadToken;
   player.pause();
   syncPlayButton();
+  ready = false;
   current = null;
   chart = null;
   highway.setChart(null);
@@ -236,23 +243,30 @@ async function selectSong(song) {
   if (narrow()) setLibraryOpen(false);
 
   els.welcome.hidden = true;
-  els.loading.hidden = false;
-  els.loading.textContent = 'Carregando…';
   showPlayInfo(true);
-  els.title.textContent = song.title;
-  els.artist.textContent = song.artist;
+  els.title.textContent = plainText(song.title);
+  els.artist.textContent = plainText(song.artist);
   els.cover.hidden = true;
+  els.infoCover.hidden = true;
+  els.instrumentCards.replaceChildren();
+  els.difficultyCards.replaceChildren();
+  els.chartStats.replaceChildren();
+  els.mixerInfo.replaceChildren();
+  els.mixer.replaceChildren();
+  renderSongInfo(song);
+  setInfoOpen(true); // the info screen opens right away and the load runs behind it
+  setLoadState('loading', 'Lendo o chart…', 0.02);
 
   const midiEntry = song.files.get('notes.mid');
   if (!midiEntry) {
-    els.loading.textContent = 'Esta música não tem notes.mid (apenas .chart não é suportado nesta versão).';
+    setLoadState('error', 'Esta música não tem notes.mid (apenas .chart não é suportado nesta versão).');
     return;
   }
   let midi;
   try {
     midi = parseMidi(await readBytes(midiEntry));
   } catch (err) {
-    if (token === loadToken) els.loading.textContent = `Não foi possível ler notes.mid: ${err.message}`;
+    if (token === loadToken) setLoadState('error', `Não foi possível ler notes.mid: ${err.message}`);
     return;
   }
   const coverEntry = ['album.jpg', 'album.png', 'album.jpeg'].map((n) => song.files.get(n)).find(Boolean);
@@ -262,30 +276,134 @@ async function selectSong(song) {
     return;
   }
   if (els.cover.src.startsWith('blob:')) URL.revokeObjectURL(els.cover.src);
-  els.cover.src = coverUrl || '';
-  els.cover.hidden = !coverUrl;
+  for (const img of [els.cover, els.infoCover]) {
+    img.src = coverUrl || '';
+    img.hidden = !coverUrl;
+  }
 
   current = { song, midi, coverUrl, options: instrumentOptions(midi) };
   renderList(); // highlight the loaded song
   fillInstrumentOptions();
-  buildMixer(audioStemsOf(song));
+  updateChart(); // the chart exists as soon as the MIDI is read; only playback waits for the audio
+  const stems = audioStemsOf(song);
+  buildMixer(stems);
 
+  let loaded = false;
   try {
-    await player.load(audioStemsOf(song), {
+    loaded = await player.load(stems, {
       delay: songDelaySeconds(song.ini),
       onProgress: (p) => {
-        if (token === loadToken) els.loading.textContent = `Carregando áudio… ${Math.round(p * 100)}%`;
+        if (token === loadToken) setLoadState('loading', `Carregando áudio… ${Math.round(p * 100)}%`, 0.1 + p * 0.9);
       },
     });
   } catch (err) {
-    setStatus(`Falha ao decodificar áudio: ${err.message}`);
+    if (token === loadToken) setLoadState('error', `Falha ao decodificar áudio: ${err.message}`);
+    return;
   }
-  if (token !== loadToken) return;
-  els.loading.hidden = true;
+  if (token !== loadToken || !loaded) return;
   els.seek.max = player.duration.toFixed(2);
   els.timeTotal.textContent = fmt(player.duration);
-  updateChart();
+  stemStates.forEach(applyStem); // volumes chosen while loading
+  ready = true;
+  setLoadState('ready', chart ? 'Pronto para tocar' : 'Nenhum instrumento jogável nesta música.', 1);
 }
+
+// ---------- Info screen ----------
+function setLoadState(state, text, fraction = 0) {
+  loadInfo = { state, text, fraction };
+  renderLoadState();
+}
+
+function renderLoadState() {
+  const { state, text, fraction } = loadInfo;
+  els.infoState.textContent = text;
+  els.infoBar.style.width = `${Math.round(fraction * 100)}%`;
+  els.infoProgress.dataset.state = state;
+  els.play.disabled = els.infoPlay.disabled = !(ready && chart);
+  const overlay = !infoOpen && (state === 'loading' || state === 'error');
+  els.loading.hidden = !overlay;
+  if (overlay) els.loading.textContent = text;
+}
+
+function setInfoOpen(open) {
+  infoOpen = open;
+  els.info.hidden = !open;
+  els.infoBtn.setAttribute('aria-pressed', String(open));
+  closePopovers();
+  renderLoadState();
+}
+
+const kv = (rows) => rows.flatMap((r) => {
+  const dt = document.createElement('dt');
+  const dd = document.createElement('dd');
+  dt.textContent = r.label;
+  dd.textContent = r.value;
+  return [dt, dd];
+});
+
+// The parts of the screen that depend only on the song (song.ini), shown before anything is loaded.
+function renderSongInfo(song) {
+  els.infoTitle.textContent = plainText(song.title);
+  els.infoArtist.textContent = plainText(song.artist);
+  const quote = plainText(song.ini?.loading_phrase);
+  els.infoQuote.textContent = quote ? `“${quote}”` : '';
+  els.infoQuote.hidden = !quote;
+  els.infoMeta.replaceChildren(...kv(metaRows(song).filter((r) => r.label !== 'Artista')));
+  const levels = difficultyLevels(song);
+  els.levels.replaceChildren(...levels.map((d) => {
+    const row = document.createElement('div');
+    row.className = 'level';
+    row.innerHTML = '<span class="level-name"></span><span class="pips"></span>';
+    row.querySelector('.level-name').textContent = d.label;
+    row.querySelector('.pips').replaceChildren(...Array.from({ length: 6 }, (_, i) => {
+      const pip = document.createElement('i');
+      pip.className = i < d.level ? 'on' : '';
+      return pip;
+    }));
+    row.title = `Nível ${d.level} de 6`;
+    return row;
+  }));
+  if (levels.length === 0) els.levels.textContent = 'Sem níveis no song.ini.';
+  const extras = extraRows(song);
+  els.infoExtra.replaceChildren(...kv(extras));
+  els.infoExtra.closest('details').hidden = extras.length === 0;
+}
+
+// Open pickers (instrument and difficulty buttons) mirror the top-bar selects, which stay the source of truth.
+function renderPickers() {
+  const instruments = current?.options ?? [];
+  const iconOf = { guitar: 'guitar', bass: 'guitar', rhythm: 'guitar', keys: 'keys', drums: 'drum', vocals: 'mic' };
+  els.instrumentCards.replaceChildren(...instruments.map((ins) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'card';
+    btn.setAttribute('aria-pressed', String(ins.id === els.instrument.value));
+    btn.innerHTML = `<svg><use href="#i-${iconOf[ins.base] || 'music'}"/></svg><span></span>`;
+    btn.querySelector('span').textContent = ins.label;
+    btn.addEventListener('click', () => {
+      els.instrument.value = ins.id;
+      els.instrument.dispatchEvent(new Event('change'));
+    });
+    return btn;
+  }));
+  els.difficultyCards.replaceChildren(...[...els.difficulty.options].map((opt) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'card text';
+    btn.setAttribute('aria-pressed', String(opt.value === els.difficulty.value));
+    btn.textContent = opt.text;
+    btn.addEventListener('click', () => {
+      els.difficulty.value = opt.value;
+      els.difficulty.dispatchEvent(new Event('change'));
+    });
+    return btn;
+  }));
+  els.chartStats.replaceChildren(...kv(chartStats(chart, current?.midi)));
+}
+
+els.infoBtn.addEventListener('click', () => { if (current || loadInfo.state !== 'idle') setInfoOpen(!infoOpen); });
+els.infoClose.addEventListener('click', () => setInfoOpen(false));
+els.infoPlay.addEventListener('click', () => togglePlay());
 
 function showPlayInfo(on) {
   els.now.hidden = !on;
@@ -323,10 +441,8 @@ function updateChart() {
   chart = ins && diff ? buildChart(current.midi, ins, diff) : null;
   highway.setChart(chart);
   fillSectionOptions();
-  if (!chart) {
-    els.loading.hidden = false;
-    els.loading.textContent = 'Nenhum instrumento jogável nesta música.';
-  }
+  renderPickers();
+  renderLoadState();
 }
 
 els.instrument.addEventListener('change', () => { fillDifficultyOptions(); updateChart(); });
@@ -343,15 +459,15 @@ function fillSectionOptions() {
 function seekToSection(i) {
   const section = chart?.sections[i];
   if (!section) return;
-  player.seek(Math.max(0, section.time + Number(els.chartDelay.value)));
+  player.seek(Math.max(0, section.time + settings.chartDelay));
 }
 els.sectionSelect.addEventListener('change', () => seekToSection(Number(els.sectionSelect.value)));
 els.back.addEventListener('click', () => stepSection(-1));
 els.forward.addEventListener('click', () => stepSection(1));
 function stepSection(dir) {
   if (!chart?.sections.length) return;
-  const here = sectionIndexAt(chart.sections, player.currentTime() - Number(els.chartDelay.value));
-  const sectionStart = chart.sections[here].time + Number(els.chartDelay.value);
+  const here = sectionIndexAt(chart.sections, player.currentTime() - settings.chartDelay);
+  const sectionStart = chart.sections[here].time + settings.chartDelay;
   // "Previous" first returns to the start of the current section, as media players do.
   let target = here + dir;
   if (dir < 0 && player.currentTime() - sectionStart > 2) target = here;
@@ -359,63 +475,71 @@ function stepSection(dir) {
 }
 
 // ---------- Mixer and settings ----------
+let stemStates = []; // { stem, value, muted, views[] }: one state per stem, shown in the menu and on the info screen
+
 function buildMixer(stems) {
-  els.mixer.replaceChildren(...stems.map((stem) => {
-    const row = document.createElement('div');
-    row.className = 'mix-row';
-    row.innerHTML = `
-      <button class="icon small-icon mute" type="button" aria-pressed="false"><svg><use href="#i-volume"/></svg></button>
-      <span class="mix-name"></span>
-      <input type="range" min="0" max="1.5" step="0.01" value="1">
-      <span class="mix-val">100%</span>
-      <button class="icon small-icon reset" type="button" title="Restaurar volume" aria-label="Restaurar volume"><svg><use href="#i-reset"/></svg></button>`;
-    const name = row.querySelector('.mix-name');
-    name.textContent = stem.label;
-    name.title = stem.label;
-    const range = row.querySelector('input');
-    const val = row.querySelector('.mix-val');
-    const mute = row.querySelector('.mute');
-    let muted = false;
-    const apply = () => {
-      player.setVolume(stem.id, muted ? 0 : Number(range.value)); // the slider keeps its value while muted
-      val.textContent = `${Math.round(range.value * 100)}%`;
-      row.classList.toggle('muted', muted);
-      mute.setAttribute('aria-pressed', String(muted));
-      mute.title = muted ? 'Ativar track' : 'Desativar track';
-      mute.setAttribute('aria-label', `${muted ? 'Ativar' : 'Desativar'} ${stem.label}`);
-      mute.querySelector('use').setAttribute('href', muted ? '#i-volume-off' : '#i-volume');
-    };
-    range.addEventListener('input', () => { if (muted) muted = false; apply(); }); // moving the slider re-enables the track
-    mute.addEventListener('click', () => { muted = !muted; apply(); });
-    row.querySelector('.reset').addEventListener('click', () => { range.value = 1; muted = false; apply(); });
-    apply();
-    return row;
-  }));
+  stemStates = stems.map((stem) => ({ stem, value: 1, muted: false, views: [] }));
+  for (const container of [els.mixer, els.mixerInfo]) {
+    container.replaceChildren(...stemStates.map(mixerRow));
+  }
+  stemStates.forEach(applyStem);
 }
 
-els.speed.addEventListener('input', () => {
-  const rate = Number(els.speed.value);
-  player.setRate(rate);
-  els.speedVal.textContent = `${rate.toFixed(2)}×`;
-});
-// Chart delay: only the highway is shifted. Positive = notes arrive later than the audio.
-els.chartDelay.addEventListener('input', () => {
-  const d = Number(els.chartDelay.value);
-  els.chartDelayVal.textContent = `${d >= 0 ? '+' : ''}${d.toFixed(2)} s`;
-});
-els.neck.addEventListener('input', () => {
-  const neck = Number(els.neck.value);
-  highway.setNeckSpeed(neck);
-  els.neckVal.textContent = `${neck.toFixed(1)}×`;
-});
-// Each setting has its own restore button (data-reset = id of the slider).
+function mixerRow(st) {
+  const row = document.createElement('div');
+  row.className = 'mix-row';
+  row.innerHTML = `
+    <button class="icon small-icon mute" type="button" aria-pressed="false"><svg><use href="#i-volume"/></svg></button>
+    <span class="mix-name"></span>
+    <input type="range" min="0" max="1.5" step="0.01" value="1">
+    <span class="mix-val">100%</span>
+    <button class="icon small-icon reset" type="button" title="Restaurar volume" aria-label="Restaurar volume"><svg><use href="#i-reset"/></svg></button>`;
+  const name = row.querySelector('.mix-name');
+  name.textContent = st.stem.label;
+  name.title = st.stem.label;
+  const view = { row, range: row.querySelector('input'), val: row.querySelector('.mix-val'), mute: row.querySelector('.mute') };
+  st.views.push(view);
+  view.range.addEventListener('input', () => { st.value = Number(view.range.value); st.muted = false; applyStem(st); }); // moving the slider re-enables the track
+  view.mute.addEventListener('click', () => { st.muted = !st.muted; applyStem(st); });
+  row.querySelector('.reset').addEventListener('click', () => { st.value = 1; st.muted = false; applyStem(st); });
+  return row;
+}
+
+// The slider keeps its value while a stem is muted; every view of the stem is updated together.
+function applyStem(st) {
+  player.setVolume(st.stem.id, st.muted ? 0 : st.value);
+  for (const v of st.views) {
+    v.range.value = st.value;
+    v.val.textContent = `${Math.round(st.value * 100)}%`;
+    v.row.classList.toggle('muted', st.muted);
+    v.mute.setAttribute('aria-pressed', String(st.muted));
+    v.mute.title = st.muted ? 'Ativar track' : 'Desativar track';
+    v.mute.setAttribute('aria-label', `${st.muted ? 'Ativar' : 'Desativar'} ${st.stem.label}`);
+    v.mute.querySelector('use').setAttribute('href', st.muted ? '#i-volume-off' : '#i-volume');
+  }
+}
+
+// Settings: one value each, shown by every [data-setting] slider (menu popover and info screen).
 const SETTING_DEFAULTS = { speed: 1, neck: 1, chartDelay: 0 };
+const SETTING_FORMAT = {
+  speed: (v) => `${v.toFixed(2)}×`,
+  neck: (v) => `${v.toFixed(1)}×`,
+  // Chart delay: only the highway is shifted. Positive = notes arrive later than the audio.
+  chartDelay: (v) => `${v >= 0 ? '+' : ''}${v.toFixed(2)} s`,
+};
+function setSetting(name, value) {
+  settings[name] = value;
+  for (const input of document.querySelectorAll(`[data-setting="${name}"]`)) input.value = value;
+  for (const out of document.querySelectorAll(`[data-out="${name}"]`)) out.textContent = SETTING_FORMAT[name](value);
+  if (name === 'speed') player.setRate(value);
+  if (name === 'neck') highway.setNeckSpeed(value);
+}
+document.addEventListener('input', (e) => {
+  const name = e.target.dataset?.setting;
+  if (name) setSetting(name, Number(e.target.value));
+});
 for (const btn of document.querySelectorAll('[data-reset]')) {
-  btn.addEventListener('click', () => {
-    const el = els[btn.dataset.reset];
-    el.value = SETTING_DEFAULTS[btn.dataset.reset];
-    el.dispatchEvent(new Event('input'));
-  });
+  btn.addEventListener('click', () => setSetting(btn.dataset.reset, SETTING_DEFAULTS[btn.dataset.reset]));
 }
 
 const popovers = [[els.mixerBtn, els.mixerPop], [els.settingsBtn, els.settingsPop]];
@@ -461,9 +585,12 @@ els.seek.addEventListener('input', () => {
 els.seek.addEventListener('change', () => { player.seek(Number(els.seek.value)); seeking = false; });
 
 async function togglePlay() {
-  if (!current || !chart) return;
+  if (!ready || !chart) return; // playback waits for the audio to finish loading
   if (player.playing) player.pause();
-  else await player.play();
+  else {
+    if (infoOpen) setInfoOpen(false); // starting from the info screen goes to the chart
+    await player.play();
+  }
   syncPlayButton();
 }
 
@@ -503,15 +630,20 @@ document.addEventListener('mousemove', wake);
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tag = e.target.tagName;
-  if (e.code === 'Escape') { closePopovers(); return; }
+  if (e.code === 'Escape') {
+    if (els.mixerPop.hidden && els.settingsPop.hidden && infoOpen && (current || loadInfo.state === 'error')) setInfoOpen(false);
+    closePopovers();
+    return;
+  }
   if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(tag)) return;
-  if (e.code === 'Space' && current) { e.preventDefault(); togglePlay(); }
+  if (e.code === 'Space' && ready) { e.preventDefault(); togglePlay(); }
+  else if (e.code === 'KeyI' && (current || loadInfo.state !== 'idle')) setInfoOpen(!infoOpen);
   else if (e.code === 'KeyL') setLibraryOpen(!libraryOpen());
   else if (e.code === 'KeyF') toggleFullscreen();
   else if (e.code === 'BracketLeft') stepSection(-1);
   else if (e.code === 'BracketRight') stepSection(1);
-  else if (e.code === 'ArrowLeft' && current) player.seek(Math.max(0, player.currentTime() - 5));
-  else if (e.code === 'ArrowRight' && current) player.seek(Math.min(player.duration, player.currentTime() + 5));
+  else if (e.code === 'ArrowLeft' && ready) player.seek(Math.max(0, player.currentTime() - 5));
+  else if (e.code === 'ArrowRight' && ready) player.seek(Math.min(player.duration, player.currentTime() + 5));
 });
 
 // ---------- Frame loop (started once) ----------
@@ -522,7 +654,7 @@ function frame() {
       player.pause();
       syncPlayButton();
     }
-    const chartTime = t - Number(els.chartDelay.value);
+    const chartTime = t - settings.chartDelay;
     highway.render(chartTime);
     const index = chart.sections.length ? sectionIndexAt(chart.sections, chartTime) : -1;
     if (index >= 0 && document.activeElement !== els.sectionSelect) els.sectionSelect.value = String(index);

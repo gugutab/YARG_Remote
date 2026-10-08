@@ -1,3 +1,5 @@
+import { plainText } from './ini.js';
+
 // Search, filter and sort for the library list. Pure functions over the song objects from library.js.
 
 // song.ini difficulty keys per instrument (value -1 = the song has no part for it).
@@ -27,16 +29,16 @@ export function filterSongs(songs, { query = '', instrument = '', genre = '' } =
     if (instrument && !hasInstrument(s, instrument)) return false;
     if (genre && s.ini?.genre !== genre) return false;
     if (!terms.length) return true;
-    const hay = norm(`${s.title} ${s.artist} ${s.album}`);
+    const hay = norm(plainText(`${s.title} ${s.artist} ${s.album}`));
     return terms.every((t) => hay.includes(t));
   });
 }
 
-const textKey = (field) => (s) => norm(s[field]);
+const textKey = (field) => (s) => norm(plainText(s[field]));
 const KEYS = {
   title: textKey('title'),
-  artist: (s) => `${norm(s.artist)}\u0000${norm(s.title)}`,
-  album: (s) => `${norm(s.album)}\u0000${norm(s.title)}`,
+  artist: (s) => `${norm(plainText(s.artist))}\u0000${norm(plainText(s.title))}`,
+  album: (s) => `${norm(plainText(s.album))}\u0000${norm(plainText(s.title))}`,
   year: (s) => parseInt(s.ini?.year, 10) || 0,
   length: (s) => Number(s.ini?.song_length) || 0,
 };
