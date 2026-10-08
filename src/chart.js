@@ -152,9 +152,12 @@ export function buildChart(midi, instrument, difficulty) {
     const percussion = track.notes
       .filter((n) => n.pitch === PERCUSSION_NOTE || n.pitch === NONPLAYED_PERCUSSION_NOTE)
       .map((n) => ({ time: toSec(n.tick), played: n.pitch === PERCUSSION_NOTE }));
-    const lyrics = track.texts
-      .filter((t) => !t.text.startsWith('['))
-      .map((t) => ({ time: toSec(t.tick), text: t.text }));
+    // Lyrics are meta type 5 events when present (most charts). Some charts put them in text events
+    // instead, where bracketed texts are sections or states, not lyrics.
+    const lyricEvents = track.lyrics.length > 0
+      ? track.lyrics
+      : track.texts.filter((t) => !t.text.startsWith('['));
+    const lyrics = lyricEvents.map((t) => ({ time: toSec(t.tick), text: t.text }));
     // Harmony parts HARM1..HARM3 (or PART HARM1..3), drawn beside the lead.
     const harmonies = harmonyTracks(midi).map((h) => ({ part: h.part, notes: vocalNotes(h.track) }));
     return { mode: 'vocals', notes, harmonies, percussion, lyrics, ...commonParts(midi, track, toSec) };

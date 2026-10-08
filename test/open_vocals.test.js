@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseMidi } from '../src/midi.js';
 import { buildChart, INSTRUMENTS, DIFFICULTIES } from '../src/chart.js';
-import { buildMidi, tempo120, trackName, text, event } from './smf.js';
+import { buildMidi, tempo120, trackName, text, event, meta } from './smf.js';
 
 const GUITAR = INSTRUMENTS.find((i) => i.id === 'guitar');
 const VOCALS = INSTRUMENTS.find((i) => i.id === 'vocals');
@@ -37,6 +37,19 @@ test('open windows for Easy do not apply to Expert (difficulty byte is respected
     sysexOpen(240, 0x00, 0x00),
   ]]));
   assert.equal(buildChart(midi, GUITAR, EXPERT).notes[0].open, false);
+});
+
+test('vocals: lyrics stored as lyric events (type 5) are read, and bracketed text events are not lyrics', () => {
+  const lyric = (s) => event(0, meta(0x05, [...s].map((c) => c.charCodeAt(0))));
+  const midi = parseMidi(buildMidi(480, [[
+    tempo120(), { dt: 0, bytes: trackName('PART VOCALS') },
+    event(0, text('[idle]')),
+    lyric('No-'), { dt: 480, bytes: [0x90, 60, 100] }, { dt: 480, bytes: [0x80, 60, 0] },
+    lyric('bod-'), { dt: 0, bytes: [0x90, 62, 100] }, { dt: 480, bytes: [0x80, 62, 0] },
+  ]]));
+  const chart = buildChart(midi, VOCALS, EXPERT);
+  assert.deepEqual(chart.lyrics.map((l) => l.text), ['No-', 'bod-']);
+  assert.deepEqual(chart.lyrics.map((l) => l.time), [0, 1]); // tick 960 at 120 bpm = 1 s
 });
 
 test('vocals: harmonies, percussion and lyrics are read from their tracks', () => {

@@ -30,7 +30,7 @@ export function parseMidi(input) {
 }
 
 function parseTrack(bytes, start, end) {
-  const track = { name: '', notes: [], texts: [], sysex: [] };
+  const track = { name: '', notes: [], texts: [], lyrics: [], sysex: [] };
   const tempos = [];
   const open = new Map(); // channel/pitch -> note-ons waiting for their note-off
   let pos = start;
@@ -50,6 +50,7 @@ function parseTrack(bytes, start, end) {
       pos = dataPos + len;
       if (type === 0x03 && !track.name) track.name = readText(data);
       else if (type === 0x01) track.texts.push({ tick, text: readText(data) });
+      else if (type === 0x05) track.lyrics.push({ tick, text: readText(data) }); // lyric events, used by vocal tracks
       else if (type === 0x51 && len === 3) tempos.push({ tick, usPerQuarter: (data[0] << 16) | (data[1] << 8) | data[2] });
       else if (type === 0x2f) break;
       continue;
