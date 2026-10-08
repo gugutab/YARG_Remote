@@ -42,6 +42,33 @@ export function findTrack(midi, instrument) {
   return midi.tracks.find((t) => instrument.tracks.includes(t.name.toUpperCase())) || null;
 }
 
+// The drum modes a track can be played in. A chart with cymbal flags can be played as Pro or
+// as 4-lane (flags ignored, every yellow/blue/green is a tom), the same choice YARG offers.
+export function drumModes(track) {
+  switch (drumKind(track)) {
+    case 'five': return [{ mode: 'five', label: 'Bateria (5-lanes)' }];
+    case 'pro': return [{ mode: 'pro', label: 'Bateria (Pro)' }, { mode: 'four', label: 'Bateria (4-lanes)' }];
+    default: return [{ mode: 'four', label: 'Bateria (4-lanes)' }];
+  }
+}
+
+// Playable instrument options for a song, in INSTRUMENTS order. Drums expand into one option per mode.
+export function instrumentOptions(midi) {
+  const options = [];
+  for (const ins of INSTRUMENTS) {
+    const track = findTrack(midi, ins);
+    if (!track || !availableDifficulties(midi, ins).length) continue;
+    if (ins.mode !== 'drums') {
+      options.push({ ...ins, base: ins.id });
+      continue;
+    }
+    for (const m of drumModes(track)) {
+      options.push({ ...ins, id: `drums-${m.mode}`, label: m.label, base: 'drums', drumMode: m.mode });
+    }
+  }
+  return options;
+}
+
 // Difficulties that actually have notes for this instrument.
 export function availableDifficulties(midi, instrument) {
   const track = findTrack(midi, instrument);
@@ -88,7 +115,7 @@ export function buildChart(midi, instrument, difficulty) {
   }
 
   if (instrument.mode === 'drums') {
-    return buildDrumChart(midi, track, difficulty, timed, toSec);
+    return buildDrumChart(midi, track, instrument.drumMode ?? drumKind(track), difficulty, timed, toSec);
   }
 
   const notes = [];
@@ -100,18 +127,17 @@ export function buildChart(midi, instrument, difficulty) {
   return { mode: 'lanes', lanes: LANES, laneColors: GUITAR_LANE_COLORS, notes, ...commonParts(midi, track, toSec) };
 }
 
-function buildDrumChart(midi, track, difficulty, timed, toSec) {
-  const kind = drumKind(track);
+function buildDrumChart(midi, track, kind, difficulty, timed, toSec) {
   const lanes = kind === 'five' ? 6 : LANES;
   const laneColors = kind === 'five' ? DRUM_LANE_COLORS_5 : DRUM_LANE_COLORS_4;
-  // Cymbal flags apply to both pro and 5-lane charts. A 4-lane chart has none, so the check is a no-op there.
-  const cymbalSpans = cymbalFlagSpans(track);
+  // Cymbal flags apply to Pro and 5-lane modes; 4-lane mode plays the same notes with no cymbals.
+  const cymbalSpans = kind === 'four' ? null : cymbalFlagSpans(track);
 
   const notes = [];
   for (const n of track.notes) {
     const offset = n.pitch - difficulty.base;
     if (offset < 0 || offset >= lanes) continue;
-    const cymbal = isCymbal(cymbalSpans, offset, n.tick);
+    const cymbal = cymbalSpans !== null && isCymbal(cymbalSpans, offset, n.tick);
     notes.push({ ...timed(n), lane: offset, cymbal });
   }
   return { mode: 'lanes', lanes, laneColors, drumKind: kind, kickLane: 0, notes, ...commonParts(midi, track, toSec) };

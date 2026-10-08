@@ -1,5 +1,5 @@
 import { parseMidi } from './midi.js';
-import { INSTRUMENTS, DIFFICULTIES, findTrack, availableDifficulties, buildChart } from './chart.js';
+import { DIFFICULTIES, instrumentOptions, availableDifficulties, buildChart } from './chart.js';
 import { MultiTrackPlayer } from './player.js';
 import { Highway } from './highway.js';
 import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, readBytes } from './library.js';
@@ -148,9 +148,9 @@ async function selectSong(song) {
 }
 
 function fillInstrumentOptions(midi) {
-  const options = INSTRUMENTS.filter((ins) => findTrack(midi, ins) && availableDifficulties(midi, ins).length);
-  els.instrument.replaceChildren(...options.map((ins) => new Option(ins.label, ins.id)));
-  if (options.length) fillDifficultyOptions();
+  current.options = instrumentOptions(midi);
+  els.instrument.replaceChildren(...current.options.map((ins) => new Option(ins.label, ins.id)));
+  if (current.options.length) fillDifficultyOptions();
 }
 
 function fillDifficultyOptions() {
@@ -162,7 +162,7 @@ function fillDifficultyOptions() {
 }
 
 function currentInstrument() {
-  return INSTRUMENTS.find((i) => i.id === els.instrument.value) || null;
+  return current?.options.find((i) => i.id === els.instrument.value) || null;
 }
 
 function updateChart() {

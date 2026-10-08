@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseMidi } from '../src/midi.js';
-import { buildChart, availableDifficulties, drumKind, INSTRUMENTS, DIFFICULTIES } from '../src/chart.js';
+import { buildChart, availableDifficulties, drumKind, instrumentOptions, INSTRUMENTS, DIFFICULTIES } from '../src/chart.js';
 import { buildMidi, tempo120, trackName } from './smf.js';
 
 const DRUMS = INSTRUMENTS.find((i) => i.id === 'drums');
@@ -74,4 +74,26 @@ test('5-lane cymbal flags: yellow (110) and orange (112) mark cymbals, green (10
   const chart = buildChart(midi, DRUMS, EXPERT);
   assert.equal(chart.lanes, 6);
   assert.deepEqual(chart.notes.map((n) => [n.lane, n.cymbal]), [[2, true], [4, true], [4, false], [5, false]]);
+});
+
+test('a pro chart offers Pro and 4-lane drum options; 4-lane mode draws no cymbals', () => {
+  const midi = drumsMidi([
+    { tick: 0, pitch: 98, len: 120 },
+    { tick: 0, pitch: 110, len: 480 },
+  ]);
+  const labels = instrumentOptions(midi).map((o) => [o.id, o.label]);
+  assert.deepEqual(labels, [['drums-pro', 'Bateria (Pro)'], ['drums-four', 'Bateria (4-lanes)']]);
+
+  const pro = buildChart(midi, instrumentOptions(midi)[0], EXPERT);
+  assert.deepEqual(pro.notes.map((n) => n.cymbal), [true]);
+  const four = buildChart(midi, instrumentOptions(midi)[1], EXPERT);
+  assert.equal(four.lanes, 5);
+  assert.deepEqual(four.notes.map((n) => [n.lane, n.cymbal]), [[2, false]]);
+});
+
+test('a 4-lane chart offers one drum option and a 5-lane chart offers 5-lanes', () => {
+  const four = drumsMidi([{ tick: 0, pitch: 96, len: 120 }]);
+  assert.deepEqual(instrumentOptions(four).map((o) => o.label), ['Bateria (4-lanes)']);
+  const five = drumsMidi([{ tick: 0, pitch: 101, len: 120 }]);
+  assert.deepEqual(instrumentOptions(five).map((o) => o.label), ['Bateria (5-lanes)']);
 });
