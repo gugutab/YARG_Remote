@@ -108,3 +108,7 @@ node scripts/find-special-notes.mjs <pasta> [--only open,accent,ghost] [--max 5]
 Procura `.mid` em todas as subpastas e mostra, por música, instrumento e dificuldade, o tempo e a seção de
 cada ocorrência: open, tap, HOPO, accent, ghost, double kick, rolls, percussão e harmonias de vocal, solos e star power.
 No fim, um resumo com o total de cada categoria. Sem `--only`, lista todas as categorias.
+
+## Acesso pela rede local
+
+`npm start` escuta em todas as interfaces (`--bind 0.0.0.0`). Em outro aparelho da LAN, abra `http://<IP-do-PC>:8080`. Por não ser HTTPS nem `localhost`, o Chrome não libera `showDirectoryPicker`: o app usa o seletor de pasta comum (`webkitdirectory`), sem guardar a pasta entre visitas. Para ter a pasta guardada, use `localhost` no próprio PC ou sirva por HTTPS.
