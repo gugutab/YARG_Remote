@@ -33,7 +33,7 @@ export async function scanSongs(entries) {
     const dir = slash < 0 ? '' : entry.path.slice(0, slash);
     const name = entry.path.slice(slash + 1);
     if (!byDir.has(dir)) byDir.set(dir, new Map());
-    byDir.get(dir).set(name.toLowerCase(), { name, getFile: entry.getFile });
+    byDir.get(dir).set(name.toLowerCase(), { name, path: entry.path, getFile: entry.getFile });
   }
 
   const songs = [];
@@ -53,6 +53,39 @@ export async function scanSongs(entries) {
   }
   songs.sort((a, b) => a.title.localeCompare(b.title, 'pt', { sensitivity: 'base' }));
   return songs;
+}
+
+// The scanned library as plain data (no file handles), so it can be stored and shown again without a rescan.
+export function serializeSongs(songs) {
+  return songs.map((s) => ({
+    id: s.id,
+    folder: s.folder,
+    title: s.title,
+    artist: s.artist,
+    album: s.album,
+    ini: s.ini,
+    files: [...s.files.values()].map((f) => ({ name: f.name, path: f.path })),
+  }));
+}
+
+// Rebuilds songs from serializeSongs output. Files are looked up again under `root`, the picked folder.
+export function restoreSongs(index, root) {
+  return index.map((s) => ({
+    ...s,
+    files: new Map(s.files.map((f) => [
+      f.name.toLowerCase(),
+      { name: f.name, path: f.path, getFile: () => resolveFile(root, f.path) },
+    ])),
+  }));
+}
+
+// Walks `path` (as walkHandle builds it: the picked folder's name first) down from `root`.
+export async function resolveFile(root, path) {
+  const parts = path.split('/').slice(1);
+  let dir = root;
+  for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part);
+  const handle = await dir.getFileHandle(parts[parts.length - 1]);
+  return handle.getFile();
 }
 
 export function audioStemsOf(song) {

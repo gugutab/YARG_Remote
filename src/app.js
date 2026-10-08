@@ -2,12 +2,15 @@ import { parseMidi } from './midi.js';
 import { DIFFICULTIES, instrumentOptions, availableDifficulties, buildChart, sectionIndexAt } from './chart.js';
 import { MultiTrackPlayer } from './player.js';
 import { Highway } from './highway.js';
-import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, readBytes } from './library.js';
+import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, readBytes, serializeSongs, restoreSongs } from './library.js';
 import { songDelaySeconds } from './ini.js';
+import { saveLibrary, loadLibrary } from './store.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
   pick: $('pick'),
+  resume: $('resume'),
+  rescan: $('rescan'),
   folderInput: $('folderInput'),
   status: $('status'),
   search: $('search'),
@@ -39,6 +42,8 @@ const player = new MultiTrackPlayer();
 const highway = new Highway(els.highway);
 let songs = [];
 let current = null; // { song, midi, coverUrl }
+let connectedRoot = null; // folder handle of the library on screen, when it came from the File System Access API
+let savedRecord = null; // folder and index stored from the last visit
 let chart = null; // chart for the selected instrument and difficulty
 let seeking = false;
 
@@ -50,6 +55,9 @@ els.sectionSelect.addEventListener('change', () => {
 });
 
 els.pick.addEventListener('click', pickFolder);
+els.resume.addEventListener('click', reopenFolder);
+els.rescan.addEventListener('click', rescanFolder);
+offerSavedFolder();
 els.folderInput.addEventListener('change', () => loadEntries(entriesFromFileList(els.folderInput.files)));
 els.search.addEventListener('input', renderList);
 els.instrument.addEventListener('change', updateChart);
@@ -87,10 +95,61 @@ async function pickFolder() {
   }
   try {
     const dir = await window.showDirectoryPicker({ mode: 'read' });
-    await loadEntries(walkHandle(dir, dir.name));
+    await scanFolder(dir);
   } catch (err) {
     if (err.name !== 'AbortError') setStatus(`Erro ao abrir pasta: ${err.message}`);
   }
+}
+
+// Scans a picked folder and remembers it, with its song index, for the next visit.
+async function scanFolder(dir) {
+  setStatus('Procurando músicas…');
+  songs = await scanSongs(walkHandle(dir, dir.name));
+  const saved = await saveLibrary({ root: dir, rootName: dir.name, index: serializeSongs(songs), savedAt: Date.now() });
+  connectedRoot = dir;
+  setStatus(`${songs.length} música(s) em "${dir.name}".${saved ? '' : ' (não foi possível guardar a pasta)'}`);
+  showLibraryButtons();
+  renderList();
+}
+
+// Reopens the remembered folder. Only the read permission is asked again, on this click.
+async function reopenFolder() {
+  if (!savedRecord) return;
+  const { root, rootName, index } = savedRecord;
+  try {
+    const permission = await root.requestPermission({ mode: 'read' });
+    if (permission !== 'granted') {
+      setStatus('Sem permissão para ler a pasta. Escolha-a de novo.');
+      return;
+    }
+  } catch (err) {
+    setStatus(`Não foi possível reabrir a pasta: ${err.message}`);
+    return;
+  }
+  songs = restoreSongs(index, root);
+  connectedRoot = root;
+  setStatus(`${songs.length} música(s) em "${rootName}" (lista guardada). Use "Atualizar lista" se mudou algo.`);
+  els.resume.hidden = true;
+  showLibraryButtons();
+  renderList();
+}
+
+async function rescanFolder() {
+  if (!connectedRoot) return;
+  try {
+    const permission = await connectedRoot.requestPermission({ mode: 'read' });
+    if (permission !== 'granted') {
+      setStatus('Sem permissão para ler a pasta. Escolha-a de novo.');
+      return;
+    }
+    await scanFolder(connectedRoot);
+  } catch (err) {
+    setStatus(`Erro ao atualizar: ${err.message}`);
+  }
+}
+
+function showLibraryButtons() {
+  els.rescan.hidden = !connectedRoot;
 }
 
 async function loadEntries(entries) {
@@ -98,6 +157,15 @@ async function loadEntries(entries) {
   songs = await scanSongs(entries);
   setStatus(`${songs.length} música(s) encontrada(s).`);
   renderList();
+}
+
+// On the first load, offer to reopen the folder from the last visit (no picker, one click).
+async function offerSavedFolder() {
+  savedRecord = await loadLibrary();
+  if (!savedRecord?.root) return;
+  els.resume.textContent = `Reabrir "${savedRecord.rootName}"`;
+  els.resume.hidden = false;
+  setStatus(`Pasta da última visita: "${savedRecord.rootName}" (${savedRecord.index.length} música(s)).`);
 }
 
 function renderList() {
