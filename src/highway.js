@@ -2,7 +2,7 @@
 // so seek/pause just means re-rendering at a different `t`.
 const GUITAR_LANE_COLORS = ['#3fbf3f', '#e5392b', '#f5c518', '#2f80ed', '#f2861e'];
 const KICK_COLOR = '#f2861e';
-const KICK_BAR_HALF_H = 3;
+const KICK_BAR_HALF_H = 6; // pedal bar is 12 px tall at rest
 const FADE_SEC = 0.25; // how long a note takes to fade out after the hit line
 const BASE_LOOKAHEAD_SEC = 2.5; // time from the top edge to the hit line at neck speed 1
 const ENTRY_MARGIN_SEC = 0.3; // extra window above the top edge, so notes are already moving when they enter
@@ -98,6 +98,21 @@ export class Highway {
     const radius = Math.min(laneW * 0.36, 26);
     const colors = chart.laneColors || GUITAR_LANE_COLORS;
     // kick (lane -1) is a bar across all columns, not a column
+    // pedal bars go behind the other notes and sustains
+    for (const n of visible) {
+      if (n.lane >= 0) continue;
+      const past = t - n.time;
+      if (past > FADE_SEC) continue;
+      const k = Math.max(0, past) / FADE_SEC; // same exit animation as the other heads
+      const cy = yOf(Math.max(n.time, t));
+      const full = laneW * chart.lanes;
+      const height = KICK_BAR_HALF_H * 2 * (1 + 0.4 * k);
+      g.globalAlpha = 1 - k;
+      g.fillStyle = tintWhite(KICK_COLOR, k);
+      g.fillRect(x0, cy - height / 2, full, height);
+    }
+    g.globalAlpha = 1;
+
     for (const n of visible) {
       if (!n.length || n.lane < 0) continue;
       const cx = x0 + (n.lane + 0.5) * laneW;
@@ -110,20 +125,13 @@ export class Highway {
     // Heads. Once a note reaches the hit line it stops moving and plays its exit animation:
     // it grows, fades and turns white over FADE_SEC, for pedals too.
     for (const n of visible) {
+      if (n.lane < 0) continue; // pedals are drawn above, behind the other notes
       const past = t - n.time;
       if (past > FADE_SEC) continue;
       const k = Math.max(0, past) / FADE_SEC; // 0 at the hit line, 1 when gone
       const cy = yOf(Math.max(n.time, t)); // parked on the hit line during the exit
       const white = k;
       g.globalAlpha = 1 - k;
-      if (n.lane < 0) {
-        // Bass pedal: orange bar across the lane area, growing in height as it fades
-        const full = laneW * chart.lanes;
-        const height = KICK_BAR_HALF_H * 2 * (1 + 0.4 * k);
-        g.fillStyle = tintWhite(KICK_COLOR, white);
-        g.fillRect(x0, cy - height / 2, full, height);
-        continue;
-      }
       const cx = x0 + (n.lane + 0.5) * laneW;
       const r = radius * (1 + 0.4 * k);
       g.beginPath();
