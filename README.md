@@ -51,8 +51,9 @@ Conferido no código do YARG.Core (`github.com/YARC-Official/YARG.Core`, também
   (`midi.js` faz o mesmo em `createTickToSeconds`).
 - **song.ini** — `IO/Ini/SongIniHandler.cs`: lista de chaves (`name`, `artist`, `song_length`,
   `diff_*`, `delay`…). O MVP lê `name`, `artist`, `album`, `delay`/`delay_seconds` e os valores crus de `diff_*`.
-- **Delay** — `SongMetadata.cs` e `SongRunner.cs`: a posição do áudio é `tempo_do_chart + delay`. O player aplica
-  isso com `stemStartPlan` (`src/player.js`): delay positivo começa o stem adiantado no arquivo, negativo atrasa o início.
+- **Delay** — `SongMetadata.cs` e `SongRunner.cs`: a posição do áudio é `tempo_do_chart + delay`. O player alinha cada
+  stem uma vez no carregamento (`alignChannel`, `src/player.js`): delay positivo descarta o início do arquivo, negativo
+  põe silêncio na frente.
 
 ### Verificação com o arquivo de exemplo
 
