@@ -8,6 +8,7 @@ using System.Linq;
 using BepInEx;
 using BepInEx.Configuration;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 
 using YARG.Song;
 using YARG.Core.Song;
@@ -158,6 +159,47 @@ namespace YargRemoteMod
             }
         }
 
+        private void ProcessTextRequest(HttpListenerContext context, Func<string> textGenerator)
+        {
+            var response = context.Response;
+            using (var mre = new ManualResetEvent(false))
+            {
+                string result = null;
+                _mainThreadActions.Enqueue(() =>
+                {
+                    try { result = textGenerator.Invoke(); }
+                    catch (Exception ex) { result = $"Error: {ex}"; }
+                    finally { mre.Set(); }
+                });
+                mre.WaitOne();
+                SendResponse(response, 200, result ?? "No data", "text/plain");
+            }
+        }
+
+        private string DebugGetAllSprites()
+        {
+            var sprites = Resources.FindObjectsOfTypeAll<Sprite>();
+            var sb = new StringBuilder();
+            sb.AppendLine($"Total Sprites Loaded: {sprites.Length}");
+            
+            // Filter likely candidates
+            var likely = sprites.Where(s => s.name.IndexOf("guitar", StringComparison.OrdinalIgnoreCase) >= 0 || 
+                                            s.name.IndexOf("icon", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                            s.name.IndexOf("instrument", StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+
+            sb.AppendLine($"--- Likely Instrument Candidates ({likely.Count}) ---");
+            foreach (var s in likely.OrderBy(x => x.name))
+            {
+                sb.AppendLine(s.name);
+            }
+
+            sb.AppendLine("\n--- All Sprites ---");
+            foreach (var s in sprites.OrderBy(x => x.name))
+            {
+                sb.AppendLine(s.name);
+            }
+            return sb.ToString();
+        }
 
         private void ProcessRequest(HttpListenerContext context) // Method name is already English, keeping it as is.
         {
@@ -207,10 +249,14 @@ namespace YargRemoteMod
                     ProcessImageRequest(context, "album art", "song", LoadAlbumArtOnMainThread);
                 } else if (path == "/source-icon" && request.HttpMethod == "GET") {
                     ProcessImageRequest(context, "source icon", "source", LoadSourceIconOnMainThread);
+                } else if (path == "/instrument-icon" && request.HttpMethod == "GET") {
+                    ProcessImageRequest(context, "instrument icon", "name", LoadInstrumentIconOnMainThread);
+                }
+                else if (path == "/debug-sprites" && request.HttpMethod == "GET") {
+                    ProcessTextRequest(context, DebugGetAllSprites);
                 }
                 else if (path == "/songs" && request.HttpMethod == "GET")
                 {
-                    // Usamos SongContainer.Songs que você confirmou existir
                     var allSongs = SongContainer.Songs; 
 
                     if (allSongs == null || allSongs.Length == 0) {
@@ -383,6 +429,143 @@ namespace YargRemoteMod
             }
         }
 
+        private Tuple<byte[], string, int> LoadInstrumentIconOnMainThread(string instrumentName)
+        {
+            Logger.LogInfo($"[YARG Remote] Loading icon for: {instrumentName}");
+            try
+            {
+                if (Enum.TryParse(instrumentName, true, out YARG.Core.Instrument inst))
+                {
+                    Type providerType = Type.GetType("YARG.Gameplay.HUD.InstrumentIconProvider, Assembly-CSharp");
+                    if (providerType == null)
+                        providerType = AppDomain.CurrentDomain.GetAssemblies().SelectMany(a => { try { return a.GetTypes(); } catch { return new Type[0]; } }).FirstOrDefault(t => t.FullName == "YARG.Gameplay.HUD.InstrumentIconProvider");
+
+                    string resourceKey = null;
+
+                    if (providerType != null)
+                    {
+                        // Get resource name using private static GetInstrumentSprite method
+                        var getSpriteMethod = providerType.GetMethod("GetInstrumentSprite", 
+                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static, 
+                            null, 
+                            new[] { typeof(YARG.Core.Instrument), typeof(int), typeof(bool) }, 
+                            null);
+
+                        if (getSpriteMethod != null)
+                        {
+                            try {
+                                resourceKey = (string)getSpriteMethod.Invoke(null, new object[] { inst, 0, false });
+                                Logger.LogInfo($"[YARG Remote] Resource key for {inst}: {resourceKey}");
+
+                                // Now load the sprite using Addressables (as shown in PlayerNameDisplay.cs)
+                                if (!string.IsNullOrEmpty(resourceKey))
+                                {
+                                    try
+                                    {
+                                        Sprite sprite = Addressables.LoadAssetAsync<Sprite>(resourceKey).WaitForCompletion();
+                                        
+                                        if (sprite != null)
+                                        {
+                                            Logger.LogInfo($"[YARG Remote] Successfully loaded sprite via Addressables for {resourceKey}");
+                                            byte[] pngData = GetPngFromSprite(sprite, flipVertically: false);
+                                            if (pngData != null) return Tuple.Create(pngData, "image/png", 200);
+                                        }
+                                        else
+                                        {
+                                            Logger.LogError($"[YARG Remote] Addressables returned null sprite for {resourceKey}");
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Logger.LogError($"[YARG Remote] Error loading sprite via Addressables for {resourceKey}: {ex.Message}");
+                                    }
+                                }
+                            } catch (Exception ex) { Logger.LogError($"[YARG Remote] Error invoking GetInstrumentSprite: {ex.Message}"); }
+                        }
+                        else
+                        {
+                            Logger.LogError($"[YARG Remote] GetInstrumentSprite method not found");
+                        }
+                    }
+                    else
+                    {
+                        Logger.LogError($"[YARG Remote] InstrumentIconProvider type not found");
+                    }
+                }
+                else
+                {
+                    Logger.LogError($"[YARG Remote] Could not parse instrument name: {instrumentName}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError($"[YARG Remote] Error loading instrument icon: {ex}");
+            }
+            return Tuple.Create(Encoding.UTF8.GetBytes("{\"status\": \"error\", \"message\": \"Instrument icon not found\"}"), "application/json", 404);
+        }
+
+        private byte[] GetPngFromSprite(Sprite sprite, bool flipVertically = false)
+        {
+            if (sprite == null || sprite.texture == null) return null;
+
+            Texture2D originalTexture = sprite.texture;
+            var uvs = sprite.uv;
+            float minX = 1f, maxX = 0f, minY = 1f, maxY = 0f;
+
+            if (uvs != null && uvs.Length > 0)
+            {
+                minX = uvs[0].x; maxX = uvs[0].x;
+                minY = uvs[0].y; maxY = uvs[0].y;
+                foreach (var uv in uvs)
+                {
+                    if (uv.x < minX) minX = uv.x;
+                    if (uv.x > maxX) maxX = uv.x;
+                    if (uv.y < minY) minY = uv.y;
+                    if (uv.y > maxY) maxY = uv.y;
+                }
+            }
+            else { minX = 0; maxX = 1; minY = 0; maxY = 1; }
+
+            int texW = originalTexture.width;
+            int texH = originalTexture.height;
+            int x = Mathf.RoundToInt(minX * texW);
+            int y = Mathf.RoundToInt(minY * texH);
+            int width = Mathf.RoundToInt((maxX - minX) * texW);
+            int height = Mathf.RoundToInt((maxY - minY) * texH);
+
+            if (width <= 0) width = 1;
+            if (height <= 0) height = 1;
+            x = Mathf.Clamp(x, 0, texW - 1);
+            y = Mathf.Clamp(y, 0, texH - 1);
+            if (x + width > texW) width = texW - x;
+            if (y + height > texH) height = texH - y;
+
+            Rect rect = new Rect(x, y, width, height);
+            Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            
+            RenderTexture currentRT = RenderTexture.active;
+            RenderTexture renderTex = RenderTexture.GetTemporary(originalTexture.width, originalTexture.height, 0, RenderTextureFormat.Default, RenderTextureReadWrite.Linear);
+            Graphics.Blit(originalTexture, renderTex);
+            RenderTexture.active = renderTex;
+            tex.ReadPixels(rect, 0, 0);
+            tex.Apply();
+            RenderTexture.active = currentRT;
+            RenderTexture.ReleaseTemporary(renderTex);
+
+            var pixels = tex.GetPixels32();
+            if (flipVertically)
+            {
+                var newPixels = new Color32[pixels.Length];
+                for (int r = 0; r < height; r++) Array.Copy(pixels, r * width, newPixels, (height - r - 1) * width, width);
+                tex.SetPixels32(newPixels);
+                tex.Apply();
+            }
+
+            byte[] pngData = EncodeTextureToPNG(tex);
+            Destroy(tex);
+            return pngData;
+        }
+
         private Tuple<byte[], string, int> LoadSourceIconOnMainThread(string sourceName)
         {
             var songSourcesType = typeof(YARG.Song.SongSources);
@@ -394,16 +577,13 @@ namespace YargRemoteMod
 
             if (sprite == null) { return Tuple.Create(Encoding.UTF8.GetBytes("{\"status\": \"error\", \"message\": \"Source icon not found for " + sourceName + "\"}"), "application/json", 404); }
 
-            Texture2D originalTexture = sprite.texture;
-            Rect rect = sprite.textureRect;
+            if (sprite.texture == null)
+            {
+                Logger.LogError($"[YARG Remote] Sprite texture is null for source: {sourceName}");
+                return Tuple.Create(Encoding.UTF8.GetBytes("{\"status\": \"error\", \"message\": \"Source icon texture is null\"}"), "application/json", 404);
+            }
 
-            Texture2D tex = new Texture2D((int)rect.width, (int)rect.height, TextureFormat.RGBA32, false);
-            RenderTexture currentRT = RenderTexture.active; RenderTexture renderTex = RenderTexture.GetTemporary(originalTexture.width, originalTexture.height, 0, RenderTextureFormat.Default, RenderTextureReadWrite.Linear); Graphics.Blit(originalTexture, renderTex); RenderTexture.active = renderTex;
-            tex.ReadPixels(rect, 0, 0); tex.Apply();
-            RenderTexture.active = currentRT; RenderTexture.ReleaseTemporary(renderTex);
-
-            byte[] pngData = EncodeTextureToPNG(tex);
-            Destroy(tex);
+            byte[] pngData = GetPngFromSprite(sprite, flipVertically: true);
 
             if (pngData != null) { return Tuple.Create(pngData, "image/png", 200); }
             else { Logger.LogError("[YARG Remote] EncodeToPNG failed for source icon."); return Tuple.Create(Encoding.UTF8.GetBytes("{\"status\": \"error\", \"message\": \"Encoding Error for source icon\"}"), "application/json", 500); }

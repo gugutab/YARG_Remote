@@ -50,7 +50,18 @@
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
         .inst-filter-btn {
-            @apply bg-dark border border-slate-600 text-slate-400 hover:text-white hover:border-slate-500 rounded px-3 py-1 flex items-center justify-center transition-colors;
+            @apply bg-dark border border-slate-600 text-slate-400 hover:text-white hover:border-slate-500 rounded-full p-1 inline-flex items-center justify-center transition-colors;
+            line-height: 0;
+            min-width: 0;
+        }
+        .inst-filter-btn img {
+            display: block;
+            width: 1rem;
+            height: 1rem;
+            margin: 0;
+            padding: 0;
+            transform: scale(2); /* scale 2 as requested */
+            transform-origin: center center;
         }
         .inst-filter-btn.active {
             @apply bg-accent text-white border-accent;
@@ -110,15 +121,11 @@
                         <div><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Charter</label><input type="text" id="search-charter" list="datalist-charter" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-md px-2 py-1 text-xs text-white focus:border-accent outline-none"></div>
                         <div><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 block">Source</label><input type="text" id="search-source" list="datalist-source" oninput="applyFilters()" class="w-full bg-dark border border-slate-600 rounded-md px-2 py-1 text-xs text-white focus:border-accent outline-none"></div>
                     </div>
-                    <div class="border-t border-slate-700 pt-3">
+                        <div class="border-t border-slate-700 pt-3">
                         <label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Instruments</label>
-                        <div class="flex flex-wrap gap-2">
+                        <div class="grid grid-cols-6 gap-2">
                             <button onclick="toggleInstrument('ALL')" class="inst-filter-btn active" data-inst="ALL">ALL</button>
-                            <button onclick="toggleInstrument('guitar')" class="inst-filter-btn" data-inst="guitar" title="Guitar"><i data-lucide="guitar" class="w-4 h-4"></i></button>
-                            <button onclick="toggleInstrument('bass')" class="inst-filter-btn" data-inst="bass" title="Bass"><i data-lucide="guitar" class="w-4 h-4"></i><span class="text-[10px] font-bold ml-1">BASS</span></button>
-                            <button onclick="toggleInstrument('drum')" class="inst-filter-btn" data-inst="drum" title="Drums"><i data-lucide="drum" class="w-4 h-4"></i></button>
-                            <button onclick="toggleInstrument('keys')" class="inst-filter-btn" data-inst="keys" title="Keys"><i data-lucide="piano" class="w-4 h-4"></i></button>
-                            <button onclick="toggleInstrument('vocals')" class="inst-filter-btn" data-inst="vocals" title="Vocals"><i data-lucide="mic" class="w-4 h-4"></i></button>
+                            <div id="inst-button-grid" class="col-span-5 grid grid-cols-5 gap-2"></div>
                         </div>
                     </div>
                 </div>
@@ -229,7 +236,7 @@
                     <div class="bg-slate-800/50 border border-slate-700 rounded-full px-3 py-1 flex items-center gap-2" title="Year"><i data-lucide="calendar" class="w-3 h-3 text-slate-500 shrink-0"></i> <span id="modal-year" class="font-medium text-white truncate">...</span></div>
                     <div class="bg-slate-800/50 border border-slate-700 rounded-full px-3 py-1 flex items-center gap-2" title="Genre"><i data-lucide="music" class="w-3 h-3 text-slate-500 shrink-0"></i> <span id="modal-genre" class="font-medium text-white truncate max-w-[150px]">...</span></div>
                     <div class="bg-slate-800/50 border border-slate-700 rounded-full px-3 py-1 flex items-center gap-2" title="Duration"><i data-lucide="clock" class="w-3 h-3 text-slate-500 shrink-0"></i> <span id="modal-duration" class="font-medium text-white truncate">...</span></div>
-                    <div class="bg-slate-800/50 border border-slate-700 rounded-full px-3 py-1 flex items-center gap-2" title="Source"><i data-lucide="database" class="w-3 h-3 text-slate-500 shrink-0"></i> <span id="modal-source" class="font-medium text-white truncate max-w-[150px]">...</span></div>
+                    <div class="bg-slate-800/50 border border-slate-700 rounded-full px-3 py-1 flex items-center gap-2" title="Source"><span id="modal-source" class="font-medium text-white truncate"></span></div>
                     <div class="bg-slate-800/50 border border-slate-700 rounded-full px-3 py-1 flex items-center gap-2" title="Charter"><i data-lucide="user" class="w-3 h-3 text-slate-500 shrink-0"></i> <span id="modal-charter" class="font-medium text-white truncate max-w-[150px]">...</span></div>
                     <div class="bg-slate-800/50 border border-slate-700 rounded-full px-3 py-1 flex items-center gap-2" title="Is Master"><i data-lucide="check-circle-2" class="w-3 h-3 text-slate-500 shrink-0"></i> <span id="modal-ismaster" class="font-medium text-white truncate">...</span></div>
                 </div>
@@ -290,6 +297,134 @@
             play: true
         };
 
+        function updateStaticIcons() {
+            const baseUrl = document.getElementById('api-url').value.trim();
+
+            // Token-based categories to find representative icon names from loaded songs
+            const tokenMap = {
+                'fiveGuitar': ['guitar','five'],
+                'proGuitar': ['guitar','pro'],
+                'fiveBass': ['bass','five'],
+                'proBass': ['bass','pro'],
+                'fourDrums': ['drum','four'],
+                'fiveDrums': ['drum','five'],
+                'sixDrums': ['drum','six'],
+                'keys': ['key'],
+                'proKeys': ['pro','key'],
+                'vocals': ['vocal'],
+                'harmony': ['harmony']
+            };
+
+            const fallback = {
+                'fiveGuitar': 'FiveFretGuitar',
+                'proGuitar': 'ProGuitar',
+                'fiveBass': 'FiveFretBass',
+                'proBass': 'ProBass',
+                'fourDrums': 'FourLaneDrums',
+                'fiveDrums': 'FiveLaneDrums',
+                'sixDrums': 'SixLaneDrums',
+                'keys': 'Keys',
+                'proKeys': 'ProKeyboard',
+                'vocals': 'Vocals',
+                'harmony': 'Harmony1'
+            };
+ 
+            const findIconForTokens = (tokens) => {
+                if (!Array.isArray(allSongs) || allSongs.length === 0) return null;
+                tokens = tokens.map(t => t.toLowerCase());
+                for (const s of allSongs) {
+                    if (!s.parts) continue;
+                    for (const p of s.parts) {
+                        const icon = (p.icon || '').toLowerCase();
+                        let ok = tokens.every(tok => icon.includes(tok));
+                        if (ok) return p.icon;
+                    }
+                }
+                // Fallback: try partial token match
+                const t0 = tokens[0];
+                for (const s of allSongs) {
+                    if (!s.parts) continue;
+                    for (const p of s.parts) {
+                        const icon = (p.icon || '').toLowerCase();
+                        if (icon.includes(t0)) return p.icon;
+                    }
+                }
+                return null;
+            };
+
+            document.querySelectorAll('.inst-filter-btn').forEach(btn => {
+                const inst = btn.getAttribute('data-inst');
+                if (!inst || inst === 'ALL') return;
+
+                let apiName = null;
+                if (tokenMap[inst]) apiName = findIconForTokens(tokenMap[inst]);
+                if (!apiName) apiName = fallback[inst] || null;
+
+                if (apiName) {
+                    const img = `<img src="${baseUrl}/instrument-icon?name=${apiName}" class="w-4 h-4 object-contain" onerror="this.style.display='none'">`;
+                    btn.innerHTML = img;
+                }
+            });
+        }
+
+        function buildInstrumentButtons() {
+            const container = document.getElementById('inst-button-grid');
+            if (!container) return;
+            container.innerHTML = '';
+            const baseUrl = document.getElementById('api-url').value.trim();
+
+            // Gather unique icons from allSongs
+            const seen = new Set();
+            const icons = [];
+            for (const s of allSongs) {
+                if (!s.parts) continue;
+                for (const p of s.parts) {
+                    const icon = p.icon || p.name || '';
+                    if (!icon) continue;
+                    const key = icon.toLowerCase();
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        icons.push(icon);
+                    }
+                }
+            }
+
+            // Limit to reasonable number (avoid extremely long lists)
+            const max = 20;
+            for (let i = 0; i < Math.min(icons.length, max); i++) {
+                const icon = icons[i];
+                const btn = document.createElement('button');
+                btn.className = 'inst-filter-btn';
+                btn.setAttribute('data-inst', icon);
+                btn.setAttribute('title', icon);
+                btn.setAttribute('onclick', `toggleInstrument('${icon.replace(/'/g, "\\'")}')`);
+                const img = document.createElement('img');
+                img.className = 'w-4 h-4 object-contain';
+                img.src = `${baseUrl}/instrument-icon?name=${icon}`;
+                img.onerror = function() { this.style.display = 'none'; };
+                btn.appendChild(img);
+                container.appendChild(btn);
+            }
+
+            // If no icons found, show a few fallbacks
+            if (icons.length === 0) {
+                const fallbacks = Object.values(fallback).slice(0, 8);
+                for (const icon of fallbacks) {
+                    const btn = document.createElement('button');
+                    btn.className = 'inst-filter-btn';
+                    btn.setAttribute('data-inst', icon);
+                    btn.setAttribute('title', icon);
+                    btn.setAttribute('onclick', `toggleInstrument('${icon}')`);
+                    const img = document.createElement('img');
+                    img.className = 'w-4 h-4 object-contain';
+                    img.src = `${baseUrl}/instrument-icon?name=${icon}`;
+                    img.onerror = function() { this.style.display = 'none'; };
+                    btn.appendChild(img);
+                    container.appendChild(btn);
+                }
+            }
+        }
+
         function updateConnectionUI(connected) {
             const btn = document.getElementById('action-btn');
             const statusDot = document.getElementById('connection-status');
@@ -304,6 +439,8 @@
                 btn.title = "Disconnect";
                 btn.innerHTML = `<i data-lucide="x" class="w-4 h-4" id="action-icon"></i>`;
                 urlInput.disabled = true;
+                
+                updateStaticIcons();
             } else {
                 statusDot.classList.remove('bg-emerald-500', 'shadow-[0_0_10px_#10b981]');
                 statusDot.classList.add('bg-rose-500', 'shadow-none');
@@ -430,6 +567,7 @@
 
                 initColumnMenu();
                 populateAutocomplete();
+                buildInstrumentButtons();
                 applyFilters();
                 showToast(`Loaded ${allSongs.length} songs.`);
                 
@@ -565,11 +703,23 @@
                         if (!s.parts) return false;
                         return s.parts.some(p => {
                             const icon = (p.icon || '').toLowerCase();
-                            if (reqInst === 'guitar') return icon.includes('guitar');
-                            if (reqInst === 'bass') return icon.includes('bass');
-                            if (reqInst === 'drum') return icon.includes('drum');
-                            if (reqInst === 'keys') return icon.includes('keys') || icon.includes('piano');
-                            if (reqInst === 'vocals') return icon.includes('vocal') || icon.includes('harmony');
+                            // Known logical keys
+                            if (reqInst === 'fiveGuitar') return icon.includes('fivefreeguitar') || icon.includes('fivefretguitar') || icon.includes('fivefreet');
+                            if (reqInst === 'proGuitar') return icon.includes('proguitar');
+                            if (reqInst === 'fiveBass') return icon.includes('fivefreetbass') || icon.includes('fivefretbass');
+                            if (reqInst === 'proBass') return icon.includes('probass');
+                            if (reqInst === 'fourDrums') return icon.includes('fourlanedrum') || icon.includes('fourlanedrums');
+                            if (reqInst === 'fiveDrums') return icon.includes('fivelanedrum') || icon.includes('fivelanedrums');
+                            if (reqInst === 'sixDrums') return icon.includes('sixlanedrum') || icon.includes('sixlanedrums');
+                            if (reqInst === 'keys') return (icon.includes('keys') || icon.includes('piano')) && !icon.includes('pro');
+                            if (reqInst === 'proKeys') return icon.includes('prokeyboard') || (icon.includes('keys') && icon.includes('pro'));
+                            if (reqInst === 'vocals') return icon.includes('vocal') && !icon.includes('harmony');
+                            if (reqInst === 'harmony') return icon.includes('harmony');
+                            // If the reqInst looks like an icon string, match by substring
+                            try {
+                                const loweredReq = reqInst.toLowerCase();
+                                if (icon.includes(loweredReq)) return true;
+                            } catch (e) {}
                             return false;
                         });
                     });
@@ -911,9 +1061,12 @@
                 if (s.parts && Array.isArray(s.parts)) {
                     const standard = s.parts.filter(p => !p.icon.toLowerCase().includes('pro'));
                     const pro = s.parts.filter(p => p.icon.toLowerCase().includes('pro'));
+                    
+                    const baseUrl = document.getElementById('api-url').value.trim();
+                    const getIcon = (iconName) => `${baseUrl}/instrument-icon?name=${iconName}`;
 
-                    if (standard.length) standardHtml = `<div class="flex gap-1 justify-center text-slate-500">${standard.map(p => `<span title="${p.icon}"><i data-lucide="${getInstrumentIcon(p.icon)}" class="w-4 h-4"></i></span>`).join('')}</div>`;
-                    if (pro.length) proHtml = `<div class="flex gap-1 justify-center text-accent/80">${pro.map(p => `<span title="${p.icon}"><i data-lucide="${getInstrumentIcon(p.icon)}" class="w-4 h-4 fill-current"></i></span>`).join('')}</div>`;
+                    if (standard.length) standardHtml = `<div class="flex gap-1 justify-center items-center">${standard.map(p => `<img src="${getIcon(p.icon)}" class="w-6 h-6 scale-110 object-contain" title="${p.icon}" onerror="this.style.display='none'">`).join('')}</div>`;
+                    if (pro.length) proHtml = `<div class="flex gap-1 justify-center items-center">${pro.map(p => `<img src="${getIcon(p.icon)}" class="w-6 h-6 scale-110 object-contain drop-shadow-md" title="${p.icon}" onerror="this.style.display='none'">`).join('')}</div>`;
                 }
 
                 if (viewMode === 'list') {
@@ -941,9 +1094,11 @@
                             <div class="text-slate-500 text-xs">${s.subgenre || ''}</div>
                         </td>
                         <td class="p-4 text-slate-400 hidden xl:table-cell truncate max-w-[150px] ${columnState.charter ? '' : 'col-hidden'}" title="${s.charter || ''}">${s.charter || '-'}</td> 
-                        <td class="p-4 text-slate-400 hidden 2xl:table-cell truncate max-w-[150px] ${columnState.source ? '' : 'col-hidden'}" title="${s.playlist || ''}">
-                            <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="${s.sourceIconUrl}" class="lazy-img inline-block w-5 h-5 mr-2 align-middle" onerror="this.style.display='none'">
-                            ${s.playlist || '-'}
+                        <td class="p-4 hidden 2xl:table-cell ${columnState.source ? '' : 'col-hidden'}" title="${s.playlist || ''}">
+                            <div class="flex flex-col items-center justify-center gap-1 min-w-[60px]">
+                                <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-src="${s.sourceIconUrl}" class="lazy-img w-10 h-10 object-contain drop-shadow-md" onerror="this.style.display='none'">
+                                <span class="text-[10px] text-slate-400 font-bold truncate max-w-[100px] text-center uppercase tracking-wider">${s.playlist || '-'}</span>
+                            </div>
                         </td>
                         <td class="p-4 text-slate-400 hidden sm:table-cell ${columnState.year ? '' : 'col-hidden'}">${s.year || '-'}</td> 
                         <td class="p-4 text-slate-400 text-right font-mono text-xs ${columnState.duration ? '' : 'col-hidden'}">${s.duration}</td> 
@@ -1097,9 +1252,9 @@
             document.getElementById('modal-charter').innerText = s.charter || '-';
             document.getElementById('modal-ismaster').innerText = s.isMaster ? 'Master' : 'Not Master';
             
-            // Display Source Icon and Playlist in the Source field
+            // Display Source Icon + playlist text in the Source field
             const sourceElement = document.getElementById('modal-source');
-            sourceElement.innerHTML = `<img src="${s.sourceIconUrl}" class="inline-block w-4 h-4 mr-2 align-middle" onerror="this.style.display='none'"> ${s.playlist || '-'}`;
+            sourceElement.innerHTML = `<img src="${s.sourceIconUrl}" class="w-4 h-4 scale-110 object-contain mr-2" onerror="this.style.display='none'"> ${s.playlist || '-'}`;
 
             
             // Render Parts & Difficulties
@@ -1107,13 +1262,12 @@
             partsContainer.innerHTML = '';
             if (s.parts && Array.isArray(s.parts)) {
                 s.parts.forEach(p => {
-                    const icon = getInstrumentIcon(p.icon);
                     const diffsHtml = p.difficulties.map(d => `<span class="${getDifficultyColor(d)}">${d.substring(0,1)}</span>`).join(' ');
                     
                     const badge = document.createElement('div');
                     badge.className = 'bg-slate-700/50 border border-slate-600 rounded px-2 py-1 flex items-center gap-2 text-xs';
                     badge.title = p.icon;
-                    badge.innerHTML = `<i data-lucide="${icon}" class="w-3 h-3 text-slate-300"></i> <span class="font-mono font-bold tracking-widest">${diffsHtml}</span>`;
+                    badge.innerHTML = `<img src="${baseUrl}/instrument-icon?name=${p.icon}" class="w-8 h-8 object-contain"> <span class="font-mono font-bold tracking-widest">${diffsHtml}</span>`;
                     partsContainer.appendChild(badge);
                 });
             }
