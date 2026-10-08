@@ -13,6 +13,7 @@ export class Highway {
     this.canvas = canvas;
     this.g = canvas.getContext('2d');
     this.chart = null;
+    this.maxLength = 0; // longest sustain in the current chart, in seconds
     this.neck = 1; // neck speed: scales distance between notes only; timing is unchanged
   }
 
@@ -22,6 +23,7 @@ export class Highway {
 
   setChart(chart) {
     this.chart = chart;
+    this.maxLength = Math.max(0, ...chart.notes.map((n) => n.length || 0));
   }
 
   resize() {
@@ -87,7 +89,7 @@ export class Highway {
     g.fillRect(x0 - 6, hitY, laneW * chart.lanes + 12, 3);
 
     // sustains first, then heads
-    const from = firstIndexAtOrAfter(chart.notes, t - 0.3);
+    const from = firstVisibleIndex(chart.notes, t, this.maxLength);
     const visible = [];
     for (let i = from; i < chart.notes.length && chart.notes[i].time <= t + ahead; i++) {
       visible.push(chart.notes[i]);
@@ -181,6 +183,13 @@ export class Highway {
       this.g.fillRect(x0, top, width, Math.max(0, Math.min(h, bottom) - Math.max(0, top)));
     }
   }
+}
+
+// First note that can still be drawn at time t. Heads stay for FADE_SEC after they pass the hit line,
+// and a sustain stays until its end, so look back by the longest sustain in the chart.
+// Notes must be sorted by time.
+export function firstVisibleIndex(notes, t, maxLength) {
+  return firstIndexAtOrAfter(notes, t - FADE_SEC - maxLength);
 }
 
 function firstIndexAtOrAfter(notes, time) {
