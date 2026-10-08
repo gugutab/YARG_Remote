@@ -94,3 +94,13 @@ O YARG.Core serve como referência de formato, não como dependência.
 2. Ler `notes.chart`.
 3. Sustains com cauda contínua e `open` notes.
 4. Persistir o handle da pasta com IndexedDB (`FileSystemDirectoryHandle` é serializável).
+
+## Achar exemplos de notas especiais no catálogo
+
+```bash
+node scripts/find-special-notes.mjs <pasta> [--only open,accent,ghost] [--max 5] [--json]
+```
+
+Procura `.mid` em todas as subpastas e mostra, por música, instrumento e dificuldade, o tempo e a seção de
+cada ocorrência: open, tap, HOPO, accent, ghost, double kick, rolls, percussão e harmonias de vocal, solos e star power.
+No fim, um resumo com o total de cada categoria. Sem `--only`, lista todas as categorias.
