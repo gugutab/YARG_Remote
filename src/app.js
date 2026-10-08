@@ -248,6 +248,10 @@ async function selectSong(song) {
   els.artist.textContent = plainText(song.artist);
   els.cover.hidden = true;
   els.infoCover.hidden = true;
+  els.instrument.replaceChildren();
+  els.difficulty.replaceChildren();
+  els.sectionSelect.replaceChildren(new Option('Sem seções', ''));
+  els.sectionSelect.disabled = true;
   els.instrumentCards.replaceChildren();
   els.difficultyCards.replaceChildren();
   els.chartStats.replaceChildren();
@@ -270,7 +274,10 @@ async function selectSong(song) {
     return;
   }
   const coverEntry = ['album.jpg', 'album.png', 'album.jpeg'].map((n) => song.files.get(n)).find(Boolean);
-  const coverUrl = coverEntry ? URL.createObjectURL(await coverEntry.getFile()) : null;
+  let coverUrl = null;
+  try {
+    if (coverEntry) coverUrl = URL.createObjectURL(await coverEntry.getFile());
+  } catch { /* a missing cover must not block the song */ }
   if (token !== loadToken) {
     if (coverUrl) URL.revokeObjectURL(coverUrl);
     return;
@@ -288,6 +295,7 @@ async function selectSong(song) {
   const stems = audioStemsOf(song);
   buildMixer(stems);
 
+  setLoadState('loading', 'Carregando áudio…', 0.1);
   let loaded = false;
   try {
     loaded = await player.load(stems, {
@@ -563,6 +571,7 @@ window.addEventListener('resize', () => closePopovers());
 for (const [btn, pop] of popovers) {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
+    if (e.detail > 0) btn.blur(); // keep the keyboard shortcuts working after a mouse click
     closePopovers(pop);
     pop.hidden = !pop.hidden;
     if (!pop.hidden) placePopover(btn, pop);
@@ -631,7 +640,7 @@ document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tag = e.target.tagName;
   if (e.code === 'Escape') {
-    if (els.mixerPop.hidden && els.settingsPop.hidden && infoOpen && (current || loadInfo.state === 'error')) setInfoOpen(false);
+    if (els.mixerPop.hidden && els.settingsPop.hidden && infoOpen && loadInfo.state !== 'idle') setInfoOpen(false);
     closePopovers();
     return;
   }
