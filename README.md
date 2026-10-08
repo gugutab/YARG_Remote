@@ -42,8 +42,8 @@ Conferido no código do YARG.Core (`github.com/YARC-Official/YARG.Core`, também
 - **Guitarra/baixo** — `Song/MidiPreparsers/MidiFiveFretPreparser.cs`: `FIVEFRET_MIN = 59`; offset 0 é a
   lane verde. Notas de *open* usam o sysex `PS` (`ENHANCED_OPENS`), que este MVP ainda não trata.
 - **Bateria** — `Song/MidiPreparsers/MidiDrumsPreparser.cs` e `MidReader.ProcessLists.cs`: 101 = bateria de
-  5 lanes (100 = laranja, 101 = verde); 110/111/112 = flags de prato para amarelo/azul/verde (pitch 98/99/100),
-  ligadas entre note-on e note-off, em bateria Pro e de 5 lanes. Sem 101 e com 110–112 = Pro; sem nenhum dos dois = 4 lanes.
+  5 lanes (100 = laranja, 101 = verde); 110/111/112 = marcadores de tom para amarelo/azul/verde (pitch 98/99/100): nessas lanes a nota é prato por padrão, e um marcador ativo a transforma em tom,
+  da nota-on à nota-off do marcador, em bateria Pro e de 5 lanes. Sem 101 e com 110–112 = Pro; sem nenhum dos dois = 4 lanes.
 - **Especiais** — `MidIOHelper.cs`: `103` = solo, `116` = star power, `12`/`13` = compasso/tempo na
   trilha `BEAT`, `105` = frase de letra em vocal.
 - **Vocal** — faixa 36–84 são as notas; texto que não começa com `[` é letra.

@@ -25,7 +25,8 @@ const SOLO_NOTE = 103;
 // Drums (YARG.Core MidiDrumsPreparser.cs / MidIOHelper.cs PAD_TO_CYMBAL_LOOKUP):
 //   offset 0..4 = kick, red, yellow, blue, green (4-lane) or orange (5-lane)
 //   offset 5 = green in 5-lane; its presence (pitch 101) means 5-lane drums
-//   pitches 110/111/112 are cymbal flags for yellow/blue/orange-or-green (offsets 2/3/4), pro and 5-lane
+//   pitches 110/111/112 are tom markers for yellow/blue/orange-or-green (offsets 2/3/4), pro and 5-lane;
+//   those pads are cymbals unless a marker covers them
 const FIVE_LANE_GREEN_NOTE = 101;
 const CYMBAL_FLAG_FOR_OFFSET = { 2: 110, 3: 111, 4: 112 };
 const DRUM_CYMBAL_FLAGS = [110, 111, 112];
@@ -152,13 +153,14 @@ function cymbalFlagSpans(track) {
   return spans;
 }
 
-// YARG toggles the cymbal flag with XOR (MidReader.cs: note.flags ^= flags) over each flag note's window
-// [start, end). So a note inside two overlapping windows is not a cymbal. Parity matches that.
+// In Pro drums yellow, blue and orange/green are cymbals by default (YARG.Core MidReader.ProcessLists.cs,
+// DrumPadDefaultFlags). A 110/111/112 note is a tom marker: over its window [start, end) it toggles the
+// cymbal flag with XOR (note.flags ^= flags). So a note is a cymbal unless an odd number of markers cover it.
 function isCymbal(spans, offset, tick) {
   const flag = CYMBAL_FLAG_FOR_OFFSET[offset];
   if (flag === undefined) return false;
-  const covering = (spans.get(flag) || []).filter((s) => tick >= s.start && tick < s.end).length;
-  return covering % 2 === 1;
+  const markers = (spans.get(flag) || []).filter((s) => tick >= s.start && tick < s.end).length;
+  return markers % 2 === 0;
 }
 
 function commonParts(midi, track, toSec) {
