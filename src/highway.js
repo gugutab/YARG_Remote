@@ -5,7 +5,8 @@ const KICK_COLOR = '#f2861e';
 const KICK_BAR_HALF_H = 6; // pedal bar is 12 px tall at rest
 const DOUBLE_KICK_GAP = 4; // px between the two bars of a double kick
 const TAP_COLOR = '#b25cff';
-const ACCENT_SCALE = 1.25;
+const ACCENT_OUTLINE_WIDTH = 4;
+const ACCENT_OUTLINE_DARKEN = 0.55; // multiplier applied to the note colour for the accent outline
 const GHOST_ALPHA = 0.45;
 const ROLL_COLORS = {
   kick: 'rgba(242,134,30,0.14)',
@@ -149,13 +150,14 @@ export class Highway {
       // ghost notes are dimmed, accents are larger (YARG draws them the same way)
       g.globalAlpha = (1 - k) * (n.ghost ? GHOST_ALPHA : 1);
       const cx = x0 + (n.lane + 0.5) * laneW;
-      const r = radius * (1 + 0.4 * k) * (n.accent ? ACCENT_SCALE : 1);
+      const r = radius * (1 + 0.4 * k);
       g.beginPath();
       g.arc(cx, cy, r, 0, Math.PI * 2);
       g.fillStyle = tintWhite(n.tap ? TAP_COLOR : colors[n.lane], white);
       g.fill();
-      g.lineWidth = 2;
-      g.strokeStyle = 'rgba(0,0,0,0.5)';
+      // accent: same size, with a thicker outline in a darker shade of the note's colour
+      g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH : 2;
+      g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : 'rgba(0,0,0,0.5)';
       g.stroke();
       if (n.hopo) { // guitar HOPO: a white dot in the head
         g.beginPath();
@@ -240,6 +242,12 @@ function firstIndexAtOrAfter(notes, time) {
 function tintWhite(hex, amount) {
   const n = parseInt(hex.slice(1), 16);
   const mix = (c) => Math.round(c + (255 - c) * amount);
+  return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
+}
+
+function darken(hex, factor) {
+  const n = parseInt(hex.slice(1), 16);
+  const mix = (c) => Math.round(c * factor);
   return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
 }
 
