@@ -35,7 +35,7 @@ export class Highway {
 
   setChart(chart) {
     this.chart = chart;
-    this.maxLength = Math.max(0, ...chart.notes.map((n) => n.length || 0));
+    this.maxLength = chart ? Math.max(0, ...chart.notes.map((n) => n.length || 0)) : 0;
   }
 
   resize() {

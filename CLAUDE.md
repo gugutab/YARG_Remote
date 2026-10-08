@@ -17,9 +17,10 @@ de código e mensagens de commit estão em inglês (padrão já usado).
 
 ## 2. Estado atual
 
-- Branch de trabalho: `claude/upbeat-knuth-87adga` (remoto `origin` = `gugutab/YARG_Remote`). Não crie PR sem
+- UI redesenhada na branch `claude/ui-redesign` (derivada da abaixo): chart em tela cheia, barra superior com ícones, biblioteca recolhível à esquerda (busca, filtro por instrumento/gênero, ordenação em `src/songlist.js`), ajustes e mixer em popovers. Atalhos: Espaço, L, F, [ ], setas. Pasta de testes real do usuário: `A:\music\Songs` (ex.: Guitar Hero\Quickplay, 'Smoke On The Water' em 0:40; 'More Than A Feeling' em 1:00). O compartilhamento 192.16.0.202 não respondeu (porta 445).
+- Branch de trabalho anterior: `claude/upbeat-knuth-87adga` (remoto `origin` = `gugutab/YARG_Remote`). Não crie PR sem
   pedido explícito. O remoto também tem `main`, que não é usado.
-- 39 testes unitários passando (`npm test`).
+- 43 testes unitários passando (`npm test`).
 - Funciona no Chromium (File System Access API). Em outros navegadores, o `<input webkitdirectory>` é o
   fallback, sem persistência.
 
@@ -82,6 +83,7 @@ Fluxo: pasta → `library.js` (músicas) → clique → `midi.js` (parse) + `cha
 | Arquivo | Papel |
 |---|---|
 | `index.html`, `styles.css` | UI. IDs dos controles são usados por `app.js`. |
+| `src/songlist.js` | Busca, filtro e ordenação da lista (funções puras). |
 | `src/app.js` | Eventos, seleção de música/instrumento/dificuldade, loop `frame()` (relógio, seção, highway). |
 | `src/midi.js` | Parser SMF: notas com `tick`/`endTick`/`velocity`, `texts` (meta 0x01), `lyrics` (meta 0x05), `sysex` (F0), `tempos`; `toSeconds` converte tick em segundos. |
 | `src/chart.js` | Regras do YARG (ver §5). Exporta `instrumentOptions`, `buildChart`, `availableDifficulties`, `phraseWindows`, `naturalHopo`, `parseSectionName`, `sectionIndexAt`, `displayLyric`, `drumKind`. |

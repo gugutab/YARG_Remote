@@ -5,87 +5,63 @@ import { Highway } from './highway.js';
 import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, readBytes, serializeSongs, restoreSongs } from './library.js';
 import { songDelaySeconds } from './ini.js';
 import { saveLibrary, loadLibrary } from './store.js';
+import { filterSongs, sortSongs, genresOf } from './songlist.js';
 
 const $ = (id) => document.getElementById(id);
-const els = {
-  pick: $('pick'),
-  resume: $('resume'),
-  rescan: $('rescan'),
-  folderInput: $('folderInput'),
-  status: $('status'),
-  search: $('search'),
-  songs: $('songs'),
-  empty: $('empty'),
-  player: $('player'),
-  cover: $('cover'),
-  title: $('title'),
-  artist: $('artist'),
-  instrument: $('instrument'),
-  difficulty: $('difficulty'),
-  play: $('play'),
-  seek: $('seek'),
-  time: $('time'),
-  speed: $('speed'),
-  speedVal: $('speedVal'),
-  neck: $('neck'),
-  neckVal: $('neckVal'),
-  chartDelay: $('chartDelay'),
-  chartDelayVal: $('chartDelayVal'),
-  sectionNow: $('sectionNow'),
-  sectionSelect: $('sectionSelect'),
-  loading: $('loading'),
-  mixer: $('mixer'),
-  highway: $('highway'),
-};
+const els = Object.fromEntries([
+  'app', 'library', 'toggleLibrary', 'closeLibrary', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
+  'search', 'sortBy', 'sortDir', 'filterInstrument', 'filterGenre', 'count', 'songs', 'empty',
+  'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
+  'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
+  'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'mixer', 'settingsBtn', 'settingsPop',
+  'speed', 'speedVal', 'neck', 'neckVal', 'chartDelay', 'chartDelayVal', 'resetSettings', 'fullscreen',
+  'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
+].map((id) => [id, $(id)]));
 
 const player = new MultiTrackPlayer();
 const highway = new Highway(els.highway);
 let songs = [];
-let current = null; // { song, midi, coverUrl }
+let current = null; // { song, midi, coverUrl, options }
 let connectedRoot = null; // folder handle of the library on screen, when it came from the File System Access API
 let savedRecord = null; // folder and index stored from the last visit
 let chart = null; // chart for the selected instrument and difficulty
 let seeking = false;
+let loadToken = 0; // bumped on every song selection, so a slow load cannot overwrite a newer one
+let sortDesc = false;
 
-els.sectionSelect.addEventListener('change', () => {
-  const section = chart?.sections[Number(els.sectionSelect.value)];
-  if (!section) return;
-  // The highway shows chart time t - delay, so seek to the section's time plus the delay to show it on time.
-  player.seek(section.time + Number(els.chartDelay.value));
-});
+const store = {
+  get(key) { try { return localStorage.getItem(`yargremote.${key}`); } catch { return null; } },
+  set(key, value) { try { localStorage.setItem(`yargremote.${key}`, value); } catch { /* storage unavailable */ } },
+};
+
+// ---------- Library panel ----------
+function setLibraryOpen(open) {
+  els.app.classList.toggle('lib-closed', !open);
+  store.set('library', open ? '1' : '0');
+  // Let the layout settle, then the canvas resizes itself on the next frame.
+}
+const narrow = () => window.matchMedia('(max-width: 700px)').matches;
+const libraryOpen = () => !els.app.classList.contains('lib-closed');
+setLibraryOpen(narrow() ? false : store.get('library') !== '0');
+// The drawer overlay on narrow screens starts closed; entering that layout closes it.
+window.matchMedia('(max-width: 700px)').addEventListener('change', (e) => { if (e.matches) setLibraryOpen(false); });
+els.toggleLibrary.addEventListener('click', () => setLibraryOpen(!libraryOpen()));
+els.closeLibrary.addEventListener('click', () => setLibraryOpen(false));
+els.scrim.addEventListener('click', () => setLibraryOpen(false));
+els.welcomeOpen.addEventListener('click', () => setLibraryOpen(true));
 
 els.pick.addEventListener('click', pickFolder);
 els.resume.addEventListener('click', reopenFolder);
 els.rescan.addEventListener('click', rescanFolder);
-offerSavedFolder();
 els.folderInput.addEventListener('change', () => loadEntries(entriesFromFileList(els.folderInput.files)));
-els.search.addEventListener('input', renderList);
-els.instrument.addEventListener('change', updateChart);
-els.difficulty.addEventListener('change', updateChart);
-els.play.addEventListener('click', togglePlay);
-els.seek.addEventListener('input', () => { seeking = true; });
-els.seek.addEventListener('change', () => { player.seek(Number(els.seek.value)); seeking = false; });
-els.speed.addEventListener('input', () => {
-  const rate = Number(els.speed.value);
-  player.setRate(rate);
-  els.speedVal.textContent = `${rate.toFixed(2)}×`;
+for (const el of [els.search, els.filterInstrument, els.filterGenre]) el.addEventListener('input', renderList);
+els.sortBy.value = store.get('sortBy') || 'title';
+els.sortBy.addEventListener('change', () => { store.set('sortBy', els.sortBy.value); renderList(); });
+els.sortDir.addEventListener('click', () => {
+  sortDesc = !sortDesc;
+  renderList();
 });
-// Chart delay: only the highway is shifted. Positive = notes arrive later than the audio.
-els.chartDelay.addEventListener('input', () => {
-  const d = Number(els.chartDelay.value);
-  els.chartDelayVal.textContent = `${d >= 0 ? '+' : ''}${d.toFixed(2)} s`;
-});
-els.neck.addEventListener('input', () => {
-  const neck = Number(els.neck.value);
-  highway.setNeckSpeed(neck);
-  els.neckVal.textContent = `${neck.toFixed(1)}×`;
-});
-document.addEventListener('keydown', (e) => {
-  if (e.code === 'Space' && current && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
-    e.preventDefault();
-    togglePlay();
-  }
-});
+offerSavedFolder();
 
 // Folder selection: File System Access API when available, <input webkitdirectory> otherwise.
 async function pickFolder() {
@@ -107,9 +83,9 @@ async function scanFolder(dir) {
   songs = await scanSongs(walkHandle(dir, dir.name));
   const saved = await saveLibrary({ root: dir, rootName: dir.name, index: serializeSongs(songs), savedAt: Date.now() });
   connectedRoot = dir;
-  setStatus(`${songs.length} música(s) em "${dir.name}".${saved ? '' : ' (não foi possível guardar a pasta)'}`);
-  showLibraryButtons();
-  renderList();
+  els.resume.hidden = true;
+  setStatus(`"${dir.name}"${saved ? '' : ' (não foi possível guardar a pasta)'}`);
+  afterLibraryLoaded();
 }
 
 // Reopens the remembered folder. Only the read permission is asked again, on this click.
@@ -128,10 +104,9 @@ async function reopenFolder() {
   }
   songs = restoreSongs(index, root);
   connectedRoot = root;
-  setStatus(`${songs.length} música(s) em "${rootName}" (lista guardada). Use "Atualizar lista" se mudou algo.`);
   els.resume.hidden = true;
-  showLibraryButtons();
-  renderList();
+  setStatus(`"${rootName}" (lista guardada; use ⟳ se mudou algo)`);
+  afterLibraryLoaded();
 }
 
 async function rescanFolder() {
@@ -148,14 +123,18 @@ async function rescanFolder() {
   }
 }
 
-function showLibraryButtons() {
-  els.rescan.hidden = !connectedRoot;
-}
-
 async function loadEntries(entries) {
   setStatus('Procurando músicas…');
   songs = await scanSongs(entries);
-  setStatus(`${songs.length} música(s) encontrada(s).`);
+  setStatus('');
+  afterLibraryLoaded();
+}
+
+function afterLibraryLoaded() {
+  els.rescan.hidden = !connectedRoot;
+  const genres = genresOf(songs);
+  els.filterGenre.replaceChildren(new Option('Gêneros', ''), ...genres.map((g) => new Option(g, g)));
+  els.filterGenre.closest('label').hidden = genres.length === 0;
   renderList();
 }
 
@@ -163,80 +142,117 @@ async function loadEntries(entries) {
 async function offerSavedFolder() {
   savedRecord = await loadLibrary();
   if (!savedRecord?.root) return;
-  els.resume.textContent = `Reabrir "${savedRecord.rootName}"`;
+  els.resume.querySelector('span').textContent = `Reabrir "${savedRecord.rootName}" (${savedRecord.index.length})`;
   els.resume.hidden = false;
-  setStatus(`Pasta da última visita: "${savedRecord.rootName}" (${savedRecord.index.length} música(s)).`);
 }
 
 function renderList() {
-  const q = els.search.value.trim().toLowerCase();
-  const filtered = songs.filter((s) => !q || `${s.title} ${s.artist}`.toLowerCase().includes(q));
-  els.songs.replaceChildren(...filtered.map((song) => {
+  const filters = { query: els.search.value, instrument: els.filterInstrument.value, genre: els.filterGenre.value };
+  const shown = sortSongs(filterSongs(songs, filters), els.sortBy.value, sortDesc);
+  els.sortDir.textContent = sortDesc ? 'Z→A' : 'A→Z';
+  els.songs.replaceChildren(...shown.map((song) => {
     const li = document.createElement('li');
     li.className = current?.song === song ? 'active' : '';
+    li.setAttribute('role', 'option');
     li.innerHTML = '<div class="song-title"></div><div class="song-artist"></div>';
     li.querySelector('.song-title').textContent = song.title;
     li.querySelector('.song-artist').textContent = song.artist;
     li.addEventListener('click', () => selectSong(song));
     return li;
   }));
+  els.count.textContent = songs.length ? `${shown.length} de ${songs.length} músicas` : '';
   els.empty.hidden = songs.length > 0;
 }
 
+function setStatus(text) {
+  els.status.textContent = text;
+}
+
+// ---------- Song and chart selection ----------
 async function selectSong(song) {
+  const token = ++loadToken;
   player.pause();
+  syncPlayButton();
+  current = null;
+  chart = null;
+  highway.setChart(null);
   renderList();
-  els.player.hidden = false;
+  if (narrow()) setLibraryOpen(false);
+
+  els.welcome.hidden = true;
+  els.loading.hidden = false;
+  els.loading.textContent = 'Carregando…';
+  showPlayInfo(true);
   els.title.textContent = song.title;
   els.artist.textContent = song.artist;
-  els.loading.hidden = false;
-  els.loading.textContent = 'Carregando áudio…';
+  els.cover.hidden = true;
 
   const midiEntry = song.files.get('notes.mid');
   if (!midiEntry) {
     els.loading.textContent = 'Esta música não tem notes.mid (apenas .chart não é suportado nesta versão).';
     return;
   }
-  const midi = parseMidi(await readBytes(midiEntry));
-
+  let midi;
+  try {
+    midi = parseMidi(await readBytes(midiEntry));
+  } catch (err) {
+    if (token === loadToken) els.loading.textContent = `Não foi possível ler notes.mid: ${err.message}`;
+    return;
+  }
   const coverEntry = ['album.jpg', 'album.png', 'album.jpeg'].map((n) => song.files.get(n)).find(Boolean);
-  if (current?.coverUrl) URL.revokeObjectURL(current.coverUrl);
   const coverUrl = coverEntry ? URL.createObjectURL(await coverEntry.getFile()) : null;
+  if (token !== loadToken) {
+    if (coverUrl) URL.revokeObjectURL(coverUrl);
+    return;
+  }
+  if (els.cover.src.startsWith('blob:')) URL.revokeObjectURL(els.cover.src);
   els.cover.src = coverUrl || '';
   els.cover.hidden = !coverUrl;
 
-  current = { song, midi, coverUrl };
-  fillInstrumentOptions(midi);
+  current = { song, midi, coverUrl, options: instrumentOptions(midi) };
+  fillInstrumentOptions();
   buildMixer(audioStemsOf(song));
 
   try {
     await player.load(audioStemsOf(song), {
       delay: songDelaySeconds(song.ini),
       onProgress: (p) => {
-        els.loading.textContent = `Carregando áudio… ${Math.round(p * 100)}%`;
+        if (token === loadToken) els.loading.textContent = `Carregando áudio… ${Math.round(p * 100)}%`;
       },
     });
   } catch (err) {
     setStatus(`Falha ao decodificar áudio: ${err.message}`);
   }
+  if (token !== loadToken) return;
   els.loading.hidden = true;
   els.seek.max = player.duration.toFixed(2);
+  els.timeTotal.textContent = fmt(player.duration);
   updateChart();
-  requestAnimationFrame(frame);
 }
 
-function fillInstrumentOptions(midi) {
-  current.options = instrumentOptions(midi);
+function showPlayInfo(on) {
+  els.now.hidden = !on;
+  els.brand.hidden = on;
+  els.chips.hidden = !on;
+  els.transport.hidden = !on;
+  els.seekbox.hidden = !on;
+  els.tools.hidden = !on;
+}
+
+function fillInstrumentOptions() {
   els.instrument.replaceChildren(...current.options.map((ins) => new Option(ins.label, ins.id)));
-  if (current.options.length) fillDifficultyOptions();
+  els.instrument.disabled = current.options.length === 0;
+  fillDifficultyOptions();
 }
 
 function fillDifficultyOptions() {
   const ins = currentInstrument();
   const diffs = ins ? availableDifficulties(current.midi, ins) : [];
+  const previous = els.difficulty.value;
   els.difficulty.replaceChildren(...diffs.map((d) => new Option(d.label, d.id)));
-  // Prefer Expert when available, otherwise the highest difficulty.
-  if (diffs.length) els.difficulty.value = diffs[diffs.length - 1].id;
+  // Keep the previous choice when still available, otherwise prefer the highest difficulty (Expert).
+  if (diffs.some((d) => d.id === previous)) els.difficulty.value = previous;
+  else if (diffs.length) els.difficulty.value = diffs[diffs.length - 1].id;
 }
 
 function currentInstrument() {
@@ -245,31 +261,54 @@ function currentInstrument() {
 
 function updateChart() {
   if (!current) return;
-  if (els.instrument.value) {
-    const previous = els.difficulty.value;
-    fillDifficultyOptions();
-    if ([...els.difficulty.options].some((o) => o.value === previous)) els.difficulty.value = previous;
-  }
   const ins = currentInstrument();
   const diff = DIFFICULTIES.find((d) => d.id === els.difficulty.value);
   chart = ins && diff ? buildChart(current.midi, ins, diff) : null;
   highway.setChart(chart);
   fillSectionOptions();
+  if (!chart) {
+    els.loading.hidden = false;
+    els.loading.textContent = 'Nenhum instrumento jogável nesta música.';
+  }
 }
+
+els.instrument.addEventListener('change', () => { fillDifficultyOptions(); updateChart(); });
+els.difficulty.addEventListener('change', updateChart);
 
 function fillSectionOptions() {
   const sections = chart?.sections ?? [];
   els.sectionSelect.replaceChildren(...sections.map((s, i) => new Option(`${fmt(s.time)} · ${s.name}`, String(i))));
   els.sectionSelect.disabled = sections.length === 0;
-  if (sections.length === 0) els.sectionNow.textContent = '—';
+  if (sections.length === 0) els.sectionSelect.replaceChildren(new Option('Sem seções', ''));
 }
 
+// The highway shows chart time t - delay, so seeking to a section needs the delay added back.
+function seekToSection(i) {
+  const section = chart?.sections[i];
+  if (!section) return;
+  player.seek(Math.max(0, section.time + Number(els.chartDelay.value)));
+}
+els.sectionSelect.addEventListener('change', () => seekToSection(Number(els.sectionSelect.value)));
+els.back.addEventListener('click', () => stepSection(-1));
+els.forward.addEventListener('click', () => stepSection(1));
+function stepSection(dir) {
+  if (!chart?.sections.length) return;
+  const here = sectionIndexAt(chart.sections, player.currentTime() - Number(els.chartDelay.value));
+  const sectionStart = chart.sections[here].time + Number(els.chartDelay.value);
+  // "Previous" first returns to the start of the current section, as media players do.
+  let target = here + dir;
+  if (dir < 0 && player.currentTime() - sectionStart > 2) target = here;
+  seekToSection(Math.min(Math.max(target, 0), chart.sections.length - 1));
+}
+
+// ---------- Mixer and settings ----------
 function buildMixer(stems) {
   els.mixer.replaceChildren(...stems.map((stem) => {
     const row = document.createElement('label');
     row.className = 'mix-row';
     row.innerHTML = '<span class="mix-name"></span><input type="range" min="0" max="1.5" step="0.01" value="1"><span class="mix-val">100%</span>';
     row.querySelector('.mix-name').textContent = stem.label;
+    row.querySelector('.mix-name').title = stem.label;
     const range = row.querySelector('input');
     const val = row.querySelector('.mix-val');
     range.addEventListener('input', () => {
@@ -280,36 +319,133 @@ function buildMixer(stems) {
   }));
 }
 
+els.speed.addEventListener('input', () => {
+  const rate = Number(els.speed.value);
+  player.setRate(rate);
+  els.speedVal.textContent = `${rate.toFixed(2)}×`;
+});
+// Chart delay: only the highway is shifted. Positive = notes arrive later than the audio.
+els.chartDelay.addEventListener('input', () => {
+  const d = Number(els.chartDelay.value);
+  els.chartDelayVal.textContent = `${d >= 0 ? '+' : ''}${d.toFixed(2)} s`;
+});
+els.neck.addEventListener('input', () => {
+  const neck = Number(els.neck.value);
+  highway.setNeckSpeed(neck);
+  els.neckVal.textContent = `${neck.toFixed(1)}×`;
+});
+els.resetSettings.addEventListener('click', () => {
+  for (const [el, value] of [[els.speed, 1], [els.neck, 1], [els.chartDelay, 0]]) {
+    el.value = value;
+    el.dispatchEvent(new Event('input'));
+  }
+});
+
+const popovers = [[els.mixerBtn, els.mixerPop], [els.settingsBtn, els.settingsPop]];
+function closePopovers(except) {
+  for (const [btn, pop] of popovers) {
+    if (pop === except) continue;
+    pop.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+  }
+}
+for (const [btn, pop] of popovers) {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closePopovers(pop);
+    pop.hidden = !pop.hidden;
+    btn.setAttribute('aria-expanded', String(!pop.hidden));
+  });
+  pop.addEventListener('click', (e) => e.stopPropagation());
+}
+document.addEventListener('click', () => closePopovers());
+
+// ---------- Transport ----------
+els.play.addEventListener('click', togglePlay);
+els.seek.addEventListener('input', () => {
+  seeking = true;
+  els.timeNow.textContent = fmt(Number(els.seek.value));
+});
+els.seek.addEventListener('change', () => { player.seek(Number(els.seek.value)); seeking = false; });
+
 async function togglePlay() {
-  if (!current) return;
+  if (!current || !chart) return;
   if (player.playing) player.pause();
   else await player.play();
-  els.play.textContent = player.playing ? 'Pausar' : 'Tocar';
+  syncPlayButton();
 }
 
+function syncPlayButton() {
+  const playing = player.playing;
+  els.play.querySelector('use').setAttribute('href', playing ? '#i-pause' : '#i-play');
+  els.play.setAttribute('aria-label', playing ? 'Pausar' : 'Tocar');
+  setImmersive();
+}
+
+// ---------- Fullscreen and idle bar ----------
+let idleTimer = 0;
+function setImmersive() {
+  const on = !!document.fullscreenElement;
+  els.app.classList.toggle('immersive', on);
+  els.fullscreen.querySelector('use').setAttribute('href', on ? '#i-shrink' : '#i-expand');
+  wake();
+}
+function wake() {
+  els.app.classList.remove('idle');
+  clearTimeout(idleTimer);
+  if (document.fullscreenElement && player.playing) {
+    idleTimer = setTimeout(() => {
+      if (els.mixerPop.hidden && els.settingsPop.hidden) els.app.classList.add('idle');
+    }, 2500);
+  }
+}
+els.fullscreen.addEventListener('click', toggleFullscreen);
+function toggleFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else els.app.requestFullscreen?.().catch(() => {});
+}
+document.addEventListener('fullscreenchange', setImmersive);
+document.addEventListener('mousemove', wake);
+
+// ---------- Keyboard ----------
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const tag = e.target.tagName;
+  if (e.code === 'Escape') { closePopovers(); return; }
+  if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(tag)) return;
+  if (e.code === 'Space' && current) { e.preventDefault(); togglePlay(); }
+  else if (e.code === 'KeyL') setLibraryOpen(!libraryOpen());
+  else if (e.code === 'KeyF') toggleFullscreen();
+  else if (e.code === 'BracketLeft') stepSection(-1);
+  else if (e.code === 'BracketRight') stepSection(1);
+  else if (e.code === 'ArrowLeft' && current) player.seek(Math.max(0, player.currentTime() - 5));
+  else if (e.code === 'ArrowRight' && current) player.seek(Math.min(player.duration, player.currentTime() + 5));
+});
+
+// ---------- Frame loop (started once) ----------
 function frame() {
-  const t = player.currentTime();
-  if (player.playing && t >= player.duration) {
-    player.pause();
-    els.play.textContent = 'Tocar';
+  if (current && chart) {
+    const t = player.currentTime();
+    if (player.playing && t >= player.duration) {
+      player.pause();
+      syncPlayButton();
+    }
+    const chartTime = t - Number(els.chartDelay.value);
+    highway.render(chartTime);
+    const index = chart.sections.length ? sectionIndexAt(chart.sections, chartTime) : -1;
+    if (index >= 0 && document.activeElement !== els.sectionSelect) els.sectionSelect.value = String(index);
+    if (!seeking) {
+      els.seek.value = t;
+      els.timeNow.textContent = fmt(t);
+    }
+  } else {
+    highway.render(0);
   }
-  const chartTime = t - Number(els.chartDelay.value);
-  highway.render(chartTime);
-  const index = chart ? sectionIndexAt(chart.sections, chartTime) : -1;
-  if (index >= 0) {
-    els.sectionNow.textContent = chart.sections[index].name;
-    if (document.activeElement !== els.sectionSelect) els.sectionSelect.value = String(index);
-  }
-  if (!seeking) els.seek.value = t;
-  els.time.textContent = `${fmt(t)} / ${fmt(player.duration)}`;
   requestAnimationFrame(frame);
 }
+requestAnimationFrame(frame);
 
 function fmt(sec) {
   const s = Math.floor(sec || 0);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-}
-
-function setStatus(text) {
-  els.status.textContent = text;
 }

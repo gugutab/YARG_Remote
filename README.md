@@ -29,6 +29,7 @@ npm test             # testes do parser MIDI / song.ini / chart
 | `src/store.js` | Guarda a pasta e o índice no IndexedDB entre visitas. |
 | `src/player.js` | Multitrack com alinhamento ao chart, velocidade sem mudar o tom (SoundTouch), volume por stem. |
 | `src/highway.js` | Desenho em canvas (notas, sustains, pedais, rolls, vocal com letra). |
+| `src/songlist.js` | Busca, filtro (instrumento, gênero) e ordenação da biblioteca. |
 | `src/app.js` | Interface, seleção, seções, delays e loop de desenho. |
 | `vendor/` | SoundTouchJS (LGPL-2.1), sem build. |
 | `scripts/find-special-notes.mjs` | Busca notas especiais num catálogo de MIDIs. |
