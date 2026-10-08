@@ -7,6 +7,11 @@ const DOUBLE_KICK_GAP = 4; // px between the two bars of a double kick
 const TAP_COLOR = '#b25cff';
 const ACCENT_SCALE = 1.25;
 const GHOST_ALPHA = 0.45;
+const ROLL_COLORS = {
+  kick: 'rgba(242,134,30,0.14)',
+  tremolo: 'rgba(63,191,63,0.14)',
+  trill: 'rgba(245,197,24,0.14)',
+};
 const FADE_SEC = 0.25; // how long a note takes to fade out after the hit line
 const BASE_LOOKAHEAD_SEC = 2.5; // time from the top edge to the hit line at neck speed 1
 const ENTRY_MARGIN_SEC = 0.3; // extra window above the top edge, so notes are already moving when they enter
@@ -73,6 +78,10 @@ export class Highway {
     // star power / solo bands
     this.fillSpans(chart.starPower, t, ahead, yOf, x0, laneW * chart.lanes, h, 'rgba(60,160,255,0.12)');
     this.fillSpans(chart.solos, t, ahead, yOf, x0, laneW * chart.lanes, h, 'rgba(255,190,60,0.10)');
+    // drum rolls: one band per roll type (kick roll, tremolo lane, trill lane)
+    for (const [type, color] of Object.entries(ROLL_COLORS)) {
+      this.fillSpans((chart.rolls || []).filter((r) => r.type === type), t, ahead, yOf, x0, laneW * chart.lanes, h, color);
+    }
 
     // beat lines
     for (const b of chart.beats) {
@@ -148,6 +157,12 @@ export class Highway {
       g.lineWidth = 2;
       g.strokeStyle = 'rgba(0,0,0,0.5)';
       g.stroke();
+      if (n.hopo) { // guitar HOPO: a white dot in the head
+        g.beginPath();
+        g.arc(cx, cy, r * 0.35, 0, Math.PI * 2);
+        g.fillStyle = `rgba(255,255,255,${0.9 * (1 - k)})`;
+        g.fill();
+      }
       if (n.cymbal) { // pro drums: cymbal = ring with a white outline, tom = solid pad
         g.beginPath();
         g.arc(cx, cy, r * 0.55, 0, Math.PI * 2);

@@ -123,43 +123,100 @@ export function buildChart(midi, instrument, difficulty) {
   }
 
   // Tap: note 104 marks a window [start, end) in which every note of the guitar is a tap (MidReader.cs).
-  const tapWindows = track.notes.filter((n) => n.pitch === TAP_NOTE).map((n) => [n.tick, n.endTick]);
+  const tapWindows = windowsOf(track.notes.filter((n) => n.pitch === TAP_NOTE));
+  // Forced HOPO (offset +5) and forced strum (offset +6) windows for this difficulty.
+  const hopoWindows = windowsOf(track.notes.filter((n) => n.pitch === difficulty.base + 5));
+  const strumWindows = windowsOf(track.notes.filter((n) => n.pitch === difficulty.base + 6));
+  const fretNotes = track.notes.filter((n) => n.pitch - difficulty.base >= 0 && n.pitch - difficulty.base < LANES);
+  const natural = naturalHopo(fretNotes, midi.division);
   const notes = [];
   for (const n of track.notes) {
     const lane = n.pitch - difficulty.base;
     if (lane < 0 || lane >= LANES) continue;
-    const tap = tapWindows.some(([start, end]) => n.tick >= start && n.tick < end);
-    notes.push({ ...timed(n), lane, cymbal: false, tap });
+    const tap = inWindows(tapWindows, n.tick);
+    // A forced strum wins over a forced HOPO; without either, the note is a HOPO only if it is natural.
+    const hopo = !tap && (inWindows(strumWindows, n.tick) ? false
+      : inWindows(hopoWindows, n.tick) ? true : natural.get(n));
+    notes.push({ ...timed(n), lane, cymbal: false, tap, hopo: Boolean(hopo) });
   }
   return { mode: 'lanes', lanes: LANES, laneColors: GUITAR_LANE_COLORS, notes, ...commonParts(midi, track, toSec) };
 }
 
 // Columns are the pads only: 4 (red, yellow, blue, green) or 5 (5-lane adds orange before green).
 // The kick is not a column; it is a bar across all columns, so its lane is -1.
+// [start, end) tick windows of marker notes (note-on to note-off), as YARG applies them.
+function windowsOf(markers) {
+  return markers.map((n) => [n.tick, n.endTick]);
+}
+
+function inWindows(windows, tick) {
+  return windows.some(([start, end]) => tick >= start && tick < end);
+}
+
+// Natural HOPO per note, as YARG.Core MoonNote.IsNaturalHopo: not a chord, has a previous note
+// (a different fret, or any chord before it), and comes within resolution / 3 + 1 ticks of it.
+// fretNotes must be sorted by tick.
+export function naturalHopo(fretNotes, division) {
+  const threshold = Math.floor(division / 3) + 1;
+  const groups = [];
+  for (const n of fretNotes) {
+    const last = groups[groups.length - 1];
+    if (last && last.tick === n.tick) last.notes.push(n);
+    else groups.push({ tick: n.tick, notes: [n] });
+  }
+  const result = new Map();
+  groups.forEach((group, i) => {
+    const prev = groups[i - 1];
+    for (const n of group.notes) {
+      const isChord = group.notes.length > 1;
+      const natural = !isChord && prev !== undefined
+        && (prev.notes.length > 1 || prev.notes[0].pitch !== n.pitch)
+        && n.tick - prev.tick <= threshold;
+      result.set(n, natural);
+    }
+  });
+  return result;
+}
+
+// Drum rolls (MidIOHelper.cs): 125 kick roll, 126 tremolo lane, 127 trill lane, as tick-to-second spans.
+const ROLL_TYPES = { 125: 'kick', 126: 'tremolo', 127: 'trill' };
+function rollSpans(track, toSec) {
+  return track.notes
+    .filter((n) => n.pitch in ROLL_TYPES)
+    .map((n) => ({ start: toSec(n.tick), end: toSec(n.endTick), type: ROLL_TYPES[n.pitch] }));
+}
+
 function buildDrumChart(midi, track, kind, difficulty, timed, toSec) {
   const lanes = kind === 'five' ? 5 : 4;
   const laneColors = kind === 'five' ? DRUM_LANE_COLORS_5 : DRUM_LANE_COLORS_4;
   // Cymbal flags apply to Pro and 5-lane modes; 4-lane mode plays the same notes with no cymbals.
   const cymbalSpans = kind === 'four' ? null : cymbalFlagSpans(track);
 
-  // Double kick: the note one below the difficulty's kick (95 in Expert) at the same tick (MidReader.cs).
-  const doubleKickTicks = new Set(track.notes.filter((n) => n.pitch === difficulty.base - 1).map((n) => n.tick));
-  const notes = [];
+  // The kick is the difficulty's base note; the note one below (95 in Expert) is a kick too, with the
+  // double kick flag (YARG.Core MidReader.ProcessLists.cs: key - 1 gets InstrumentPlus). Kicks share a tick.
+  const kicks = new Map();
+  const pads = [];
   for (const n of track.notes) {
     const offset = n.pitch - difficulty.base; // 0 kick, 1 red, 2 yellow, 3 blue, 4 orange/green, 5 green
+    if (offset === 0 || offset === -1) {
+      const double = offset === -1;
+      const prev = kicks.get(n.tick);
+      kicks.set(n.tick, {
+        ...timed(n), lane: -1, cymbal: false, accent: false, ghost: false,
+        doubleKick: double || (prev ? prev.doubleKick : false),
+      });
+      continue;
+    }
     if (offset < 0 || offset > lanes) continue;
     const cymbal = cymbalSpans !== null && isCymbal(cymbalSpans, offset, n.tick);
-    const note = { ...timed(n), lane: offset - 1, cymbal, accent: false, ghost: false, doubleKick: false };
-    if (note.lane < 0) {
-      note.doubleKick = doubleKickTicks.has(n.tick);
-    } else {
-      // Velocity marks dynamics on pads, not the kick (YARG.Core MidReader.ProcessLists.cs, VELOCITY_*).
-      note.accent = n.velocity === VELOCITY_ACCENT;
-      note.ghost = n.velocity === VELOCITY_GHOST;
-    }
-    notes.push(note);
+    // Velocity marks dynamics on pads, not the kick (YARG.Core MidReader.ProcessLists.cs, VELOCITY_*).
+    pads.push({
+      ...timed(n), lane: offset - 1, cymbal,
+      accent: n.velocity === VELOCITY_ACCENT, ghost: n.velocity === VELOCITY_GHOST, doubleKick: false,
+    });
   }
-  return { mode: 'lanes', lanes, laneColors, drumKind: kind, notes, ...commonParts(midi, track, toSec) };
+  const notes = [...kicks.values(), ...pads].sort((a, b) => a.time - b.time);
+  return { mode: 'lanes', lanes, laneColors, drumKind: kind, notes, rolls: rollSpans(track, toSec), ...commonParts(midi, track, toSec) };
 }
 
 // Tick ranges during which each cymbal flag (110/111/112) is on.
