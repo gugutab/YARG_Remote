@@ -406,11 +406,22 @@ function closePopovers(except) {
     btn.setAttribute('aria-expanded', 'false');
   }
 }
+// Opens the popover under its button, aligned to the button's right edge but clamped inside the viewport.
+function placePopover(btn, pop) {
+  const b = btn.getBoundingClientRect();
+  const width = pop.offsetWidth;
+  const left = Math.min(Math.max(8, b.right - width), window.innerWidth - width - 8);
+  pop.style.left = `${Math.max(8, left)}px`;
+  pop.style.top = `${b.bottom + 8}px`;
+  pop.style.maxHeight = `${Math.max(120, window.innerHeight - b.bottom - 16)}px`;
+}
+window.addEventListener('resize', () => closePopovers());
 for (const [btn, pop] of popovers) {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     closePopovers(pop);
     pop.hidden = !pop.hidden;
+    if (!pop.hidden) placePopover(btn, pop);
     btn.setAttribute('aria-expanded', String(!pop.hidden));
   });
   pop.addEventListener('click', (e) => e.stopPropagation());

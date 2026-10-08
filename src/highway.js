@@ -56,13 +56,7 @@ export class Highway {
     g.fillStyle = '#0d1117';
     g.fillRect(0, 0, w, h);
 
-    if (!this.chart) {
-      g.fillStyle = '#8b949e';
-      g.font = '16px system-ui';
-      g.textAlign = 'center';
-      g.fillText('Selecione uma música', w / 2, h / 2);
-      return;
-    }
+    if (!this.chart) return; // the page shows its own welcome / loading overlay
     if (this.chart.mode === 'vocals') this.renderVocals(t, w, h);
     else this.renderLanes(t, w, h);
   }

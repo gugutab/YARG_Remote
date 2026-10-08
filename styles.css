@@ -134,11 +134,11 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 /* ---------- Popovers ---------- */
 .pop-wrap { position: relative; }
 .popover {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
+  position: fixed; /* placed by placePopover() in app.js so it never leaves the screen */
+  left: 8px;
+  top: var(--bar-h);
   z-index: 20;
-  width: 300px;
+  width: min(300px, calc(100vw - 16px));
   max-height: 70vh;
   overflow: auto;
   padding: 12px;
