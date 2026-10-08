@@ -43,7 +43,7 @@ Conferido no código do YARG.Core (`github.com/YARC-Official/YARG.Core`, também
   lane verde. Notas de *open* usam o sysex `PS` (`ENHANCED_OPENS`), que este MVP ainda não trata.
 - **Bateria** — `Song/MidiPreparsers/MidiDrumsPreparser.cs` e `MidReader.ProcessLists.cs`: 101 = bateria de
   5 lanes (100 = laranja, 101 = verde); 110/111/112 = flags de prato para amarelo/azul/verde (pitch 98/99/100),
-  ligadas entre note-on e note-off. Sem 101 e com 110–112 = Pro; sem nenhum dos dois = 4 lanes.
+  ligadas entre note-on e note-off, em bateria Pro e de 5 lanes. Sem 101 e com 110–112 = Pro; sem nenhum dos dois = 4 lanes.
 - **Especiais** — `MidIOHelper.cs`: `103` = solo, `116` = star power, `12`/`13` = compasso/tempo na
   trilha `BEAT`, `105` = frase de letra em vocal.
 - **Vocal** — faixa 36–84 são as notas; texto que não começa com `[` é letra.
@@ -79,7 +79,7 @@ O YARG.Core serve como referência de formato, não como dependência.
 
 - Só `notes.mid`; `notes.chart` (formato .chart) não é lido ainda.
 - Sem `open` notes (sysex `PS`) e sem Pro Guitar/Keys. Bateria 4 lanes, Pro (flags de prato, mostrados como anel)
-  e 5 lanes são suportadas.
+  e 5 lanes são suportadas, ambas com tags de prato.
 - Vocal é um visualizador de pitch com letra, sem sílabas nem fases.
 - Áudio é decodificado inteiro na memória: um conjunto de stems de 3 min costuma ocupar algumas centenas
   de MB no navegador.

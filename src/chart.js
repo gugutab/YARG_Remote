@@ -25,7 +25,7 @@ const SOLO_NOTE = 103;
 // Drums (YARG.Core MidiDrumsPreparser.cs / MidIOHelper.cs PAD_TO_CYMBAL_LOOKUP):
 //   offset 0..4 = kick, red, yellow, blue, green (4-lane) or orange (5-lane)
 //   offset 5 = green in 5-lane; its presence (pitch 101) means 5-lane drums
-//   pitches 110/111/112 are pro cymbal flags for yellow/blue/green (offsets 2/3/4)
+//   pitches 110/111/112 are cymbal flags for yellow/blue/orange-or-green (offsets 2/3/4), pro and 5-lane
 const FIVE_LANE_GREEN_NOTE = 101;
 const CYMBAL_FLAG_FOR_OFFSET = { 2: 110, 3: 111, 4: 112 };
 const DRUM_CYMBAL_FLAGS = [110, 111, 112];
@@ -104,13 +104,14 @@ function buildDrumChart(midi, track, difficulty, timed, toSec) {
   const kind = drumKind(track);
   const lanes = kind === 'five' ? 6 : LANES;
   const laneColors = kind === 'five' ? DRUM_LANE_COLORS_5 : DRUM_LANE_COLORS_4;
-  const cymbalSpans = kind === 'pro' ? cymbalFlagSpans(track) : null;
+  // Cymbal flags apply to both pro and 5-lane charts. A 4-lane chart has none, so the check is a no-op there.
+  const cymbalSpans = cymbalFlagSpans(track);
 
   const notes = [];
   for (const n of track.notes) {
     const offset = n.pitch - difficulty.base;
     if (offset < 0 || offset >= lanes) continue;
-    const cymbal = cymbalSpans !== null && isCymbal(cymbalSpans, offset, n.tick);
+    const cymbal = isCymbal(cymbalSpans, offset, n.tick);
     notes.push({ ...timed(n), lane: offset, cymbal });
   }
   return { mode: 'lanes', lanes, laneColors, drumKind: kind, kickLane: 0, notes, ...commonParts(midi, track, toSec) };

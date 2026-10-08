@@ -61,13 +61,17 @@ test('pro drums: a cymbal flag marks yellow only while the flag is on', () => {
   assert.deepEqual(chart.notes.map((n) => [n.lane, n.cymbal]), [[2, false], [2, true], [4, false]]);
 });
 
-test('cymbal flags are ignored on 5-lane charts', () => {
+test('5-lane cymbal flags: yellow (110) and orange (112) mark cymbals, green (101) never does', () => {
   const midi = drumsMidi([
-    { tick: 0, pitch: 101, len: 120 },
+    { tick: 0, pitch: 98, len: 120 },    // yellow, flag 110 on from 0 to 480 => cymbal
+    { tick: 480, pitch: 100, len: 120 }, // orange, flag 112 on from 480 to 720 => cymbal
+    { tick: 960, pitch: 100, len: 120 }, // orange, no flag at this tick => tom-style pad
+    { tick: 960, pitch: 101, len: 120 }, // green is not a cymbal in 5-lane
     { tick: 0, pitch: 110, len: 480 },
+    { tick: 480, pitch: 112, len: 240 },
   ]);
   assert.equal(drumKind(midi.tracks[0]), 'five');
   const chart = buildChart(midi, DRUMS, EXPERT);
   assert.equal(chart.lanes, 6);
-  assert.deepEqual(chart.notes.map((n) => [n.lane, n.cymbal]), [[5, false]]);
+  assert.deepEqual(chart.notes.map((n) => [n.lane, n.cymbal]), [[2, true], [4, true], [4, false], [5, false]]);
 });
