@@ -40,7 +40,7 @@ const TAP_NOTE = 104;
 const VELOCITY_ACCENT = 127; // drum pads: accent (bigger) and ghost (dim), as YARG.Core MidIOHelper.cs
 const VELOCITY_GHOST = 1;
 const VOCAL_RANGE = [36, 84];
-const MIN_SUSTAIN_SEC = 0.12; // shorter notes are taps, not sustains
+// YARG.Core MidReader.cs: notes shorter than resolution / 3 ticks have no sustain (SustainCutoffThreshold).
 
 export function findTrack(midi, instrument) {
   return midi.tracks.find((t) => instrument.tracks.includes(t.name.toUpperCase())) || null;
@@ -102,10 +102,12 @@ export function buildChart(midi, instrument, difficulty) {
   const track = findTrack(midi, instrument);
   if (!track) return null;
   const toSec = midi.toSeconds;
+  const sustainCutoff = Math.floor(midi.division / 3);
   const timed = (n) => {
     const time = toSec(n.tick);
     const end = toSec(n.endTick);
-    return { time, end, length: end - time >= MIN_SUSTAIN_SEC ? end - time : 0 };
+    const long = n.endTick - n.tick >= sustainCutoff;
+    return { time, end, length: long ? end - time : 0 };
   };
 
   if (instrument.mode === 'vocals') {
@@ -202,7 +204,7 @@ function buildDrumChart(midi, track, kind, difficulty, timed, toSec) {
       const double = offset === -1;
       const prev = kicks.get(n.tick);
       kicks.set(n.tick, {
-        ...timed(n), lane: -1, cymbal: false, accent: false, ghost: false,
+        ...timed(n), length: 0, lane: -1, cymbal: false, accent: false, ghost: false,
         doubleKick: double || (prev ? prev.doubleKick : false),
       });
       continue;
@@ -211,7 +213,7 @@ function buildDrumChart(midi, track, kind, difficulty, timed, toSec) {
     const cymbal = cymbalSpans !== null && isCymbal(cymbalSpans, offset, n.tick);
     // Velocity marks dynamics on pads, not the kick (YARG.Core MidReader.ProcessLists.cs, VELOCITY_*).
     pads.push({
-      ...timed(n), lane: offset - 1, cymbal,
+      ...timed(n), length: 0, lane: offset - 1, cymbal,
       accent: n.velocity === VELOCITY_ACCENT, ghost: n.velocity === VELOCITY_GHOST, doubleKick: false,
     });
   }
