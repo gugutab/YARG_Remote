@@ -72,8 +72,9 @@ export class Highway {
 
     // beat lines
     for (const b of chart.beats) {
-      if (b.time < t - 0.05 || b.time > t + ahead) continue;
+      if (b.time > t + ahead) continue;
       const y = yOf(b.time);
+      if (y > h) continue; // already below the screen; lines above the top are clipped by the canvas
       g.fillStyle = b.measure ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)';
       g.fillRect(x0, y, laneW * chart.lanes, b.measure ? 2 : 1);
     }
@@ -174,13 +175,17 @@ export class Highway {
     }
   }
 
+  // Bands are drawn at their real position and the canvas clips the part outside the screen,
+  // so a band slides in from the top edge instead of growing there. Culling uses screen position,
+  // not time, so a band never vanishes while it is still on screen.
   fillSpans(spans, t, ahead, yOf, x0, width, h, color) {
     this.g.fillStyle = color;
     for (const s of spans) {
-      if (s.end < t - 0.1 || s.start > t + ahead) continue;
+      if (s.start > t + ahead) continue;
       const top = yOf(s.end);
       const bottom = yOf(s.start);
-      this.g.fillRect(x0, top, width, Math.max(0, Math.min(h, bottom) - Math.max(0, top)));
+      if (top > h || bottom < 0) continue;
+      this.g.fillRect(x0, top, width, bottom - top);
     }
   }
 }
