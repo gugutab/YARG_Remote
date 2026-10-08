@@ -12,10 +12,13 @@ const DIFF_KEYS = {
 
 const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-// false only when song.ini lists the instrument and every listed value is negative; unknown = kept.
+// false only when the main key (first in DIFF_KEYS) says -1 and no other key says otherwise. Pro/real keys
+// alone (often -1 in old charts that lack the main key) do not exclude a song; unknown = kept.
 export function hasInstrument(song, instrument) {
-  const values = (DIFF_KEYS[instrument] || []).map((k) => song.ini?.[k]).filter((v) => typeof v === 'number');
-  return values.length === 0 || values.some((v) => v >= 0);
+  const keys = DIFF_KEYS[instrument] || [];
+  const values = keys.map((k) => song.ini?.[k]).filter((v) => typeof v === 'number');
+  if (values.some((v) => v >= 0)) return true;
+  return typeof song.ini?.[keys[0]] !== 'number';
 }
 
 export function filterSongs(songs, { query = '', instrument = '', genre = '' } = {}) {

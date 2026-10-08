@@ -210,6 +210,7 @@ async function selectSong(song) {
   els.cover.hidden = !coverUrl;
 
   current = { song, midi, coverUrl, options: instrumentOptions(midi) };
+  renderList(); // highlight the loaded song
   fillInstrumentOptions();
   buildMixer(audioStemsOf(song));
 
@@ -358,7 +359,11 @@ for (const [btn, pop] of popovers) {
   });
   pop.addEventListener('click', (e) => e.stopPropagation());
 }
-document.addEventListener('click', () => closePopovers());
+document.addEventListener('click', (e) => {
+  closePopovers();
+  // Drop focus from clicked buttons so Space and the other shortcuts keep working afterwards.
+  if (e.target.closest?.('button') && e.detail > 0) document.activeElement?.blur();
+});
 
 // ---------- Transport ----------
 els.play.addEventListener('click', togglePlay);

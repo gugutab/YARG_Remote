@@ -21,6 +21,11 @@ test('instrument filter drops only songs whose ini says -1; unknown stays', () =
   assert.equal(filterSongs(songs, { instrument: 'drums' }).length, 2);
 });
 
+test('a pro-only -1 key does not exclude the song', () => {
+  assert.equal(hasInstrument(mk('X', 'Y', { diff_guitar_real: -1 }), 'guitar'), true);
+  assert.equal(hasInstrument(mk('X', 'Y', { diff_guitar: -1, diff_guitar_real: -1 }), 'guitar'), false);
+});
+
 test('genre filter and genre list', () => {
   assert.equal(filterSongs(songs, { genre: 'Rock' }).length, 2);
   assert.deepEqual(genresOf(songs), ['Metal', 'Rock']);

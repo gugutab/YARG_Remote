@@ -113,9 +113,11 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
   min-width: 0;
+  flex-wrap: wrap;
+  row-gap: 4px;
 }
 .brand { font-weight: 700; }
-.now { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 0 1 260px; }
+.now { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 0 1 200px; }
 .now img { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; }
 .now-text { min-width: 0; }
 .now-title { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -123,11 +125,11 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 .chips { display: flex; gap: 6px; }
 .chips select { padding: 4px 6px; font-size: 13px; }
 .transport { display: flex; align-items: center; gap: 2px; }
-.seekbox { flex: 1; min-width: 80px; display: flex; align-items: center; gap: 8px; }
+.seekbox { flex: 1; min-width: 360px; display: flex; align-items: center; gap: 8px; }
 .seekbox input { flex: 1; min-width: 0; accent-color: var(--accent); }
 .time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
 .tools { display: flex; align-items: center; gap: 2px; }
-.section-pill select { max-width: 170px; padding: 4px 6px; font-size: 13px; text-overflow: ellipsis; }
+.section-pill select { max-width: 130px; padding: 4px 6px; font-size: 13px; text-overflow: ellipsis; }
 
 /* ---------- Popovers ---------- */
 .pop-wrap { position: relative; }
@@ -203,7 +205,7 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
   .app.lib-closed .library { margin-left: 0; transform: translateX(-105%); box-shadow: none; }
   .library { transition: transform .2s ease; }
   .topbar { flex-wrap: wrap; padding: 6px 10px; row-gap: 4px; }
-  .seekbox { order: 10; flex-basis: 100%; }
+  .seekbox { order: 10; flex-basis: 100%; min-width: 0; }
   .time { display: inline; }
   .tools { margin-left: auto; }
   .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); z-index: 25; }

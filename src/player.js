@@ -33,6 +33,7 @@ export class MultiTrackPlayer {
     this.master = this.ctx.createGain();
     this.master.connect(this.ctx.destination);
     this.stems = new Map(); // id -> { label, buffer, gain, volume }
+    this.loadGeneration = 0; // bumped by every load(), so a superseded load can bail out
     this.shifters = []; // PitchShifter nodes of the current playback
     this.duration = 0;
     this.rate = 1; // playback speed; chart time advances rate× faster than real time
@@ -44,20 +45,24 @@ export class MultiTrackPlayer {
   // stems: [{ id, label, getFile }]; delay in seconds (see songDelaySeconds)
   async load(stems, { delay = 0, onProgress = () => {} } = {}) {
     this.stop();
-    this.stems.clear();
+    const generation = ++this.loadGeneration;
+    const loaded = new Map();
     let done = 0;
     for (const s of stems) {
       const file = await s.getFile();
       const data = await file.arrayBuffer();
       const decoded = await this.ctx.decodeAudioData(data);
+      if (generation !== this.loadGeneration) return false; // a newer load() took over
       const buffer = this.alignBuffer(decoded, delay);
       const gain = this.ctx.createGain();
       gain.connect(this.master);
-      this.stems.set(s.id, { label: s.label, buffer, gain, volume: 1 });
+      loaded.set(s.id, { label: s.label, buffer, gain, volume: 1 });
       onProgress(++done / stems.length);
     }
-    this.duration = Math.max(0, ...[...this.stems.values()].map((s) => s.buffer.duration));
+    this.stems = loaded;
+    this.duration = Math.max(0, ...[...loaded.values()].map((s) => s.buffer.duration));
     this.offset = 0;
+    return true;
   }
 
   alignBuffer(decoded, delay) {
