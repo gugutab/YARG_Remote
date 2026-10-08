@@ -42,6 +42,11 @@
         <label>Delay do chart <input id="chartDelay" type="range" min="-1" max="1" step="0.01" value="0"> <span id="chartDelayVal" class="time">+0.00 s</span></label>
       </div>
 
+      <div class="sections">
+        <span>Seção atual: <strong id="sectionNow">—</strong></span>
+        <label>Ir para seção <select id="sectionSelect" disabled></select></label>
+      </div>
+
       <div class="stage">
         <canvas id="highway"></canvas>
         <div id="loading" class="loading"></div>

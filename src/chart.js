@@ -176,8 +176,9 @@ function commonParts(midi, track, toSec) {
   const eventsTrack = midi.tracks.find((t) => t.name.toUpperCase() === 'EVENTS');
   const sections = eventsTrack
     ? eventsTrack.texts
-      .filter((t) => t.text.startsWith('[section '))
-      .map((t) => ({ time: toSec(t.tick), name: t.text.slice(9, -1) }))
+      .map((t) => ({ time: toSec(t.tick), name: parseSectionName(t.text) }))
+      .filter((s) => s.name !== null)
+      .sort((a, b) => a.time - b.time)
     : [];
   const duration = Math.max(0, ...track.notes.map((n) => toSec(n.endTick)));
   return {
@@ -187,6 +188,31 @@ function commonParts(midi, track, toSec) {
     sections,
     duration,
   };
+}
+
+// Section names come from text events in the EVENTS track, as YARG.Core reads them (TextEvents.cs):
+// the text is optionally wrapped in [brackets], then a "section" or "prc" prefix, then the name with
+// leading underscores and spaces removed. Anything else is not a section and returns null.
+export function parseSectionName(raw) {
+  let text = raw.trim();
+  const open = text.indexOf('[');
+  const close = text.indexOf(']');
+  if (open >= 0 && close > open) text = text.slice(open + 1, close).trim();
+  let rest;
+  if (text.startsWith('section')) rest = text.slice('section'.length);
+  else if (text.startsWith('prc')) rest = text.slice('prc'.length);
+  else return null;
+  const name = rest.replace(/^_+/, '').trim();
+  return name || null;
+}
+
+// Index of the section playing at chart time t: the last section that has started, or the first one
+// before any section starts (YARG's FindSectionAtTime does the same). -1 when there are no sections.
+export function sectionIndexAt(sections, t) {
+  if (sections.length === 0) return -1;
+  let index = 0;
+  for (let i = 0; i < sections.length && sections[i].time <= t; i++) index = i;
+  return index;
 }
 
 function spansOf(notes, toSec) {

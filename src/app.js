@@ -1,5 +1,5 @@
 import { parseMidi } from './midi.js';
-import { DIFFICULTIES, instrumentOptions, availableDifficulties, buildChart } from './chart.js';
+import { DIFFICULTIES, instrumentOptions, availableDifficulties, buildChart, sectionIndexAt } from './chart.js';
 import { MultiTrackPlayer } from './player.js';
 import { Highway } from './highway.js';
 import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, readBytes } from './library.js';
@@ -28,6 +28,8 @@ const els = {
   neckVal: $('neckVal'),
   chartDelay: $('chartDelay'),
   chartDelayVal: $('chartDelayVal'),
+  sectionNow: $('sectionNow'),
+  sectionSelect: $('sectionSelect'),
   loading: $('loading'),
   mixer: $('mixer'),
   highway: $('highway'),
@@ -37,7 +39,15 @@ const player = new MultiTrackPlayer();
 const highway = new Highway(els.highway);
 let songs = [];
 let current = null; // { song, midi, coverUrl }
+let chart = null; // chart for the selected instrument and difficulty
 let seeking = false;
+
+els.sectionSelect.addEventListener('change', () => {
+  const section = chart?.sections[Number(els.sectionSelect.value)];
+  if (!section) return;
+  // The highway shows chart time t - delay, so seek to the section's time plus the delay to show it on time.
+  player.seek(section.time + Number(els.chartDelay.value));
+});
 
 els.pick.addEventListener('click', pickFolder);
 els.folderInput.addEventListener('change', () => loadEntries(entriesFromFileList(els.folderInput.files)));
@@ -174,7 +184,16 @@ function updateChart() {
   }
   const ins = currentInstrument();
   const diff = DIFFICULTIES.find((d) => d.id === els.difficulty.value);
-  highway.setChart(ins && diff ? buildChart(current.midi, ins, diff) : null);
+  chart = ins && diff ? buildChart(current.midi, ins, diff) : null;
+  highway.setChart(chart);
+  fillSectionOptions();
+}
+
+function fillSectionOptions() {
+  const sections = chart?.sections ?? [];
+  els.sectionSelect.replaceChildren(...sections.map((s, i) => new Option(`${fmt(s.time)} · ${s.name}`, String(i))));
+  els.sectionSelect.disabled = sections.length === 0;
+  if (sections.length === 0) els.sectionNow.textContent = '—';
 }
 
 function buildMixer(stems) {
@@ -206,7 +225,13 @@ function frame() {
     player.pause();
     els.play.textContent = 'Tocar';
   }
-  highway.render(t - Number(els.chartDelay.value));
+  const chartTime = t - Number(els.chartDelay.value);
+  highway.render(chartTime);
+  const index = chart ? sectionIndexAt(chart.sections, chartTime) : -1;
+  if (index >= 0) {
+    els.sectionNow.textContent = chart.sections[index].name;
+    if (document.activeElement !== els.sectionSelect) els.sectionSelect.value = String(index);
+  }
   if (!seeking) els.seek.value = t;
   els.time.textContent = `${fmt(t)} / ${fmt(player.duration)}`;
   requestAnimationFrame(frame);

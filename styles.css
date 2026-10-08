@@ -91,6 +91,10 @@ button { cursor: pointer; background: var(--accent); color: #fff; border-color: 
 .controls input[type="range"] { flex: 1; min-width: 160px; }
 .time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; }
 
+.sections { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 14px; color: var(--muted); }
+.sections strong { color: var(--text); }
+.sections select { max-width: 100%; }
+
 .stage { position: relative; }
 #highway {
   width: 100%;
