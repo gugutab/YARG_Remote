@@ -14,7 +14,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'mixer', 'settingsBtn', 'settingsPop',
-  'speed', 'speedVal', 'neck', 'neckVal', 'chartDelay', 'chartDelayVal', 'resetSettings', 'fullscreen',
+  'speed', 'speedVal', 'neck', 'neckVal', 'chartDelay', 'chartDelayVal', 'fullscreen',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
 ].map((id) => [id, $(id)]));
 
@@ -361,17 +361,34 @@ function stepSection(dir) {
 // ---------- Mixer and settings ----------
 function buildMixer(stems) {
   els.mixer.replaceChildren(...stems.map((stem) => {
-    const row = document.createElement('label');
+    const row = document.createElement('div');
     row.className = 'mix-row';
-    row.innerHTML = '<span class="mix-name"></span><input type="range" min="0" max="1.5" step="0.01" value="1"><span class="mix-val">100%</span>';
-    row.querySelector('.mix-name').textContent = stem.label;
-    row.querySelector('.mix-name').title = stem.label;
+    row.innerHTML = `
+      <button class="icon small-icon mute" type="button" aria-pressed="false"><svg><use href="#i-volume"/></svg></button>
+      <span class="mix-name"></span>
+      <input type="range" min="0" max="1.5" step="0.01" value="1">
+      <span class="mix-val">100%</span>
+      <button class="icon small-icon reset" type="button" title="Restaurar volume" aria-label="Restaurar volume"><svg><use href="#i-reset"/></svg></button>`;
+    const name = row.querySelector('.mix-name');
+    name.textContent = stem.label;
+    name.title = stem.label;
     const range = row.querySelector('input');
     const val = row.querySelector('.mix-val');
-    range.addEventListener('input', () => {
-      player.setVolume(stem.id, Number(range.value));
+    const mute = row.querySelector('.mute');
+    let muted = false;
+    const apply = () => {
+      player.setVolume(stem.id, muted ? 0 : Number(range.value)); // the slider keeps its value while muted
       val.textContent = `${Math.round(range.value * 100)}%`;
-    });
+      row.classList.toggle('muted', muted);
+      mute.setAttribute('aria-pressed', String(muted));
+      mute.title = muted ? 'Ativar track' : 'Desativar track';
+      mute.setAttribute('aria-label', `${muted ? 'Ativar' : 'Desativar'} ${stem.label}`);
+      mute.querySelector('use').setAttribute('href', muted ? '#i-volume-off' : '#i-volume');
+    };
+    range.addEventListener('input', () => { if (muted) muted = false; apply(); }); // moving the slider re-enables the track
+    mute.addEventListener('click', () => { muted = !muted; apply(); });
+    row.querySelector('.reset').addEventListener('click', () => { range.value = 1; muted = false; apply(); });
+    apply();
     return row;
   }));
 }
@@ -391,12 +408,15 @@ els.neck.addEventListener('input', () => {
   highway.setNeckSpeed(neck);
   els.neckVal.textContent = `${neck.toFixed(1)}×`;
 });
-els.resetSettings.addEventListener('click', () => {
-  for (const [el, value] of [[els.speed, 1], [els.neck, 1], [els.chartDelay, 0]]) {
-    el.value = value;
+// Each setting has its own restore button (data-reset = id of the slider).
+const SETTING_DEFAULTS = { speed: 1, neck: 1, chartDelay: 0 };
+for (const btn of document.querySelectorAll('[data-reset]')) {
+  btn.addEventListener('click', () => {
+    const el = els[btn.dataset.reset];
+    el.value = SETTING_DEFAULTS[btn.dataset.reset];
     el.dispatchEvent(new Event('input'));
-  }
-});
+  });
+}
 
 const popovers = [[els.mixerBtn, els.mixerPop], [els.settingsBtn, els.settingsPop]];
 function closePopovers(except) {

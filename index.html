@@ -21,6 +21,8 @@
       <symbol id="i-next" viewBox="0 0 24 24"><path d="M18 5v14M5 5v14l10-7z"/></symbol>
       <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
       <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></symbol>
+      <symbol id="i-volume-off" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM16 9.5l5 5M21 9.5l-5 5"/></symbol>
+      <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 1 2.3 5.7M4 5v6h6"/></symbol>
       <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
       <symbol id="i-shrink" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></symbol>
       <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
@@ -126,10 +128,9 @@
             <button id="settingsBtn" class="icon" type="button" title="Velocidade, neck e delay" aria-label="Ajustes" aria-expanded="false"><svg><use href="#i-sliders"/></svg></button>
             <div class="popover" id="settingsPop" hidden>
               <div class="pop-title">Ajustes</div>
-              <label class="row">Velocidade <input id="speed" type="range" min="0.2" max="2" step="0.05" value="1"><output id="speedVal">1.00×</output></label>
-              <label class="row">Neck speed <input id="neck" type="range" min="0.5" max="3" step="0.1" value="1"><output id="neckVal">1.0×</output></label>
-              <label class="row">Delay do chart <input id="chartDelay" type="range" min="-1" max="1" step="0.01" value="0"><output id="chartDelayVal">+0.00 s</output></label>
-              <button id="resetSettings" class="link" type="button">Restaurar padrão</button>
+              <label class="row">Velocidade <input id="speed" type="range" min="0.2" max="2" step="0.05" value="1"><output id="speedVal">1.00×</output><button class="icon small-icon reset" type="button" data-reset="speed" title="Restaurar" aria-label="Restaurar velocidade"><svg><use href="#i-reset"/></svg></button></label>
+              <label class="row">Neck speed <input id="neck" type="range" min="0.5" max="3" step="0.1" value="1"><output id="neckVal">1.0×</output><button class="icon small-icon reset" type="button" data-reset="neck" title="Restaurar" aria-label="Restaurar neck speed"><svg><use href="#i-reset"/></svg></button></label>
+              <label class="row">Delay do chart <input id="chartDelay" type="range" min="-1" max="1" step="0.01" value="0"><output id="chartDelayVal">+0.00 s</output><button class="icon small-icon reset" type="button" data-reset="chartDelay" title="Restaurar" aria-label="Restaurar delay do chart"><svg><use href="#i-reset"/></svg></button></label>
             </div>
           </div>
           <button id="fullscreen" class="icon" type="button" title="Tela cheia (F)" aria-label="Tela cheia"><svg><use href="#i-expand"/></svg></button>
