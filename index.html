@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YARG Remote - Visualizador</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>YARG Remote</h1>
+    <button id="pick" type="button">Escolher pasta de músicas</button>
+    <input id="folderInput" type="file" webkitdirectory hidden>
+    <span id="status" class="status"></span>
+  </header>
+
+  <main class="layout">
+    <aside class="library">
+      <input id="search" type="search" placeholder="Buscar por título ou artista">
+      <ul id="songs"></ul>
+      <p id="empty" class="hint">Escolha a pasta (ex.: A:\music\Songs) para listar as músicas.<br>Use Chrome ou Edge.</p>
+    </aside>
+
+    <section id="player" class="player" hidden>
+      <div class="song-head">
+        <img id="cover" alt="" hidden>
+        <div>
+          <h2 id="title"></h2>
+          <div id="artist" class="song-artist"></div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <label>Instrumento <select id="instrument"></select></label>
+        <label>Dificuldade <select id="difficulty"></select></label>
+        <button id="play" type="button">Tocar</button>
+        <input id="seek" type="range" min="0" max="0" step="0.01" value="0">
+        <span id="time" class="time">0:00 / 0:00</span>
+      </div>
+
+      <div class="stage">
+        <canvas id="highway"></canvas>
+        <div id="loading" class="loading"></div>
+      </div>
+
+      <div id="mixer" class="mixer" aria-label="Volume por track"></div>
+    </section>
+  </main>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
