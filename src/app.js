@@ -26,6 +26,8 @@ const els = {
   speedVal: $('speedVal'),
   neck: $('neck'),
   neckVal: $('neckVal'),
+  chartDelay: $('chartDelay'),
+  chartDelayVal: $('chartDelayVal'),
   loading: $('loading'),
   mixer: $('mixer'),
   highway: $('highway'),
@@ -49,6 +51,11 @@ els.speed.addEventListener('input', () => {
   const rate = Number(els.speed.value);
   player.setRate(rate);
   els.speedVal.textContent = `${rate.toFixed(2)}×`;
+});
+// Chart delay: only the highway is shifted. Positive = notes arrive later than the audio.
+els.chartDelay.addEventListener('input', () => {
+  const d = Number(els.chartDelay.value);
+  els.chartDelayVal.textContent = `${d >= 0 ? '+' : ''}${d.toFixed(2)} s`;
 });
 els.neck.addEventListener('input', () => {
   const neck = Number(els.neck.value);
@@ -199,7 +206,7 @@ function frame() {
     player.pause();
     els.play.textContent = 'Tocar';
   }
-  highway.render(t);
+  highway.render(t - Number(els.chartDelay.value));
   if (!seeking) els.seek.value = t;
   els.time.textContent = `${fmt(t)} / ${fmt(player.duration)}`;
   requestAnimationFrame(frame);

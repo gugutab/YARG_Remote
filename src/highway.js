@@ -7,7 +7,6 @@ const FADE_SEC = 0.25; // how long a note takes to fade out after the hit line
 const BASE_LOOKAHEAD_SEC = 2.5; // time from the top edge to the hit line at neck speed 1
 const ENTRY_MARGIN_SEC = 0.3; // extra window above the top edge, so notes are already moving when they enter
 const HIT_Y = 0.88; // hit line position as a fraction of canvas height
-const ENTRY_TINT_FRAC = 0.3; // notes are fully white at the top edge and reach their colour this far down
 
 export class Highway {
   constructor(canvas) {
@@ -83,6 +82,10 @@ export class Highway {
       if (i % 2 === 0) g.fillRect(x0 + i * laneW, 0, laneW, hitY);
     }
 
+    // hit line sits under the notes, so notes passing over it stay visible
+    g.fillStyle = 'rgba(255,255,255,0.7)';
+    g.fillRect(x0 - 6, hitY, laneW * chart.lanes + 12, 3);
+
     // sustains first, then heads
     const from = firstIndexAtOrAfter(chart.notes, t - 0.3);
     const visible = [];
@@ -102,13 +105,13 @@ export class Highway {
     }
 
     // Heads. Once a note reaches the hit line it stops moving and plays its exit animation:
-    // it grows and fades over FADE_SEC, for pedals too. Notes still coming in are tinted white near the top.
+    // it grows, fades and turns white over FADE_SEC, for pedals too.
     for (const n of visible) {
       const past = t - n.time;
       if (past > FADE_SEC) continue;
       const k = Math.max(0, past) / FADE_SEC; // 0 at the hit line, 1 when gone
       const cy = yOf(Math.max(n.time, t)); // parked on the hit line during the exit
-      const white = entryWhite(cy, h);
+      const white = k;
       g.globalAlpha = 1 - k;
       if (n.lane === kickLane) {
         // Bass pedal: orange bar across the lane area, growing in height as it fades
@@ -138,10 +141,6 @@ export class Highway {
       }
     }
     g.globalAlpha = 1;
-
-    // hit line
-    g.fillStyle = 'rgba(255,255,255,0.7)';
-    g.fillRect(x0 - 6, hitY, laneW * chart.lanes + 12, 3);
   }
 
   renderVocals(t, w, h) {
@@ -192,11 +191,6 @@ function firstIndexAtOrAfter(notes, time) {
     if (notes[mid].time < time) lo = mid + 1; else hi = mid;
   }
   return lo;
-}
-
-// 0 at the hit line, 1 at the top edge of the canvas; used to whiten notes as they come in.
-function entryWhite(cy, h) {
-  return Math.min(1, Math.max(0, 1 - cy / (h * ENTRY_TINT_FRAC)));
 }
 
 function tintWhite(hex, amount) {
