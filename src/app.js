@@ -24,6 +24,8 @@ const els = {
   time: $('time'),
   speed: $('speed'),
   speedVal: $('speedVal'),
+  neck: $('neck'),
+  neckVal: $('neckVal'),
   loading: $('loading'),
   mixer: $('mixer'),
   highway: $('highway'),
@@ -47,6 +49,11 @@ els.speed.addEventListener('input', () => {
   const rate = Number(els.speed.value);
   player.setRate(rate);
   els.speedVal.textContent = `${rate.toFixed(2)}×`;
+});
+els.neck.addEventListener('input', () => {
+  const neck = Number(els.neck.value);
+  highway.setNeckSpeed(neck);
+  els.neckVal.textContent = `${neck.toFixed(1)}×`;
 });
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space' && current && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {

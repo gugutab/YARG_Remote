@@ -4,7 +4,8 @@ const GUITAR_LANE_COLORS = ['#3fbf3f', '#e5392b', '#f5c518', '#2f80ed', '#f2861e
 const KICK_COLOR = '#f2861e';
 const KICK_BAR_HALF_H = 3;
 const FADE_SEC = 0.25; // how long a note takes to fade out after the hit line
-const LOOKAHEAD_SEC = 2.5; // how far ahead the highway shows notes
+const BASE_LOOKAHEAD_SEC = 2.5; // time from the top edge to the hit line at neck speed 1
+const ENTRY_MARGIN_SEC = 0.3; // extra window above the top edge, so notes are already moving when they enter
 const HIT_Y = 0.88; // hit line position as a fraction of canvas height
 
 export class Highway {
@@ -12,6 +13,11 @@ export class Highway {
     this.canvas = canvas;
     this.g = canvas.getContext('2d');
     this.chart = null;
+    this.neck = 1; // neck speed: scales distance between notes only; timing is unchanged
+  }
+
+  setNeckSpeed(value) {
+    this.neck = value;
   }
 
   setChart(chart) {
@@ -53,16 +59,18 @@ export class Highway {
     const laneW = Math.min(90, (w * 0.8) / chart.lanes);
     const x0 = (w - laneW * chart.lanes) / 2;
     const hitY = h * HIT_Y;
-    const pxPerSec = hitY / LOOKAHEAD_SEC;
+    const pxPerSec = (hitY / BASE_LOOKAHEAD_SEC) * this.neck;
     const yOf = (time) => hitY - (time - t) * pxPerSec;
+    // Notes are drawn from this far ahead, so the ones past the top edge are already walking in.
+    const ahead = hitY / pxPerSec + ENTRY_MARGIN_SEC;
 
     // star power / solo bands
-    this.fillSpans(chart.starPower, t, yOf, x0, laneW * chart.lanes, h, 'rgba(60,160,255,0.12)');
-    this.fillSpans(chart.solos, t, yOf, x0, laneW * chart.lanes, h, 'rgba(255,190,60,0.10)');
+    this.fillSpans(chart.starPower, t, ahead, yOf, x0, laneW * chart.lanes, h, 'rgba(60,160,255,0.12)');
+    this.fillSpans(chart.solos, t, ahead, yOf, x0, laneW * chart.lanes, h, 'rgba(255,190,60,0.10)');
 
     // beat lines
     for (const b of chart.beats) {
-      if (b.time < t - 0.05 || b.time > t + LOOKAHEAD_SEC) continue;
+      if (b.time < t - 0.05 || b.time > t + ahead) continue;
       const y = yOf(b.time);
       g.fillStyle = b.measure ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)';
       g.fillRect(x0, y, laneW * chart.lanes, b.measure ? 2 : 1);
@@ -77,7 +85,7 @@ export class Highway {
     // sustains first, then heads
     const from = firstIndexAtOrAfter(chart.notes, t - 0.3);
     const visible = [];
-    for (let i = from; i < chart.notes.length && chart.notes[i].time <= t + LOOKAHEAD_SEC; i++) {
+    for (let i = from; i < chart.notes.length && chart.notes[i].time <= t + ahead; i++) {
       visible.push(chart.notes[i]);
     }
     const radius = Math.min(laneW * 0.36, 26);
@@ -100,9 +108,12 @@ export class Highway {
       const cy = yOf(n.time);
       g.globalAlpha = 1 - k;
       if (n.lane === kickLane) {
-        // Bass pedal: orange bar across the whole lane area
+        // Bass pedal: orange bar across the lane area; on exit it thins and narrows toward the centre
+        const full = laneW * chart.lanes;
+        const width = full * (1 - 0.3 * k);
+        const height = KICK_BAR_HALF_H * 2 * (1 - 0.5 * k);
         g.fillStyle = KICK_COLOR;
-        g.fillRect(x0, cy - KICK_BAR_HALF_H, laneW * chart.lanes, KICK_BAR_HALF_H * 2);
+        g.fillRect(x0 + (full - width) / 2, cy - height / 2, width, height);
         continue;
       }
       const cx = x0 + (n.lane + 0.5) * laneW;
@@ -135,7 +146,7 @@ export class Highway {
     const g = this.g;
     const chart = this.chart;
     const hitX = w * 0.15;
-    const pxPerSec = (w * 0.85) / LOOKAHEAD_SEC;
+    const pxPerSec = (w * 0.85) / BASE_LOOKAHEAD_SEC;
     const [lo, hi] = [36, 84];
     const yOfPitch = (p) => h * 0.9 - ((p - lo) / (hi - lo)) * h * 0.8;
     const xOf = (time) => hitX + (time - t) * pxPerSec;
@@ -144,7 +155,7 @@ export class Highway {
     g.fillRect(hitX - 2, 0, 3, h);
 
     for (const n of chart.notes) {
-      if (n.end < t - 0.2 || n.time > t + LOOKAHEAD_SEC) continue;
+      if (n.end < t - 0.2 || n.time > t + BASE_LOOKAHEAD_SEC + ENTRY_MARGIN_SEC) continue;
       const x1 = xOf(n.time);
       const x2 = Math.max(x1 + 6, xOf(n.end));
       g.fillStyle = n.time <= t && n.end >= t ? '#f5c518' : '#5b8def';
@@ -155,15 +166,15 @@ export class Highway {
     g.textAlign = 'left';
     g.fillStyle = '#e6edf3';
     for (const l of chart.lyrics) {
-      if (l.time < t - 0.3 || l.time > t + LOOKAHEAD_SEC) continue;
+      if (l.time < t - 0.3 || l.time > t + BASE_LOOKAHEAD_SEC + ENTRY_MARGIN_SEC) continue;
       g.fillText(l.text, xOf(l.time), h * 0.06);
     }
   }
 
-  fillSpans(spans, t, yOf, x0, width, h, color) {
+  fillSpans(spans, t, ahead, yOf, x0, width, h, color) {
     this.g.fillStyle = color;
     for (const s of spans) {
-      if (s.end < t - 0.1 || s.start > t + LOOKAHEAD_SEC) continue;
+      if (s.end < t - 0.1 || s.start > t + ahead) continue;
       const top = yOf(s.end);
       const bottom = yOf(s.start);
       this.g.fillRect(x0, top, width, Math.max(0, Math.min(h, bottom) - Math.max(0, top)));
