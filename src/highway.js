@@ -7,6 +7,7 @@ const FADE_SEC = 0.25; // how long a note takes to fade out after the hit line
 const BASE_LOOKAHEAD_SEC = 2.5; // time from the top edge to the hit line at neck speed 1
 const ENTRY_MARGIN_SEC = 0.3; // extra window above the top edge, so notes are already moving when they enter
 const HIT_Y = 0.88; // hit line position as a fraction of canvas height
+const ENTRY_TINT_FRAC = 0.3; // notes are fully white at the top edge and reach their colour this far down
 
 export class Highway {
   constructor(canvas) {
@@ -100,27 +101,28 @@ export class Highway {
       g.fillRect(cx - radius * 0.35, yTop, radius * 0.7, Math.max(0, yBot - yTop));
     }
 
-    // Heads. A note fades and grows for FADE_SEC after it crosses the hit line, instead of vanishing.
+    // Heads. Once a note reaches the hit line it stops moving and plays its exit animation:
+    // it grows and fades over FADE_SEC, for pedals too. Notes still coming in are tinted white near the top.
     for (const n of visible) {
       const past = t - n.time;
       if (past > FADE_SEC) continue;
       const k = Math.max(0, past) / FADE_SEC; // 0 at the hit line, 1 when gone
-      const cy = yOf(n.time);
+      const cy = yOf(Math.max(n.time, t)); // parked on the hit line during the exit
+      const white = entryWhite(cy, h);
       g.globalAlpha = 1 - k;
       if (n.lane === kickLane) {
-        // Bass pedal: orange bar across the lane area; on exit it thins and narrows toward the centre
+        // Bass pedal: orange bar across the lane area, growing in height as it fades
         const full = laneW * chart.lanes;
-        const width = full * (1 - 0.3 * k);
-        const height = KICK_BAR_HALF_H * 2 * (1 - 0.5 * k);
-        g.fillStyle = KICK_COLOR;
-        g.fillRect(x0 + (full - width) / 2, cy - height / 2, width, height);
+        const height = KICK_BAR_HALF_H * 2 * (1 + 0.4 * k);
+        g.fillStyle = tintWhite(KICK_COLOR, white);
+        g.fillRect(x0, cy - height / 2, full, height);
         continue;
       }
       const cx = x0 + (n.lane + 0.5) * laneW;
       const r = radius * (1 + 0.4 * k);
       g.beginPath();
       g.arc(cx, cy, r, 0, Math.PI * 2);
-      g.fillStyle = colors[n.lane];
+      g.fillStyle = tintWhite(colors[n.lane], white);
       g.fill();
       g.lineWidth = 2;
       g.strokeStyle = 'rgba(0,0,0,0.5)';
@@ -190,6 +192,17 @@ function firstIndexAtOrAfter(notes, time) {
     if (notes[mid].time < time) lo = mid + 1; else hi = mid;
   }
   return lo;
+}
+
+// 0 at the hit line, 1 at the top edge of the canvas; used to whiten notes as they come in.
+function entryWhite(cy, h) {
+  return Math.min(1, Math.max(0, 1 - cy / (h * ENTRY_TINT_FRAC)));
+}
+
+function tintWhite(hex, amount) {
+  const n = parseInt(hex.slice(1), 16);
+  const mix = (c) => Math.round(c + (255 - c) * amount);
+  return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
 }
 
 function withAlpha(hex, alpha) {
