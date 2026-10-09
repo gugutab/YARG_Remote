@@ -9,7 +9,7 @@ import {
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the flat view shows 2.5)
 const FAR_SCALE = 0.3; // size of things at the far edge relative to the hit line
 const FAR_TOP = 0.05; // far edge position, as a fraction of the canvas height
-const HIT_Y3 = 0.84; // hit line position, as a fraction of the canvas height
+const HIT_Y3 = 0.915; // hit line position, as a fraction of the canvas height
 const HEAD_R = 0.36; // note head radius, in lane widths
 const HEAD_TILT = 0.55; // vertical squash of the heads (they lie on the road)
 const FADE_IN = 0.14; // fraction of the depth over which notes fade in at the far edge

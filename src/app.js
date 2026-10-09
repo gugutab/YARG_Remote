@@ -45,19 +45,20 @@ const store = {
 };
 
 // ---------- Library panel ----------
-function setLibraryOpen(open) {
+// `persist` is false for the automatic closes on narrow screens, so they do not become the saved preference.
+function setLibraryOpen(open, persist = true) {
   els.app.classList.toggle('lib-closed', !open);
-  store.set('library', open ? '1' : '0');
+  if (persist) store.set('library', open ? '1' : '0');
   // Let the layout settle, then the canvas resizes itself on the next frame.
 }
 const narrow = () => window.matchMedia('(max-width: 700px)').matches;
 const libraryOpen = () => !els.app.classList.contains('lib-closed');
-setLibraryOpen(narrow() ? false : store.get('library') !== '0');
+setLibraryOpen(narrow() ? false : store.get('library') !== '0', false);
 // The drawer overlay on narrow screens starts closed; entering that layout closes it.
-window.matchMedia('(max-width: 700px)').addEventListener('change', (e) => { if (e.matches) setLibraryOpen(false); });
+window.matchMedia('(max-width: 700px)').addEventListener('change', (e) => { if (e.matches) setLibraryOpen(false, false); });
 els.toggleLibrary.addEventListener('click', () => setLibraryOpen(!libraryOpen()));
-els.closeLibrary.addEventListener('click', () => setLibraryOpen(false));
-els.scrim.addEventListener('click', () => setLibraryOpen(false));
+els.closeLibrary.addEventListener('click', () => setLibraryOpen(false, false));
+els.scrim.addEventListener('click', () => setLibraryOpen(false, false));
 els.welcomeOpen.addEventListener('click', () => setLibraryOpen(true));
 
 els.pick.addEventListener('click', pickFolder);
@@ -241,7 +242,7 @@ async function selectSong(song) {
   chart = null;
   highway.setChart(null);
   renderList();
-  if (narrow()) setLibraryOpen(false);
+  if (narrow()) setLibraryOpen(false, false);
 
   els.welcome.hidden = true;
   showPlayInfo(true);
@@ -536,6 +537,7 @@ function showPlayInfo(on) {
   els.transport.hidden = !on;
   els.seekbox.hidden = !on;
   els.tools.hidden = !on;
+  els.viewBtn.hidden = true; // shown once there is a lane chart (updateChart)
 }
 
 function fillInstrumentOptions() {
@@ -565,6 +567,7 @@ function updateChart() {
   chart = ins && diff ? buildChart(current.midi, ins, diff) : null;
   highway.setChart(chart);
   fillSectionOptions();
+  els.viewBtn.hidden = !chart || chart.mode === 'vocals'; // vocals have no highway to turn 3D
   renderPickers();
   renderLoadState();
 }

@@ -379,9 +379,6 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
 .prow[data-active="true"] .prow-time { color: inherit; }
 .sec-pop { width: min(340px, calc(100vw - 16px)); }
 
-@media (max-width: 900px) {
-  .section-wrap { display: none; } /* the previous/next buttons still step through the sections */
-}
 @media (max-width: 700px) {
   :root { --bar-h: 92px; }
   .tb-cover { display: none; }
@@ -407,3 +404,22 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
 .info-pop .chip { min-height: 28px; font-size: 12px; }
 .info-pop .chip-btn { align-self: flex-start; }
 .mix-row.master { padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+
+/* ---------- Round 8: seek bar at the bottom edge, section next to the time, corner 3D button ---------- */
+.topbar { position: relative; z-index: 4; border-bottom: 4px solid var(--line); }
+.tb-main { grid-template-rows: 1fr 1fr; }
+.seekbox { position: absolute; left: 0; right: 0; bottom: -10px; height: 16px; margin: 0; }
+.seekbox input { height: 16px; }
+.seekbox input::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--accent) var(--pct), transparent var(--pct)); border-radius: 0; }
+.seekbox input::-moz-range-track { background: transparent; border-radius: 0; }
+.seekbox input::-moz-range-progress { border-radius: 0; }
+.seekbox input::-webkit-slider-thumb { margin-top: -4px; }
+.seekbox:hover input::-webkit-slider-runnable-track { height: 6px; }
+.seekbox:hover input::-webkit-slider-thumb { margin-top: -3px; }
+.transport .section-wrap { margin-left: 8px; }
+.stage-btn { position: absolute; top: 10px; right: 10px; z-index: 3; background: rgba(13, 17, 23, 0.55); border: 1px solid var(--line); color: #e6edf3; border-radius: 10px; }
+.stage-btn:hover { background: rgba(13, 17, 23, 0.8); }
+.stage-btn[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+@media (max-width: 700px) {
+  .section-wrap { display: none; }
+}
