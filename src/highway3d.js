@@ -12,6 +12,8 @@ const FAR_TOP = 0.05; // far edge position, as a fraction of the canvas height
 const HEAD_R = 0.36; // note head radius, in lane widths
 const HEAD_TILT = 0.55; // vertical squash of the heads (they lie on the road)
 const FADE_IN = 0.14; // fraction of the depth over which notes fade in at the far edge
+const TAIL_TAPER_POWER = 3; // like the heads' TAPER_GAIN: about 3x the natural perspective change
+const TAIL_MIN_WIDTH = 0.3; // a tail never gets thinner than this fraction of its base width
 const ROAD_END = 1.8; // the road runs well past the last visible note, so it has no visible far edge: the fade hides the rest
 const BAR_DEPTH = 0.0087; // one third of the earlier 0.026 // pedal/open bar thickness along the road, in depth units (it lies flat on the fretboard)
 const GLOW_DEPTH = 0.009; // half-height of the hit glow (it was 0.026 and looked too tall)
@@ -42,6 +44,23 @@ export function renderLanes3D(hw, t, w, h) {
     g.lineTo(xAt(lx1, d0), yAt(d0));
     g.lineTo(xAt(lx1, d1), yAt(d1));
     g.lineTo(xAt(lx0, d1), yAt(d1));
+    g.closePath();
+  };
+  // A tail strip with the same extra perspective taper the note heads get (see noteShape): relative to the strip's base
+  // (dRef, where the head is), its width shrinks with (scale / baseScale) ^ TAIL_TAPER_POWER, never below TAIL_MIN_WIDTH.
+  const tailFactor = (d, dRef) => TAIL_MIN_WIDTH + (1 - TAIL_MIN_WIDTH) * (scaleAt(d) / scaleAt(dRef)) ** TAIL_TAPER_POWER;
+  const taperedStrip = (d0, d1, mid, wl, dRef) => {
+    const N = 20;
+    const right = [];
+    g.beginPath();
+    for (let i = 0; i <= N; i++) {
+      const d = d0 + ((d1 - d0) * i) / N;
+      const hw = wl * tailFactor(d, dRef);
+      if (i === 0) g.moveTo(xAt(mid - hw, d), yAt(d));
+      else g.lineTo(xAt(mid - hw, d), yAt(d));
+      right.push([xAt(mid + hw, d), yAt(d)]);
+    }
+    for (let i = N; i >= 0; i--) g.lineTo(right[i][0], right[i][1]);
     g.closePath();
   };
   const span = (spans, color) => {
@@ -189,16 +208,17 @@ export function renderLanes3D(hw, t, w, h) {
     if (n.open) {
       g.fillStyle = withAlpha(OPEN_COLOR, 0.3);
       quad(dBot, dTop, -half, half);
+      g.fill();
     } else {
       // held (active): the whole tail is lighter, more opaque and slowly brightens and dims (no extra shapes)
       const amt = heldAmount(n, t); // fades in after the hit
       g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.6 + 0.25 * amt);
       const mid = n.lane + 0.5 - half;
-      quad(dBot, dTop, mid - HEAD_R * 0.38, mid + HEAD_R * 0.38);
+      taperedStrip(dBot, dTop, mid, HEAD_R * 0.38, dBot);
       g.fill();
       if (amt > 0) {
         g.fillStyle = `rgba(255,255,255,${amt * (0.3 + 0.12 * tailShimmer(t))})`;
-        quad(dBot, dTop, mid - HEAD_R * 0.38, mid + HEAD_R * 0.38);
+        taperedStrip(dBot, dTop, mid, HEAD_R * 0.38, dBot);
         g.fill();
         // soft halo around the tail while it is played: many wider and wider faint strips, added together, each with a
         // rounded end (a half ellipse beyond the tail's end, only when the end is on screen)
@@ -212,10 +232,10 @@ export function renderLanes3D(hw, t, w, h) {
           // each strip adds what the smooth falloff loses between its inner and outer edge, so the sum follows it
           g.fillStyle = withAlpha(haloColor, 0.12 * amt * (haloProfile((i - 1) / 12) - haloProfile(i / 12)));
           const wl = HEAD_R * (0.38 + 0.08 * i); // half width in lane units
-          quad(dBot, dTop, mid - wl, mid + wl);
+          taperedStrip(dBot, dTop, mid, wl, dBot);
           g.fill();
           if (endVisible) {
-            const rxi = laneW * wl * pEnd;
+            const rxi = laneW * wl * pEnd * tailFactor(dTop, dBot); // the rounded end follows the tapered width
             g.save();
             g.beginPath();
             g.rect(0, 0, w, yEnd); // only the part beyond the end
@@ -229,7 +249,6 @@ export function renderLanes3D(hw, t, w, h) {
         g.globalCompositeOperation = 'source-over';
       }
     }
-    g.fill();
   }
 
   // heads, far to near so closer ones cover farther ones
