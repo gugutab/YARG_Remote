@@ -173,7 +173,8 @@ export class Highway {
       if (past > FADE_SEC) continue;
       const k = Math.max(0, past) / FADE_SEC; // 0 at the hit line, 1 when gone
       const cy = yOf(Math.max(n.time, t)); // parked on the hit line during the exit
-      const white = k;
+      const heldNow = isHeld(n, t);
+      const white = heldNow ? 0.32 + 0.12 * tailShimmer(t) : k; // an active long note's head is lighter, like its tail
       // ghost notes are dimmed, accents are larger (YARG draws them the same way)
       g.globalAlpha = (1 - k) * (n.ghost ? GHOST_ALPHA : 1);
       const cx = x0 + (n.lane + 0.5) * laneW;

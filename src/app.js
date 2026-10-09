@@ -678,7 +678,13 @@ function stepSection(dir) {
 // ---------- Mixer and settings ----------
 const LONG_PRESS_MS = 500;
 // Master volume: one more mixer row (kept across songs) that scales every stem.
-const masterState = { stem: { id: 'master', label: 'Master' }, master: true, value: 1, muted: false, views: [] };
+const masterState = { stem: { id: 'master', label: 'Master' }, master: true, value: savedMaster(), muted: false, views: [] };
+player.setMaster(masterState.value); // from the first sound on, not only after a mixer is built
+
+function savedMaster() {
+  const v = Number(store.get('master'));
+  return store.get('master') !== null && Number.isFinite(v) ? Math.min(1.5, Math.max(0, v)) : 1;
+}
 let stemStates = []; // { stem, value, muted, group, views[] }: one state per stem, shown in the menu and on the info screen
 let groupList = []; // { key, label, members[], value, muted, expanded, views[] }: stems of one instrument, collapsed by default
 
@@ -853,8 +859,10 @@ function applyEverything() {
 
 // The slider keeps its value while a stem is muted; every view of the stem is updated together.
 function applyStem(st) {
-  if (st.master) player.setMaster(st.muted ? 0 : st.value);
-  else player.setVolume(st.stem.id, effectiveVolume(st));
+  if (st.master) {
+    player.setMaster(st.muted ? 0 : st.value);
+    store.set('master', String(st.value)); // the master level is kept between visits (the mute is not)
+  } else player.setVolume(st.stem.id, effectiveVolume(st));
   const off = st.master ? st.muted : silent(st);
   for (const v of st.views) {
     v.range.value = st.value;

@@ -224,7 +224,7 @@ export function renderLanes3D(hw, t, w, h) {
       g.fill();
       g.globalCompositeOperation = 'source-over';
     }
-    const body = tintWhite(n.sp ? STAR_POWER_NOTE : n.tap ? TAP_COLOR : colors[n.lane], kx);
+    const body = tintWhite(n.sp ? STAR_POWER_NOTE : n.tap ? TAP_COLOR : colors[n.lane], held ? 0.32 + 0.12 * tailShimmer(t) : kx); // an active long note's head is lighter, like its tail
     g.globalAlpha = (1 - kx) * (n.ghost ? GHOST_ALPHA : 1) * Math.min(1, (1 - d) / FADE_IN);
     // thickness: a darker disc underneath, then the top face
     const th = rx * 0.28;
