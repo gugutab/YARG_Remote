@@ -198,12 +198,29 @@ export function renderLanes3D(hw, t, w, h) {
         g.fillStyle = `rgba(255,255,255,${amt * (0.3 + 0.12 * tailShimmer(t))})`;
         quad(dBot, dTop, mid - HEAD_R * 0.38, mid + HEAD_R * 0.38);
         g.fill();
-        // halo around the tail while it is played: wider and wider translucent strips, added together, fade outwards
+        // soft halo around the tail while it is played: many wider and wider faint strips, added together, each with a
+        // rounded end (a half ellipse beyond the tail's end, only when the end is on screen)
         g.globalCompositeOperation = 'lighter';
-        g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.075 * amt);
-        for (let i = 1; i <= 7; i++) {
-          quad(dBot, dTop, mid - HEAD_R * (0.38 + 0.12 * i), mid + HEAD_R * (0.38 + 0.12 * i));
+        g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.02 * amt);
+        const endVisible = n.time + n.length <= t + windowSec;
+        const pEnd = scaleAt(dTop);
+        const xEnd = xAt(mid, dTop);
+        const yEnd = yAt(dTop);
+        for (let i = 1; i <= 12; i++) {
+          const wl = HEAD_R * (0.38 + 0.08 * i); // half width in lane units
+          quad(dBot, dTop, mid - wl, mid + wl);
           g.fill();
+          if (endVisible) {
+            const rxi = laneW * wl * pEnd;
+            g.save();
+            g.beginPath();
+            g.rect(0, 0, w, yEnd); // only the part beyond the end
+            g.clip();
+            g.beginPath();
+            g.ellipse(xEnd, yEnd, rxi, rxi * HEAD_TILT, 0, 0, Math.PI * 2);
+            g.fill();
+            g.restore();
+          }
         }
         g.globalCompositeOperation = 'source-over';
       }

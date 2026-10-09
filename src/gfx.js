@@ -90,3 +90,40 @@ export function fillHalo(g, color, inner, outer, strength) {
   g.arc(0, 0, outer, 0, Math.PI * 2);
   g.fill();
 }
+
+// Soft falloff of the halo around a held tail: [distance from the strip's edge as a fraction of the reach, strength].
+export const TAIL_HALO_PROFILE = [[0, 1], [0.25, 0.6], [0.55, 0.25], [0.8, 0.08], [1, 0]];
+
+function hexRgb(color) {
+  const n = parseInt(color.slice(1), 16);
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+}
+
+// Halo beside a tail (2D): a horizontal gradient, strongest at the strip's edges and fading out over `reach` px.
+// Draws from yTop to yBot, plus a rounded cap above yTop (the same falloff, as a half circle).
+export function fillTailHalo(g, color, cx, half, reach, yTop, yBot, strength, withCap) {
+  const rgb = hexRgb(color);
+  const total = 2 * (half + reach);
+  const lin = g.createLinearGradient(cx - half - reach, 0, cx + half + reach, 0);
+  for (let i = TAIL_HALO_PROFILE.length - 1; i >= 0; i--) {
+    const [f, a] = TAIL_HALO_PROFILE[i];
+    lin.addColorStop((reach * (1 - f)) / total, `rgba(${rgb},${a * strength})`);
+  }
+  for (const [f, a] of TAIL_HALO_PROFILE) lin.addColorStop(1 - (reach * (1 - f)) / total, `rgba(${rgb},${a * strength})`);
+  g.fillStyle = lin;
+  g.fillRect(cx - half - reach, yTop, total, Math.max(0, yBot - yTop));
+  if (withCap) { // the rounded end: the half of a radial gradient that lies beyond the tail's end
+    g.save();
+    g.beginPath();
+    g.rect(cx - half - reach, yTop - half - reach, total, half + reach);
+    g.clip();
+    g.translate(cx, yTop);
+    const rad = g.createRadialGradient(0, 0, half, 0, 0, half + reach);
+    for (const [f, a] of TAIL_HALO_PROFILE) rad.addColorStop(f, `rgba(${rgb},${a * strength})`);
+    g.fillStyle = rad;
+    g.beginPath();
+    g.arc(0, 0, half + reach, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+  }
+}
