@@ -490,3 +490,15 @@ button.icon.primary svg { width: 18px; height: 18px; }
 
 /* Round 13: the info screen is one scroll area, with room above the Play bar */
 .info-scroll { padding-bottom: 24px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+
+/* ---------- Round 14: no extra top margin in the lone details card; chart counts behind an info button ---------- */
+.info-card > .extra:first-child { margin-top: 0; }
+.icard-top { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.icard-top .icard-head { flex: 0 1 auto; width: auto; min-width: 0; }
+.icard-top .pips { margin-left: auto; flex: none; }
+.icard-info { color: var(--muted); }
+.icard-info[aria-expanded="true"] { color: var(--accent); }
+.kv.mini[hidden] { display: none; }
+.icard-top .icard-name { white-space: nowrap; }
+.icard-top .pips { gap: 3px; }
+.icard-top .pips i { width: 10px; }

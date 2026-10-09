@@ -292,7 +292,7 @@ async function selectSong(song) {
     img.hidden = !coverUrl;
   }
 
-  current = { song, midi, coverUrl, options: instrumentOptions(midi), diffChoice: {}, statsCache: new Map() };
+  current = { song, midi, coverUrl, options: instrumentOptions(midi), diffChoice: {}, statsCache: new Map(), expandedStats: new Set() };
   renderMeta(song, midi); // adds the BPM chip
   renderList(); // highlight the loaded song
   fillInstrumentOptions();
@@ -449,18 +449,42 @@ function renderPickers() {
     head.type = 'button';
     head.className = 'icard-head';
     head.setAttribute('aria-pressed', String(ins.id === activeId));
-    head.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[ins.base] || 'music'}"/></svg><span class="icard-name"></span><span class="pips"></span>`;
+    head.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[ins.base] || 'music'}"/></svg><span class="icard-name"></span>`;
     head.querySelector('.icard-name').textContent = ins.label;
+
+    // title row: [icon + name] [info button] ...... [level pips]
+    const top = document.createElement('div');
+    top.className = 'icard-top';
+    top.append(head);
+    const expanded = current.expandedStats.has(ins.id);
+    if (chosen) {
+      const info = document.createElement('button');
+      info.type = 'button';
+      info.className = 'icon small-icon icard-info';
+      info.title = 'Detalhes do chart';
+      info.setAttribute('aria-label', `Detalhes do chart de ${ins.label}`);
+      info.setAttribute('aria-expanded', String(expanded));
+      info.innerHTML = '<svg><use href="#i-info"/></svg>';
+      info.addEventListener('click', (e) => { // only shows or hides the counts; it does not select the instrument
+        e.stopPropagation();
+        const open = card.querySelector('.kv.mini').hidden;
+        card.querySelector('.kv.mini').hidden = !open;
+        info.setAttribute('aria-expanded', String(open));
+        current.expandedStats[open ? 'add' : 'delete'](ins.id);
+      });
+      top.append(info);
+    }
     const level = instrumentLevel(current.song, ins);
-    const pips = head.querySelector('.pips');
-    if (level === null) pips.remove();
-    else {
+    if (level !== null) {
+      const pips = document.createElement('span');
+      pips.className = 'pips';
       pips.title = `Nível ${level} de 6`;
       pips.replaceChildren(...Array.from({ length: 6 }, (_, i) => Object.assign(document.createElement('i'), { className: i < level ? 'on' : '' })));
+      top.append(pips);
     }
     // The whole card selects the instrument (with its remembered difficulty); the difficulty buttons stop the click.
     card.addEventListener('click', () => selectInstrument(ins.id, chosen?.id));
-    card.append(head);
+    card.append(top);
 
     if (!vocal) {
       const seg = document.createElement('div');
@@ -478,6 +502,7 @@ function renderPickers() {
     if (chosen) {
       const dl = document.createElement('dl');
       dl.className = 'kv mini';
+      dl.hidden = !expanded; // the counts hide behind the info button
       dl.replaceChildren(...kv(cardStats(ins, chosen)));
       card.append(dl);
     }
