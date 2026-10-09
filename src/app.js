@@ -14,7 +14,7 @@ const els = Object.fromEntries([
   'search', 'sortBy', 'sortDir', 'filterInstrument', 'filterGenre', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
-  'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'mixer', 'settingsBtn', 'settingsPop',
+  'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'mixer', 'settingsBtn', 'settingsPop',
   'fullscreen', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoClose', 'infoPlay', 'infoMenu',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
@@ -419,13 +419,13 @@ function cardStats(ins, diff) {
   return current.statsCache.get(key);
 }
 
+const INSTRUMENT_ICON = { guitar: 'guitar', bass: 'guitar', rhythm: 'guitar', keys: 'keys', drums: 'drum', vocals: 'mic', harmony: 'mic' };
+
 function renderPickers() {
   if (!current) return;
-  const iconOf = { guitar: 'guitar', bass: 'guitar', rhythm: 'guitar', keys: 'keys', drums: 'drum', vocals: 'mic', harmony: 'mic' };
   const activeId = els.instrument.value;
   if (activeId) current.diffChoice[activeId] = els.difficulty.value;
-  // Vocal parts have a single chart: no difficulty buttons, and the top-bar difficulty select is hidden.
-  els.difficulty.hidden = currentInstrument()?.mode === 'vocals';
+  // Vocal parts have a single chart: no difficulty buttons.
   els.instrumentCards.replaceChildren(...current.options.map((ins) => {
     const diffs = availableDifficulties(current.midi, ins);
     const vocal = ins.mode === 'vocals';
@@ -439,7 +439,7 @@ function renderPickers() {
     head.type = 'button';
     head.className = 'icard-head';
     head.setAttribute('aria-pressed', String(ins.id === activeId));
-    head.innerHTML = `<svg><use href="#i-${iconOf[ins.base] || 'music'}"/></svg><span class="icard-name"></span><span class="pips"></span>`;
+    head.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[ins.base] || 'music'}"/></svg><span class="icard-name"></span><span class="pips"></span>`;
     head.querySelector('.icard-name').textContent = ins.label;
     const level = instrumentLevel(current.song, ins);
     const pips = head.querySelector('.pips');
@@ -448,7 +448,8 @@ function renderPickers() {
       pips.title = `Nível ${level} de 6`;
       pips.replaceChildren(...Array.from({ length: 6 }, (_, i) => Object.assign(document.createElement('i'), { className: i < level ? 'on' : '' })));
     }
-    head.addEventListener('click', () => selectInstrument(ins.id, chosen?.id));
+    // The whole card selects the instrument (with its remembered difficulty); the difficulty buttons stop the click.
+    card.addEventListener('click', () => selectInstrument(ins.id, chosen?.id));
     card.append(head);
 
     if (!vocal) {
@@ -459,7 +460,7 @@ function renderPickers() {
         btn.type = 'button';
         btn.textContent = d.label;
         btn.setAttribute('aria-pressed', String(ins.id === activeId && d.id === els.difficulty.value));
-        btn.addEventListener('click', () => selectInstrument(ins.id, d.id));
+        btn.addEventListener('click', (e) => { e.stopPropagation(); selectInstrument(ins.id, d.id); });
         seg.append(btn);
       }
       card.append(seg);
@@ -471,6 +472,43 @@ function renderPickers() {
       card.append(dl);
     }
     return card;
+  }));
+  renderPartMenu();
+}
+
+// Top-bar item: one chip for instrument + difficulty, opening a compact vertical list (icon, name, difficulty buttons).
+function renderPartMenu() {
+  const ins = currentInstrument();
+  const diffLabel = DIFFICULTIES.find((d) => d.id === els.difficulty.value)?.label;
+  els.partIcon.setAttribute('href', `#i-${ins ? INSTRUMENT_ICON[ins.base] || 'music' : 'music'}`);
+  els.partText.textContent = !ins ? 'Sem instrumento' : ins.mode === 'vocals' || !diffLabel ? ins.label : `${ins.label} · ${diffLabel}`;
+  els.partPop.replaceChildren(...(current?.options ?? []).map((o) => {
+    const diffs = availableDifficulties(current.midi, o);
+    const wanted = current.diffChoice[o.id];
+    const chosen = diffs.find((d) => d.id === wanted) || diffs[diffs.length - 1];
+    const active = o.id === els.instrument.value;
+    const row = document.createElement('div');
+    row.className = 'prow';
+    row.dataset.active = String(active);
+    row.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[o.base] || 'music'}"/></svg><span class="prow-name"></span>`;
+    row.querySelector('.prow-name').textContent = o.label;
+    row.addEventListener('click', () => { selectInstrument(o.id, chosen?.id); closePopovers(); });
+    if (o.mode !== 'vocals') {
+      const seg = document.createElement('div');
+      seg.className = 'seg compact';
+      for (const d of diffs) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = d.label[0]; // F, M, D, E
+        btn.title = d.label;
+        btn.setAttribute('aria-label', `${o.label}, ${d.label}`);
+        btn.setAttribute('aria-pressed', String(active && d.id === els.difficulty.value));
+        btn.addEventListener('click', (e) => { e.stopPropagation(); selectInstrument(o.id, d.id); closePopovers(); });
+        seg.append(btn);
+      }
+      row.append(seg);
+    }
+    return row;
   }));
 }
 
@@ -641,7 +679,7 @@ for (const btn of document.querySelectorAll('[data-reset]')) {
   btn.addEventListener('click', () => setSetting(btn.dataset.reset, SETTING_DEFAULTS[btn.dataset.reset]));
 }
 
-const popovers = [[els.mixerBtn, els.mixerPop], [els.settingsBtn, els.settingsPop]];
+const popovers = [[els.partBtn, els.partPop], [els.mixerBtn, els.mixerPop], [els.settingsBtn, els.settingsPop]];
 function closePopovers(except) {
   for (const [btn, pop] of popovers) {
     if (pop === except) continue;
@@ -714,7 +752,7 @@ function wake() {
   clearTimeout(idleTimer);
   if (document.fullscreenElement && player.playing) {
     idleTimer = setTimeout(() => {
-      if (els.mixerPop.hidden && els.settingsPop.hidden) els.app.classList.add('idle');
+      if (popovers.every(([, pop]) => pop.hidden)) els.app.classList.add('idle');
     }, 2500);
   }
 }
@@ -731,7 +769,7 @@ document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tag = e.target.tagName;
   if (e.code === 'Escape') {
-    if (els.mixerPop.hidden && els.settingsPop.hidden && infoOpen && loadInfo.state !== 'idle') setInfoOpen(false);
+    if (popovers.every(([, pop]) => pop.hidden) && infoOpen && loadInfo.state !== 'idle') setInfoOpen(false);
     closePopovers();
     return;
   }

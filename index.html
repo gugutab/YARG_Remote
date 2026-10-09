@@ -37,6 +37,8 @@
       <symbol id="i-hash" viewBox="0 0 24 24"><path d="M5 9h15M4 15h15M10 3 8 21M16 3l-2 18"/></symbol>
       <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
       <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+      <symbol id="i-flag" viewBox="0 0 24 24"><path d="M6 3v18M6 4h12l-2.5 4 2.5 4H6"/></symbol>
       <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
       <symbol id="i-shrink" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></symbol>
       <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
@@ -65,7 +67,7 @@
         <input id="search" type="search" placeholder="Título, artista ou álbum" aria-label="Buscar">
       </div>
       <div class="lib-filters">
-        <label title="Ordenar"><svg><use href="#i-sort"/></svg>
+        <label class="chip-select" title="Ordenar"><svg><use href="#i-sort"/></svg>
           <select id="sortBy" aria-label="Ordenar por">
             <option value="title">Título</option>
             <option value="artist">Artista</option>
@@ -74,8 +76,8 @@
             <option value="length">Duração</option>
           </select>
         </label>
-        <button id="sortDir" class="icon small" type="button" title="Inverter ordem" aria-label="Inverter ordem">A→Z</button>
-        <label title="Instrumento"><svg><use href="#i-music"/></svg>
+        <button id="sortDir" class="chip-btn" type="button" title="Inverter ordem" aria-label="Inverter ordem">A→Z</button>
+        <label class="chip-select" title="Instrumento"><svg><use href="#i-music"/></svg>
           <select id="filterInstrument" aria-label="Filtrar por instrumento">
             <option value="">Todos</option>
             <option value="guitar">Guitarra</option>
@@ -86,7 +88,7 @@
             <option value="vocals">Vocal</option>
           </select>
         </label>
-        <label title="Gênero"><svg><use href="#i-list"/></svg>
+        <label class="chip-select" title="Gênero"><svg><use href="#i-list"/></svg>
           <select id="filterGenre" aria-label="Filtrar por gênero"><option value="">Gêneros</option></select>
         </label>
       </div>
@@ -112,8 +114,12 @@
         <div class="brand" id="brand">YARG Remote</div>
 
         <div class="chips" id="chips" hidden>
-          <select id="instrument" title="Instrumento" aria-label="Instrumento"></select>
-          <select id="difficulty" title="Dificuldade" aria-label="Dificuldade"></select>
+          <div class="pop-wrap">
+            <button id="partBtn" class="chip-btn" type="button" title="Instrumento e dificuldade" aria-label="Instrumento e dificuldade" aria-expanded="false"><svg><use id="partIcon" href="#i-guitar"/></svg><span id="partText"></span><svg class="chev"><use href="#i-chevron"/></svg></button>
+            <div class="popover part-pop" id="partPop" hidden></div>
+          </div>
+          <select id="instrument" hidden aria-hidden="true"></select>
+          <select id="difficulty" hidden aria-hidden="true"></select>
         </div>
 
         <div class="transport" id="transport" hidden>
@@ -128,9 +134,9 @@
         </div>
 
         <div class="tools" id="tools" hidden>
-          <span class="section-pill" id="sectionPill" title="Seção atual (clique para escolher)">
+          <label class="chip-select section-pill" id="sectionPill" title="Seção atual (clique para escolher)"><svg><use href="#i-flag"/></svg>
             <select id="sectionSelect" aria-label="Ir para seção" disabled></select>
-          </span>
+          </label>
           <div class="pop-wrap">
             <button id="mixerBtn" class="icon" type="button" title="Volume por stem" aria-label="Volume por stem" aria-expanded="false"><svg><use href="#i-volume"/></svg></button>
             <div class="popover" id="mixerPop" hidden>

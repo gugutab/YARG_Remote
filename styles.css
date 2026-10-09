@@ -320,3 +320,39 @@ button.icon.small-icon svg { width: 16px; height: 16px; }
 
 button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
 .stem-btn { touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+
+/* ---------- Chip-style selectors (same look as the song info chips) ---------- */
+.chip-select, .chip-btn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 8px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--text);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.chip-select:hover, .chip-btn:hover { border-color: var(--muted); }
+.chip-select:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.chip-select svg, .chip-btn svg { width: 16px; height: 16px; color: var(--accent); }
+.chip-btn .chev { color: var(--muted); width: 14px; height: 14px; }
+.chip-select select {
+  appearance: none; -webkit-appearance: none; border: 0; background: transparent; color: inherit; font: inherit;
+  padding: 0 16px 0 0; min-width: 0; max-width: 120px; text-overflow: ellipsis; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right center; background-size: 12px;
+}
+.chip-select select:disabled { opacity: .5; cursor: default; }
+.chip-select select:focus { outline: none; }
+.lib-filters { gap: 6px; }
+.lib-filters .chip-select select { max-width: 96px; padding: 0 16px 0 0; border: 0; font-size: 13px; }
+.section-pill select { max-width: 150px; }
+.topbar .chips { display: flex; gap: 6px; align-items: center; }
+
+/* instrument + difficulty list in the top bar: compact version of the info cards */
+.part-pop { width: min(300px, calc(100vw - 16px)); gap: 4px; padding: 8px; }
+.prow { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid transparent; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 14px; }
+.prow:hover { background: var(--panel-2); }
+.prow[data-active="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.prow svg { width: 18px; height: 18px; }
+.prow-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seg.compact { flex: none; }
+.seg.compact button { padding: 3px 9px; min-width: 28px; font-size: 12px; font-weight: 600; color: var(--text); }
+.icard { cursor: pointer; }
+.icard:hover { border-color: var(--muted); }
+.icard[data-active="true"]:hover { border-color: var(--accent); }
