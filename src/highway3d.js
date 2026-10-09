@@ -28,7 +28,7 @@ export function renderLanes3D(hw, t, w, h) {
   const roadW = portrait ? w * 0.94 : Math.min(w * 0.62, h * 1.05); // road width at the hit line
   const laneW = roadW / lanes;
   const padRy = laneW * HEAD_R * 1.05 * HEAD_TILT; // vertical radius of the hit pads
-  const hitY = h - (padRy + 14); // hit line: just far enough from the bottom edge to fit the pads
+  const hitY = h - (padRy + 26); // hit line (the pads): the 26 px below them hold the bottom fade
   const cx = w / 2;
   const windowSec = DEPTH_SEC / hw.neck; // neck speed shortens or stretches the visible time
   const k = 1 / FAR_SCALE - 1;

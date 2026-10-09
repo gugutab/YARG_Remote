@@ -18,7 +18,7 @@ export const ROLL_COLORS = {
 export const FADE_SEC = 0.25; // how long a note takes to fade out after the hit line
 export const BASE_LOOKAHEAD_SEC = 2.5; // time from the top edge to the hit line at neck speed 1
 export const ENTRY_MARGIN_SEC = 0.3; // extra window above the top edge, so notes are already moving when they enter
-export const HIT_Y = 0.94; // hit line position as a fraction of canvas height
+export const HIT_Y = 0.93; // hit line position as a fraction of canvas height
 
 // First note that can still be drawn at time t. Heads stay for FADE_SEC after they pass the hit line,
 // and a sustain stays until its end, so look back by the longest sustain in the chart.
