@@ -416,6 +416,7 @@ function renderSongInfo(song) {
   const extras = extraRows(song);
   els.infoExtra.replaceChildren(...kv(extras));
   els.infoExtra.closest('details').hidden = extras.length === 0;
+  els.infoExtra.closest('.info-card').hidden = extras.length === 0; // no empty card when the song.ini has nothing else
 }
 
 // Each instrument is a small card: icon, song.ini level, its own difficulty buttons and the chart counts.

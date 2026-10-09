@@ -615,3 +615,19 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .icard-top .icard-head { min-width: 0; overflow: hidden; }
 .icard-top .icard-name { overflow: hidden; text-overflow: ellipsis; }
 .icard-top .icard-info { flex: none; }
+
+/* Round 40: the cards under the instruments fit together without gaps: settings and the extra properties stack on the
+   left, the taller volume card takes the right column; one column when the area is narrow */
+.info-cols { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; gap: 12px; }
+.info-cols > .card-adjust { grid-column: 1; grid-row: 1; }
+.info-cols > .card-volume { grid-column: 2; grid-row: 1 / span 2; }
+.info-cols > .card-extra { grid-column: 1; grid-row: 2; align-self: start; }
+@container (max-width: 700px) {
+  .info-cols { grid-template-columns: 1fr; grid-template-rows: none; }
+  .info-cols > .card-adjust, .info-cols > .card-volume, .info-cols > .card-extra { grid-column: 1; grid-row: auto; }
+}
+@media (max-width: 700px) {
+  .info-cols { grid-template-columns: 1fr; grid-template-rows: none; }
+  .info-cols > .card-adjust, .info-cols > .card-volume, .info-cols > .card-extra { grid-column: 1; grid-row: auto; }
+}
+.icards { align-items: start; } /* each instrument card is as tall as its content (no stretched empty cards) */
