@@ -280,3 +280,33 @@ button.icon.small-icon svg { width: 16px; height: 16px; }
 .mix-row.muted .stem-btn { color: #e5392b; border-color: #e5392b; }
 .mix-row.muted .stem-btn::after { content: ""; position: absolute; left: 6px; right: 6px; top: 50%; border-top: 2px solid #e5392b; transform: rotate(-35deg); }
 .mix-row.muted .mix-name { opacity: .4; }
+
+/* ---------- Info header chips and instrument cards ---------- */
+.info-wide { grid-column: 1 / -1; }
+.info-head { display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; align-items: start; }
+.info-head img { width: 160px; height: 160px; grid-row: auto; }
+.info-head-text { min-width: 0; grid-column: 2; }
+.info-head img[hidden] + .info-head-text { grid-column: 1 / -1; }
+.chips-v { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-height: 32px; padding: 4px 12px 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); font-size: 13px; }
+.chip svg { width: 18px; height: 18px; color: var(--accent); }
+.chip-label { color: var(--muted); }
+.chip-value { font-weight: 600; overflow-wrap: anywhere; }
+.icards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.icard { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); min-width: 0; }
+.icard[data-active="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.icard-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 2px; border: 0; background: transparent; font-weight: 600; }
+.icard-name { flex: 1; text-align: left; }
+.icard-head[aria-pressed="true"] { color: var(--accent); }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { flex: 1; min-width: 0; padding: 5px 2px; border: 0; border-right: 1px solid var(--line); border-radius: 0; background: transparent; font-size: 12px; }
+.seg button:last-child { border-right: 0; }
+.seg button[data-chosen="true"] { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.kv.mini { grid-template-columns: max-content 1fr max-content 1fr; gap: 3px 10px; font-size: 12px; }
+@media (max-width: 700px) {
+  .info-head { grid-template-columns: 1fr; }
+  .info-head img { width: 110px; height: 110px; }
+  .info-head-text { grid-column: 1; }
+  .icards { grid-template-columns: 1fr; }
+}

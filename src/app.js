@@ -4,7 +4,7 @@ import { MultiTrackPlayer } from './player.js';
 import { Highway } from './highway.js';
 import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, readBytes, serializeSongs, restoreSongs, restoreRemoteSongs } from './library.js';
 import { songDelaySeconds, plainText } from './ini.js';
-import { metaRows, difficultyLevels, extraRows, chartStats, stemKind, stemBadge } from './songinfo.js';
+import { metaRows, extraRows, chartStats, bpmLabel, instrumentLevel, stemKind, stemBadge } from './songinfo.js';
 import { saveLibrary, loadLibrary } from './store.js';
 import { filterSongs, sortSongs, genresOf } from './songlist.js';
 
@@ -16,7 +16,7 @@ const els = Object.fromEntries([
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'mixer', 'settingsBtn', 'settingsPop',
   'fullscreen', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
-  'difficultyCards', 'chartStats', 'mixerInfo', 'levels', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoClose', 'infoPlay', 'infoMenu', 'difficultyTitle',
+  'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoClose', 'infoPlay', 'infoMenu',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
 ].map((id) => [id, $(id)]));
 
@@ -254,8 +254,6 @@ async function selectSong(song) {
   els.sectionSelect.replaceChildren(new Option('Sem seções', ''));
   els.sectionSelect.disabled = true;
   els.instrumentCards.replaceChildren();
-  els.difficultyCards.replaceChildren();
-  els.chartStats.replaceChildren();
   els.mixerInfo.replaceChildren();
   els.mixer.replaceChildren();
   renderSongInfo(song);
@@ -289,7 +287,8 @@ async function selectSong(song) {
     img.hidden = !coverUrl;
   }
 
-  current = { song, midi, coverUrl, options: instrumentOptions(midi) };
+  current = { song, midi, coverUrl, options: instrumentOptions(midi), diffChoice: {}, statsCache: new Map() };
+  renderMeta(song, midi); // adds the BPM chip
   renderList(); // highlight the loaded song
   fillInstrumentOptions();
   updateChart(); // the chart exists as soon as the MIDI is read; only playback waits for the audio
@@ -351,6 +350,21 @@ const kv = (rows) => rows.flatMap((r) => {
   return [dt, dd];
 });
 
+// Header chips: a vertical list of icon + label + value. The BPM chip joins once the MIDI has been read.
+function renderMeta(song, midi) {
+  const rows = metaRows(song).filter((r) => r.label !== 'Artista'); // the artist is the subtitle
+  const bpm = bpmLabel(midi?.tempos);
+  if (bpm) rows.push({ label: 'BPM', value: bpm, icon: 'pulse' });
+  els.infoMeta.replaceChildren(...rows.map((r) => {
+    const li = document.createElement('li');
+    li.className = 'chip';
+    li.innerHTML = `<svg><use href="#i-${r.icon || 'info'}"/></svg><span class="chip-label"></span><span class="chip-value"></span>`;
+    li.querySelector('.chip-label').textContent = r.label;
+    li.querySelector('.chip-value').textContent = r.value;
+    return li;
+  }));
+}
+
 // The parts of the screen that depend only on the song (song.ini), shown before anything is loaded.
 function renderSongInfo(song) {
   els.infoTitle.textContent = plainText(song.title);
@@ -358,62 +372,85 @@ function renderSongInfo(song) {
   const quote = plainText(song.ini?.loading_phrase);
   els.infoQuote.textContent = quote ? `“${quote}”` : '';
   els.infoQuote.hidden = !quote;
-  els.infoMeta.replaceChildren(...kv(metaRows(song).filter((r) => r.label !== 'Artista')));
-  const levels = difficultyLevels(song);
-  els.levels.replaceChildren(...levels.map((d) => {
-    const row = document.createElement('div');
-    row.className = 'level';
-    row.innerHTML = '<span class="level-name"></span><span class="pips"></span>';
-    row.querySelector('.level-name').textContent = d.label;
-    row.querySelector('.pips').replaceChildren(...Array.from({ length: 6 }, (_, i) => {
-      const pip = document.createElement('i');
-      pip.className = i < d.level ? 'on' : '';
-      return pip;
-    }));
-    row.title = `Nível ${d.level} de 6`;
-    return row;
-  }));
-  if (levels.length === 0) els.levels.textContent = 'Sem níveis no song.ini.';
+  renderMeta(song, null);
+  els.instrumentCards.replaceChildren();
   const extras = extraRows(song);
   els.infoExtra.replaceChildren(...kv(extras));
   els.infoExtra.closest('details').hidden = extras.length === 0;
 }
 
-// Open pickers (instrument and difficulty buttons) mirror the top-bar selects, which stay the source of truth.
+// Each instrument is a small card: icon, song.ini level, its own difficulty buttons and the chart counts.
+// The top-bar selects stay the source of truth for what is playing.
+function selectInstrument(insId, diffId) {
+  els.instrument.value = insId;
+  fillDifficultyOptions();
+  if (diffId && [...els.difficulty.options].some((o) => o.value === diffId)) els.difficulty.value = diffId;
+  updateChart();
+}
+
+function cardStats(ins, diff) {
+  const key = `${ins.id}:${diff.id}`;
+  if (!current.statsCache.has(key)) {
+    const built = ins.id === els.instrument.value && diff.id === els.difficulty.value && chart ? chart : buildChart(current.midi, ins, diff);
+    current.statsCache.set(key, chartStats(built));
+  }
+  return current.statsCache.get(key);
+}
+
 function renderPickers() {
-  const instruments = current?.options ?? [];
-  // Vocal parts have a single chart: the difficulty picker only applies to the other instruments.
-  const noDifficulty = currentInstrument()?.mode === 'vocals';
-  els.difficulty.hidden = noDifficulty;
-  els.difficultyTitle.hidden = noDifficulty;
-  els.difficultyCards.hidden = noDifficulty;
+  if (!current) return;
   const iconOf = { guitar: 'guitar', bass: 'guitar', rhythm: 'guitar', keys: 'keys', drums: 'drum', vocals: 'mic', harmony: 'mic' };
-  els.instrumentCards.replaceChildren(...instruments.map((ins) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'card';
-    btn.setAttribute('aria-pressed', String(ins.id === els.instrument.value));
-    btn.innerHTML = `<svg><use href="#i-${iconOf[ins.base] || 'music'}"/></svg><span></span>`;
-    btn.querySelector('span').textContent = ins.label;
-    btn.addEventListener('click', () => {
-      els.instrument.value = ins.id;
-      els.instrument.dispatchEvent(new Event('change'));
-    });
-    return btn;
+  const activeId = els.instrument.value;
+  if (activeId) current.diffChoice[activeId] = els.difficulty.value;
+  // Vocal parts have a single chart: no difficulty buttons, and the top-bar difficulty select is hidden.
+  els.difficulty.hidden = currentInstrument()?.mode === 'vocals';
+  els.instrumentCards.replaceChildren(...current.options.map((ins) => {
+    const diffs = availableDifficulties(current.midi, ins);
+    const vocal = ins.mode === 'vocals';
+    const wanted = current.diffChoice[ins.id];
+    const chosen = diffs.find((d) => d.id === wanted) || diffs[diffs.length - 1];
+    const card = document.createElement('div');
+    card.className = 'icard';
+    card.dataset.active = String(ins.id === activeId);
+
+    const head = document.createElement('button');
+    head.type = 'button';
+    head.className = 'icard-head';
+    head.setAttribute('aria-pressed', String(ins.id === activeId));
+    head.innerHTML = `<svg><use href="#i-${iconOf[ins.base] || 'music'}"/></svg><span class="icard-name"></span><span class="pips"></span>`;
+    head.querySelector('.icard-name').textContent = ins.label;
+    const level = instrumentLevel(current.song, ins);
+    const pips = head.querySelector('.pips');
+    if (level === null) pips.remove();
+    else {
+      pips.title = `Nível ${level} de 6`;
+      pips.replaceChildren(...Array.from({ length: 6 }, (_, i) => Object.assign(document.createElement('i'), { className: i < level ? 'on' : '' })));
+    }
+    head.addEventListener('click', () => selectInstrument(ins.id, chosen?.id));
+    card.append(head);
+
+    if (!vocal) {
+      const seg = document.createElement('div');
+      seg.className = 'seg';
+      for (const d of diffs) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = d.label;
+        btn.setAttribute('aria-pressed', String(ins.id === activeId && d.id === els.difficulty.value));
+        btn.dataset.chosen = String(d.id === chosen.id);
+        btn.addEventListener('click', () => selectInstrument(ins.id, d.id));
+        seg.append(btn);
+      }
+      card.append(seg);
+    }
+    if (chosen) {
+      const dl = document.createElement('dl');
+      dl.className = 'kv mini';
+      dl.replaceChildren(...kv(cardStats(ins, chosen)));
+      card.append(dl);
+    }
+    return card;
   }));
-  els.difficultyCards.replaceChildren(...[...els.difficulty.options].map((opt) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'card text';
-    btn.setAttribute('aria-pressed', String(opt.value === els.difficulty.value));
-    btn.textContent = opt.text;
-    btn.addEventListener('click', () => {
-      els.difficulty.value = opt.value;
-      els.difficulty.dispatchEvent(new Event('change'));
-    });
-    return btn;
-  }));
-  els.chartStats.replaceChildren(...kv(chartStats(chart, current?.midi)));
 }
 
 els.infoBtn.addEventListener('click', () => { if (current || loadInfo.state !== 'idle') setInfoOpen(!infoOpen); });

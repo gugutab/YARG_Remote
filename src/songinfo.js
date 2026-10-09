@@ -17,10 +17,11 @@ export function formatDuration(ms) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+// [ini key, label, icon id]
 const META_FIELDS = [
-  ['album', 'Álbum'], ['artist', 'Artista'], ['genre', 'Gênero'], ['year', 'Ano'],
-  ['charter', 'Charter'], ['frets', 'Frets'], ['playlist', 'Playlist'], ['sub_playlist', 'Subplaylist'],
-  ['playlist_track', 'Faixa'], ['album_track', 'Faixa do álbum'],
+  ['album', 'Álbum', 'disc'], ['artist', 'Artista', 'user'], ['genre', 'Gênero', 'tag'], ['year', 'Ano', 'calendar'],
+  ['charter', 'Charter', 'pen'], ['frets', 'Frets', 'pen'], ['playlist', 'Playlist', 'list'], ['sub_playlist', 'Subplaylist', 'list'],
+  ['playlist_track', 'Faixa', 'hash'], ['album_track', 'Faixa do álbum', 'hash'],
 ];
 const SHOWN_KEYS = new Set([
   'name', 'artist', 'album', 'genre', 'year', 'charter', 'frets', 'playlist', 'sub_playlist', 'playlist_track',
@@ -28,21 +29,31 @@ const SHOWN_KEYS = new Set([
   ...DIFF_LABELS.map(([k]) => k),
 ]);
 
-// [{ label, value }] for the main metadata block; empty values are left out.
+// [{ label, value, icon }] for the header chips; empty values are left out.
 export function metaRows(song) {
   const ini = song.ini || {};
   const rows = [];
-  for (const [key, label] of META_FIELDS) {
+  for (const [key, label, icon] of META_FIELDS) {
     const value = plainText(key === 'artist' || key === 'album' ? song[key] : ini[key]);
-    if (value && value !== '-1') rows.push({ label, value });
+    if (value && value !== '-1') rows.push({ label, value, icon });
   }
   const length = formatDuration(ini.song_length);
-  if (length) rows.push({ label: 'Duração', value: length });
+  if (length) rows.push({ label: 'Duração', value: length, icon: 'clock' });
   const delay = Number(ini.delay);
-  if (Number.isFinite(delay) && delay !== 0) rows.push({ label: 'Delay do áudio', value: `${delay} ms` });
-  const preview = formatDuration(ini.preview_start_time);
-  if (preview) rows.push({ label: 'Prévia em', value: preview });
+  if (Number.isFinite(delay) && delay !== 0) rows.push({ label: 'Delay do áudio', value: `${delay} ms`, icon: 'clock' });
   return rows;
+}
+
+// song.ini difficulty level (0..6) for a playable instrument option, or null when the ini has none.
+const LEVEL_KEYS = {
+  guitar: ['diff_guitar'], bass: ['diff_bass'], rhythm: ['diff_rhythm'], keys: ['diff_keys'],
+  drums: ['diff_drums', 'diff_drums_real'], vocals: ['diff_vocals'], harmony: ['diff_vocals_harm'],
+};
+export function instrumentLevel(song, option) {
+  const keys = LEVEL_KEYS[option.base] || [];
+  const ini = song.ini || {};
+  const values = keys.map((k) => ini[k]).filter((v) => typeof v === 'number' && v >= 0);
+  return values.length ? Math.min(6, Math.max(...values)) : null;
 }
 
 // Instruments with a difficulty level in song.ini: [{ label, level }] (level 0..6).
@@ -68,18 +79,20 @@ export function bpmRange(tempos) {
   return bpms.length ? [Math.min(...bpms), Math.max(...bpms)] : null;
 }
 
-// Statistics of the selected chart: [{ label, value }].
-export function chartStats(chart, midi) {
+// "121–191" / "120" for the tempo map, or '' without tempo events.
+export function bpmLabel(tempos) {
+  const range = bpmRange(tempos);
+  if (!range) return '';
+  const [lo, hi] = range.map((b) => Math.round(b));
+  return lo === hi ? String(lo) : `${lo}–${hi}`;
+}
+
+// Per-chart counts shown in each instrument card: [{ label, value }].
+export function chartStats(chart) {
   if (!chart) return [];
-  const rows = [];
-  const bpm = bpmRange(midi?.tempos);
-  if (bpm) {
-    const [lo, hi] = bpm.map((b) => Math.round(b));
-    rows.push({ label: 'BPM', value: lo === hi ? String(lo) : `${lo}–${hi}` });
-  }
-  rows.push({ label: 'Notas', value: String(chart.notes.length) });
+  const rows = [{ label: 'Notas', value: String(chart.notes.length) }];
   if (chart.mode === 'vocals') {
-    rows.push({ label: 'Linhas de letra', value: String(chart.lyrics?.length ?? 0) });
+    rows.push({ label: 'Letra', value: String(chart.lyrics?.length ?? 0) });
     if (chart.harmonies?.length) rows.push({ label: 'Harmonias', value: String(chart.harmonies.length) });
     if (chart.percussion?.length) rows.push({ label: 'Percussão', value: String(chart.percussion.length) });
   } else {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { metaRows, difficultyLevels, extraRows, bpmRange, chartStats, formatDuration } from '../src/songinfo.js';
+import { metaRows, difficultyLevels, extraRows, bpmRange, bpmLabel, chartStats, formatDuration, instrumentLevel } from '../src/songinfo.js';
 import { plainText } from '../src/ini.js';
 
 const song = {
@@ -29,12 +29,19 @@ test('difficultyLevels keeps parts with level >= 0; extraRows keeps the rest', (
   assert.deepEqual(extraRows(song).map((r) => r.label), ['hopo_frequency', 'pro_drums']);
 });
 
-test('bpmRange and chartStats', () => {
+test('bpm label, chart counts and per-instrument level', () => {
   assert.deepEqual(bpmRange([{ usPerQuarter: 500000 }, { usPerQuarter: 250000 }]), [120, 240]);
   assert.equal(bpmRange([]), null);
+  assert.equal(bpmLabel([{ usPerQuarter: 500000 }]), '120');
+  assert.equal(bpmLabel([{ usPerQuarter: 500000 }, { usPerQuarter: 250000 }]), '120–240');
   const chart = { mode: 'lanes', notes: [{ length: 0 }, { length: 1 }], solos: [1], starPower: [], sections: [1, 2] };
-  const stats = Object.fromEntries(chartStats(chart, { tempos: [{ usPerQuarter: 500000 }] }).map((r) => [r.label, r.value]));
-  assert.deepEqual([stats.BPM, stats.Notas, stats.Sustains, stats.Solos, stats['Seções']], ['120', '2', '1', '1', '2']);
+  const stats = Object.fromEntries(chartStats(chart).map((r) => [r.label, r.value]));
+  assert.deepEqual([stats.Notas, stats.Sustains, stats.Solos, stats['Seções']], ['2', '1', '1', '2']);
+  assert.equal(instrumentLevel(song, { base: 'guitar' }), 4);
+  assert.equal(instrumentLevel(song, { base: 'bass' }), null);
+  assert.equal(instrumentLevel(song, { base: 'drums' }), 0);
+  assert.equal(metaRows(song).some((r) => r.label === 'Prévia em'), false);
+  assert.equal(metaRows(song).find((r) => r.label === 'Ano').icon, 'calendar');
 });
 
 import { stemKind, stemBadge } from '../src/songinfo.js';
