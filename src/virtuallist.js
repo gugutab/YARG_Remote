@@ -3,6 +3,7 @@
 
 export const ROW_H = 56;
 export const HEAD_H = 26;
+export const GAP = 6; // space between the rows and the scrollbar (rows get right: GAP in the CSS)
 const OVERSCAN_PX = 5 * ROW_H;
 const THUMB_DELAY_MS = 120; // a row asks for its thumbnail only after it stayed visible this long (skips flings)
 
@@ -113,7 +114,7 @@ export function createVirtualList({ scroller, label, thumbs, onSelect, text }) {
       scroller.append(entry.el);
     }
     if (label) {
-      label.style.right = `${scroller.offsetWidth - scroller.clientWidth}px`; // keep the scrollbar uncovered
+      label.style.right = `${scroller.offsetWidth - scroller.clientWidth + GAP}px`; // keep the scrollbar uncovered
       const idx = itemAt(offsets, top);
       let head = '';
       for (let i = idx; i >= 0; i--) if (items[i]?.type === 'head') { head = items[i].label; break; }

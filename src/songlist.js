@@ -75,7 +75,11 @@ export function groupLabel(song, by = 'title') {
     if (min < 7) return '5–7 min';
     return '7+ min';
   }
-  const text = norm(plainText(song[by === 'artist' || by === 'album' ? by : 'title'])).replace(/^[^a-z0-9]+/, '');
+  if (by === 'artist' || by === 'album') { // one header per artist / album
+    const name = plainText(song[by]).trim();
+    return name || `Unknown ${by}`;
+  }
+  const text = norm(plainText(song.title)).replace(/^[^a-z0-9]+/, '');
   return /^[a-z]/.test(text) ? text[0].toUpperCase() : '#';
 }
 
@@ -85,9 +89,9 @@ export function buildItems(sorted, by = 'title') {
   let last = null;
   for (const song of sorted) {
     const label = groupLabel(song, by);
-    if (label !== last) {
+    if (norm(label) !== last) { // names that differ only by case or accents share a header
       items.push({ type: 'head', label });
-      last = label;
+      last = norm(label);
     }
     items.push({ type: 'song', song });
   }

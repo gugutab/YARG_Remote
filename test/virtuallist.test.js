@@ -77,8 +77,10 @@ test('groupLabel follows the sort key', () => {
   assert.equal(groupLabel(mk({ title: 'Émile' }), 'title'), 'E');
   assert.equal(groupLabel(mk({ title: '(Don\'t Fear) The Reaper' }), 'title'), 'D');
   assert.equal(groupLabel(mk({ title: '99 Luftballons' }), 'title'), '#');
-  assert.equal(groupLabel(mk({ artist: 'ZZ Top' }), 'artist'), 'Z');
-  assert.equal(groupLabel(mk({ album: 'Abbey Road' }), 'album'), 'A');
+  assert.equal(groupLabel(mk({ artist: 'ZZ Top' }), 'artist'), 'ZZ Top');
+  assert.equal(groupLabel(mk({ artist: '' }), 'artist'), 'Unknown artist');
+  assert.equal(groupLabel(mk({ album: 'Abbey Road' }), 'album'), 'Abbey Road');
+  assert.equal(groupLabel(mk({ album: '' }), 'album'), 'Unknown album');
   assert.equal(groupLabel(mk({ ini: { year: '1972' } }), 'year'), '1970s');
   assert.equal(groupLabel(mk({}), 'year'), 'Unknown year');
   assert.equal(groupLabel(mk({ ini: { song_length: 250000 } }), 'length'), '4–5 min');
@@ -92,4 +94,11 @@ test('buildItems inserts a head before each run, also when reversed', () => {
   assert.deepEqual(buildItems(sorted, 'title').map((i) => (i.type === 'head' ? i.label : i.song.title)), ['A', 'alpha', 'Apple', 'B', 'Beta']);
   const desc = sortSongs([mk('Beta'), mk('alpha'), mk('Apple')], 'title', true);
   assert.deepEqual(buildItems(desc, 'title').filter((i) => i.type === 'head').map((i) => i.label), ['B', 'A']);
+});
+
+test('artist and album sorts get one header per name (case and accents ignored)', () => {
+  const mk = (title, artist, album) => ({ title, artist, album, ini: {} });
+  const sorted = sortSongs([mk('b', 'Émile', 'X'), mk('a', 'emile', 'X'), mk('c', 'Zed', 'Y')], 'artist');
+  assert.deepEqual(buildItems(sorted, 'artist').filter((i) => i.type === 'head').map((i) => i.label), ['emile', 'Zed']);
+  assert.deepEqual(buildItems(sortSongs(sorted, 'album'), 'album').filter((i) => i.type === 'head').map((i) => i.label), ['X', 'Y']);
 });
