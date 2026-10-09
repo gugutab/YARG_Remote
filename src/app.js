@@ -316,6 +316,7 @@ async function selectSong(song) {
   if (token !== loadToken || !loaded) return;
   els.seek.max = player.duration.toFixed(2);
   els.timeTotal.textContent = fmt(player.duration);
+  paintSectionTicks(); // the slider range is known now
   stemStates.forEach(applyStem); // volumes chosen while loading
   ready = true;
   setLoadState('ready', chart ? 'Pronto para tocar' : 'Nenhum instrumento jogável nesta música.', 1);
@@ -596,6 +597,23 @@ function fillSectionOptions() {
   }));
   activeSection = -2;
   els.sectionText.textContent = sections.length ? sections[0].name : 'Sem seções';
+  paintSectionTicks();
+}
+
+// Marks on the seek bar where each section starts. Positions follow the slider's thumb travel (12 px thumb).
+function paintSectionTicks() {
+  els.seekbox.querySelectorAll('.tick').forEach((t) => t.remove());
+  const max = Number(els.seek.max);
+  if (!chart?.sections.length || !(max > 0)) return;
+  for (const s of chart.sections) {
+    const at = s.time + settings.chartDelay; // the slider shows playback time; the chart is shifted by the delay
+    if (at < 0 || at > max) continue;
+    const tick = document.createElement('i');
+    tick.className = 'tick';
+    tick.style.left = `calc(${(at / max).toFixed(5)} * (100% - 12px) + 6px)`;
+    tick.title = s.name;
+    els.seekbox.append(tick);
+  }
 }
 
 function setActiveSection(index) {
@@ -713,6 +731,7 @@ function setSetting(name, value) {
   for (const input of document.querySelectorAll(`[data-setting="${name}"]`)) input.value = value;
   for (const out of document.querySelectorAll(`[data-out="${name}"]`)) out.textContent = SETTING_FORMAT[name](value);
   for (const btn of document.querySelectorAll(`[data-reset="${name}"]`)) btn.disabled = value === SETTING_DEFAULTS[name];
+  if (name === 'chartDelay') paintSectionTicks();
   if (name === 'speed') player.setRate(value);
   if (name === 'neck') highway.setNeckSpeed(value);
 }

@@ -462,3 +462,20 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
   .tools .icon { width: 32px; height: 32px; }
   .tb-top { gap: 6px; }
 }
+
+/* ---------- Round 10: smaller play button, section ticks, mobile menu placement ---------- */
+button.icon.primary { width: 32px; height: 32px; }
+button.icon.primary svg { width: 18px; height: 18px; }
+.seekbox .tick { position: absolute; bottom: 2px; width: 2px; height: 10px; margin-left: -1px; border-radius: 1px; background: rgba(255, 255, 255, 0.6); pointer-events: none; }
+.seekbox:hover .tick { height: 12px; background: rgba(255, 255, 255, 0.85); }
+
+@media (max-width: 700px) {
+  .transport .icon.primary { width: 30px; height: 30px; }
+  /* the menu button stays on the first row; the second row starts at the left edge, under it */
+  .topbar { grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 1fr 1fr; column-gap: 6px; padding-left: 4px; }
+  .tb-main { display: contents; }
+  .menu-btn { grid-column: 1; grid-row: 1; align-self: start; }
+  .tb-top { grid-column: 2; grid-row: 1; }
+  .tb-bottom { grid-column: 1 / -1; grid-row: 2; }
+  .section-wrap .chip-btn { max-width: 130px; }
+}
