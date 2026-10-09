@@ -1,119 +1,119 @@
-# YARG Remote — visualizador web de músicas
+# YARG Remote — web song visualizer
 
-Aponte o navegador para uma pasta de músicas (ex.: `A:\music\Songs\`), veja a lista, escolha
-instrumento e dificuldade e toque a música com o chart sincronizado e o volume de cada track
-individual. Só visualização: nenhuma detecção de acerto/erro.
+Point the browser at a songs folder (e.g. `A:\music\Songs\`), see the list, pick an instrument and a
+difficulty, and play the song with the chart in sync and the volume of each individual track.
+Visualization only: no hit/miss detection.
 
-## Como rodar
+## How to run
 
 ```bash
-npm start            # python3 -m http.server 8080 — depois abra http://localhost:8080
-npm test             # testes do parser MIDI / song.ini / chart
+npm start            # python3 -m http.server 8080 — then open http://localhost:8080
+npm test             # tests for the MIDI parser / song.ini / chart
 ```
 
-- Use **Chrome ou Edge** (a seleção de pasta usa a File System Access API). Em outros navegadores o
-  botão cai no `<input webkitdirectory>`, que funciona mas não mantém a pasta entre sessões.
-- A pasta é lida pelo navegador, não por caminho: o botão abre o seletor e você escolhe `A:\music\Songs`.
-- Cada música é uma pasta com `song.ini` + `notes.mid` + stems de áudio (`song.ogg`, `guitar.ogg`,
-  `drums.ogg`, `vocals.ogg`, `bass.ogg`…). Qualquer `.ogg/.mp3/.opus/.wav/.flac` da pasta vira um track
-  no mixer.
+- Use **Chrome or Edge** (folder selection uses the File System Access API). In other browsers the
+  button falls back to `<input webkitdirectory>`, which works but does not keep the folder between sessions.
+- The folder is read by the browser, not by path: the button opens the picker and you choose `A:\music\Songs`.
+- Each song is a folder with `song.ini` + `notes.mid` + audio stems (`song.ogg`, `guitar.ogg`,
+  `drums.ogg`, `vocals.ogg`, `bass.ogg`…). Any `.ogg/.mp3/.opus/.wav/.flac` in the folder becomes a track
+  in the mixer.
 
-## Estrutura
+## Structure
 
-| Arquivo | Responsabilidade |
+| File | Responsibility |
 | --- | --- |
-| `src/midi.js` | Parser SMF: notas com duração, textos, letras (meta 0x05), SysEx, mapa de tempo. |
-| `src/ini.js` | Parser do `song.ini` e leitura do delay. |
-| `src/chart.js` | Regras do YARG: instrumentos e modos de bateria, notas especiais, seções, letra, harmonias e percussão. |
-| `src/library.js` | Varre a pasta (FSA ou `webkitdirectory`), monta o índice e resolve arquivos. |
-| `src/store.js` | Guarda a pasta e o índice no IndexedDB entre visitas. |
-| `src/player.js` | Multitrack com alinhamento ao chart, velocidade sem mudar o tom (SoundTouch), volume por stem. |
-| `src/highway.js` | Desenho em canvas (notas, sustains, pedais, rolls, vocal com letra). |
-| `src/songlist.js` | Busca, filtro (instrumento, gênero) e ordenação da biblioteca. |
-| `src/app.js` | Interface, seleção, seções, delays e loop de desenho. |
-| `vendor/` | SoundTouchJS (LGPL-2.1), sem build. |
-| `scripts/find-special-notes.mjs` | Busca notas especiais num catálogo de MIDIs. |
+| `src/midi.js` | SMF parser: notes with duration, texts, lyrics (meta 0x05), SysEx, tempo map. |
+| `src/ini.js` | `song.ini` parser and delay reading. |
+| `src/chart.js` | YARG rules: instruments and drum modes, special notes, sections, lyrics, harmonies and percussion. |
+| `src/library.js` | Scans the folder (FSA or `webkitdirectory`), builds the index and resolves files. |
+| `src/store.js` | Keeps the folder and the index in IndexedDB between visits. |
+| `src/player.js` | Multitrack with chart alignment, speed change without changing pitch (SoundTouch), per-stem volume. |
+| `src/highway.js` | Canvas drawing (notes, sustains, pedals, rolls, vocals with lyrics). |
+| `src/songlist.js` | Search, filter (instrument, genre) and sorting of the library. |
+| `src/app.js` | UI, selection, sections, delays and the draw loop. |
+| `vendor/` | SoundTouchJS (LGPL-2.1), no build. |
+| `scripts/find-special-notes.mjs` | Finds special notes in a catalog of MIDIs. |
 
-Para quem vai continuar o projeto, o arquivo `CLAUDE.md` tem o estado atual, as regras do YARG com referências
-e as convenções de trabalho.
+For whoever continues the project, `CLAUDE.md` has the current state, the YARG rules with references
+and the working conventions.
 
-## Como o `.mid` é interpretado (referências)
+## How the `.mid` is interpreted (references)
 
-Conferido no código do YARG.Core (`github.com/YARC-Official/YARG.Core`, também presente em
+Checked against the YARG.Core code (`github.com/YARC-Official/YARG.Core`, also present in
 `github.com/YARC-Official/YARG/YARG.Core`):
 
-- **Nomes de trilha** — `MoonscraperChartParser/IO/Midi/MidIOHelper.cs`: `PART GUITAR`, `PART BASS`,
+- **Track names** — `MoonscraperChartParser/IO/Midi/MidIOHelper.cs`: `PART GUITAR`, `PART BASS`,
   `PART RHYTHM`, `PART KEYS`, `PART DRUMS` (alias `PART DRUM`), `PART VOCALS`, `HARM1-3`, `EVENTS`, `BEAT`.
-- **Dificuldade por pitch** — `Song/MidiPreparsers/MidiInstrumentPreparser.cs` (`NOTES_PER_DIFFICULTY = 12`):
-  Fácil 60–64, Médio 72–76, Difícil 84–88, Especialista 96–100. Offset 0..4 = lane verde→laranja.
-- **Guitarra/baixo** — `Song/MidiPreparsers/MidiFiveFretPreparser.cs`: `FIVEFRET_MIN = 59`; offset 0 é a
-  lane verde. Notas de *open* usam o sysex `PS` (`ENHANCED_OPENS`), que este MVP ainda não trata.
-- **Bateria** — `Song/MidiPreparsers/MidiDrumsPreparser.cs` e `MidReader.ProcessLists.cs`: 101 = bateria de
-  5 lanes (100 = laranja, 101 = verde); 110/111/112 = marcadores de tom para amarelo/azul/verde (pitch 98/99/100): nessas lanes a nota é prato por padrão, e um marcador ativo a transforma em tom,
-  da nota-on à nota-off do marcador, em bateria Pro e de 5 lanes. Sem 101 e com 110–112 = Pro; sem nenhum dos dois = 4 lanes.
-- **Especiais** — `MidIOHelper.cs`: `103` = solo, `116` = star power, `12`/`13` = compasso/tempo na
-  trilha `BEAT`, `105` = frase de letra em vocal.
-- **Vocal** — faixa 36–84 são as notas; texto que não começa com `[` é letra.
-- **Tempo** — `Chart/Sync/SyncTrack.cs`: mudanças de tempo (meta `0x51`) integradas tick a tick
-  (`midi.js` faz o mesmo em `createTickToSeconds`).
-- **song.ini** — `IO/Ini/SongIniHandler.cs`: lista de chaves (`name`, `artist`, `song_length`,
-  `diff_*`, `delay`…). O MVP lê `name`, `artist`, `album`, `delay`/`delay_seconds` e os valores crus de `diff_*`.
-- **Delay** — `SongMetadata.cs` e `SongRunner.cs`: a posição do áudio é `tempo_do_chart + delay`. O player alinha cada
-  stem uma vez no carregamento (`alignChannel`, `src/player.js`): delay positivo descarta o início do arquivo, negativo
-  põe silêncio na frente.
+- **Difficulty by pitch** — `Song/MidiPreparsers/MidiInstrumentPreparser.cs` (`NOTES_PER_DIFFICULTY = 12`):
+  Easy 60–64, Medium 72–76, Hard 84–88, Expert 96–100. Offset 0..4 = green→orange lane.
+- **Guitar/bass** — `Song/MidiPreparsers/MidiFiveFretPreparser.cs`: `FIVEFRET_MIN = 59`; offset 0 is the
+  green lane. *Open* notes use the `PS` sysex (`ENHANCED_OPENS`), which this MVP does not handle yet.
+- **Drums** — `Song/MidiPreparsers/MidiDrumsPreparser.cs` and `MidReader.ProcessLists.cs`: 101 = 5-lane
+  drums (100 = orange, 101 = green); 110/111/112 = tom markers for yellow/blue/green (pitch 98/99/100): on those lanes the note is a cymbal by default, and an active marker turns it into a tom,
+  from the marker's note-on to its note-off, in Pro and 5-lane drums. Without 101 and with 110–112 = Pro; with neither = 4 lanes.
+- **Specials** — `MidIOHelper.cs`: `103` = solo, `116` = star power, `12`/`13` = measure/beat in the
+  `BEAT` track, `105` = lyric phrase in vocals.
+- **Vocals** — range 36–84 are the notes; text that does not start with `[` is a lyric.
+- **Tempo** — `Chart/Sync/SyncTrack.cs`: tempo changes (meta `0x51`) integrated tick by tick
+  (`midi.js` does the same in `createTickToSeconds`).
+- **song.ini** — `IO/Ini/SongIniHandler.cs`: list of keys (`name`, `artist`, `song_length`,
+  `diff_*`, `delay`…). The MVP reads `name`, `artist`, `album`, `delay`/`delay_seconds` and the raw values of `diff_*`.
+- **Delay** — `SongMetadata.cs` and `SongRunner.cs`: the audio position is `chart_time + delay`. The player aligns each
+  stem once at load time (`alignChannel`, `src/player.js`): a positive delay discards the start of the file, a negative one
+  puts silence in front.
 
-### Verificação com o arquivo de exemplo
+### Verification with the sample file
 
-Com o `notes.mid` do Aerosmith — "Toys in the Attic" (fora do repositório):
+With the Aerosmith `notes.mid` — "Toys in the Attic" (outside the repository):
 
-- Trilhas: `notes`, `PART DRUMS`, `PART GUITAR`, `PART BASS`, `PART VOCALS`, `HARM1-3`, `EVENTS`, `BEAT`.
-- Duração calculada: 191,43 s (`song_length` do `song.ini`: 191,726 s).
-- Bateria Especialista: 531/311/264/196/98 notas por pitch 96–100 — idêntico à contagem bruta.
-- Guitarra Especialista: 1000 notas, 154 sustains, 2 solos (103), 13 star power (116), 12 seções.
-- Sem `PART RHYTHM`/`PART KEYS` no arquivo: esses instrumentos não aparecem na lista.
+- Tracks: `notes`, `PART DRUMS`, `PART GUITAR`, `PART BASS`, `PART VOCALS`, `HARM1-3`, `EVENTS`, `BEAT`.
+- Computed duration: 191.43 s (`song_length` in `song.ini`: 191.726 s).
+- Expert drums: 531/311/264/196/98 notes per pitch 96–100 — identical to the raw count.
+- Expert guitar: 1000 notes, 154 sustains, 2 solos (103), 13 star power (116), 12 sections.
+- No `PART RHYTHM`/`PART KEYS` in the file: those instruments do not appear in the list.
 
-## Reaproveitar o YARG Remote atual ou começar do zero?
+## Reuse the current YARG Remote or start from scratch?
 
-O repositório `gugutab/YARG_Remote` **está vazio**: a API do GitHub responde `409 Git Repository is empty`,
-não há branches e o clone local não tem commits. Não há código a aproveitar, então o projeto começa do zero
-nesta branch (`claude/upbeat-knuth-87adga`).
+The `gugutab/YARG_Remote` repository **is empty**: the GitHub API answers `409 Git Repository is empty`,
+there are no branches and the local clone has no commits. There is no code to reuse, so the project starts from scratch
+on this branch (`claude/upbeat-knuth-87adga`).
 
-Para o escopo pedido, faz sentido começar do zero mesmo que houvesse código. O YARG em si é um cliente
-Unity/C# (pasta `Assets/`) e o parsing vive no YARG.Core em C#, que não roda no navegador. Portar a lógica
-de chart (o que este projeto faz em `src/chart.js`) é mais simples do que embutir o cliente inteiro.
-O YARG.Core serve como referência de formato, não como dependência.
+For the requested scope, starting from scratch makes sense even if there were code. YARG itself is a
+Unity/C# client (`Assets/` folder) and the parsing lives in YARG.Core in C#, which does not run in the browser. Porting the chart
+logic (what this project does in `src/chart.js`) is simpler than embedding the whole client.
+YARG.Core serves as a format reference, not as a dependency.
 
-## Limitações
+## Limitations
 
-- Só `notes.mid`; arquivos `.chart` não são lidos.
-- Guitarra e baixo Pro, teclado Pro e Elite Drums não são desenhados.
-- Open pelo modo "enhanced opens" (texto) não é tratado; open pelo SysEx é.
-- Fills de bateria, BRE e coda não são desenhados; venue e luzes também não.
-- Star power e solo aparecem como faixa de fundo, não por nota.
-- Áudio e delays não foram conferidos por ouvido com stems reais.
+- Only `notes.mid`; `.chart` files are not read.
+- Pro guitar and bass, Pro keys and Elite Drums are not drawn.
+- Open via the "enhanced opens" mode (text) is not handled; open via SysEx is.
+- Drum fills, BRE and coda are not drawn; venue and lights are not either.
+- Star power and solo appear as a background band, not per note.
+- Audio and delays have not been checked by ear with real stems.
 
-## Próximos passos sugeridos
+## Suggested next steps
 
-1. Conferir a sincronia com stems reais, e o delay do `song.ini`.
-2. Guitarra e baixo Pro (`PART REAL_GUITAR`, `PART REAL_BASS`).
-3. Arquivos `.chart`.
-4. Star power e solo por nota.
+1. Check sync with real stems, and the `song.ini` delay.
+2. Pro guitar and bass (`PART REAL_GUITAR`, `PART REAL_BASS`).
+3. `.chart` files.
+4. Star power and solo per note.
 
-## Achar exemplos de notas especiais no catálogo
-
-```bash
-node scripts/find-special-notes.mjs <pasta> [--only open,accent,ghost] [--max 5] [--json]
-```
-
-Procura `.mid` em todas as subpastas e mostra, por música, instrumento e dificuldade, o tempo e a seção de
-cada ocorrência: open, tap, HOPO, accent, ghost, double kick, rolls, percussão e harmonias de vocal, solos e star power.
-No fim, um resumo com o total de cada categoria. Sem `--only`, lista todas as categorias.
-
-## Servidor com a biblioteca (sem pedir permissão de pasta)
+## Finding examples of special notes in the catalog
 
 ```bash
-npm start                      # node server.mjs; músicas em A:\music\Songs, porta 8080, todas as interfaces
-node server.mjs D:\Musicas     # outra pasta (ou SONGS_DIR); PORT e HOST também por variável de ambiente
+node scripts/find-special-notes.mjs <folder> [--only open,accent,ghost] [--max 5] [--json]
 ```
 
-O servidor entrega o app, o índice (`/api/library`, guardado em `.cache/library.json`) e os arquivos (`/songs/<caminho>`, com suporte a Range). O app detecta o servidor e abre a biblioteca sozinho, em qualquer navegador (Firefox inclusive) e em outros aparelhos da LAN (`http://<IP-do-PC>:8080`), sem seletor de pasta. O botão de atualizar (⟳) refaz a varredura. Sem o servidor (`npm run start:static`, ou hospedagem estática) o app volta a usar o seletor de pasta do navegador, descrito acima: no Chrome/Edge em `localhost` a pasta é lembrada; em outros casos só a lista é guardada.
+Looks for `.mid` in all subfolders and shows, per song, instrument and difficulty, the time and the section of
+each occurrence: open, tap, HOPO, accent, ghost, double kick, rolls, percussion and vocal harmonies, solos and star power.
+At the end, a summary with the total of each category. Without `--only`, it lists all categories.
+
+## Server with the library (no folder permission prompt)
+
+```bash
+npm start                      # node server.mjs; songs in A:\music\Songs, port 8080, all interfaces
+node server.mjs D:\Musicas     # another folder (or SONGS_DIR); PORT and HOST also via environment variable
+```
+
+The server delivers the app, the index (`/api/library`, stored in `.cache/library.json`) and the files (`/songs/<path>`, with Range support). The app detects the server and opens the library on its own, in any browser (Firefox included) and on other devices on the LAN (`http://<PC-IP>:8080`), with no folder picker. The refresh button (⟳) redoes the scan. Without the server (`npm run start:static`, or static hosting) the app goes back to the browser's folder picker, described above: in Chrome/Edge on `localhost` the folder is remembered; otherwise only the list is stored.

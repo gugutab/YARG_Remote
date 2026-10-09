@@ -50,7 +50,7 @@ export async function scanLibrary(songsDir) {
     }
   }
   await walk(songsDir, '');
-  songs.sort((a, b) => a.title.localeCompare(b.title, 'pt', { sensitivity: 'base' }));
+  songs.sort((a, b) => a.title.localeCompare(b.title, 'en', { sensitivity: 'base' }));
   return songs;
 }
 
@@ -163,10 +163,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const port = Number(process.env.PORT) || 8080;
   const host = process.env.HOST || '0.0.0.0';
   if (!fs.existsSync(songsDir)) {
-    console.error(`Pasta de músicas não encontrada: ${songsDir}\nUse: node server.mjs <pasta> (ou SONGS_DIR).`);
+    console.error(`Songs folder not found: ${songsDir}\nUsage: node server.mjs <folder> (or SONGS_DIR).`);
     process.exit(1);
   }
   createServer({ songsDir }).listen(port, host, () => {
-    console.log(`YARG Remote em http://localhost:${port} (rede: porta ${port}) — músicas: ${songsDir}`);
+    console.log(`YARG Remote at http://localhost:${port} (network: port ${port}) — songs: ${songsDir}`);
   });
 }

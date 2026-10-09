@@ -7,13 +7,13 @@ const DEFAULT_US_PER_QUARTER = 500000;
 export function parseMidi(input) {
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  if (readStr(bytes, 0, 4) !== 'MThd') throw new Error('Arquivo não é um MIDI válido (MThd ausente)');
+  if (readStr(bytes, 0, 4) !== 'MThd') throw new Error('Not a valid MIDI file (MThd missing)');
 
   const headerLen = view.getUint32(4);
   const format = view.getUint16(8);
   const trackCount = view.getUint16(10);
   const division = view.getUint16(12);
-  if (division & 0x8000) throw new Error('Divisão SMPTE não suportada');
+  if (division & 0x8000) throw new Error('SMPTE division not supported');
 
   const tracks = [];
   let pos = 8 + headerLen;

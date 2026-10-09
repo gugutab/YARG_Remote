@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>YARG Remote - Visualizador</title>
+  <title>YARG Remote - Viewer</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -52,13 +52,13 @@
 
   <div class="app" id="app">
     <!-- Left collapsible library -->
-    <aside class="library" id="library" aria-label="Biblioteca">
+    <aside class="library" id="library" aria-label="Library">
       <div class="lib-head">
-        <strong>Biblioteca</strong>
+        <strong>Library</strong>
         <span class="lib-tools">
-          <button id="pick" class="icon" type="button" title="Escolher pasta de músicas" aria-label="Escolher pasta de músicas"><svg><use href="#i-folder"/></svg></button>
-          <button id="rescan" class="icon" type="button" title="Atualizar lista" aria-label="Atualizar lista" hidden><svg><use href="#i-refresh"/></svg></button>
-          <button id="closeLibrary" class="icon only-narrow" type="button" title="Fechar" aria-label="Fechar biblioteca"><svg><use href="#i-x"/></svg></button>
+          <button id="pick" class="icon" type="button" title="Choose songs folder" aria-label="Choose songs folder"><svg><use href="#i-folder"/></svg></button>
+          <button id="rescan" class="icon" type="button" title="Refresh list" aria-label="Refresh list" hidden><svg><use href="#i-refresh"/></svg></button>
+          <button id="closeLibrary" class="icon only-narrow" type="button" title="Close" aria-label="Close library"><svg><use href="#i-x"/></svg></button>
         </span>
         <input id="folderInput" type="file" webkitdirectory hidden>
       </div>
@@ -66,37 +66,37 @@
 
       <div class="search">
         <svg><use href="#i-search"/></svg>
-        <input id="search" type="search" placeholder="Título, artista ou álbum" aria-label="Buscar">
+        <input id="search" type="search" placeholder="Title, artist or album" aria-label="Search">
       </div>
       <div class="lib-filters">
-        <label class="chip-select" title="Ordenar"><svg><use href="#i-sort"/></svg>
-          <select id="sortBy" aria-label="Ordenar por">
-            <option value="title">Título</option>
-            <option value="artist">Artista</option>
-            <option value="album">Álbum</option>
-            <option value="year">Ano</option>
-            <option value="length">Duração</option>
+        <label class="chip-select" title="Sort"><svg><use href="#i-sort"/></svg>
+          <select id="sortBy" aria-label="Sort by">
+            <option value="title">Title</option>
+            <option value="artist">Artist</option>
+            <option value="album">Album</option>
+            <option value="year">Year</option>
+            <option value="length">Length</option>
           </select>
         </label>
-        <button id="sortDir" class="chip-btn" type="button" title="Inverter ordem" aria-label="Inverter ordem">A→Z</button>
-        <label class="chip-select" title="Instrumento"><svg><use href="#i-music"/></svg>
-          <select id="filterInstrument" aria-label="Filtrar por instrumento">
-            <option value="">Todos</option>
-            <option value="guitar">Guitarra</option>
-            <option value="bass">Baixo</option>
+        <button id="sortDir" class="chip-btn" type="button" title="Reverse order" aria-label="Reverse order">A→Z</button>
+        <label class="chip-select" title="Instrument"><svg><use href="#i-music"/></svg>
+          <select id="filterInstrument" aria-label="Filter by instrument">
+            <option value="">All</option>
+            <option value="guitar">Guitar</option>
+            <option value="bass">Bass</option>
             <option value="rhythm">Rhythm</option>
-            <option value="keys">Teclado</option>
-            <option value="drums">Bateria</option>
-            <option value="vocals">Vocal</option>
+            <option value="keys">Keys</option>
+            <option value="drums">Drums</option>
+            <option value="vocals">Vocals</option>
           </select>
         </label>
-        <label class="chip-select" title="Gênero"><svg><use href="#i-list"/></svg>
-          <select id="filterGenre" aria-label="Filtrar por gênero"><option value="">Gêneros</option></select>
+        <label class="chip-select" title="Genre"><svg><use href="#i-list"/></svg>
+          <select id="filterGenre" aria-label="Filter by genre"><option value="">Genres</option></select>
         </label>
       </div>
       <div id="count" class="count"></div>
       <ul id="songs" role="listbox"></ul>
-      <p id="empty" class="hint">Escolha a pasta (ex.: A:\music\Songs) para listar as músicas.<br>Use Chrome ou Edge.</p>
+      <p id="empty" class="hint">Choose the folder (e.g. A:\music\Songs) to list the songs.<br>Use Chrome or Edge.</p>
       <div id="status" class="status" role="status"></div>
     </aside>
     <div class="scrim" id="scrim"></div>
@@ -104,7 +104,7 @@
     <div class="main">
       <!-- Top menu + play info -->
       <header class="topbar" id="topbar">
-        <button id="toggleLibrary" class="icon menu-btn" type="button" title="Biblioteca (L)" aria-label="Abrir ou fechar a biblioteca"><svg><use href="#i-menu"/></svg></button>
+        <button id="toggleLibrary" class="icon menu-btn" type="button" title="Library (L)" aria-label="Open or close the library"><svg><use href="#i-menu"/></svg></button>
         <img id="cover" class="tb-cover" alt="" hidden>
 
         <div class="tb-main">
@@ -115,7 +115,7 @@
                 <div id="artist" class="now-artist"></div>
               </div>
               <div class="pop-wrap">
-                <button id="infoBtn" class="icon" type="button" title="Informações da música" aria-label="Informações da música" aria-expanded="false"><svg><use href="#i-info"/></svg></button>
+                <button id="infoBtn" class="icon" type="button" title="Song info" aria-label="Song info" aria-expanded="false"><svg><use href="#i-info"/></svg></button>
                 <div class="popover info-pop align-left" id="infoPop" hidden>
                   <div class="ip-head">
                     <img id="infoPopCover" alt="" hidden>
@@ -125,7 +125,7 @@
                     </div>
                   </div>
                   <ul id="infoPopMeta" class="chips-v"></ul>
-                  <button id="infoPopMore" class="chip-btn" type="button"><svg><use href="#i-list"/></svg>Todos os detalhes</button>
+                  <button id="infoPopMore" class="chip-btn" type="button"><svg><use href="#i-list"/></svg>All details</button>
                 </div>
               </div>
             </div>
@@ -133,7 +133,7 @@
 
             <div class="chips" id="chips" hidden>
               <div class="pop-wrap">
-                <button id="partBtn" class="chip-btn" type="button" title="Instrumento e dificuldade" aria-label="Instrumento e dificuldade" aria-expanded="false"><svg><use id="partIcon" href="#i-guitar"/></svg><span id="partText"></span><b id="partDiff" class="dbadge" hidden></b><svg class="chev"><use href="#i-chevron"/></svg></button>
+                <button id="partBtn" class="chip-btn" type="button" title="Instrument and difficulty" aria-label="Instrument and difficulty" aria-expanded="false"><svg><use id="partIcon" href="#i-guitar"/></svg><span id="partText"></span><b id="partDiff" class="dbadge" hidden></b><svg class="chev"><use href="#i-chevron"/></svg></button>
                 <div class="popover part-pop" id="partPop" hidden></div>
               </div>
               
@@ -144,40 +144,40 @@
           </div>
 
           <div class="seekbox" id="seekbox" hidden>
-            <input id="seek" type="range" min="0" max="0" step="0.01" value="0" aria-label="Posição">
+            <input id="seek" type="range" min="0" max="0" step="0.01" value="0" aria-label="Position">
           </div>
 
           <div class="tb-bottom">
             <div class="transport" id="transport" hidden>
-              <button id="back" class="icon" type="button" title="Seção anterior ([)" aria-label="Seção anterior"><svg><use href="#i-prev"/></svg></button>
-              <button id="play" class="icon primary" type="button" title="Tocar/pausar (Espaço)" aria-label="Tocar"><svg><use href="#i-play"/></svg></button>
-              <button id="forward" class="icon" type="button" title="Próxima seção (])" aria-label="Próxima seção"><svg><use href="#i-next"/></svg></button>
+              <button id="back" class="icon" type="button" title="Previous section ([)" aria-label="Previous section"><svg><use href="#i-prev"/></svg></button>
+              <button id="play" class="icon primary" type="button" title="Play/pause (Space)" aria-label="Play"><svg><use href="#i-play"/></svg></button>
+              <button id="forward" class="icon" type="button" title="Next section (])" aria-label="Next section"><svg><use href="#i-next"/></svg></button>
               <span class="time"><span id="timeNow">0:00</span> / <span id="timeTotal">0:00</span></span>
               <div class="pop-wrap section-wrap">
-                <button id="sectionBtn" class="chip-btn" type="button" title="Ir para seção" aria-label="Ir para seção" aria-expanded="false" disabled><svg><use href="#i-flag"/></svg><span id="sectionText">Sem seções</span><svg class="chev"><use href="#i-chevron"/></svg></button>
+                <button id="sectionBtn" class="chip-btn" type="button" title="Go to section" aria-label="Go to section" aria-expanded="false" disabled><svg><use href="#i-flag"/></svg><span id="sectionText">No sections</span><svg class="chev"><use href="#i-chevron"/></svg></button>
                 <div class="popover part-pop sec-pop align-left" id="sectionPop" hidden></div>
               </div>
             </div>
             <div class="tools" id="tools" hidden>
               <div class="pop-wrap">
-            <button id="mixerBtn" class="icon" type="button" title="Volume por stem" aria-label="Volume por stem" aria-expanded="false"><svg><use href="#i-volume"/></svg></button>
+            <button id="mixerBtn" class="icon" type="button" title="Stem volume" aria-label="Stem volume" aria-expanded="false"><svg><use href="#i-volume"/></svg></button>
             <div class="popover" id="mixerPop" hidden>
               <div class="pop-title">Volume</div>
               <div id="mixer" class="mixer"></div>
             </div>
           </div>
           <div class="pop-wrap">
-            <button id="settingsBtn" class="icon" type="button" title="Velocidade, neck e delay" aria-label="Ajustes" aria-expanded="false"><svg><use href="#i-sliders"/></svg></button>
+            <button id="settingsBtn" class="icon" type="button" title="Speed, neck and delay" aria-label="Settings" aria-expanded="false"><svg><use href="#i-sliders"/></svg></button>
             <div class="popover" id="settingsPop" hidden>
-              <div class="pop-title">Ajustes</div>
-              <label class="row">Velocidade <input data-setting="speed" type="range" min="0.2" max="2" step="0.1" value="1"><output data-out="speed">1.0×</output><button class="icon small-icon reset" type="button" data-reset="speed" title="Restaurar" aria-label="Restaurar velocidade"><svg><use href="#i-reset"/></svg></button></label>
-              <label class="row">Neck speed <input data-setting="neck" type="range" min="0.5" max="3" step="0.1" value="1.2"><output data-out="neck">1.2×</output><button class="icon small-icon reset" type="button" data-reset="neck" title="Restaurar" aria-label="Restaurar neck speed"><svg><use href="#i-reset"/></svg></button></label>
-              <label class="row">Delay do chart <input data-setting="chartDelay" type="range" min="-1" max="1" step="0.05" value="0"><output data-out="chartDelay">+0.00 s</output><button class="icon small-icon reset" type="button" data-reset="chartDelay" title="Restaurar" aria-label="Restaurar delay do chart"><svg><use href="#i-reset"/></svg></button></label>
+              <div class="pop-title">Settings</div>
+              <label class="row">Speed <input data-setting="speed" type="range" min="0.2" max="2" step="0.1" value="1"><output data-out="speed">1.0×</output><button class="icon small-icon reset" type="button" data-reset="speed" title="Reset" aria-label="Reset speed"><svg><use href="#i-reset"/></svg></button></label>
+              <label class="row">Neck speed <input data-setting="neck" type="range" min="0.5" max="3" step="0.1" value="1.2"><output data-out="neck">1.2×</output><button class="icon small-icon reset" type="button" data-reset="neck" title="Reset" aria-label="Reset neck speed"><svg><use href="#i-reset"/></svg></button></label>
+              <label class="row">Chart delay <input data-setting="chartDelay" type="range" min="-1" max="1" step="0.05" value="0"><output data-out="chartDelay">+0.00 s</output><button class="icon small-icon reset" type="button" data-reset="chartDelay" title="Reset" aria-label="Reset chart delay"><svg><use href="#i-reset"/></svg></button></label>
             </div>
           </div>
               
           
-          <button id="fullscreen" class="icon" type="button" title="Tela cheia (F)" aria-label="Tela cheia"><svg><use href="#i-expand"/></svg></button>
+          <button id="fullscreen" class="icon" type="button" title="Fullscreen (F)" aria-label="Fullscreen"><svg><use href="#i-expand"/></svg></button>
             </div>
           </div>
         </div>
@@ -186,11 +186,11 @@
       <!-- Chart takes the whole remaining screen -->
       <main class="stage" id="stage">
         <canvas id="highway"></canvas>
-        <button id="viewBtn" class="icon stage-btn" hidden type="button" title="Visão 3D / 2D (V)" aria-label="Alternar visão 3D" aria-pressed="false"><svg><use href="#i-cube"/></svg></button>
-        <button id="styleBtn" class="icon stage-btn style-btn" type="button" title="Notas retangulares (N)" aria-label="Alternar estilo das notas" aria-pressed="false" hidden><svg><use href="#i-shapes"/></svg></button>
+        <button id="viewBtn" class="icon stage-btn" hidden type="button" title="3D / 2D view (V)" aria-label="Toggle 3D view" aria-pressed="false"><svg><use href="#i-cube"/></svg></button>
+        <button id="styleBtn" class="icon stage-btn style-btn" type="button" title="Rectangular notes (N)" aria-label="Toggle note style" aria-pressed="false" hidden><svg><use href="#i-shapes"/></svg></button>
         <div id="loading" class="loading" hidden></div>
-        <section id="info" class="info" hidden aria-label="Informações da música">
-          <button id="infoMenu" class="icon info-menu" type="button" title="Biblioteca (L)" aria-label="Abrir ou fechar a biblioteca"><svg><use href="#i-menu"/></svg></button>
+        <section id="info" class="info" hidden aria-label="Song info">
+          <button id="infoMenu" class="icon info-menu" type="button" title="Library (L)" aria-label="Open or close the library"><svg><use href="#i-menu"/></svg></button>
           <div class="info-scroll">
             <div class="info-grid">
               <header class="info-card info-head">
@@ -204,26 +204,26 @@
               </header>
 
               <div class="info-card info-wide">
-                <h3>Instrumento e dificuldade</h3>
+                <h3>Instrument and difficulty</h3>
                 <div id="instrumentCards" class="icards"></div>
               </div>
 
               <div class="info-cols">
               <div class="info-card card-adjust">
-                <h3>Ajustes</h3>
-                <label class="row">Velocidade <input data-setting="speed" type="range" min="0.2" max="2" step="0.1" value="1"><output data-out="speed">1.0×</output><button class="icon small-icon reset" type="button" data-reset="speed" title="Restaurar" aria-label="Restaurar velocidade"><svg><use href="#i-reset"/></svg></button></label>
-                <label class="row">Neck speed <input data-setting="neck" type="range" min="0.5" max="3" step="0.1" value="1.2"><output data-out="neck">1.2×</output><button class="icon small-icon reset" type="button" data-reset="neck" title="Restaurar" aria-label="Restaurar neck speed"><svg><use href="#i-reset"/></svg></button></label>
-                <label class="row">Delay do chart <input data-setting="chartDelay" type="range" min="-1" max="1" step="0.05" value="0"><output data-out="chartDelay">+0.00 s</output><button class="icon small-icon reset" type="button" data-reset="chartDelay" title="Restaurar" aria-label="Restaurar delay do chart"><svg><use href="#i-reset"/></svg></button></label>
+                <h3>Settings</h3>
+                <label class="row">Speed <input data-setting="speed" type="range" min="0.2" max="2" step="0.1" value="1"><output data-out="speed">1.0×</output><button class="icon small-icon reset" type="button" data-reset="speed" title="Reset" aria-label="Reset speed"><svg><use href="#i-reset"/></svg></button></label>
+                <label class="row">Neck speed <input data-setting="neck" type="range" min="0.5" max="3" step="0.1" value="1.2"><output data-out="neck">1.2×</output><button class="icon small-icon reset" type="button" data-reset="neck" title="Reset" aria-label="Reset neck speed"><svg><use href="#i-reset"/></svg></button></label>
+                <label class="row">Chart delay <input data-setting="chartDelay" type="range" min="-1" max="1" step="0.05" value="0"><output data-out="chartDelay">+0.00 s</output><button class="icon small-icon reset" type="button" data-reset="chartDelay" title="Reset" aria-label="Reset chart delay"><svg><use href="#i-reset"/></svg></button></label>
               </div>
 
               <div class="info-card card-volume">
-                <h3>Volume por stem</h3>
+                <h3>Stem volume</h3>
                 <div id="mixerInfo" class="mixer"></div>
               </div>
 
               <div class="info-card card-extra" id="infoExtraCard">
                 <details class="extra">
-                  <summary>Outras propriedades do song.ini</summary>
+                  <summary>Other song.ini properties</summary>
                   <dl id="infoExtra" class="kv kv-pairs"></dl>
                 </details>
               </div>
@@ -231,14 +231,14 @@
             </div>
           </div>
           <div class="info-actions">
-            <div class="progress" id="infoProgress"><div class="bar"><span id="infoBar"></span></div><span id="infoState">Carregando…</span></div>
-            <button id="infoPlay" class="cta" type="button" disabled><svg><use href="#i-play"/></svg><span>Tocar</span></button>
+            <div class="progress" id="infoProgress"><div class="bar"><span id="infoBar"></span></div><span id="infoState">Loading…</span></div>
+            <button id="infoPlay" class="cta" type="button" disabled><svg><use href="#i-play"/></svg><span>Play</span></button>
           </div>
         </section>
         <div id="welcome" class="welcome">
           <svg><use href="#i-music"/></svg>
-          <p>Abra a biblioteca e escolha uma música.</p>
-          <button id="welcomeOpen" type="button">Abrir biblioteca</button>
+          <p>Open the library and choose a song.</p>
+          <button id="welcomeOpen" type="button">Open library</button>
         </div>
       </main>
     </div>

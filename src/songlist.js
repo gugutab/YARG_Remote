@@ -55,5 +55,5 @@ export function sortSongs(songs, by = 'title', desc = false) {
 
 export function genresOf(songs) {
   const set = new Set(songs.map((s) => s.ini?.genre).filter((g) => typeof g === 'string' && g));
-  return [...set].sort((a, b) => a.localeCompare(b, 'pt', { sensitivity: 'base' }));
+  return [...set].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
 }

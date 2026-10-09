@@ -86,18 +86,18 @@ async function pickFolder() {
     const dir = await window.showDirectoryPicker({ mode: 'read' });
     await scanFolder(dir);
   } catch (err) {
-    if (err.name !== 'AbortError') setStatus(`Erro ao abrir pasta: ${err.message}`);
+    if (err.name !== 'AbortError') setStatus(`Error opening folder: ${err.message}`);
   }
 }
 
 // Scans a picked folder and remembers it, with its song index, for the next visit.
 async function scanFolder(dir) {
-  setStatus('Procurando músicas…');
+  setStatus('Scanning songs…');
   songs = await scanSongs(walkHandle(dir, dir.name));
   const saved = await saveLibrary({ root: dir, rootName: dir.name, index: serializeSongs(songs), savedAt: Date.now() });
   connectedRoot = dir;
   els.resume.hidden = true;
-  setStatus(`"${dir.name}"${saved ? '' : ' (não foi possível guardar a pasta)'}`);
+  setStatus(`"${dir.name}"${saved ? '' : ' (could not save the folder)'}`);
   afterLibraryLoaded();
 }
 
@@ -108,17 +108,17 @@ async function reopenFolder() {
   try {
     const permission = await root.requestPermission({ mode: 'read' });
     if (permission !== 'granted') {
-      setStatus('Sem permissão para ler a pasta. Escolha-a de novo.');
+      setStatus('No permission to read the folder. Choose it again.');
       return;
     }
   } catch (err) {
-    setStatus(`Não foi possível reabrir a pasta: ${err.message}`);
+    setStatus(`Could not reopen the folder: ${err.message}`);
     return;
   }
   songs = restoreSongs(index, root);
   connectedRoot = root;
   els.resume.hidden = true;
-  setStatus(`"${rootName}" (lista guardada; use ⟳ se mudou algo)`);
+  setStatus(`"${rootName}" (saved list; use ⟳ if anything changed)`);
   afterLibraryLoaded();
 }
 
@@ -138,7 +138,7 @@ async function loadRemoteLibrary(refresh) {
     detached = false;
     els.pick.hidden = true;
     els.resume.hidden = true;
-    setStatus(`"${data.rootName}" no servidor`);
+    setStatus(`"${data.rootName}" on the server`);
     afterLibraryLoaded();
     return true;
   } catch {
@@ -148,7 +148,7 @@ async function loadRemoteLibrary(refresh) {
 
 async function rescanFolder() {
   if (remote) {
-    setStatus('Atualizando…');
+    setStatus('Refreshing…');
     await loadRemoteLibrary(true);
     return;
   }
@@ -156,17 +156,17 @@ async function rescanFolder() {
   try {
     const permission = await connectedRoot.requestPermission({ mode: 'read' });
     if (permission !== 'granted') {
-      setStatus('Sem permissão para ler a pasta. Escolha-a de novo.');
+      setStatus('No permission to read the folder. Choose it again.');
       return;
     }
     await scanFolder(connectedRoot);
   } catch (err) {
-    setStatus(`Erro ao atualizar: ${err.message}`);
+    setStatus(`Error refreshing: ${err.message}`);
   }
 }
 
 async function loadEntries(entries) {
-  setStatus('Procurando músicas…');
+  setStatus('Scanning songs…');
   songs = await scanSongs(entries);
   detached = false;
   // Without a folder handle only the song index can be remembered; files need the folder picked again.
@@ -182,7 +182,7 @@ async function loadEntries(entries) {
 function afterLibraryLoaded() {
   els.rescan.hidden = !connectedRoot && !remote;
   const genres = genresOf(songs);
-  els.filterGenre.replaceChildren(new Option('Gêneros', ''), ...genres.map((g) => new Option(g, g)));
+  els.filterGenre.replaceChildren(new Option('Genres', ''), ...genres.map((g) => new Option(g, g)));
   els.filterGenre.closest('label').hidden = genres.length === 0;
   renderList();
 }
@@ -195,11 +195,11 @@ async function offerSavedFolder() {
     // No handle was stored: show the saved list now; the files are asked for when a song is opened.
     songs = savedRecord.index.map((s) => ({ ...s, files: new Map() }));
     detached = true;
-    setStatus(`Lista guardada de "${savedRecord.rootName}". Escolha a pasta de novo ao abrir uma música.`);
+    setStatus(`Saved list from "${savedRecord.rootName}". Choose the folder again to open a song.`);
     afterLibraryLoaded();
     return;
   }
-  els.resume.querySelector('span').textContent = `Reabrir "${savedRecord.rootName}" (${savedRecord.index.length})`;
+  els.resume.querySelector('span').textContent = `Reopen "${savedRecord.rootName}" (${savedRecord.index.length})`;
   els.resume.hidden = false;
 }
 
@@ -217,7 +217,7 @@ function renderList() {
     li.addEventListener('click', () => selectSong(song));
     return li;
   }));
-  els.count.textContent = songs.length ? `${shown.length} de ${songs.length} músicas` : '';
+  els.count.textContent = songs.length ? `${shown.length} of ${songs.length} songs` : '';
   els.empty.hidden = songs.length > 0;
 }
 
@@ -229,7 +229,7 @@ function setStatus(text) {
 async function selectSong(song) {
   if (detached) {
     pendingSongId = song.id;
-    setStatus('Escolha a pasta de músicas para abrir esta música.');
+    setStatus('Choose the songs folder to open this song.');
     els.folderInput.value = '';
     els.folderInput.click();
     return;
@@ -253,29 +253,29 @@ async function selectSong(song) {
   els.infoPopCover.hidden = true;
   els.instrument.replaceChildren();
   els.difficulty.replaceChildren();
-  els.sectionSelect.replaceChildren(new Option('Sem seções', ''));
+  els.sectionSelect.replaceChildren(new Option('No sections', ''));
   els.sectionSelect.disabled = true;
   els.sectionBtn.disabled = true;
   els.sectionPop.replaceChildren();
-  els.sectionText.textContent = 'Sem seções';
+  els.sectionText.textContent = 'No sections';
   els.instrumentCards.replaceChildren();
   els.mixerInfo.replaceChildren();
   els.mixer.replaceChildren();
   renderSongInfo(song);
   infoScroll.scrollTop = 0; // a new song starts at the top
   setInfoOpen(true); // the info screen opens right away and the load runs behind it
-  setLoadState('loading', 'Lendo o chart…', 0.02);
+  setLoadState('loading', 'Reading the chart…', 0.02);
 
   const midiEntry = song.files.get('notes.mid');
   if (!midiEntry) {
-    setLoadState('error', 'Esta música não tem notes.mid (apenas .chart não é suportado nesta versão).');
+    setLoadState('error', 'This song has no notes.mid (.chart-only is not supported in this version).');
     return;
   }
   let midi;
   try {
     midi = parseMidi(await readBytes(midiEntry));
   } catch (err) {
-    if (token === loadToken) setLoadState('error', `Não foi possível ler notes.mid: ${err.message}`);
+    if (token === loadToken) setLoadState('error', `Could not read notes.mid: ${err.message}`);
     return;
   }
   const coverEntry = findCover(song);
@@ -301,17 +301,17 @@ async function selectSong(song) {
   const stems = audioStemsOf(song);
   buildMixer(stems);
 
-  setLoadState('loading', 'Carregando áudio…', 0.1);
+  setLoadState('loading', 'Loading audio…', 0.1);
   let loaded = false;
   try {
     loaded = await player.load(stems, {
       delay: songDelaySeconds(song.ini),
       onProgress: (p) => {
-        if (token === loadToken) setLoadState('loading', `Carregando áudio… ${Math.round(p * 100)}%`, 0.1 + p * 0.9);
+        if (token === loadToken) setLoadState('loading', `Loading audio… ${Math.round(p * 100)}%`, 0.1 + p * 0.9);
       },
     });
   } catch (err) {
-    if (token === loadToken) setLoadState('error', `Falha ao decodificar áudio: ${err.message}`);
+    if (token === loadToken) setLoadState('error', `Failed to decode audio: ${err.message}`);
     return;
   }
   if (token !== loadToken || !loaded) return;
@@ -320,7 +320,7 @@ async function selectSong(song) {
   paintSectionTicks(); // the slider range is known now
   stemStates.forEach(applyStem); // volumes chosen while loading
   ready = true;
-  setLoadState('ready', chart ? 'Pronto para tocar' : 'Nenhum instrumento jogável nesta música.', 1);
+  setLoadState('ready', chart ? 'Ready to play' : 'No playable instrument in this song.', 1);
 }
 
 // ---------- Info screen ----------
@@ -365,7 +365,7 @@ const kv = (rows) => rows.flatMap((r) => {
 
 // Header chips: a vertical list of icon + label + value. The BPM chip joins once the MIDI has been read.
 function renderMeta(song, midi) {
-  const rows = metaRows(song).filter((r) => r.label !== 'Artista'); // the artist is the subtitle
+  const rows = metaRows(song).filter((r) => r.label !== 'Artist'); // the artist is the subtitle
   const bpm = bpmLabel(midi?.tempos);
   if (bpm) rows.push({ label: 'BPM', value: bpm, icon: 'pulse' });
   const chip = (r) => {
@@ -444,7 +444,7 @@ function cardStats(ins, diff) {
 
 const INSTRUMENT_ICON = { guitar: 'guitar', bass: 'guitar', rhythm: 'guitar', keys: 'keys', drums: 'drum', vocals: 'mic', harmony: 'mic' };
 
-// The instruments as the pickers show them: every drum mode is one item ("Bateria") with a mode selector
+// The instruments as the pickers show them: every drum mode is one item ("Drums") with a mode selector
 // (4 lanes / 5 lanes / Pro / Pro 7 lanes); the other instruments are single items.
 function instrumentGroups() {
   const out = [];
@@ -452,7 +452,7 @@ function instrumentGroups() {
   for (const o of current.options) {
     const key = o.base === 'drums' ? 'drums' : o.mode === 'vocals' ? 'vocals' : o.id; // drum modes and vocal parts merge
     if (!byKey.has(key)) {
-      const g = { key, label: key === 'drums' ? 'Bateria' : key === 'vocals' ? 'Vocal' : o.label, options: [] };
+      const g = { key, label: key === 'drums' ? 'Drums' : key === 'vocals' ? 'Vocals' : o.label, options: [] };
       byKey.set(key, g);
       out.push(g);
     }
@@ -506,8 +506,8 @@ function renderPickers() {
       const info = document.createElement('button');
       info.type = 'button';
       info.className = 'icon small-icon icard-info';
-      info.title = 'Detalhes do chart';
-      info.setAttribute('aria-label', `Detalhes do chart de ${ins.label}`);
+      info.title = 'Chart details';
+      info.setAttribute('aria-label', `Chart details for ${ins.label}`);
       info.setAttribute('aria-expanded', String(expanded));
       info.innerHTML = '<svg><use href="#i-info"/></svg>';
       info.addEventListener('click', (e) => { // only shows or hides the counts; it does not select the instrument
@@ -523,7 +523,7 @@ function renderPickers() {
     if (level !== null) {
       const pips = document.createElement('span');
       pips.className = 'pips';
-      pips.title = `Nível ${level} de 6`;
+      pips.title = `Level ${level} of 6`;
       pips.replaceChildren(...Array.from({ length: 6 }, (_, i) => Object.assign(document.createElement('i'), { className: i < level ? 'on' : '' })));
       top.append(pips);
     }
@@ -577,10 +577,12 @@ function renderPickers() {
 // Drums are one row with a second line of mode buttons.
 function renderPartMenu() {
   const ins = currentInstrument();
-  const diffLabel = DIFFICULTIES.find((d) => d.id === els.difficulty.value)?.label;
+  const diffInfo = DIFFICULTIES.find((d) => d.id === els.difficulty.value);
+  const diffLabel = diffInfo?.label;
+  const diffShort = diffInfo?.short;
   els.partIcon.setAttribute('href', `#i-${ins ? INSTRUMENT_ICON[ins.base] || 'music' : 'music'}`);
-  els.partText.textContent = ins ? ins.label : 'Sem instrumento';
-  const letter = ins && ins.mode !== 'vocals' && diffLabel ? diffLabel[0] : '';
+  els.partText.textContent = ins ? ins.label : 'No instrument';
+  const letter = ins && ins.mode !== 'vocals' && diffShort ? diffShort : '';
   els.partDiff.textContent = letter;
   els.partDiff.title = diffLabel || '';
   els.partDiff.hidden = !letter; // difficulty as a single letter, like the list rows
@@ -600,7 +602,7 @@ function renderPartMenu() {
       for (const d of diffs) {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.textContent = d.label[0]; // F, M, D, E
+        btn.textContent = d.short; // E, M, H, X
         btn.title = d.label;
         btn.setAttribute('aria-label', `${group.label}, ${d.label}`);
         btn.setAttribute('aria-pressed', String(group.active && d.id === els.difficulty.value));
@@ -710,7 +712,7 @@ function fillSectionOptions() {
     return row;
   }));
   activeSection = -2;
-  els.sectionText.textContent = sections.length ? sections[0].name : 'Sem seções';
+  els.sectionText.textContent = sections.length ? sections[0].name : 'No sections';
   paintSectionTicks();
 }
 
@@ -733,7 +735,7 @@ function paintSectionTicks() {
 function setActiveSection(index) {
   if (index === activeSection) return;
   activeSection = index;
-  els.sectionText.textContent = chart?.sections[index]?.name ?? 'Sem seções';
+  els.sectionText.textContent = chart?.sections[index]?.name ?? 'No sections';
   for (const row of els.sectionPop.children) row.dataset.active = String(Number(row.dataset.index) === index);
   if (index >= 0) els.sectionSelect.value = String(index);
 }
@@ -835,7 +837,7 @@ const ROW_HTML = (kind) => `
     <button class="stem-btn" type="button" aria-pressed="false"><svg><use href="#i-${kind}"/></svg><b class="badge"></b></button>
     <input type="range" min="0" max="1.5" step="0.01" value="1">
     <span class="mix-val">100%</span>
-    <button class="icon small-icon reset" type="button" title="Restaurar volume" aria-label="Restaurar volume"><svg><use href="#i-reset"/></svg></button>`;
+    <button class="icon small-icon reset" type="button" title="Reset volume" aria-label="Reset volume"><svg><use href="#i-reset"/></svg></button>`;
 
 function mixerRow(st) {
   const row = document.createElement('div');
@@ -905,13 +907,13 @@ function renderGroup(g) {
     v.val.textContent = `${Math.round(g.value * 100)}%`;
     v.row.classList.toggle('muted', muted);
     v.mute.setAttribute('aria-pressed', String(muted));
-    v.mute.title = `${g.label} (${g.members.length} tracks) — ${muted ? 'ativar' : 'desativar'} (segure para solo)`;
-    v.mute.setAttribute('aria-label', `${muted ? 'Ativar' : 'Desativar'} ${g.label}`);
-    v.range.setAttribute('aria-label', `Volume de ${g.label}`);
+    v.mute.title = `${g.label} (${g.members.length} tracks) — ${muted ? 'unmute' : 'mute'} (hold to solo)`;
+    v.mute.setAttribute('aria-label', `${muted ? 'Unmute' : 'Mute'} ${g.label}`);
+    v.range.setAttribute('aria-label', `${g.label} volume`);
     v.reset.disabled = g.value === 1 && !muted;
     v.kids.hidden = !g.expanded;
     v.expand.setAttribute('aria-expanded', String(g.expanded));
-    v.expand.title = g.expanded ? 'Recolher tracks' : 'Mostrar cada track';
+    v.expand.title = g.expanded ? 'Collapse tracks' : 'Show each track';
     v.expand.setAttribute('aria-label', v.expand.title);
   }
 }
@@ -953,10 +955,10 @@ function applyStem(st) {
     v.val.textContent = `${Math.round(st.value * 100)}%`;
     v.row.classList.toggle('muted', off);
     v.mute.setAttribute('aria-pressed', String(off));
-    v.mute.title = `${st.stem.label} — ${off ? 'ativar' : 'desativar'} (segure para solo)`;
+    v.mute.title = `${st.stem.label} — ${off ? 'unmute' : 'mute'} (hold to solo)`;
     v.reset.disabled = st.value === 1 && !off; // already at the default
-    v.mute.setAttribute('aria-label', `${off ? 'Ativar' : 'Desativar'} ${st.stem.label}`);
-    v.range.setAttribute('aria-label', `Volume de ${st.stem.label}`);
+    v.mute.setAttribute('aria-label', `${off ? 'Unmute' : 'Mute'} ${st.stem.label}`);
+    v.range.setAttribute('aria-label', `${st.stem.label} volume`);
   }
 }
 
@@ -1054,7 +1056,7 @@ async function togglePlay() {
 function syncPlayButton() {
   const playing = player.playing;
   els.play.querySelector('use').setAttribute('href', playing ? '#i-pause' : '#i-play');
-  els.play.setAttribute('aria-label', playing ? 'Pausar' : 'Tocar');
+  els.play.setAttribute('aria-label', playing ? 'Pause' : 'Play');
   setImmersive();
 }
 
@@ -1062,7 +1064,7 @@ function syncPlayButton() {
 function setView(view) {
   highway.setView(view);
   els.viewBtn.setAttribute('aria-pressed', String(view === '3d'));
-  els.viewBtn.title = view === '3d' ? 'Visão 2D (V)' : 'Visão 3D (V)';
+  els.viewBtn.title = view === '3d' ? '2D view (V)' : '3D view (V)';
   store.set('view', view);
 }
 setView(store.get('view') === '3d' ? '3d' : '2d');
@@ -1072,7 +1074,7 @@ els.viewBtn.addEventListener('click', () => setView(highway.view === '3d' ? '2d'
 function setNoteStyle(style) {
   highway.setNoteStyle(style);
   els.styleBtn.setAttribute('aria-pressed', String(style === 'rect'));
-  els.styleBtn.title = style === 'rect' ? 'Notas circulares (N)' : 'Notas retangulares (N)';
+  els.styleBtn.title = style === 'rect' ? 'Round notes (N)' : 'Rectangular notes (N)';
   store.set('noteStyle', style);
 }
 setNoteStyle(store.get('noteStyle') === 'rect' ? 'rect' : 'round');

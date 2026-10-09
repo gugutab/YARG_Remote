@@ -90,7 +90,7 @@ function scanSong(path) {
 
 function sectionAt(sections, time) {
   const i = sectionIndexAt(sections, time);
-  return i >= 0 ? sections[i].name : '(sem seção)';
+  return i >= 0 ? sections[i].name : '(no section)';
 }
 
 const files = [...midiFiles(root)];
@@ -140,16 +140,16 @@ for (const path of files) {
     totalFound += list.length;
     console.log(`  ${category}: ${list.length}`);
     for (const r of list.slice(0, maxPerCategory)) {
-      const span = r.end !== undefined ? ` até ${formatTime(r.end)}` : '';
-      const extra = r.count ? ` (${r.count} notas)` : '';
-      console.log(`    ${formatTime(r.time)}${span} · seção: ${sectionAt(sections, r.time)} · ${r.instrument} ${r.difficulty}${extra}`);
+      const span = r.end !== undefined ? ` until ${formatTime(r.end)}` : '';
+      const extra = r.count ? ` (${r.count} notes)` : '';
+      console.log(`    ${formatTime(r.time)}${span} · section: ${sectionAt(sections, r.time)} · ${r.instrument} ${r.difficulty}${extra}`);
     }
-    if (list.length > maxPerCategory) console.log(`    ... mais ${list.length - maxPerCategory}`);
+    if (list.length > maxPerCategory) console.log(`    ... ${list.length - maxPerCategory} more`);
   }
 }
 
 if (!asJson) {
-  console.log('\nResumo (ocorrências em todos os arquivos):');
+  console.log('\nSummary (occurrences across all files):');
   for (const [category, count] of [...catalogTotals].sort((a, b) => b[1] - a[1])) console.log(`  ${category}: ${count}`);
-  console.log(`\n${totalFiles} arquivo(s) lidos, ${totalFound} ocorrência(s).`);
+  console.log(`\n${totalFiles} file(s) read, ${totalFound} occurrence(s).`);
 }

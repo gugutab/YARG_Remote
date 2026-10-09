@@ -82,7 +82,7 @@ test('a pro chart offers Pro, extended Pro and 4-lane drum options; 4-lane mode 
     { tick: 0, pitch: 110, len: 480 },
   ]);
   const labels = instrumentOptions(midi).map((o) => [o.id, o.label]);
-  assert.deepEqual(labels, [['drums-four', 'Bateria (4 lanes)'], ['drums-pro', 'Bateria (Pro)'], ['drums-extended', 'Bateria (Pro 7 lanes)']]);
+  assert.deepEqual(labels, [['drums-four', 'Drums (4 lanes)'], ['drums-pro', 'Drums (Pro)'], ['drums-extended', 'Drums (Pro 7 lanes)']]);
 
   // the yellow note sits under the marker 110 (tom), so Pro shows a tom here
   const pro = buildChart(midi, instrumentOptions(midi)[1], EXPERT);
@@ -94,9 +94,9 @@ test('a pro chart offers Pro, extended Pro and 4-lane drum options; 4-lane mode 
 
 test('a 4-lane chart offers one drum option and a 5-lane chart offers 5 lanes', () => {
   const four = drumsMidi([{ tick: 0, pitch: 96, len: 120 }]);
-  assert.deepEqual(instrumentOptions(four).map((o) => o.label), ['Bateria (4 lanes)']);
+  assert.deepEqual(instrumentOptions(four).map((o) => o.label), ['Drums (4 lanes)']);
   const five = drumsMidi([{ tick: 0, pitch: 101, len: 120 }]);
-  assert.deepEqual(instrumentOptions(five).map((o) => o.label), ['Bateria (5 lanes)']);
+  assert.deepEqual(instrumentOptions(five).map((o) => o.label), ['Drums (5 lanes)']);
 });
 
 test('tom markers toggle like YARG: under one marker is a tom, under two overlapping markers is a cymbal again', () => {

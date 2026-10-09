@@ -51,7 +51,7 @@ export async function scanSongs(entries) {
       files,
     });
   }
-  songs.sort((a, b) => a.title.localeCompare(b.title, 'pt', { sensitivity: 'base' }));
+  songs.sort((a, b) => a.title.localeCompare(b.title, 'en', { sensitivity: 'base' }));
   return songs;
 }
 

@@ -2,12 +2,12 @@
 // Pure functions, no DOM.
 import { plainText } from './ini.js';
 
-// song.ini difficulty keys (value 0..6 = difficulty level, -1 = no part). Labels in Portuguese for the UI.
+// song.ini difficulty keys (value 0..6 = difficulty level, -1 = no part). Labels for the UI.
 export const DIFF_LABELS = [
-  ['diff_guitar', 'Guitarra'], ['diff_bass', 'Baixo'], ['diff_rhythm', 'Rhythm'], ['diff_guitar_coop', 'Guitarra coop'],
-  ['diff_keys', 'Teclado'], ['diff_drums', 'Bateria'], ['diff_drums_real', 'Bateria Pro'],
-  ['diff_vocals', 'Vocal'], ['diff_vocals_harm', 'Harmonias'],
-  ['diff_guitar_real', 'Guitarra Pro'], ['diff_bass_real', 'Baixo Pro'], ['diff_keys_real', 'Teclado Pro'],
+  ['diff_guitar', 'Guitar'], ['diff_bass', 'Bass'], ['diff_rhythm', 'Rhythm'], ['diff_guitar_coop', 'Guitar coop'],
+  ['diff_keys', 'Keys'], ['diff_drums', 'Drums'], ['diff_drums_real', 'Drums Pro'],
+  ['diff_vocals', 'Vocals'], ['diff_vocals_harm', 'Harmonies'],
+  ['diff_guitar_real', 'Guitar Pro'], ['diff_bass_real', 'Bass Pro'], ['diff_keys_real', 'Keys Pro'],
 ];
 
 export function formatDuration(ms) {
@@ -23,8 +23,8 @@ const SHOWN_KEYS = new Set([
   ...DIFF_LABELS.map(([k]) => k),
 ]);
 
-// Header chips, in display order: Álbum, Faixa, Duração, Charter first, then the rest.
-// [ini key, label, icon id]; the track number is shown once, as "Faixa" (album track, else playlist track).
+// Header chips, in display order: Album, Track, Length, Charter first, then the rest.
+// [ini key, label, icon id]; the track number is shown once, as "Track" (album track, else playlist track).
 const META_ORDER = ['album', 'track', 'length', 'charter', 'artist', 'genre', 'year', 'frets', 'playlist', 'sub_playlist', 'delay'];
 
 // [{ label, value, icon }] for the header chips; empty values are left out.
@@ -36,17 +36,17 @@ export function metaRows(song) {
   };
   const delay = Number(ini.delay);
   const items = {
-    album: ['Álbum', text(song.album), 'disc'],
-    track: ['Faixa', text(ini.album_track) || text(ini.playlist_track), 'hash'],
-    length: ['Duração', formatDuration(ini.song_length), 'clock'],
+    album: ['Album', text(song.album), 'disc'],
+    track: ['Track', text(ini.album_track) || text(ini.playlist_track), 'hash'],
+    length: ['Length', formatDuration(ini.song_length), 'clock'],
     charter: ['Charter', text(ini.charter), 'pen'],
-    artist: ['Artista', text(song.artist), 'user'],
-    genre: ['Gênero', text(ini.genre), 'tag'],
-    year: ['Ano', text(ini.year), 'calendar'],
+    artist: ['Artist', text(song.artist), 'user'],
+    genre: ['Genre', text(ini.genre), 'tag'],
+    year: ['Year', text(ini.year), 'calendar'],
     frets: ['Frets', text(ini.frets), 'pen'],
     playlist: ['Playlist', text(ini.playlist), 'list'],
     sub_playlist: ['Subplaylist', text(ini.sub_playlist), 'list'],
-    delay: ['Delay do áudio', Number.isFinite(delay) && delay !== 0 ? `${delay} ms` : '', 'clock'],
+    delay: ['Audio delay', Number.isFinite(delay) && delay !== 0 ? `${delay} ms` : '', 'clock'],
   };
   return META_ORDER.map((k) => ({ label: items[k][0], value: items[k][1], icon: items[k][2] })).filter((r) => r.value);
 }
@@ -77,7 +77,7 @@ export function extraRows(song) {
     .filter(([key]) => !SHOWN_KEYS.has(key))
     .map(([key, value]) => ({ label: key, value: plainText(value) }))
     .filter((r) => r.value !== '')
-    .sort((a, b) => a.label.localeCompare(b.label));
+    .sort((a, b) => a.label.localeCompare(b.label, 'en'));
 }
 
 // [min, max] BPM of the tempo map, or null without tempo events.
@@ -97,11 +97,11 @@ export function bpmLabel(tempos) {
 // Per-chart counts shown in each instrument card: [{ label, value }].
 export function chartStats(chart) {
   if (!chart) return [];
-  const rows = [{ label: 'Notas', value: String(chart.notes.length) }];
+  const rows = [{ label: 'Notes', value: String(chart.notes.length) }];
   if (chart.mode === 'vocals') {
-    rows.push({ label: 'Letra', value: String(chart.lyrics?.length ?? 0) });
-    if (chart.harmonies?.length) rows.push({ label: 'Harmonias', value: String(chart.harmonies.length) });
-    if (chart.percussion?.length) rows.push({ label: 'Percussão', value: String(chart.percussion.length) });
+    rows.push({ label: 'Lyrics', value: String(chart.lyrics?.length ?? 0) });
+    if (chart.harmonies?.length) rows.push({ label: 'Harmonies', value: String(chart.harmonies.length) });
+    if (chart.percussion?.length) rows.push({ label: 'Percussion', value: String(chart.percussion.length) });
   } else {
     const sustains = chart.notes.filter((n) => n.length > 0).length;
     if (sustains) rows.push({ label: 'Sustains', value: String(sustains) });
@@ -109,7 +109,7 @@ export function chartStats(chart) {
   }
   rows.push({ label: 'Solos', value: String(chart.solos?.length ?? 0) });
   rows.push({ label: 'Star power', value: String(chart.starPower?.length ?? 0) });
-  rows.push({ label: 'Seções', value: String(chart.sections?.length ?? 0) });
+  rows.push({ label: 'Sections', value: String(chart.sections?.length ?? 0) });
   return rows;
 }
 
@@ -133,7 +133,7 @@ export function stemGroup(label) {
 }
 
 export function stemGroupLabel(key) {
-  const names = { drums: 'Bateria', vocals: 'Vocal', guitar: 'Guitarra', bass: 'Baixo', rhythm: 'Rhythm', keys: 'Teclado', song: 'Música', crowd: 'Plateia', backing: 'Backing' };
+  const names = { drums: 'Drums', vocals: 'Vocals', guitar: 'Guitar', bass: 'Bass', rhythm: 'Rhythm', keys: 'Keys', song: 'Song', crowd: 'Crowd', backing: 'Backing' };
   return names[key] ?? key;
 }
 

@@ -611,7 +611,7 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
 /* Round 31: the note-style button sits right under the 3D button, in the corner of the stage */
 button.icon.stage-btn.style-btn { top: 54px; }
 
-/* Long instrument names (e.g. "Bateria (Pro estendida)") shrink with an ellipsis instead of covering the info button and level */
+/* Long instrument names (e.g. "Drums (Pro 7 lanes)") shrink with an ellipsis instead of covering the info button and level */
 .icard-top .icard-head { min-width: 0; overflow: hidden; }
 .icard-top .icard-name { overflow: hidden; text-overflow: ellipsis; }
 .icard-top .icard-info { flex: none; }
@@ -634,7 +634,7 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .icards { display: block; column-width: 260px; column-gap: 10px; }
 .icards > .icard { break-inside: avoid; margin-bottom: 10px; }
 
-/* "Outras propriedades do song.ini": as many columns as fit (each at least 190 px) */
+/* "Other song.ini properties": as many columns as fit (each at least 190 px) */
 .kv.kv-pairs { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 18px; }
 .kv-pairs > div { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: 0 10px; align-items: baseline; min-width: 0; }
 .kv-pairs dt { overflow-wrap: anywhere; }

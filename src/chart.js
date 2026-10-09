@@ -5,21 +5,21 @@
 // Reference: YARG.Core MidIOHelper.cs and MidiInstrumentPreparser.cs.
 
 export const INSTRUMENTS = [
-  { id: 'guitar', label: 'Guitarra', tracks: ['PART GUITAR'], mode: 'lanes' },
-  { id: 'bass', label: 'Baixo', tracks: ['PART BASS'], mode: 'lanes' },
+  { id: 'guitar', label: 'Guitar', tracks: ['PART GUITAR'], mode: 'lanes' },
+  { id: 'bass', label: 'Bass', tracks: ['PART BASS'], mode: 'lanes' },
   { id: 'rhythm', label: 'Rhythm', tracks: ['PART RHYTHM'], mode: 'lanes' },
-  { id: 'keys', label: 'Teclado', tracks: ['PART KEYS'], mode: 'lanes' },
-  { id: 'drums', label: 'Bateria', tracks: ['PART DRUMS', 'PART DRUM'], mode: 'drums' },
-  { id: 'vocals', label: 'Vocal', tracks: ['PART VOCALS'], mode: 'vocals' },
+  { id: 'keys', label: 'Keys', tracks: ['PART KEYS'], mode: 'lanes' },
+  { id: 'drums', label: 'Drums', tracks: ['PART DRUMS', 'PART DRUM'], mode: 'drums' },
+  { id: 'vocals', label: 'Vocals', tracks: ['PART VOCALS'], mode: 'vocals' },
   // Harmonies are their own part in YARG (HARM1 is the lead; HARM2/HARM3 sit behind it). Vocals have no difficulty.
-  { id: 'harmony', label: 'Harmonia', tracks: ['HARM1', 'PART HARM1'], mode: 'vocals', harmony: true },
+  { id: 'harmony', label: 'Harmony', tracks: ['HARM1', 'PART HARM1'], mode: 'vocals', harmony: true },
 ];
 
 export const DIFFICULTIES = [
-  { id: 'easy', label: 'Fácil', base: 60 },
-  { id: 'medium', label: 'Médio', base: 72 },
-  { id: 'hard', label: 'Difícil', base: 84 },
-  { id: 'expert', label: 'Especialista', base: 96 },
+  { id: 'easy', label: 'Easy', short: 'E', base: 60 },
+  { id: 'medium', label: 'Medium', short: 'M', base: 72 },
+  { id: 'hard', label: 'Hard', short: 'H', base: 84 },
+  { id: 'expert', label: 'Expert', short: 'X', base: 96 },
 ];
 
 const LANES = 5;
@@ -98,13 +98,13 @@ export function findTrack(midi, instrument) {
 // The drum modes a track can be played in. A chart with cymbal flags can be played as Pro or
 // as 4-lane (flags ignored, every yellow/blue/green is a tom), the same choice YARG offers.
 export function drumModes(track) {
-  const four = { mode: 'four', label: 'Bateria (4 lanes)', short: '4 lanes' };
+  const four = { mode: 'four', label: 'Drums (4 lanes)', short: '4 lanes' };
   switch (drumKind(track)) {
-    case 'five': return [{ mode: 'five', label: 'Bateria (5 lanes)', short: '5 lanes' }];
+    case 'five': return [{ mode: 'five', label: 'Drums (5 lanes)', short: '5 lanes' }];
     case 'pro': return [
       four,
-      { mode: 'pro', label: 'Bateria (Pro)', short: 'Pro' },
-      { mode: 'extended', label: `Bateria (Pro ${EXTENDED_DRUM_LANES.length} lanes)`, short: `Pro ${EXTENDED_DRUM_LANES.length} lanes` },
+      { mode: 'pro', label: 'Drums (Pro)', short: 'Pro' },
+      { mode: 'extended', label: `Drums (Pro ${EXTENDED_DRUM_LANES.length} lanes)`, short: `Pro ${EXTENDED_DRUM_LANES.length} lanes` },
     ];
     default: return [four];
   }
