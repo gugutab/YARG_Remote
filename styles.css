@@ -423,3 +423,42 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
 @media (max-width: 700px) {
   .section-wrap { display: none; }
 }
+
+/* ---------- Round 9: mobile info header, top bar and info button alignment ---------- */
+.now { align-items: flex-start; }
+.now > .pop-wrap { align-self: flex-start; }
+.now > .pop-wrap > .icon { width: 24px; height: 24px; margin-top: -1px; }
+.now > .pop-wrap > .icon svg { width: 16px; height: 16px; }
+
+/* Info header on narrow layouts (small screens, or a wide screen with the library open): the image on the
+   left, title and subtitle to its right, the chips below. */
+@container (max-width: 560px) {
+  .info-head { grid-template-columns: auto 1fr; gap: 4px 14px; }
+  .info-head-text { display: contents; }
+  .info-head img { grid-row: 1 / span 2; width: 96px; height: 96px; }
+  #infoTitle { grid-column: 2; align-self: end; font-size: 20px; }
+  #infoArtist { grid-column: 2; align-self: start; }
+  #infoQuote, #infoMeta { grid-column: 1 / -1; }
+  .info-head img[hidden] ~ .info-head-text #infoTitle, .info-head img[hidden] ~ .info-head-text #infoArtist { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  .info-head { grid-template-columns: auto 1fr; gap: 4px 14px; }
+  .info-head-text { display: contents; }
+  .info-head img { grid-row: 1 / span 2; width: 96px; height: 96px; }
+  #infoTitle { grid-column: 2; align-self: end; font-size: 20px; }
+  #infoArtist { grid-column: 2; align-self: start; }
+  #infoQuote, #infoMeta { grid-column: 1 / -1; }
+  .info-head img[hidden] ~ .info-head-text #infoTitle, .info-head img[hidden] ~ .info-head-text #infoArtist { grid-column: 1 / -1; }
+
+  /* top bar: keep the time and the section chip, make everything a little tighter */
+  .tb-bottom { gap: 4px; }
+  .transport { min-width: 0; gap: 0; flex: 1 1 auto; }
+  .transport .icon { width: 32px; height: 32px; }
+  .transport .icon.primary { width: 36px; height: 36px; }
+  .transport .time { display: inline; margin-left: 4px; font-size: 12px; white-space: nowrap; }
+  .transport .section-wrap { display: block; margin-left: 4px; min-width: 0; }
+  .section-wrap .chip-btn { max-width: 96px; min-height: 28px; padding: 0 6px; }
+  .tools { flex: none; }
+  .tools .icon { width: 32px; height: 32px; }
+  .tb-top { gap: 6px; }
+}

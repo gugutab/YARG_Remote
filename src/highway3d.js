@@ -9,7 +9,6 @@ import {
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the flat view shows 2.5)
 const FAR_SCALE = 0.3; // size of things at the far edge relative to the hit line
 const FAR_TOP = 0.05; // far edge position, as a fraction of the canvas height
-const HIT_Y3 = 0.915; // hit line position, as a fraction of the canvas height
 const HEAD_R = 0.36; // note head radius, in lane widths
 const HEAD_TILT = 0.55; // vertical squash of the heads (they lie on the road)
 const FADE_IN = 0.14; // fraction of the depth over which notes fade in at the far edge
@@ -26,8 +25,9 @@ export function renderLanes3D(hw, t, w, h) {
   const portrait = h > w;
   const roadW = portrait ? w * 0.94 : Math.min(w * 0.62, h * 1.05); // road width at the hit line
   const laneW = roadW / lanes;
+  const padRy = laneW * HEAD_R * 1.05 * HEAD_TILT; // vertical radius of the hit pads
+  const hitY = h - (padRy + 14); // hit line: just far enough from the bottom edge to fit the pads
   const cx = w / 2;
-  const hitY = h * HIT_Y3;
   const windowSec = DEPTH_SEC / hw.neck; // neck speed shortens or stretches the visible time
   const k = 1 / FAR_SCALE - 1;
   const scaleAt = (d) => 1 / (1 + k * d); // perspective scale at depth d (0 = hit line, 1 = far edge)
