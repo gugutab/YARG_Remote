@@ -191,5 +191,5 @@ export function noteShape(g, x, y, rx, ry, style, dist = 0) {
 }
 
 // Resting look of the hit pads at the bottom of the board (fill and ring alpha); they light up from here.
-export const PAD_FILL_ALPHA = 0.07; // it was 0.14
-export const PAD_RING_ALPHA = 0.32; // it was 0.55
+export const PAD_FILL_ALPHA = 0.26; // originally 0.14: the resting pads are more opaque now
+export const PAD_RING_ALPHA = 0.8; // originally 0.55
