@@ -582,3 +582,7 @@ button.icon.small-icon.expand-btn svg { width: 14px; height: 14px; }
    auto column collapse while the 14 px arrow straddles the gaps) */
 .mix-row.has-expand { grid-template-columns: 36px auto 1fr 40px 28px; }
 button.icon.small-icon.expand-btn { margin-inline: -6px; }
+
+/* Round 21: the arrow is 18 px wide (same 2 px outer spacing as before) */
+button.icon.small-icon.expand-btn { width: 18px; }
+button.icon.small-icon.expand-btn svg { width: 18px; height: 18px; }
