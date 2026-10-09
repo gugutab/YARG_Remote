@@ -3,7 +3,6 @@
 
 export const ROW_H = 56;
 export const HEAD_H = 26;
-export const GAP = 6; // space between the rows and the scrollbar (rows get right: GAP in the CSS)
 const OVERSCAN_PX = 5 * ROW_H;
 const THUMB_DELAY_MS = 120; // a row asks for its thumbnail only after it stayed visible this long (skips flings)
 
@@ -50,12 +49,27 @@ export function itemAt(offsets, y) {
   return a;
 }
 
-export function createVirtualList({ scroller, label, thumbs, onSelect, text }) {
+// Pure geometry of the rail: where a scroll offset / group sits on it (thumb center), and the inverse.
+export function railPos(offset, range, railH, thumbH) {
+  return thumbH / 2 + (range > 0 ? Math.min(1, Math.max(0, offset / range)) : 0) * (railH - thumbH);
+}
+export function railScroll(y, range, railH, thumbH) {
+  const f = railH - thumbH > 0 ? (y - thumbH / 2) / (railH - thumbH) : 0;
+  return Math.min(1, Math.max(0, f)) * range;
+}
+
+export function createVirtualList({ scroller, label, rail, thumbs, onSelect, text, anchor = (l) => l[0] }) {
   let items = [];
   let offsets = layoutOffsets(items);
   const rows = new Map(); // index -> { el, timer }
   let activeSong = null;
   let frame = 0;
+  let groups = []; // { index, label, anchor } of the headers, for the rail
+  const canvas = rail?.querySelector('canvas');
+  const railThumb = rail?.querySelector('.rail-thumb');
+  const bubble = rail?.querySelector('.rail-bubble');
+  const range = () => Math.max(0, offsets[items.length] - scroller.clientHeight);
+  const thumbH = () => Math.min(rail.clientHeight, Math.max(28, (scroller.clientHeight / Math.max(1, offsets[items.length])) * rail.clientHeight));
 
   const spacer = document.createElement('li');
   spacer.className = 'spacer';
@@ -96,6 +110,54 @@ export function createVirtualList({ scroller, label, thumbs, onSelect, text }) {
     return entry;
   }
 
+  function css(name, fallback) {
+    return getComputedStyle(scroller).getPropertyValue(name).trim() || fallback;
+  }
+
+  // Ticks for every group header and a short label at the first group of each initial / decade / bucket.
+  function drawRail() {
+    if (!rail) return;
+    const H = rail.clientHeight;
+    const W = rail.clientWidth;
+    const off = range() <= 0 || H <= 0; // nothing to scroll: the rail is invisible but keeps its size
+    rail.classList.toggle('off', off);
+    if (off) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    const g = canvas.getContext('2d');
+    g.scale(dpr, dpr);
+    g.clearRect(0, 0, W, H);
+    const th = thumbH();
+    const tick = css('--line', '#2a3140');
+    const muted = css('--muted', '#8b95a7');
+    g.font = '600 9px system-ui, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    let lastText = null;
+    let lastY = -99;
+    for (const gr of groups) {
+      const y = railPos(offsets[gr.index], range(), H, th);
+      const isAnchor = gr.anchor !== lastText;
+      if (isAnchor && y - lastY >= 11) {
+        g.fillStyle = muted;
+        g.fillText(gr.anchor, 8, y);
+        lastY = y;
+      }
+      if (isAnchor) lastText = gr.anchor;
+      g.fillStyle = isAnchor ? muted : tick;
+      g.fillRect(W - 6, Math.round(y), isAnchor ? 5 : 3, 1);
+    }
+    railThumb.style.height = `${th}px`;
+  }
+
+  function updateThumb() {
+    if (!rail || rail.classList.contains('off')) return;
+    const th = thumbH();
+    const y = railPos(scroller.scrollTop, range(), rail.clientHeight, th) - th / 2;
+    railThumb.style.transform = `translateY(${y}px)`;
+  }
+
   function render() {
     frame = 0;
     const top = scroller.scrollTop;
@@ -114,27 +176,64 @@ export function createVirtualList({ scroller, label, thumbs, onSelect, text }) {
       scroller.append(entry.el);
     }
     if (label) {
-      label.style.right = `${scroller.offsetWidth - scroller.clientWidth + GAP}px`; // keep the scrollbar uncovered
       const idx = itemAt(offsets, top);
       let head = '';
       for (let i = idx; i >= 0; i--) if (items[i]?.type === 'head') { head = items[i].label; break; }
       label.textContent = head;
       label.hidden = !head;
     }
+    updateThumb();
   }
 
   const schedule = () => { if (!frame) frame = requestAnimationFrame(render); };
   scroller.addEventListener('scroll', schedule, { passive: true });
-  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(schedule).observe(scroller);
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(() => { drawRail(); schedule(); }).observe(scroller);
+  }
+
+  // Scrubbing: press or drag on the rail to move through the list; near a group tick it snaps to that header.
+  let hideBubble = 0;
+  function scrubTo(clientY) {
+    const box = rail.getBoundingClientRect();
+    const y = clientY - box.top;
+    const th = thumbH();
+    let target = railScroll(y, range(), box.height, th);
+    for (const gr of groups) {
+      if (Math.abs(railPos(offsets[gr.index], range(), box.height, th) - y) <= 4) { target = Math.min(offsets[gr.index], range()); break; }
+    }
+    scroller.scrollTop = target;
+    render();
+    bubble.textContent = label?.textContent || '';
+    bubble.hidden = !bubble.textContent;
+    bubble.style.top = `${Math.min(box.height - 12, Math.max(12, y))}px`;
+  }
+  if (rail) {
+    rail.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      clearTimeout(hideBubble);
+      rail.setPointerCapture(e.pointerId);
+      rail.classList.add('dragging');
+      scrubTo(e.clientY);
+    });
+    rail.addEventListener('pointermove', (e) => { if (rail.classList.contains('dragging')) scrubTo(e.clientY); });
+    const end = () => {
+      rail.classList.remove('dragging');
+      hideBubble = setTimeout(() => { bubble.hidden = true; }, 500);
+    };
+    rail.addEventListener('pointerup', end);
+    rail.addEventListener('pointercancel', end);
+  }
 
   return {
     setItems(next, { keepScroll = false } = {}) {
       items = next;
       offsets = layoutOffsets(items);
+      groups = items.flatMap((it, index) => (it.type === 'head' ? [{ index, label: it.label, anchor: anchor(it.label) }] : []));
       for (const entry of rows.values()) { clearTimeout(entry.timer); entry.el.remove(); }
       rows.clear();
       spacer.style.height = `${offsets[items.length]}px`;
       if (!keepScroll) scroller.scrollTop = 0;
+      drawRail();
       render();
     },
     setActive(song) {

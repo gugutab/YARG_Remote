@@ -96,7 +96,7 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 /* Windowed list: rows are absolutely positioned inside the scrolling list (heights match ROW_H / HEAD_H in virtuallist.js) */
 .songs-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
 #songs { position: relative; list-style: none; margin: 0; padding: 0; overflow: auto; flex: 1; min-height: 0; }
-#songs li { position: absolute; left: 0; right: 6px; box-sizing: border-box; } /* right = GAP in virtuallist.js */
+#songs li { position: absolute; left: 0; box-sizing: border-box; }
 #songs li.spacer { position: static; pointer-events: none; }
 #songs li.row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-bottom: 1px solid var(--line); cursor: pointer; }
 #songs li.row:hover { background: var(--panel-2); }
@@ -656,11 +656,17 @@ button.icon.stage-btn.style-btn { top: 54px; }
 /* The library's own close button replaces the hamburger while the library is open */
 .app:not(.lib-closed) #toggleLibrary, .app:not(.lib-closed) #infoMenu { display: none; }
 
-/* Library list scrollbar: slim, dark, no arrows. (Firefox has no arrows; Chromium needs the webkit rules, and they only
-   apply when scrollbar-width is not set there.) */
-#songs::-webkit-scrollbar { width: 8px; }
-#songs::-webkit-scrollbar-track { background: transparent; }
-#songs::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
-#songs::-webkit-scrollbar-thumb:hover { background: var(--muted); }
-#songs::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
-@supports not selector(::-webkit-scrollbar) { #songs { scrollbar-width: thin; scrollbar-color: var(--line) transparent; } }
+/* Library list: the native scrollbar is hidden; the rail on the right is the scrollbar (thumb), the group index (ticks
+   and short labels) and a quick-navigation strip (press or drag). --rail-w also sets the right edge of the rows and
+   of the sticky group label, so they always line up. */
+.songs-wrap { --rail-w: 24px; }
+#songs { scrollbar-width: none; }
+#songs::-webkit-scrollbar { display: none; }
+#songs li { right: var(--rail-w); }
+.group-label { right: var(--rail-w); }
+.rail { position: absolute; top: 0; right: 0; bottom: 0; width: var(--rail-w); z-index: 3; touch-action: none; cursor: pointer; user-select: none; }
+.rail canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.rail-thumb { position: absolute; left: 2px; right: 2px; top: 0; border-radius: 6px; background: rgba(120, 150, 255, .16); border: 1px solid rgba(120, 150, 255, .28); pointer-events: none; transition: background .15s; }
+.rail:hover .rail-thumb, .rail.dragging .rail-thumb { background: rgba(120, 150, 255, .3); }
+.rail-bubble { position: absolute; right: calc(var(--rail-w) + 6px); transform: translateY(-50%); max-width: 220px; padding: 4px 9px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 4px 14px rgba(0, 0, 0, .4); font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.rail.off { visibility: hidden; }

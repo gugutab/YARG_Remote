@@ -6,13 +6,13 @@ import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, re
 import { songDelaySeconds, plainText } from './ini.js';
 import { metaRows, extraRows, chartStats, bpmLabel, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel } from './songinfo.js';
 import { saveLibrary, loadLibrary, loadThumb, saveThumb } from './store.js';
-import { filterSongs, sortSongs, genresOf, buildItems } from './songlist.js';
+import { filterSongs, sortSongs, genresOf, buildItems, anchorLabel } from './songlist.js';
 import { createVirtualList } from './virtuallist.js';
 import { createThumbs, renderCoverThumb } from './thumbs.js';
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
-  'app', 'library', 'toggleLibrary', 'closeLibrary', 'groupLabel', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
+  'app', 'library', 'toggleLibrary', 'closeLibrary', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterInstrument', 'filterGenre', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
@@ -208,7 +208,8 @@ async function offerSavedFolder() {
 // The list is windowed (only the rows near the viewport are in the DOM) and shows album thumbnails.
 const thumbs = createThumbs({ render: (song) => renderCoverThumb(song, findCover), load: loadThumb, save: saveThumb });
 const list = createVirtualList({
-  scroller: els.songs, label: els.groupLabel, thumbs, text: plainText, onSelect: (song) => selectSong(song),
+  scroller: els.songs, label: els.groupLabel, rail: els.rail, thumbs, text: plainText, onSelect: (song) => selectSong(song),
+  anchor: (label) => anchorLabel(label, els.sortBy.value),
 });
 
 function renderList({ keepScroll = false } = {}) {

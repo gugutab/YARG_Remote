@@ -97,3 +97,11 @@ export function buildItems(sorted, by = 'title') {
   }
   return items;
 }
+
+// Short text for the scrollbar rail: the initial for text sorts, '70s' for decades, '3–4' for length buckets.
+export function anchorLabel(label, by = 'title') {
+  if (by === 'year') return /^\d{4}s$/.test(label) ? label.slice(2) : '?';
+  if (by === 'length') return /^Unknown/.test(label) ? '?' : label.replace(/\s*min$/, '').replace(/\s+/g, '');
+  const text = norm(plainText(label)).replace(/^[^a-z0-9]+/, '');
+  return /^[a-z]/.test(text) ? text[0].toUpperCase() : '#';
+}

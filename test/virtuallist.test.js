@@ -102,3 +102,27 @@ test('artist and album sorts get one header per name (case and accents ignored)'
   assert.deepEqual(buildItems(sorted, 'artist').filter((i) => i.type === 'head').map((i) => i.label), ['emile', 'Zed']);
   assert.deepEqual(buildItems(sortSongs(sorted, 'album'), 'album').filter((i) => i.type === 'head').map((i) => i.label), ['X', 'Y']);
 });
+
+test('rail geometry: scroll offset and pointer position are inverses', async () => {
+  const { railPos, railScroll } = await import('../src/virtuallist.js');
+  const H = 400;
+  const th = 40;
+  assert.equal(railPos(0, 1000, H, th), 20);
+  assert.equal(railPos(1000, 1000, H, th), 380);
+  for (const off of [0, 250, 777, 1000]) assert.ok(Math.abs(railScroll(railPos(off, 1000, H, th), 1000, H, th) - off) < 1e-9);
+  assert.equal(railScroll(-50, 1000, H, th), 0); // dragging past the ends clamps
+  assert.equal(railScroll(900, 1000, H, th), 1000);
+  assert.equal(railPos(10, 0, H, th), 20); // nothing to scroll
+});
+
+test('anchorLabel gives short rail labels', async () => {
+  const { anchorLabel } = await import('../src/songlist.js');
+  assert.equal(anchorLabel('AC/DC', 'artist'), 'A');
+  assert.equal(anchorLabel('(Pronounced', 'album'), 'P');
+  assert.equal(anchorLabel('99 Red', 'title'), '#');
+  assert.equal(anchorLabel('1970s', 'year'), '70s');
+  assert.equal(anchorLabel('Unknown year', 'year'), '?');
+  assert.equal(anchorLabel('3–4 min', 'length'), '3–4');
+  assert.equal(anchorLabel('< 3 min', 'length'), '<3');
+  assert.equal(anchorLabel('7+ min', 'length'), '7+');
+});

@@ -98,7 +98,7 @@ Flow: folder → `library.js` (songs) → click → `midi.js` (parse) + `chart.j
 | `src/player.js` | `MultiTrackPlayer`: stems in `AudioBuffer`, aligned to the chart (`alignChannel`) and played by `PitchShifter` (SoundTouch, `vendor/`). Speed via `tempo`. |
 | `src/library.js` | Folder scan (FSA or input), serializable index, `resolveFile`. |
 | `src/store.js` | IndexedDB: folder handle, index and album thumbnails (`thumbs` store, db v2). Failures are silent. |
-| `src/virtuallist.js` | Windowed library list (fixed-height rows and group headers; only rows near the viewport are in the DOM). `ROW_H`/`HEAD_H` must match the CSS. |
+| `src/virtuallist.js` | Windowed library list with a custom scrollbar rail (group ticks, short anchor labels, press/drag to jump, snaps to headers). Fixed-height rows and headers; `ROW_H`/`HEAD_H` must match the CSS. |
 | `src/thumbs.js` | Library thumbnails: ~96 px JPEG made in the browser, LRU of object URLs (cap 300) + IndexedDB, 3 jobs at a time, dropped if the row scrolled away. |
 | `src/ini.js` | `song.ini` and `songDelaySeconds` (`delay` in ms or `delay_seconds`). |
 | `vendor/` | SoundTouchJS 0.1.30 (LGPL-2.1), no build. License included. |
