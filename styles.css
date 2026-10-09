@@ -502,3 +502,16 @@ button.icon.primary svg { width: 18px; height: 18px; }
 .icard-top .icard-name { white-space: nowrap; }
 .icard-top .pips { gap: 3px; }
 .icard-top .pips i { width: 10px; }
+
+/* Round 15: floating buttons keep a background (button.icon is transparent and was winning on specificity) */
+button.icon.info-menu {
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+button.icon.info-menu:hover { background: var(--panel-2); }
+button.icon.stage-btn { background: rgba(13, 17, 23, 0.55); border: 1px solid var(--line); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+button.icon.stage-btn:hover { background: rgba(13, 17, 23, 0.8); }
+button.icon.stage-btn[aria-pressed="true"] { border-color: var(--accent); }
