@@ -16,7 +16,7 @@ const els = Object.fromEntries([
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'sectionBtn', 'sectionPop', 'sectionText', 'partDiff', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
   'fullscreen', 'viewBtn', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
-  'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoClose', 'infoPlay', 'infoMenu',
+  'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay', 'infoMenu',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
 ].map((id) => [id, $(id)]));
 
@@ -560,7 +560,6 @@ function renderPartMenu() {
 
 els.infoPopMore.addEventListener('click', () => { closePopovers(); setInfoOpen(true); });
 els.infoMenu.addEventListener('click', () => setLibraryOpen(!libraryOpen()));
-els.infoClose.addEventListener('click', () => setInfoOpen(false));
 els.infoPlay.addEventListener('click', () => togglePlay());
 
 function showPlayInfo(on) {
