@@ -128,3 +128,6 @@ export function fillTailHalo(g, color, cx, half, reach, yTop, yBot, strength, wi
     g.restore();
   }
 }
+
+export const HIT_FLASH_SEC = 0.14; // how long a hit pad stays lit after a note hit
+export const BAR_FLASH_SEC = 0.24; // ... after a pedal or open hit (it lights every pad)

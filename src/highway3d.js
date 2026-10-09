@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   GUITAR_LANE_COLORS, KICK_COLOR, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, STAR_POWER_NOTE, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, heldPulse, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, STAR_POWER_NOTE, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, heldPulse, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha,
 } from './gfx.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the flat view shows 2.5)
@@ -12,11 +12,9 @@ const FAR_TOP = 0.05; // far edge position, as a fraction of the canvas height
 const HEAD_R = 0.36; // note head radius, in lane widths
 const HEAD_TILT = 0.55; // vertical squash of the heads (they lie on the road)
 const FADE_IN = 0.14; // fraction of the depth over which notes fade in at the far edge
-const HIT_FLASH_SEC = 0.14;
 const ROAD_END = 1.8; // the road runs well past the last visible note, so it has no visible far edge: the fade hides the rest
 const BAR_DEPTH = 0.0087; // one third of the earlier 0.026 // pedal/open bar thickness along the road, in depth units (it lies flat on the fretboard)
 const GLOW_DEPTH = 0.009; // half-height of the hit glow (it was 0.026 and looked too tall)
-const BAR_FLASH_SEC = 0.24; // how long the hit pads and the hit bar stay lit after a pedal hit
 const easeOut = (x) => 1 - (1 - x) ** 3;
 
 export function renderLanes3D(hw, t, w, h) {

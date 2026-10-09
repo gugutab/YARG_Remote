@@ -25,6 +25,8 @@ import {
   STAR_POWER_NOTE,
   exitTime,
   heldAmount,
+  HIT_FLASH_SEC,
+  BAR_FLASH_SEC,
   fillHalo,
   fillTailHalo,
   tailShimmer,
@@ -118,8 +120,9 @@ export class Highway {
     }
 
     // hit line sits under the notes, so notes passing over it stay visible
-    g.fillStyle = 'rgba(255,255,255,0.7)';
-    g.fillRect(x0 - 6, hitY, laneW * chart.lanes + 12, 3);
+    // (as in 3D: 4 px shorter and at half the alpha, so it does not cut the pads below)
+    g.fillStyle = 'rgba(255,255,255,0.35)';
+    g.fillRect(x0 - 4, hitY, laneW * chart.lanes + 8, 3);
 
     // sustains first, then heads
     const from = firstVisibleIndex(chart.notes, t, this.maxLength);
@@ -129,6 +132,31 @@ export class Highway {
     }
     const radius = Math.min(laneW * 0.36, 26);
     const colors = chart.laneColors || GUITAR_LANE_COLORS;
+
+    // hit pads, like the 3D view: a ring per lane at the hit line, lit when a note is hit, while a long note is held,
+    // and (every pad) on a pedal or open hit
+    const flash = new Array(chart.lanes).fill(0);
+    let barFlash = 0;
+    for (const n of visible) {
+      const past = t - n.time;
+      if (past < 0) continue;
+      if (n.lane >= 0 && !n.open) {
+        if (past < HIT_FLASH_SEC) flash[n.lane] = Math.max(flash[n.lane], 1 - past / HIT_FLASH_SEC);
+        flash[n.lane] = Math.max(flash[n.lane], heldAmount(n, t) * (0.75 + 0.15 * Math.sin(t * 22)));
+      } else if (past < BAR_FLASH_SEC) {
+        barFlash = Math.max(barFlash, 1 - past / BAR_FLASH_SEC);
+      }
+    }
+    for (let i = 0; i < chart.lanes; i++) {
+      g.beginPath();
+      g.arc(x0 + (i + 0.5) * laneW, hitY, radius * 1.05, 0, Math.PI * 2);
+      g.fillStyle = withAlpha(colors[i], Math.min(0.9, 0.14 + 0.5 * flash[i] + 0.35 * barFlash));
+      g.fill();
+      g.lineWidth = 2;
+      g.strokeStyle = withAlpha(colors[i], Math.min(1, 0.55 + 0.45 * Math.max(flash[i], barFlash)));
+      g.stroke();
+    }
+
     // kick (lane -1) is a bar across all columns, not a column
     // pedal bars go behind the other notes and sustains
     for (const n of visible) {
