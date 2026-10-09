@@ -2,9 +2,9 @@ import { parseMidi } from './midi.js';
 import { DIFFICULTIES, instrumentOptions, availableDifficulties, buildChart, sectionIndexAt } from './chart.js';
 import { MultiTrackPlayer } from './player.js';
 import { Highway } from './highway.js';
-import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, readBytes, serializeSongs, restoreSongs, restoreRemoteSongs } from './library.js';
+import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, readBytes, serializeSongs, restoreSongs, restoreRemoteSongs } from './library.js';
 import { songDelaySeconds, plainText } from './ini.js';
-import { metaRows, difficultyLevels, extraRows, chartStats } from './songinfo.js';
+import { metaRows, difficultyLevels, extraRows, chartStats, stemKind, stemBadge } from './songinfo.js';
 import { saveLibrary, loadLibrary } from './store.js';
 import { filterSongs, sortSongs, genresOf } from './songlist.js';
 
@@ -16,10 +16,11 @@ const els = Object.fromEntries([
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'mixer', 'settingsBtn', 'settingsPop',
   'fullscreen', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
-  'difficultyCards', 'chartStats', 'mixerInfo', 'levels', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoClose', 'infoPlay',
+  'difficultyCards', 'chartStats', 'mixerInfo', 'levels', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoClose', 'infoPlay', 'infoMenu', 'difficultyTitle',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
 ].map((id) => [id, $(id)]));
 
+for (const img of [els.cover, els.infoCover]) img.addEventListener('error', () => { img.hidden = true; });
 const player = new MultiTrackPlayer();
 const highway = new Highway(els.highway);
 let songs = [];
@@ -273,10 +274,10 @@ async function selectSong(song) {
     if (token === loadToken) setLoadState('error', `Não foi possível ler notes.mid: ${err.message}`);
     return;
   }
-  const coverEntry = ['album.jpg', 'album.png', 'album.jpeg'].map((n) => song.files.get(n)).find(Boolean);
+  const coverEntry = findCover(song);
   let coverUrl = null;
   try {
-    if (coverEntry) coverUrl = URL.createObjectURL(await coverEntry.getFile());
+    if (coverEntry) coverUrl = coverEntry.url || URL.createObjectURL(await coverEntry.getFile());
   } catch { /* a missing cover must not block the song */ }
   if (token !== loadToken) {
     if (coverUrl) URL.revokeObjectURL(coverUrl);
@@ -336,6 +337,7 @@ function renderLoadState() {
 function setInfoOpen(open) {
   infoOpen = open;
   els.info.hidden = !open;
+  els.app.classList.toggle('info-open', open); // the top bar is redundant while the info screen shows everything
   els.infoBtn.setAttribute('aria-pressed', String(open));
   closePopovers();
   renderLoadState();
@@ -380,7 +382,12 @@ function renderSongInfo(song) {
 // Open pickers (instrument and difficulty buttons) mirror the top-bar selects, which stay the source of truth.
 function renderPickers() {
   const instruments = current?.options ?? [];
-  const iconOf = { guitar: 'guitar', bass: 'guitar', rhythm: 'guitar', keys: 'keys', drums: 'drum', vocals: 'mic' };
+  // Vocal parts have a single chart: the difficulty picker only applies to the other instruments.
+  const noDifficulty = currentInstrument()?.mode === 'vocals';
+  els.difficulty.hidden = noDifficulty;
+  els.difficultyTitle.hidden = noDifficulty;
+  els.difficultyCards.hidden = noDifficulty;
+  const iconOf = { guitar: 'guitar', bass: 'guitar', rhythm: 'guitar', keys: 'keys', drums: 'drum', vocals: 'mic', harmony: 'mic' };
   els.instrumentCards.replaceChildren(...instruments.map((ins) => {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -410,6 +417,7 @@ function renderPickers() {
 }
 
 els.infoBtn.addEventListener('click', () => { if (current || loadInfo.state !== 'idle') setInfoOpen(!infoOpen); });
+els.infoMenu.addEventListener('click', () => setLibraryOpen(!libraryOpen()));
 els.infoClose.addEventListener('click', () => setInfoOpen(false));
 els.infoPlay.addEventListener('click', () => togglePlay());
 
@@ -496,19 +504,18 @@ function buildMixer(stems) {
 function mixerRow(st) {
   const row = document.createElement('div');
   row.className = 'mix-row';
+  const kind = stemKind(st.stem.label);
   row.innerHTML = `
-    <button class="icon small-icon mute" type="button" aria-pressed="false"><svg><use href="#i-volume"/></svg></button>
-    <span class="mix-name"></span>
+    <button class="stem-btn" type="button" aria-pressed="false"><svg><use href="#i-${kind}"/></svg><b class="badge"></b></button>
     <input type="range" min="0" max="1.5" step="0.01" value="1">
     <span class="mix-val">100%</span>
     <button class="icon small-icon reset" type="button" title="Restaurar volume" aria-label="Restaurar volume"><svg><use href="#i-reset"/></svg></button>`;
-  const name = row.querySelector('.mix-name');
-  name.textContent = st.stem.label;
-  name.title = st.stem.label;
-  const view = { row, range: row.querySelector('input'), val: row.querySelector('.mix-val'), mute: row.querySelector('.mute') };
+  const mute = row.querySelector('.stem-btn');
+  mute.querySelector('.badge').textContent = stemBadge(st.stem.label);
+  const view = { row, range: row.querySelector('input'), val: row.querySelector('.mix-val'), mute };
   st.views.push(view);
   view.range.addEventListener('input', () => { st.value = Number(view.range.value); st.muted = false; applyStem(st); }); // moving the slider re-enables the track
-  view.mute.addEventListener('click', () => { st.muted = !st.muted; applyStem(st); });
+  mute.addEventListener('click', () => { st.muted = !st.muted; applyStem(st); });
   row.querySelector('.reset').addEventListener('click', () => { st.value = 1; st.muted = false; applyStem(st); });
   return row;
 }
@@ -521,9 +528,9 @@ function applyStem(st) {
     v.val.textContent = `${Math.round(st.value * 100)}%`;
     v.row.classList.toggle('muted', st.muted);
     v.mute.setAttribute('aria-pressed', String(st.muted));
-    v.mute.title = st.muted ? 'Ativar track' : 'Desativar track';
+    v.mute.title = `${st.stem.label} — ${st.muted ? 'ativar' : 'desativar'}`;
     v.mute.setAttribute('aria-label', `${st.muted ? 'Ativar' : 'Desativar'} ${st.stem.label}`);
-    v.mute.querySelector('use').setAttribute('href', st.muted ? '#i-volume-off' : '#i-volume');
+    v.range.setAttribute('aria-label', `Volume de ${st.stem.label}`);
   }
 }
 

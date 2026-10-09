@@ -20,12 +20,12 @@ de código e mensagens de commit estão em inglês (padrão já usado).
 - UI redesenhada na branch `claude/ui-redesign` (derivada da abaixo): chart em tela cheia, barra superior com ícones, biblioteca recolhível à esquerda (busca, filtro por instrumento/gênero, ordenação em `src/songlist.js`), ajustes e mixer em popovers. Tela de info da música (abre ao escolher a música, já com o carregamento em andamento; Tocar fica desabilitado até `ready`; tecla I ou botão ⓘ reabre): pickers abertos de instrumento/dificuldade, ajustes e mixer (estado compartilhado com os popovers da barra via `settings`/`stemStates`). Atalhos: Espaço, I, L, F, [ ], setas. Pasta de testes real do usuário: `A:\music\Songs` (ex.: Guitar Hero\Quickplay, 'Smoke On The Water' em 0:40; 'More Than A Feeling' em 1:00). O compartilhamento 192.16.0.202 não respondeu (porta 445).
 - Branch de trabalho anterior: `claude/upbeat-knuth-87adga` (remoto `origin` = `gugutab/YARG_Remote`). Não crie PR sem
   pedido explícito. O remoto também tem `main`, que não é usado.
-- 52 testes unitários passando (`npm test`).
+- 54 testes unitários passando (`npm test`).
 - Funciona no Chromium (File System Access API). Em outros navegadores, o `<input webkitdirectory>` é o
   fallback, sem persistência.
 
 Suportado: guitarra, baixo, rhythm, teclado (5 lanes); bateria em 4 lanes, Pro (com marcadores de prato),
-5 lanes; vocal com letra, harmonias HARM1–3, percussão; open (SysEx PhaseShift); tap; HOPO e strum forçado;
+5 lanes; vocal solo (`PART VOCALS`) e Harmonia (instrumento próprio: HARM1 lidera, HARM2/3 atrás; letra e percussão caem para `PART VOCALS`), sem dificuldade para vocal; letra, percussão; open (SysEx PhaseShift); tap; HOPO e strum forçado;
 accent e ghost; double kick; rolls (tremolo, trill, kick roll); solos e star power (faixas de fundo); seções
 (EVENTS); delay do áudio e do chart; velocidade e neck; persistência da pasta e da lista (IndexedDB).
 

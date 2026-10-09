@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseMidi } from '../src/midi.js';
-import { buildChart, displayLyric, INSTRUMENTS, DIFFICULTIES } from '../src/chart.js';
+import { buildChart, displayLyric, instrumentOptions, availableDifficulties, INSTRUMENTS, DIFFICULTIES } from '../src/chart.js';
 import { buildMidi, tempo120, trackName, text, event, meta } from './smf.js';
 
 const GUITAR = INSTRUMENTS.find((i) => i.id === 'guitar');
@@ -52,18 +52,32 @@ test('vocals: lyrics stored as lyric events (type 5) are read, and bracketed tex
   assert.deepEqual(chart.lyrics.map((l) => l.time), [0, 1]); // tick 960 at 120 bpm = 1 s
 });
 
-test('vocals: harmonies, percussion and lyrics are read from their tracks', () => {
-  const midi = parseMidi(buildMidi(480, [
-    [tempo120(), { dt: 0, bytes: trackName('PART VOCALS') }, event(0, text('Hel-')), { dt: 0, bytes: [0x90, 60, 100] },
-      { dt: 480, bytes: [0x80, 60, 0] }, { dt: 0, bytes: [0x90, 96, 100] }, { dt: 480, bytes: [0x80, 96, 0] },
-      { dt: 0, bytes: [0x90, 97, 100] }, { dt: 480, bytes: [0x80, 97, 0] }],
-    [{ dt: 0, bytes: trackName('HARM1') }, { dt: 0, bytes: [0x90, 64, 100] }, { dt: 480, bytes: [0x80, 64, 0] }],
-  ]));
-  const chart = buildChart(midi, VOCALS, EXPERT);
+const harmonyMidi = () => parseMidi(buildMidi(480, [
+  [tempo120(), { dt: 0, bytes: trackName('PART VOCALS') }, event(0, text('Hel-')), { dt: 0, bytes: [0x90, 60, 100] },
+    { dt: 480, bytes: [0x80, 60, 0] }, { dt: 0, bytes: [0x90, 96, 100] }, { dt: 480, bytes: [0x80, 96, 0] },
+    { dt: 0, bytes: [0x90, 97, 100] }, { dt: 480, bytes: [0x80, 97, 0] }],
+  [{ dt: 0, bytes: trackName('HARM1') }, { dt: 0, bytes: [0x90, 64, 100] }, { dt: 480, bytes: [0x80, 64, 0] }],
+  [{ dt: 0, bytes: trackName('HARM2') }, { dt: 0, bytes: [0x90, 67, 100] }, { dt: 480, bytes: [0x80, 67, 0] }],
+]));
+
+test('solo vocals: lead notes, percussion and lyrics only, no harmony parts', () => {
+  const chart = buildChart(harmonyMidi(), VOCALS, EXPERT);
   assert.deepEqual(chart.notes.map((n) => n.pitch), [60]);
-  assert.deepEqual(chart.harmonies.map((h) => [h.part, h.notes.map((n) => n.pitch)]), [[1, [64]]]);
+  assert.deepEqual(chart.harmonies, []);
   assert.deepEqual(chart.percussion.map((p) => p.played), [true, false]);
   assert.deepEqual(chart.lyrics.map((l) => l.text), ['Hel-']);
+});
+
+test('harmony: HARM1 leads, HARM2/3 sit behind, lyrics and percussion fall back to PART VOCALS', () => {
+  const midi = harmonyMidi();
+  const HARMONY = INSTRUMENTS.find((i) => i.id === 'harmony');
+  const chart = buildChart(midi, HARMONY, EXPERT);
+  assert.deepEqual(chart.notes.map((n) => n.pitch), [64]);
+  assert.deepEqual(chart.harmonies.map((h) => [h.part, h.notes.map((n) => n.pitch)]), [[2, [67]]]);
+  assert.deepEqual(chart.lyrics.map((l) => l.text), ['Hel-']);
+  assert.deepEqual(chart.percussion.map((p) => p.played), [true, false]);
+  assert.deepEqual(instrumentOptions(midi).map((i) => i.id), ['vocals', 'harmony']);
+  assert.equal(availableDifficulties(midi, HARMONY).length, 1);
 });
 
 test('lyric symbols: timing and scoring markers are not shown; = is a hyphen; § joins syllables', () => {

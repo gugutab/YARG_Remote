@@ -36,3 +36,10 @@ test('bpmRange and chartStats', () => {
   const stats = Object.fromEntries(chartStats(chart, { tempos: [{ usPerQuarter: 500000 }] }).map((r) => [r.label, r.value]));
   assert.deepEqual([stats.BPM, stats.Notas, stats.Sustains, stats.Solos, stats['Seções']], ['120', '2', '1', '1', '2']);
 });
+
+import { stemKind, stemBadge } from '../src/songinfo.js';
+test('stem icons and badges', () => {
+  assert.deepEqual(['drums_2', 'guitar', 'bass', 'rhythm', 'vocals', 'keys', 'crowd', 'song', 'backing'].map(stemKind),
+    ['drum', 'guitar', 'guitar', 'guitar', 'mic', 'keys', 'users', 'music', 'music']);
+  assert.deepEqual(['drums_2', 'bass', 'rhythm', 'guitar'].map(stemBadge), ['2', 'B', 'R', '']);
+});

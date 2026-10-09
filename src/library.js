@@ -92,6 +92,7 @@ export function restoreRemoteSongs(index) {
       {
         name: f.name,
         path: f.path,
+        url: remoteFileUrl(f.path), // images can be shown straight from the server
         getFile: async () => {
           const res = await fetch(remoteFileUrl(f.path));
           if (!res.ok) throw new Error(`${f.name}: HTTP ${res.status}`);
@@ -109,6 +110,19 @@ export async function resolveFile(root, path) {
   for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part);
   const handle = await dir.getFileHandle(parts[parts.length - 1]);
   return handle.getFile();
+}
+
+// The cover image of a song folder: album.* first, then other common names, then any image that is not a
+// background or an alternate cover.
+const IMAGE_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'];
+export function findCover(song) {
+  const base = (f) => f.name.replace(/\.[^.]+$/, '').toLowerCase();
+  const images = [...song.files.values()].filter((f) => IMAGE_EXT.includes(f.name.split('.').pop().toLowerCase()));
+  for (const want of ['album', 'cover', 'folder', 'front', 'art']) {
+    const hit = images.find((f) => base(f) === want);
+    if (hit) return hit;
+  }
+  return images.find((f) => !/^(background|bg|album_alt|banner|highway)/.test(base(f))) || null;
 }
 
 export function audioStemsOf(song) {

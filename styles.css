@@ -268,3 +268,15 @@ button.icon.small-icon svg { width: 16px; height: 16px; }
   .info-actions { flex-wrap: wrap; }
   .info-grid { grid-template-columns: 1fr; }
 }
+
+/* ---------- Info screen without the top bar, stem icons ---------- */
+.app.info-open .topbar { display: none; }
+.info-menu { position: absolute; top: 8px; left: 8px; z-index: 2; background: var(--panel); border-color: var(--line); }
+.info-scroll { padding-top: 52px; }
+.mix-row { grid-template-columns: 36px 1fr 40px 28px; }
+.stem-btn { position: relative; width: 36px; height: 32px; display: inline-grid; place-items: center; padding: 0; background: var(--panel-2); border-radius: 8px; }
+.stem-btn svg { width: 18px; height: 18px; }
+.stem-btn .badge { position: absolute; right: 2px; bottom: 0; font-size: 10px; line-height: 1; color: var(--accent); font-style: normal; }
+.mix-row.muted .stem-btn { color: #e5392b; border-color: #e5392b; }
+.mix-row.muted .stem-btn::after { content: ""; position: absolute; left: 6px; right: 6px; top: 50%; border-top: 2px solid #e5392b; transform: rotate(-35deg); }
+.mix-row.muted .mix-name { opacity: .4; }

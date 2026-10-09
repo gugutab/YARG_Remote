@@ -11,6 +11,8 @@ export const INSTRUMENTS = [
   { id: 'keys', label: 'Teclado', tracks: ['PART KEYS'], mode: 'lanes' },
   { id: 'drums', label: 'Bateria', tracks: ['PART DRUMS', 'PART DRUM'], mode: 'drums' },
   { id: 'vocals', label: 'Vocal', tracks: ['PART VOCALS'], mode: 'vocals' },
+  // Harmonies are their own part in YARG (HARM1 is the lead; HARM2/HARM3 sit behind it). Vocals have no difficulty.
+  { id: 'harmony', label: 'Harmonia', tracks: ['HARM1', 'PART HARM1'], mode: 'vocals', harmony: true },
 ];
 
 export const DIFFICULTIES = [
@@ -147,23 +149,28 @@ export function buildChart(midi, instrument, difficulty) {
     const vocalNotes = (vocalTrack) => vocalTrack.notes
       .filter((n) => inRange(n.pitch, VOCAL_RANGE))
       .map((n) => ({ ...timed(n), pitch: n.pitch }));
+    // Solo vocals use PART VOCALS alone; the harmony part leads with HARM1 and adds HARM2/HARM3 behind it.
     const notes = vocalNotes(track);
+    const soloTrack = midi.tracks.find((t) => t.name.toUpperCase() === 'PART VOCALS');
     // Percussion (YARG.Core VocalsTrack): 96 is played, 97 is not played.
-    const percussion = track.notes
+    const percussionTrack = track.notes.some((n) => n.pitch === PERCUSSION_NOTE || n.pitch === NONPLAYED_PERCUSSION_NOTE) || !soloTrack ? track : soloTrack;
+    const percussion = percussionTrack.notes
       .filter((n) => n.pitch === PERCUSSION_NOTE || n.pitch === NONPLAYED_PERCUSSION_NOTE)
       .map((n) => ({ time: toSec(n.tick), played: n.pitch === PERCUSSION_NOTE }));
     // Lyrics are meta type 5 events when present (most charts). Some charts put them in text events
     // instead, where bracketed texts are sections or states, not lyrics.
-    const lyricEvents = track.lyrics.length > 0
-      ? track.lyrics
-      : track.texts.filter((t) => !t.text.startsWith('['));
+    const lyricSource = (t) => (t.lyrics.length > 0 ? t.lyrics : t.texts.filter((x) => !x.text.startsWith('[')));
+    let lyricEvents = lyricSource(track);
+    if (lyricEvents.length === 0 && soloTrack && soloTrack !== track) lyricEvents = lyricSource(soloTrack); // harmony charts keep lyrics on PART VOCALS
     // Symbols that only mark timing or scoring are not shown (YARG.Core LyricSymbols.cs). Events left
     // empty by that (a lone '+', say) are dropped.
     const lyrics = lyricEvents
       .map((t) => ({ time: toSec(t.tick), text: displayLyric(t.text) }))
       .filter((l) => l.text !== '');
     // Harmony parts HARM1..HARM3 (or PART HARM1..3), drawn beside the lead.
-    const harmonies = harmonyTracks(midi).map((h) => ({ part: h.part, notes: vocalNotes(h.track) }));
+    const harmonies = instrument.harmony
+      ? harmonyTracks(midi).filter((h) => h.part > 1).map((h) => ({ part: h.part, notes: vocalNotes(h.track) }))
+      : [];
     return { mode: 'vocals', notes, harmonies, percussion, lyrics, ...commonParts(midi, track, toSec) };
   }
 

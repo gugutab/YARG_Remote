@@ -92,3 +92,24 @@ export function chartStats(chart, midi) {
   rows.push({ label: 'Seções', value: String(chart.sections?.length ?? 0) });
   return rows;
 }
+
+// Which icon and corner badge represent a stem in the mixer (stem file names vary: drums_1, guitar, song, ...).
+export function stemKind(label) {
+  const n = String(label).toLowerCase();
+  if (/drum|kick|snare|cymbal|\btom|percus/.test(n)) return 'drum';
+  if (/vocal|vox|harm|sing/.test(n)) return 'mic';
+  if (/key|piano|organ|synth/.test(n)) return 'keys';
+  if (/guitar|bass|rhythm|lead/.test(n)) return 'guitar';
+  if (/crowd|audience/.test(n)) return 'users';
+  return 'music';
+}
+
+// Short text that tells apart stems sharing an icon: the trailing number (drums_2 -> "2"), B for bass, R for rhythm.
+export function stemBadge(label) {
+  const n = String(label).toLowerCase();
+  const digits = /(\d+)$/.exec(n);
+  if (digits) return digits[1];
+  if (/bass/.test(n)) return 'B';
+  if (/rhythm/.test(n)) return 'R';
+  return '';
+}
