@@ -75,3 +75,18 @@ export function heldAmount(n, t) {
   const rampOut = t <= end ? 1 : Math.max(0, 1 - (t - end) / FADE_SEC);
   return Math.min(rampIn, rampOut);
 }
+
+// Radial halo: fills a circle of radius `outer` around (0, 0) that is strongest near `inner` and fades to nothing at the
+// edge. `color` is a #rrggbb string. The caller positions/scales the context (an ellipse is a scaled circle).
+export function fillHalo(g, color, inner, outer, strength) {
+  const n = parseInt(color.slice(1), 16);
+  const rgb = `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+  const grad = g.createRadialGradient(0, 0, inner, 0, 0, outer);
+  grad.addColorStop(0, `rgba(${rgb},${strength})`);
+  grad.addColorStop(0.45, `rgba(${rgb},${strength * 0.4})`);
+  grad.addColorStop(1, `rgba(${rgb},0)`);
+  g.fillStyle = grad;
+  g.beginPath();
+  g.arc(0, 0, outer, 0, Math.PI * 2);
+  g.fill();
+}

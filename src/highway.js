@@ -25,6 +25,7 @@ import {
   STAR_POWER_NOTE,
   exitTime,
   heldAmount,
+  fillHalo,
   tailShimmer,
   heldPulse,
 } from './gfx.js';
@@ -181,10 +182,10 @@ export class Highway {
       const r = radius * (1 + 0.4 * k) * (1 + (heldPulse(t) - 1) * amt);
       if (amt > 0) { // a soft halo while the note is held
         g.globalCompositeOperation = 'lighter';
-        g.beginPath();
-        g.arc(cx, cy, r * 1.5, 0, Math.PI * 2);
-        g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.28 * amt);
-        g.fill();
+        g.save();
+        g.translate(cx, cy);
+        fillHalo(g, n.sp ? STAR_POWER_NOTE : colors[n.lane], r * 0.7, r * 2.1, 0.55 * amt); // radial fade-out
+        g.restore();
         g.globalCompositeOperation = 'source-over';
       }
       g.beginPath();

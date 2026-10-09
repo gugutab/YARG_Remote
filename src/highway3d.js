@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   GUITAR_LANE_COLORS, KICK_COLOR, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, STAR_POWER_NOTE, exitTime, heldAmount, tailShimmer, heldPulse, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, STAR_POWER_NOTE, exitTime, heldAmount, fillHalo, tailShimmer, heldPulse, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha,
 } from './gfx.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the flat view shows 2.5)
@@ -218,10 +218,11 @@ export function renderLanes3D(hw, t, w, h) {
     const ry = rx * HEAD_TILT;
     if (amt > 0) { // a soft halo while the note is held
       g.globalCompositeOperation = 'lighter';
-      g.beginPath();
-      g.ellipse(x, y, rx * 1.55, ry * 1.55, 0, 0, Math.PI * 2);
-      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.28 * amt);
-      g.fill();
+      g.save();
+      g.translate(x, y);
+      g.scale(1, HEAD_TILT); // the halo lies on the road: a circle squashed like the head
+      fillHalo(g, n.sp ? STAR_POWER_NOTE : colors[n.lane], rx * 0.7, rx * 2.1, 0.55 * amt); // radial fade-out
+      g.restore();
       g.globalCompositeOperation = 'source-over';
     }
     const body = tintWhite(n.sp ? STAR_POWER_NOTE : n.tap ? TAP_COLOR : colors[n.lane], Math.min(1, kx + amt * (0.32 + 0.12 * tailShimmer(t)))); // an active long note's head is lighter, like its tail
