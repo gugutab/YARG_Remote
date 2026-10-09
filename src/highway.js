@@ -24,7 +24,7 @@ import {
   firstIndexAtOrAfter,
   STAR_POWER_NOTE,
   exitTime,
-  isHeld,
+  heldAmount,
   tailShimmer,
   heldPulse,
 } from './gfx.js';
@@ -156,11 +156,11 @@ export class Highway {
       }
       const cx = x0 + (n.lane + 0.5) * laneW;
       // held (active): the whole tail is lighter, more opaque and slowly brightens and dims (no extra shapes)
-      const held = isHeld(n, t);
-      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], held ? 0.8 : 0.55);
+      const amt = heldAmount(n, t); // fades in after the hit
+      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.55 + 0.25 * amt);
       g.fillRect(cx - radius * 0.35, yTop, radius * 0.7, Math.max(0, yBot - yTop));
-      if (held) {
-        g.fillStyle = `rgba(255,255,255,${0.3 + 0.12 * tailShimmer(t)})`;
+      if (amt > 0) {
+        g.fillStyle = `rgba(255,255,255,${amt * (0.3 + 0.12 * tailShimmer(t))})`;
         g.fillRect(cx - radius * 0.35, yTop, radius * 0.7, Math.max(0, yBot - yTop));
       }
     }
@@ -173,18 +173,17 @@ export class Highway {
       if (past > FADE_SEC) continue;
       const k = Math.max(0, past) / FADE_SEC; // 0 at the hit line, 1 when gone
       const cy = yOf(Math.max(n.time, t)); // parked on the hit line during the exit
-      const heldNow = isHeld(n, t);
-      const white = heldNow ? 0.32 + 0.12 * tailShimmer(t) : k; // an active long note's head is lighter, like its tail
+      const amt = heldAmount(n, t);
+      const white = Math.min(1, k + amt * (0.32 + 0.12 * tailShimmer(t))); // an active long note's head is lighter, like its tail
       // ghost notes are dimmed, accents are larger (YARG draws them the same way)
       g.globalAlpha = (1 - k) * (n.ghost ? GHOST_ALPHA : 1);
       const cx = x0 + (n.lane + 0.5) * laneW;
-      const held = isHeld(n, t);
-      const r = radius * (1 + 0.4 * k) * (held ? heldPulse(t) : 1);
-      if (held) { // a soft halo while the note is held
+      const r = radius * (1 + 0.4 * k) * (1 + (heldPulse(t) - 1) * amt);
+      if (amt > 0) { // a soft halo while the note is held
         g.globalCompositeOperation = 'lighter';
         g.beginPath();
         g.arc(cx, cy, r * 1.5, 0, Math.PI * 2);
-        g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.28);
+        g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.28 * amt);
         g.fill();
         g.globalCompositeOperation = 'source-over';
       }

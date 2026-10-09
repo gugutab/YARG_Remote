@@ -63,3 +63,15 @@ export const tailShimmer = (t) => 0.5 + 0.5 * Math.sin(t * 4);
 // The held head is a little bigger than a normal one and swells very slightly.
 export const HELD_SCALE = 1.12;
 export const heldPulse = (t) => HELD_SCALE + 0.025 * Math.sin(t * 9);
+
+// How much of the "active long note" look to show, 0..1: it fades in over HELD_FADE_IN seconds after the hit and
+// fades out over the exit (FADE_SEC) after the tail ends, so nothing pops.
+export const HELD_FADE_IN = 0.2;
+export function heldAmount(n, t) {
+  if (!(n.length > 0) || t < n.time) return 0;
+  const end = n.time + n.length;
+  const x = Math.min(1, (t - n.time) / HELD_FADE_IN);
+  const rampIn = x * x * (3 - 2 * x); // smoothstep
+  const rampOut = t <= end ? 1 : Math.max(0, 1 - (t - end) / FADE_SEC);
+  return Math.min(rampIn, rampOut);
+}

@@ -26,7 +26,7 @@ test('notes inside a star power phrase are flagged, others are not', () => {
   assert.deepEqual(chart.notes.map((n) => n.sp), [false, true, true, false, false]);
 });
 
-import { exitTime, isHeld, heldPulse, HELD_SCALE, tailShimmer } from '../src/gfx.js';
+import { exitTime, isHeld, heldPulse, HELD_SCALE, tailShimmer, heldAmount, HELD_FADE_IN, FADE_SEC } from '../src/gfx.js';
 test('long notes stay held until their tail ends, and the exit starts then', () => {
   const n = { time: 10, length: 2 };
   assert.equal(exitTime(n), 12);
@@ -43,4 +43,19 @@ test('the held head is a little bigger than normal and the tail shimmer stays wi
     assert.ok(tailShimmer(t) >= 0 && tailShimmer(t) <= 1);
   }
   assert.equal(HELD_SCALE, 1.12);
+});
+
+test('the active look of a long note fades in after the hit and out after the tail, never popping', () => {
+  const n = { time: 10, length: 2 };
+  assert.equal(heldAmount(n, 9.99), 0);
+  assert.equal(heldAmount(n, 10), 0);
+  const mid = heldAmount(n, 10 + HELD_FADE_IN / 2);
+  assert.ok(mid > 0.3 && mid < 0.7);
+  assert.equal(heldAmount(n, 11), 1);
+  assert.equal(heldAmount(n, 12), 1);
+  assert.ok(heldAmount(n, 12 + FADE_SEC / 2) > 0.3 && heldAmount(n, 12 + FADE_SEC / 2) < 0.7);
+  assert.equal(heldAmount(n, 12 + FADE_SEC), 0);
+  assert.equal(heldAmount({ time: 10, length: 0 }, 10.1), 0);
+  let last = 0; // continuous: no step bigger than a few percent between 5 ms samples
+  for (let x = 9.9; x < 12.4; x += 0.005) { const v = heldAmount(n, x); assert.ok(Math.abs(v - last) < 0.1); last = v; }
 });

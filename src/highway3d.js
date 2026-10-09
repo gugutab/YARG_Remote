@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   GUITAR_LANE_COLORS, KICK_COLOR, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, STAR_POWER_NOTE, exitTime, isHeld, tailShimmer, heldPulse, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, STAR_POWER_NOTE, exitTime, heldAmount, tailShimmer, heldPulse, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha,
 } from './gfx.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the flat view shows 2.5)
@@ -107,7 +107,7 @@ export function renderLanes3D(hw, t, w, h) {
   for (const n of visible) {
     const past = t - n.time;
     if (past < 0) continue;
-    if (n.lane >= 0 && !n.open && isHeld(n, t)) flash[n.lane] = Math.max(flash[n.lane], 0.75 + 0.15 * Math.sin(t * 22));
+    if (n.lane >= 0 && !n.open) flash[n.lane] = Math.max(flash[n.lane], heldAmount(n, t) * (0.75 + 0.15 * Math.sin(t * 22)));
     if (n.lane >= 0 && !n.open) {
       if (past < HIT_FLASH_SEC) flash[n.lane] = Math.max(flash[n.lane], 1 - past / HIT_FLASH_SEC);
     } else if (past < BAR_FLASH_SEC && 1 - past / BAR_FLASH_SEC > barFlash) {
@@ -189,13 +189,13 @@ export function renderLanes3D(hw, t, w, h) {
       quad(dBot, dTop, -half, half);
     } else {
       // held (active): the whole tail is lighter, more opaque and slowly brightens and dims (no extra shapes)
-      const held = isHeld(n, t);
-      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], held ? 0.85 : 0.6);
+      const amt = heldAmount(n, t); // fades in after the hit
+      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.6 + 0.25 * amt);
       const mid = n.lane + 0.5 - half;
       quad(dBot, dTop, mid - HEAD_R * 0.38, mid + HEAD_R * 0.38);
       g.fill();
-      if (held) {
-        g.fillStyle = `rgba(255,255,255,${0.3 + 0.12 * tailShimmer(t)})`;
+      if (amt > 0) {
+        g.fillStyle = `rgba(255,255,255,${amt * (0.3 + 0.12 * tailShimmer(t))})`;
         quad(dBot, dTop, mid - HEAD_R * 0.38, mid + HEAD_R * 0.38);
       }
     }
@@ -213,18 +213,18 @@ export function renderLanes3D(hw, t, w, h) {
     const p = scaleAt(d);
     const x = xAt(n.lane + 0.5 - half, d);
     const y = yAt(d);
-    const held = isHeld(n, t);
-    const rx = laneW * HEAD_R * p * (1 + 0.4 * kx) * (held ? heldPulse(t) : 1);
+    const amt = heldAmount(n, t);
+    const rx = laneW * HEAD_R * p * (1 + 0.4 * kx) * (1 + (heldPulse(t) - 1) * amt);
     const ry = rx * HEAD_TILT;
-    if (held) { // a soft halo while the note is held
+    if (amt > 0) { // a soft halo while the note is held
       g.globalCompositeOperation = 'lighter';
       g.beginPath();
       g.ellipse(x, y, rx * 1.55, ry * 1.55, 0, 0, Math.PI * 2);
-      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.28);
+      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.28 * amt);
       g.fill();
       g.globalCompositeOperation = 'source-over';
     }
-    const body = tintWhite(n.sp ? STAR_POWER_NOTE : n.tap ? TAP_COLOR : colors[n.lane], held ? 0.32 + 0.12 * tailShimmer(t) : kx); // an active long note's head is lighter, like its tail
+    const body = tintWhite(n.sp ? STAR_POWER_NOTE : n.tap ? TAP_COLOR : colors[n.lane], Math.min(1, kx + amt * (0.32 + 0.12 * tailShimmer(t)))); // an active long note's head is lighter, like its tail
     g.globalAlpha = (1 - kx) * (n.ghost ? GHOST_ALPHA : 1) * Math.min(1, (1 - d) / FADE_IN);
     // thickness: a darker disc underneath, then the top face
     const th = rx * 0.28;
