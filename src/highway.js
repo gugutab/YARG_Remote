@@ -155,9 +155,14 @@ export class Highway {
         continue;
       }
       const cx = x0 + (n.lane + 0.5) * laneW;
-      // held: the whole tail slowly brightens and dims (no extra shapes)
-      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.55 + (isHeld(n, t) ? 0.14 * tailShimmer(t) : 0));
+      // held (active): the whole tail is lighter, more opaque and slowly brightens and dims (no extra shapes)
+      const held = isHeld(n, t);
+      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], held ? 0.8 : 0.55);
       g.fillRect(cx - radius * 0.35, yTop, radius * 0.7, Math.max(0, yBot - yTop));
+      if (held) {
+        g.fillStyle = `rgba(255,255,255,${0.3 + 0.12 * tailShimmer(t)})`;
+        g.fillRect(cx - radius * 0.35, yTop, radius * 0.7, Math.max(0, yBot - yTop));
+      }
     }
 
     // Heads. Once a note reaches the hit line it stops moving and plays its exit animation:

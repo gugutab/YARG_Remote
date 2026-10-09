@@ -188,10 +188,16 @@ export function renderLanes3D(hw, t, w, h) {
       g.fillStyle = withAlpha(OPEN_COLOR, 0.3);
       quad(dBot, dTop, -half, half);
     } else {
-      // held: the whole tail slowly brightens and dims (no extra shapes)
-      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.6 + (isHeld(n, t) ? 0.14 * tailShimmer(t) : 0));
+      // held (active): the whole tail is lighter, more opaque and slowly brightens and dims (no extra shapes)
+      const held = isHeld(n, t);
+      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], held ? 0.85 : 0.6);
       const mid = n.lane + 0.5 - half;
       quad(dBot, dTop, mid - HEAD_R * 0.38, mid + HEAD_R * 0.38);
+      g.fill();
+      if (held) {
+        g.fillStyle = `rgba(255,255,255,${0.3 + 0.12 * tailShimmer(t)})`;
+        quad(dBot, dTop, mid - HEAD_R * 0.38, mid + HEAD_R * 0.38);
+      }
     }
     g.fill();
   }
