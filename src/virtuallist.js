@@ -193,7 +193,12 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
 
   // Scrubbing: press or drag on the rail to move through the list; near a group tick it snaps to that header.
   let hideBubble = 0;
-  function scrubTo(clientY) {
+  const headAt = (offset) => {
+    for (let i = itemAt(offsets, offset); i >= 0; i--) if (items[i]?.type === 'head') return items[i].label;
+    return '';
+  };
+  // Where the list would scroll for a pointer position (snapping to a header's tick when close to one).
+  function railTarget(clientY) {
     const box = rail.getBoundingClientRect();
     const y = clientY - box.top;
     const th = thumbH();
@@ -201,11 +206,22 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     for (const gr of groups) {
       if (Math.abs(railPos(offsets[gr.index], range(), box.height, th) - y) <= 4) { target = Math.min(offsets[gr.index], range()); break; }
     }
+    return { target, y, height: box.height };
+  }
+  function showBubble(text, y, height) {
+    bubble.textContent = text;
+    bubble.hidden = !text;
+    bubble.style.top = `${Math.min(height - 12, Math.max(12, y))}px`;
+  }
+  function scrubTo(clientY) {
+    const { target, y, height } = railTarget(clientY);
     scroller.scrollTop = target;
     render();
-    bubble.textContent = label?.textContent || '';
-    bubble.hidden = !bubble.textContent;
-    bubble.style.top = `${Math.min(box.height - 12, Math.max(12, y))}px`;
+    showBubble(label?.textContent || '', y, height);
+  }
+  function hoverAt(clientY) { // not holding the handle: just name the section under the pointer
+    const { target, y, height } = railTarget(clientY);
+    showBubble(headAt(target), y, height);
   }
   if (rail) {
     rail.addEventListener('pointerdown', (e) => {
@@ -215,10 +231,14 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       rail.classList.add('dragging');
       scrubTo(e.clientY);
     });
-    rail.addEventListener('pointermove', (e) => { if (rail.classList.contains('dragging')) scrubTo(e.clientY); });
+    rail.addEventListener('pointermove', (e) => {
+      if (rail.classList.contains('dragging')) scrubTo(e.clientY);
+      else { clearTimeout(hideBubble); hoverAt(e.clientY); }
+    });
+    rail.addEventListener('pointerleave', () => { if (!rail.classList.contains('dragging')) bubble.hidden = true; });
     const end = () => {
       rail.classList.remove('dragging');
-      hideBubble = setTimeout(() => { bubble.hidden = true; }, 500);
+      hideBubble = setTimeout(() => { if (!rail.matches(':hover')) bubble.hidden = true; }, 500); // stays while the pointer is still over the rail
     };
     rail.addEventListener('pointerup', end);
     rail.addEventListener('pointercancel', end);
