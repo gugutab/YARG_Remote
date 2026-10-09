@@ -197,6 +197,15 @@ export function renderLanes3D(hw, t, w, h) {
       if (amt > 0) {
         g.fillStyle = `rgba(255,255,255,${amt * (0.3 + 0.12 * tailShimmer(t))})`;
         quad(dBot, dTop, mid - HEAD_R * 0.38, mid + HEAD_R * 0.38);
+        g.fill();
+        // halo around the tail while it is played: wider and wider translucent strips, added together, fade outwards
+        g.globalCompositeOperation = 'lighter';
+        g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.075 * amt);
+        for (let i = 1; i <= 7; i++) {
+          quad(dBot, dTop, mid - HEAD_R * (0.38 + 0.12 * i), mid + HEAD_R * (0.38 + 0.12 * i));
+          g.fill();
+        }
+        g.globalCompositeOperation = 'source-over';
       }
     }
     g.fill();
@@ -221,7 +230,7 @@ export function renderLanes3D(hw, t, w, h) {
       g.save();
       g.translate(x, y);
       g.scale(1, HEAD_TILT); // the halo lies on the road: a circle squashed like the head
-      fillHalo(g, n.sp ? STAR_POWER_NOTE : colors[n.lane], rx * 0.7, rx * 2.1, 0.55 * amt); // radial fade-out
+      fillHalo(g, n.sp ? STAR_POWER_NOTE : colors[n.lane], rx * 0.7, rx * 1.7, 0.45 * amt); // radial fade-out
       g.restore();
       g.globalCompositeOperation = 'source-over';
     }

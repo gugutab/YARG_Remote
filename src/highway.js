@@ -163,6 +163,20 @@ export class Highway {
       if (amt > 0) {
         g.fillStyle = `rgba(255,255,255,${amt * (0.3 + 0.12 * tailShimmer(t))})`;
         g.fillRect(cx - radius * 0.35, yTop, radius * 0.7, Math.max(0, yBot - yTop));
+        // halo around the tail while it is played: a horizontal fade from the strip's edges outwards (additive)
+        const half = radius * 0.35;
+        const reach = radius * 0.9;
+        const grad = g.createLinearGradient(cx - half - reach, 0, cx + half + reach, 0);
+        const rgb = n.sp ? STAR_POWER_NOTE : colors[n.lane];
+        const edge = reach / (2 * (half + reach));
+        grad.addColorStop(0, withAlpha(rgb, 0));
+        grad.addColorStop(edge, withAlpha(rgb, 0.4 * amt));
+        grad.addColorStop(1 - edge, withAlpha(rgb, 0.4 * amt));
+        grad.addColorStop(1, withAlpha(rgb, 0));
+        g.globalCompositeOperation = 'lighter';
+        g.fillStyle = grad;
+        g.fillRect(cx - half - reach, yTop, 2 * (half + reach), Math.max(0, yBot - yTop));
+        g.globalCompositeOperation = 'source-over';
       }
     }
 
@@ -184,7 +198,7 @@ export class Highway {
         g.globalCompositeOperation = 'lighter';
         g.save();
         g.translate(cx, cy);
-        fillHalo(g, n.sp ? STAR_POWER_NOTE : colors[n.lane], r * 0.7, r * 2.1, 0.55 * amt); // radial fade-out
+        fillHalo(g, n.sp ? STAR_POWER_NOTE : colors[n.lane], r * 0.7, r * 1.7, 0.45 * amt); // radial fade-out
         g.restore();
         g.globalCompositeOperation = 'source-over';
       }
