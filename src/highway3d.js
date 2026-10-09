@@ -188,17 +188,12 @@ export function renderLanes3D(hw, t, w, h) {
       g.fillStyle = withAlpha(OPEN_COLOR, 0.3);
       quad(dBot, dTop, -half, half);
     } else {
-      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.6);
+      // held: the whole tail slowly brightens and dims (no extra shapes)
+      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.6 + (isHeld(n, t) ? 0.14 * tailShimmer(t) : 0));
       const mid = n.lane + 0.5 - half;
       quad(dBot, dTop, mid - HEAD_R * 0.38, mid + HEAD_R * 0.38);
     }
     g.fill();
-    if (isHeld(n, t) && !n.open) { // held: a faint core that slowly brightens and dims
-      const mid = n.lane + 0.5 - half;
-      g.fillStyle = `rgba(255,255,255,${0.1 + 0.1 * tailShimmer(t)})`;
-      quad(dBot, dTop, mid - HEAD_R * 0.06, mid + HEAD_R * 0.06);
-      g.fill();
-    }
   }
 
   // heads, far to near so closer ones cover farther ones
