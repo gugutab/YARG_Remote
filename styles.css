@@ -655,3 +655,12 @@ button.icon.stage-btn.style-btn { top: 54px; }
 
 /* The library's own close button replaces the hamburger while the library is open */
 .app:not(.lib-closed) #toggleLibrary, .app:not(.lib-closed) #infoMenu { display: none; }
+
+/* Library list scrollbar: slim, dark, no arrows. (Firefox has no arrows; Chromium needs the webkit rules, and they only
+   apply when scrollbar-width is not set there.) */
+#songs::-webkit-scrollbar { width: 8px; }
+#songs::-webkit-scrollbar-track { background: transparent; }
+#songs::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+#songs::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+#songs::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+@supports not selector(::-webkit-scrollbar) { #songs { scrollbar-width: thin; scrollbar-color: var(--line) transparent; } }

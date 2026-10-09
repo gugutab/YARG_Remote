@@ -113,6 +113,7 @@ export function createVirtualList({ scroller, label, thumbs, onSelect, text }) {
       scroller.append(entry.el);
     }
     if (label) {
+      label.style.right = `${scroller.offsetWidth - scroller.clientWidth}px`; // keep the scrollbar uncovered
       const idx = itemAt(offsets, top);
       let head = '';
       for (let i = idx; i >= 0; i--) if (items[i]?.type === 'head') { head = items[i].label; break; }
