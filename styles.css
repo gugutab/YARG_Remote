@@ -636,3 +636,9 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .kv.kv-pairs { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 18px; }
 .kv-pairs > div { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: 0 10px; align-items: baseline; min-width: 0; }
 .kv-pairs dt { overflow-wrap: anywhere; }
+
+/* Round 41: drums are one item with a mode selector; in the top-bar list the mode buttons take a second line */
+.prow { flex-wrap: wrap; }
+.prow .seg.modes { margin-left: 26px; }
+.prow .seg.modes button { flex: 1; font-size: 11px; }
+.prow .seg.modes { flex: 1 1 calc(100% - 26px); min-width: 0; box-sizing: border-box; }

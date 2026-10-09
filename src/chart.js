@@ -98,10 +98,15 @@ export function findTrack(midi, instrument) {
 // The drum modes a track can be played in. A chart with cymbal flags can be played as Pro or
 // as 4-lane (flags ignored, every yellow/blue/green is a tom), the same choice YARG offers.
 export function drumModes(track) {
+  const four = { mode: 'four', label: 'Bateria (4 lanes)', short: '4 lanes' };
   switch (drumKind(track)) {
-    case 'five': return [{ mode: 'five', label: 'Bateria (5-lanes)' }];
-    case 'pro': return [{ mode: 'pro', label: 'Bateria (Pro)' }, { mode: 'extended', label: 'Bateria (Pro estendida)' }, { mode: 'four', label: 'Bateria (4-lanes)' }];
-    default: return [{ mode: 'four', label: 'Bateria (4-lanes)' }];
+    case 'five': return [{ mode: 'five', label: 'Bateria (5 lanes)', short: '5 lanes' }];
+    case 'pro': return [
+      four,
+      { mode: 'pro', label: 'Bateria (Pro)', short: 'Pro' },
+      { mode: 'extended', label: `Bateria (Pro ${EXTENDED_DRUM_LANES.length} lanes)`, short: `Pro ${EXTENDED_DRUM_LANES.length} lanes` },
+    ];
+    default: return [four];
   }
 }
 
@@ -116,7 +121,7 @@ export function instrumentOptions(midi) {
       continue;
     }
     for (const m of drumModes(track)) {
-      options.push({ ...ins, id: `drums-${m.mode}`, label: m.label, base: 'drums', drumMode: m.mode });
+      options.push({ ...ins, id: `drums-${m.mode}`, label: m.label, modeLabel: m.short, base: 'drums', drumMode: m.mode });
     }
   }
   return options;

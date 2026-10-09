@@ -1,5 +1,5 @@
 import { parseMidi } from './midi.js';
-import { DIFFICULTIES, instrumentOptions, availableDifficulties, buildChart, sectionIndexAt } from './chart.js';
+import { DIFFICULTIES, EXTENDED_DRUM_LANES, instrumentOptions, availableDifficulties, buildChart, sectionIndexAt } from './chart.js';
 import { MultiTrackPlayer } from './player.js';
 import { Highway } from './highway.js';
 import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, readBytes, serializeSongs, restoreSongs, restoreRemoteSongs } from './library.js';
@@ -444,32 +444,63 @@ function cardStats(ins, diff) {
 
 const INSTRUMENT_ICON = { guitar: 'guitar', bass: 'guitar', rhythm: 'guitar', keys: 'keys', drums: 'drum', vocals: 'mic', harmony: 'mic' };
 
+// The instruments as the pickers show them: every drum mode is one item ("Bateria") with a mode selector
+// (4 lanes / 5 lanes / Pro / Pro 7 lanes); the other instruments are single items.
+function instrumentGroups() {
+  const out = [];
+  const drums = [];
+  for (const o of current.options) {
+    if (o.base === 'drums') {
+      if (!drums.length) out.push({ key: 'drums', label: 'Bateria', options: drums });
+      drums.push(o);
+    } else {
+      out.push({ key: o.id, label: o.label, options: [o] });
+    }
+  }
+  const activeId = els.instrument.value;
+  for (const g of out) {
+    g.chosen = g.options.find((o) => o.id === activeId)
+      || g.options.find((o) => o.id === current.drumModeChoice)
+      || (g.key === 'drums' ? g.options.find((o) => o.drumMode === 'pro') : null)
+      || g.options[0];
+    g.active = g.options.some((o) => o.id === activeId);
+  }
+  return out;
+}
+
+const diffFor = (ins) => {
+  const diffs = availableDifficulties(current.midi, ins);
+  const chosen = diffs.find((d) => d.id === current.diffChoice[ins.id]) || diffs[diffs.length - 1];
+  return { diffs, chosen };
+};
+
 function renderPickers() {
   if (!current) return;
   const activeId = els.instrument.value;
   if (activeId) current.diffChoice[activeId] = els.difficulty.value;
+  const activeIns = currentInstrument();
+  if (activeIns?.base === 'drums') current.drumModeChoice = activeIns.id; // the drum mode the card remembers
   // Vocal parts have a single chart: no difficulty buttons.
-  els.instrumentCards.replaceChildren(...current.options.map((ins) => {
-    const diffs = availableDifficulties(current.midi, ins);
+  els.instrumentCards.replaceChildren(...instrumentGroups().map((group) => {
+    const ins = group.chosen; // the option this card stands for (for drums: the chosen mode)
+    const { diffs, chosen } = diffFor(ins);
     const vocal = ins.mode === 'vocals';
-    const wanted = current.diffChoice[ins.id];
-    const chosen = diffs.find((d) => d.id === wanted) || diffs[diffs.length - 1];
     const card = document.createElement('div');
     card.className = 'icard';
-    card.dataset.active = String(ins.id === activeId);
+    card.dataset.active = String(group.active);
 
     const head = document.createElement('button');
     head.type = 'button';
     head.className = 'icard-head';
-    head.setAttribute('aria-pressed', String(ins.id === activeId));
+    head.setAttribute('aria-pressed', String(group.active));
     head.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[ins.base] || 'music'}"/></svg><span class="icard-name"></span>`;
-    head.querySelector('.icard-name').textContent = ins.label;
+    head.querySelector('.icard-name').textContent = group.label;
 
     // title row: [icon + name] [info button] ...... [level pips]
     const top = document.createElement('div');
     top.className = 'icard-top';
     top.append(head);
-    const expanded = current.expandedStats.has(ins.id);
+    const expanded = current.expandedStats.has(group.key);
     if (chosen) {
       const info = document.createElement('button');
       info.type = 'button';
@@ -483,7 +514,7 @@ function renderPickers() {
         const open = card.querySelector('.kv.mini').hidden;
         card.querySelector('.kv.mini').hidden = !open;
         info.setAttribute('aria-expanded', String(open));
-        current.expandedStats[open ? 'add' : 'delete'](ins.id);
+        current.expandedStats[open ? 'add' : 'delete'](group.key);
       });
       top.append(info);
     }
@@ -495,10 +526,27 @@ function renderPickers() {
       pips.replaceChildren(...Array.from({ length: 6 }, (_, i) => Object.assign(document.createElement('i'), { className: i < level ? 'on' : '' })));
       top.append(pips);
     }
-    // The whole card selects the instrument (with its remembered difficulty); the difficulty buttons stop the click.
+    // The whole card selects the instrument (with its remembered mode and difficulty); the buttons stop the click.
     card.addEventListener('click', () => selectInstrument(ins.id, chosen?.id));
     card.append(top);
 
+    if (group.options.length > 1) { // drum mode selector, same look as the difficulty one
+      const modes = document.createElement('div');
+      modes.className = 'seg';
+      for (const o of group.options) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = o.modeLabel;
+        btn.setAttribute('aria-pressed', String(group.active && o.id === activeId));
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          current.drumModeChoice = o.id;
+          selectInstrument(o.id, diffFor(o).chosen?.id);
+        });
+        modes.append(btn);
+      }
+      card.append(modes);
+    }
     if (!vocal) {
       const seg = document.createElement('div');
       seg.className = 'seg';
@@ -506,7 +554,7 @@ function renderPickers() {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = d.label;
-        btn.setAttribute('aria-pressed', String(ins.id === activeId && d.id === els.difficulty.value));
+        btn.setAttribute('aria-pressed', String(group.active && d.id === els.difficulty.value));
         btn.addEventListener('click', (e) => { e.stopPropagation(); selectInstrument(ins.id, d.id); });
         seg.append(btn);
       }
@@ -525,6 +573,7 @@ function renderPickers() {
 }
 
 // Top-bar item: one chip for instrument + difficulty, opening a compact vertical list (icon, name, difficulty buttons).
+// Drums are one row with a second line of mode buttons.
 function renderPartMenu() {
   const ins = currentInstrument();
   const diffLabel = DIFFICULTIES.find((d) => d.id === els.difficulty.value)?.label;
@@ -534,16 +583,15 @@ function renderPartMenu() {
   els.partDiff.textContent = letter;
   els.partDiff.title = diffLabel || '';
   els.partDiff.hidden = !letter; // difficulty as a single letter, like the list rows
-  els.partPop.replaceChildren(...(current?.options ?? []).map((o) => {
-    const diffs = availableDifficulties(current.midi, o);
-    const wanted = current.diffChoice[o.id];
-    const chosen = diffs.find((d) => d.id === wanted) || diffs[diffs.length - 1];
-    const active = o.id === els.instrument.value;
+  const shortMode = { four: '4', five: '5', pro: 'Pro', extended: String(EXTENDED_DRUM_LANES.length) };
+  els.partPop.replaceChildren(...(current ? instrumentGroups() : []).map((group) => {
+    const o = group.chosen;
+    const { diffs, chosen } = diffFor(o);
     const row = document.createElement('div');
     row.className = 'prow';
-    row.dataset.active = String(active);
+    row.dataset.active = String(group.active);
     row.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[o.base] || 'music'}"/></svg><span class="prow-name"></span>`;
-    row.querySelector('.prow-name').textContent = o.label;
+    row.querySelector('.prow-name').textContent = group.label;
     row.addEventListener('click', () => { selectInstrument(o.id, chosen?.id); closePopovers(); });
     if (o.mode !== 'vocals') {
       const seg = document.createElement('div');
@@ -553,12 +601,32 @@ function renderPartMenu() {
         btn.type = 'button';
         btn.textContent = d.label[0]; // F, M, D, E
         btn.title = d.label;
-        btn.setAttribute('aria-label', `${o.label}, ${d.label}`);
-        btn.setAttribute('aria-pressed', String(active && d.id === els.difficulty.value));
+        btn.setAttribute('aria-label', `${group.label}, ${d.label}`);
+        btn.setAttribute('aria-pressed', String(group.active && d.id === els.difficulty.value));
         btn.addEventListener('click', (e) => { e.stopPropagation(); selectInstrument(o.id, d.id); closePopovers(); });
         seg.append(btn);
       }
       row.append(seg);
+    }
+    if (group.options.length > 1) {
+      const modes = document.createElement('div');
+      modes.className = 'seg compact modes';
+      for (const m of group.options) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = shortMode[m.drumMode] ?? m.modeLabel;
+        btn.title = m.modeLabel;
+        btn.setAttribute('aria-label', m.label);
+        btn.setAttribute('aria-pressed', String(group.active && m.id === els.instrument.value));
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          current.drumModeChoice = m.id;
+          selectInstrument(m.id, diffFor(m).chosen?.id);
+          closePopovers();
+        });
+        modes.append(btn);
+      }
+      row.append(modes);
     }
     return row;
   }));

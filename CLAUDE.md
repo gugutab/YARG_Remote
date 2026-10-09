@@ -86,7 +86,7 @@ Fluxo: pasta → `library.js` (músicas) → clique → `midi.js` (parse) + `cha
 | `server.mjs` | Servidor opcional (`npm start`): app + `/api/library` + `/songs/*`. O app o usa automaticamente (`startLibrary` em `app.js`). Cache do índice em `.cache/`. |
 | `src/gfx.js` | Constantes e helpers de desenho compartilhados pelas duas visões. |
 | `src/highway3d.js` | Visão 3D da highway (perspectiva no canvas 2D, sem WebGL; vocal usa a visão plana). Botão ⬡ / tecla V; preferência em localStorage. Estilo das notas (círculos ou retângulos arredondados, `noteShape` em `gfx.js`): botão abaixo do 3D / tecla N, também em localStorage. |
-| (bateria) | Modo "Bateria (Pro estendida)": 7 lanes, tambor e prato cada um na sua (`EXTENDED_DRUM_LANES` em `chart.js`). No YARG isso é por perfil (Split/Merge em `DrumsHighwaySpecs.cs`); a ordem exata após o split não foi confirmada. Pratos são triângulos. |
+| (bateria) | Modo "Bateria (Pro 7 lanes)" (id `drums-extended`): 7 lanes, tambor e prato cada um na sua (`EXTENDED_DRUM_LANES` em `chart.js`). No YARG isso é por perfil (Split/Merge em `DrumsHighwaySpecs.cs`); a ordem exata após o split não foi confirmada. Pratos são triângulos. |
 | `src/songinfo.js` | Dados da tela de info: metadados e níveis do `song.ini`, BPM e contagens do chart (funções puras). |
 | `src/songlist.js` | Busca, filtro e ordenação da lista (funções puras). |
 | `src/app.js` | Eventos, seleção de música/instrumento/dificuldade, loop `frame()` (relógio, seção, highway). |
@@ -128,7 +128,7 @@ Clone de referência usado: `/home/user/yarc-official/yarg.core` (pode não exis
 | Bateria: tipo | 101 presente = 5 lanes; 110–112 presentes = Pro; senão 4 lanes. | `MidiDrumsPreparser.cs` |
 | Bateria: pads | Offsets 0 kick, 1 vermelho, 2 amarelo, 3 azul, 4 laranja (5 lanes) ou verde (4 lanes), 5 verde (5 lanes). | `DrumPadToMidiKey` em `MidReader.ProcessLists.cs` |
 | Prato (Pro) | Amarelo, azul e laranja/verde são **prato por padrão**. Notas 110/111/112 são **marcadores de tom**: a janela de cada uma faz XOR. Prato = número par de marcadores cobrindo a nota. | `DrumPadDefaultFlags`, `PAD_TO_CYMBAL_LOOKUP` em `MidIOHelper.cs`, `ProcessNoteOnEventAsFlagToggle` (`note.flags ^= flags`) |
-| Modo 4 lanes do Pro | Mesmas notas, sem prato. A opção aparece como "Bateria (4-lanes)". | `MoonNoteToFourLane` |
+| Modo 4 lanes do Pro | Mesmas notas, sem prato. A opção aparece como "Bateria (4 lanes)". Nos seletores (cartões e menu superior) as baterias são um item só, "Bateria", com seletor de modo (4 lanes / 5 lanes / Pro / Pro 7 lanes); `instrumentGroups()` em `app.js`. | `MoonNoteToFourLane` |
 | Accent / ghost | Velocity 127 = accent, 1 = ghost, só em pads (não kick). | `MidIOHelper.VELOCITY_ACCENT/GHOST` |
 | Double kick | Nota uma abaixo do kick da dificuldade (95 no Especialista) vira um kick próprio, no seu tick, com o flag. | `MidReader.ProcessLists.cs` (`key - 1` com `InstrumentPlus`) |
 | Rolls | 125 kick roll, 126 tremolo, 127 trill (faixas de tempo). | `MidIOHelper.cs` |
