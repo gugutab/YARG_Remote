@@ -14,7 +14,7 @@ const els = Object.fromEntries([
   'search', 'sortBy', 'sortDir', 'filterInstrument', 'filterGenre', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
-  'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'mixer', 'settingsBtn', 'settingsPop',
+  'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'sectionBtn', 'sectionPop', 'sectionText', 'mixer', 'settingsBtn', 'settingsPop',
   'fullscreen', 'viewBtn', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoClose', 'infoPlay', 'infoMenu',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
@@ -253,6 +253,9 @@ async function selectSong(song) {
   els.difficulty.replaceChildren();
   els.sectionSelect.replaceChildren(new Option('Sem seções', ''));
   els.sectionSelect.disabled = true;
+  els.sectionBtn.disabled = true;
+  els.sectionPop.replaceChildren();
+  els.sectionText.textContent = 'Sem seções';
   els.instrumentCards.replaceChildren();
   els.mixerInfo.replaceChildren();
   els.mixer.replaceChildren();
@@ -560,11 +563,35 @@ function updateChart() {
 els.instrument.addEventListener('change', () => { fillDifficultyOptions(); updateChart(); });
 els.difficulty.addEventListener('change', updateChart);
 
+let activeSection = -2; // index shown as current in the section chip and list
+
+// Sections: the hidden select keeps the state, the chip and its list (same look as the instrument list) show it.
 function fillSectionOptions() {
   const sections = chart?.sections ?? [];
-  els.sectionSelect.replaceChildren(...sections.map((s, i) => new Option(`${fmt(s.time)} · ${s.name}`, String(i))));
+  els.sectionSelect.replaceChildren(...sections.map((x, i) => new Option(`${fmt(x.time)} · ${x.name}`, String(i))));
   els.sectionSelect.disabled = sections.length === 0;
-  if (sections.length === 0) els.sectionSelect.replaceChildren(new Option('Sem seções', ''));
+  els.sectionBtn.disabled = sections.length === 0;
+  els.sectionPop.replaceChildren(...sections.map((x, i) => {
+    const row = document.createElement('div');
+    row.className = 'prow';
+    row.dataset.index = String(i);
+    row.dataset.active = 'false';
+    row.innerHTML = '<span class="prow-time"></span><span class="prow-name"></span>';
+    row.querySelector('.prow-time').textContent = fmt(x.time);
+    row.querySelector('.prow-name').textContent = x.name;
+    row.addEventListener('click', () => { seekToSection(i); closePopovers(); });
+    return row;
+  }));
+  activeSection = -2;
+  els.sectionText.textContent = sections.length ? sections[0].name : 'Sem seções';
+}
+
+function setActiveSection(index) {
+  if (index === activeSection) return;
+  activeSection = index;
+  els.sectionText.textContent = chart?.sections[index]?.name ?? 'Sem seções';
+  for (const row of els.sectionPop.children) row.dataset.active = String(Number(row.dataset.index) === index);
+  if (index >= 0) els.sectionSelect.value = String(index);
 }
 
 // The highway shows chart time t - delay, so seeking to a section needs the delay added back.
@@ -679,7 +706,7 @@ for (const btn of document.querySelectorAll('[data-reset]')) {
   btn.addEventListener('click', () => setSetting(btn.dataset.reset, SETTING_DEFAULTS[btn.dataset.reset]));
 }
 
-const popovers = [[els.partBtn, els.partPop], [els.mixerBtn, els.mixerPop], [els.settingsBtn, els.settingsPop]];
+const popovers = [[els.partBtn, els.partPop], [els.sectionBtn, els.sectionPop], [els.mixerBtn, els.mixerPop], [els.settingsBtn, els.settingsPop]];
 function closePopovers(except) {
   for (const [btn, pop] of popovers) {
     if (pop === except) continue;
@@ -703,7 +730,10 @@ for (const [btn, pop] of popovers) {
     if (e.detail > 0) btn.blur(); // keep the keyboard shortcuts working after a mouse click
     closePopovers(pop);
     pop.hidden = !pop.hidden;
-    if (!pop.hidden) placePopover(btn, pop);
+    if (!pop.hidden) {
+      placePopover(btn, pop);
+      pop.querySelector('[data-active="true"]')?.scrollIntoView({ block: 'center' }); // long lists open on the current item
+    }
     btn.setAttribute('aria-expanded', String(!pop.hidden));
   });
   pop.addEventListener('click', (e) => e.stopPropagation());
@@ -716,7 +746,12 @@ document.addEventListener('click', (e) => {
 
 // ---------- Transport ----------
 els.play.addEventListener('click', togglePlay);
+function paintSeek() {
+  const max = Number(els.seek.max) || 1;
+  els.seek.style.setProperty('--pct', `${Math.min(100, (Number(els.seek.value) / max) * 100)}%`);
+}
 els.seek.addEventListener('input', () => {
+  paintSeek();
   seeking = true;
   els.timeNow.textContent = fmt(Number(els.seek.value));
 });
@@ -806,9 +841,10 @@ function frame() {
     const chartTime = t - settings.chartDelay;
     highway.render(chartTime);
     const index = chart.sections.length ? sectionIndexAt(chart.sections, chartTime) : -1;
-    if (index >= 0 && document.activeElement !== els.sectionSelect) els.sectionSelect.value = String(index);
+    if (index >= 0) setActiveSection(index);
     if (!seeking) {
       els.seek.value = t;
+      paintSeek();
       els.timeNow.textContent = fmt(t);
     }
   } else {
