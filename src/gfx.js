@@ -58,14 +58,8 @@ export function withAlpha(hex, alpha) {
 export const exitTime = (n) => n.time + (n.length || 0);
 export const isHeld = (n, t) => n.length > 0 && t >= n.time && t < n.time + n.length;
 
-// Sparks that flow along a held tail toward the hit line: chart times of the dashes visible in [t, until].
-// They drift toward the hit line faster than the scroll (DASH_SPEED seconds of chart time per second).
-export const DASH_PERIOD_SEC = 0.15;
-export const DASH_SPEED = 0.9;
-export function* tailDashes(n, t, until) {
-  const phase = (t * DASH_SPEED) % DASH_PERIOD_SEC;
-  const end = Math.min(n.time + n.length, until);
-  const k0 = Math.ceil((t - n.time + phase) / DASH_PERIOD_SEC);
-  for (let tau = n.time + k0 * DASH_PERIOD_SEC - phase; tau < end; tau += DASH_PERIOD_SEC) if (tau >= t) yield tau;
-}
-export const heldPulse = (t) => 1 + 0.06 * Math.sin(t * 22); // the held head breathes a little
+// A held tail only breathes: a slow, faint brightening of its core (0..1 shimmer).
+export const tailShimmer = (t) => 0.5 + 0.5 * Math.sin(t * 4);
+// The held head is a little bigger than a normal one and swells very slightly.
+export const HELD_SCALE = 1.12;
+export const heldPulse = (t) => HELD_SCALE + 0.025 * Math.sin(t * 9);

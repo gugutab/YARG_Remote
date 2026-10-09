@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   GUITAR_LANE_COLORS, KICK_COLOR, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, STAR_POWER_NOTE, exitTime, isHeld, tailDashes, heldPulse, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, STAR_POWER_NOTE, exitTime, isHeld, tailShimmer, heldPulse, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha,
 } from './gfx.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the flat view shows 2.5)
@@ -193,17 +193,11 @@ export function renderLanes3D(hw, t, w, h) {
       quad(dBot, dTop, mid - HEAD_R * 0.38, mid + HEAD_R * 0.38);
     }
     g.fill();
-    if (isHeld(n, t) && !n.open) { // held: a bright core and sparks flowing into the hit line
+    if (isHeld(n, t) && !n.open) { // held: a faint core that slowly brightens and dims
       const mid = n.lane + 0.5 - half;
-      g.fillStyle = 'rgba(255,255,255,0.3)';
-      quad(dBot, dTop, mid - HEAD_R * 0.07, mid + HEAD_R * 0.07);
+      g.fillStyle = `rgba(255,255,255,${0.1 + 0.1 * tailShimmer(t)})`;
+      quad(dBot, dTop, mid - HEAD_R * 0.06, mid + HEAD_R * 0.06);
       g.fill();
-      g.fillStyle = 'rgba(255,255,255,0.8)';
-      for (const tau of tailDashes(n, t, t + windowSec)) {
-        const dd = depth(tau);
-        quad(Math.max(0, dd - 0.006), dd + 0.006, mid - HEAD_R * 0.38, mid + HEAD_R * 0.38);
-        g.fill();
-      }
     }
   }
 

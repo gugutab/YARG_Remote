@@ -26,7 +26,7 @@ test('notes inside a star power phrase are flagged, others are not', () => {
   assert.deepEqual(chart.notes.map((n) => n.sp), [false, true, true, false, false]);
 });
 
-import { exitTime, isHeld, tailDashes, DASH_PERIOD_SEC } from '../src/gfx.js';
+import { exitTime, isHeld, heldPulse, HELD_SCALE, tailShimmer } from '../src/gfx.js';
 test('long notes stay held until their tail ends, and the exit starts then', () => {
   const n = { time: 10, length: 2 };
   assert.equal(exitTime(n), 12);
@@ -37,12 +37,10 @@ test('long notes stay held until their tail ends, and the exit starts then', () 
   assert.equal(isHeld(n, 12), false);
 });
 
-test('tail sparks stay inside the tail, ahead of the current time, and flow toward the hit line', () => {
-  const n = { time: 10, length: 2 };
-  const a = [...tailDashes(n, 10.5, 12.5)];
-  assert.ok(a.length > 5 && a.every((x) => x >= 10.5 && x < 12));
-  assert.ok(a.every((x, i) => i === 0 || Math.abs(x - a[i - 1] - DASH_PERIOD_SEC) < 1e-9)); // evenly spaced
-  const b = [...tailDashes(n, 10.6, 12.5)]; // a bit later every spark is earlier in chart time: closer to the hit line
-  const shift = (a[0] - b[0] + DASH_PERIOD_SEC * 100) % DASH_PERIOD_SEC;
-  assert.ok(Math.abs(shift - ((0.1 * 0.9) % DASH_PERIOD_SEC)) < 1e-9 || Math.abs(shift - ((0.1 * 0.9) % DASH_PERIOD_SEC) - DASH_PERIOD_SEC) < 1e-9 || true);
+test('the held head is a little bigger than normal and the tail shimmer stays within 0..1', () => {
+  for (let t = 0; t < 5; t += 0.05) {
+    assert.ok(heldPulse(t) > 1.05 && heldPulse(t) < 1.2, `pulse ${heldPulse(t)}`);
+    assert.ok(tailShimmer(t) >= 0 && tailShimmer(t) <= 1);
+  }
+  assert.equal(HELD_SCALE, 1.12);
 });

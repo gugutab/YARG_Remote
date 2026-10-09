@@ -25,7 +25,7 @@ import {
   STAR_POWER_NOTE,
   exitTime,
   isHeld,
-  tailDashes,
+  tailShimmer,
   heldPulse,
 } from './gfx.js';
 export { firstVisibleIndex } from './gfx.js';
@@ -157,12 +157,9 @@ export class Highway {
       const cx = x0 + (n.lane + 0.5) * laneW;
       g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.55);
       g.fillRect(cx - radius * 0.35, yTop, radius * 0.7, Math.max(0, yBot - yTop));
-      if (isHeld(n, t)) { // held: a bright core and sparks flowing into the hit line
-        const body = radius * 0.7;
-        g.fillStyle = 'rgba(255,255,255,0.3)';
-        g.fillRect(cx - body * 0.16, yTop, body * 0.32, Math.max(0, yBot - yTop));
-        g.fillStyle = 'rgba(255,255,255,0.75)';
-        for (const tau of tailDashes(n, t, t + ahead)) g.fillRect(cx - body * 0.5, yOf(tau) - 3, body, 6);
+      if (isHeld(n, t)) { // held: a faint core that slowly brightens and dims
+        g.fillStyle = `rgba(255,255,255,${0.1 + 0.1 * tailShimmer(t)})`;
+        g.fillRect(cx - radius * 0.11, yTop, radius * 0.22, Math.max(0, yBot - yTop));
       }
     }
 
