@@ -124,13 +124,9 @@ export class Highway {
     // lane guides
     g.fillStyle = 'rgba(255,255,255,0.04)';
     for (let i = 0; i < chart.lanes; i++) {
-      if (i % 2 === 0) g.fillRect(x0 + i * laneW, 0, laneW, hitY);
+      if (i % 2 === 0) g.fillRect(x0 + i * laneW, 0, laneW, h); // down to the bottom edge, where it fades out
     }
-
-    // hit line sits under the notes, so notes passing over it stay visible
-    // (as in 3D: 4 px shorter and at half the alpha, so it does not cut the pads below)
-    g.fillStyle = 'rgba(255,255,255,0.35)';
-    g.fillRect(x0 - 4, hitY, laneW * chart.lanes + 8, 3);
+    // (there is no hit line: the pads mark the spot)
 
     // sustains first, then heads
     const from = firstVisibleIndex(chart.notes, t, this.maxLength);
@@ -254,6 +250,16 @@ export class Highway {
       }
     }
     g.globalAlpha = 1;
+
+    // a very short fade at the bottom: the board dissolves right below the pads
+    const bottomFade = Math.min(h - hitY, radius * 1.05 + 28);
+    const fadeStart = Math.max(hitY + radius * 1.05, h - bottomFade);
+    if (h - fadeStart > 2) {
+      const bf = g.createLinearGradient(0, fadeStart, 0, h);
+      for (const [at, a] of [[0, 0], [0.3, 0.2], [0.6, 0.6], [0.85, 0.92], [1, 1]]) bf.addColorStop(at, `rgba(13,17,23,${a})`);
+      g.fillStyle = bf;
+      g.fillRect(0, fadeStart, w, h - fadeStart);
+    }
 
     // the board and the notes entering from the top dissolve into the background (an eased fade)
     const fadeH = h * 0.2;
