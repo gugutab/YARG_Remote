@@ -36,11 +36,17 @@ export function filterSongs(songs, { query = '', instrument = '', genre = '' } =
 
 // Text keys skip leading punctuation, so "(Don't Fear) The Reaper" sorts under D, like its divider.
 const sortText = (v) => norm(plainText(v)).replace(/^[^a-z0-9]+/, '');
+// Names that differ only by case, accents, punctuation or spacing are the same group, e.g.
+// "(Pronounced 'Lĕh-'nérd 'Skin-'nérd)" and "(Pronounced Leh-nerd Skin-nerd)".
+export const groupKey = (name) => {
+  const text = norm(plainText(name));
+  return text.replace(/[^a-z0-9]+/g, '') || text.trim();
+};
 const textKey = (field) => (s) => sortText(s[field]);
 const KEYS = {
   title: textKey('title'),
-  artist: (s) => `${norm(plainText(s.artist))}\u0000${norm(plainText(s.title))}`,
-  album: (s) => `${norm(plainText(s.album))}\u0000${norm(plainText(s.title))}`,
+  artist: (s) => `${groupKey(s.artist)}\u0000${norm(plainText(s.title))}`,
+  album: (s) => `${groupKey(s.album)}\u0000${norm(plainText(s.title))}`,
   year: (s) => parseInt(s.ini?.year, 10) || 0,
   length: (s) => Number(s.ini?.song_length) || 0,
 };
@@ -85,16 +91,25 @@ export function groupLabel(song, by = 'title') {
 
 // Songs (already sorted) with a { type: 'head', label } item before each run of the same group.
 export function buildItems(sorted, by = 'title') {
+  // Each group is named by its most common spelling (ties: the first one seen).
+  const spellings = new Map(); // groupKey -> Map(label -> count)
+  const labels = sorted.map((song) => groupLabel(song, by));
+  for (const label of labels) {
+    const key = groupKey(label);
+    const counts = spellings.get(key) ?? spellings.set(key, new Map()).get(key);
+    counts.set(label, (counts.get(label) || 0) + 1);
+  }
+  const nameOf = (label) => [...spellings.get(groupKey(label))].reduce((best, e) => (e[1] > best[1] ? e : best))[0];
   const items = [];
   let last = null;
-  for (const song of sorted) {
-    const label = groupLabel(song, by);
-    if (norm(label) !== last) { // names that differ only by case or accents share a header
-      items.push({ type: 'head', label });
-      last = norm(label);
+  sorted.forEach((song, i) => {
+    const key = groupKey(labels[i]);
+    if (key !== last) { // near-identical names share a header
+      items.push({ type: 'head', label: nameOf(labels[i]) });
+      last = key;
     }
     items.push({ type: 'song', song });
-  }
+  });
   return items;
 }
 

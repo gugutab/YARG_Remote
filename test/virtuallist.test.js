@@ -126,3 +126,13 @@ test('anchorLabel gives short rail labels', async () => {
   assert.equal(anchorLabel('< 3 min', 'length'), '<3');
   assert.equal(anchorLabel('7+ min', 'length'), '7+');
 });
+
+test('near-identical album names share one header even with punctuation differences', () => {
+  const mk = (title, album) => ({ title, artist: 'Lynyrd Skynyrd', album, ini: {} });
+  const a = "(Pronounced 'Lĕh-'nérd 'Skin-'nérd)";
+  const b = '(Pronounced Leh-nerd Skin-nerd)';
+  const sorted = sortSongs([mk('Free Bird', a), mk('Gimme Three Steps', b), mk('Simple Man', a), mk('Tuesday', b), mk('Zed', a)], 'album');
+  const heads = buildItems(sorted, 'album').filter((i) => i.type === 'head');
+  assert.equal(heads.length, 1);
+  assert.equal(heads[0].label, a); // the most common spelling names the group
+});
