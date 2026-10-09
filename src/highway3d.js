@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   GUITAR_LANE_COLORS, KICK_COLOR, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, STAR_POWER_NOTE, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, STAR_POWER_NOTE, exitTime, isHeld, tailDashes, heldPulse, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha,
 } from './gfx.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the flat view shows 2.5)
@@ -107,6 +107,7 @@ export function renderLanes3D(hw, t, w, h) {
   for (const n of visible) {
     const past = t - n.time;
     if (past < 0) continue;
+    if (n.lane >= 0 && !n.open && isHeld(n, t)) flash[n.lane] = Math.max(flash[n.lane], 0.75 + 0.15 * Math.sin(t * 22));
     if (n.lane >= 0 && !n.open) {
       if (past < HIT_FLASH_SEC) flash[n.lane] = Math.max(flash[n.lane], 1 - past / HIT_FLASH_SEC);
     } else if (past < BAR_FLASH_SEC && 1 - past / BAR_FLASH_SEC > barFlash) {
@@ -135,7 +136,7 @@ export function renderLanes3D(hw, t, w, h) {
   for (let i = visible.length - 1; i >= 0; i--) {
     const n = visible[i];
     if (n.lane >= 0 && !n.open) continue;
-    const past = t - n.time;
+    const past = t - exitTime(n);
     if (past > FADE_SEC) continue;
     const kx = Math.max(0, past) / FADE_SEC;
     const e = easeOut(kx);
@@ -192,21 +193,42 @@ export function renderLanes3D(hw, t, w, h) {
       quad(dBot, dTop, mid - HEAD_R * 0.38, mid + HEAD_R * 0.38);
     }
     g.fill();
+    if (isHeld(n, t) && !n.open) { // held: a bright core and sparks flowing into the hit line
+      const mid = n.lane + 0.5 - half;
+      g.fillStyle = 'rgba(255,255,255,0.3)';
+      quad(dBot, dTop, mid - HEAD_R * 0.07, mid + HEAD_R * 0.07);
+      g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.8)';
+      for (const tau of tailDashes(n, t, t + windowSec)) {
+        const dd = depth(tau);
+        quad(Math.max(0, dd - 0.006), dd + 0.006, mid - HEAD_R * 0.38, mid + HEAD_R * 0.38);
+        g.fill();
+      }
+    }
   }
 
   // heads, far to near so closer ones cover farther ones
   for (let i = visible.length - 1; i >= 0; i--) {
     const n = visible[i];
     if (n.lane < 0 || n.open) continue;
-    const past = t - n.time;
+    const past = t - exitTime(n); // long notes: the exit starts when the tail ends
     if (past > FADE_SEC) continue;
     const kx = Math.max(0, past) / FADE_SEC;
     const d = depth(n.time);
     const p = scaleAt(d);
     const x = xAt(n.lane + 0.5 - half, d);
     const y = yAt(d);
-    const rx = laneW * HEAD_R * p * (1 + 0.4 * kx);
+    const held = isHeld(n, t);
+    const rx = laneW * HEAD_R * p * (1 + 0.4 * kx) * (held ? heldPulse(t) : 1);
     const ry = rx * HEAD_TILT;
+    if (held) { // a soft halo while the note is held
+      g.globalCompositeOperation = 'lighter';
+      g.beginPath();
+      g.ellipse(x, y, rx * 1.55, ry * 1.55, 0, 0, Math.PI * 2);
+      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.28);
+      g.fill();
+      g.globalCompositeOperation = 'source-over';
+    }
     const body = tintWhite(n.sp ? STAR_POWER_NOTE : n.tap ? TAP_COLOR : colors[n.lane], kx);
     g.globalAlpha = (1 - kx) * (n.ghost ? GHOST_ALPHA : 1) * Math.min(1, (1 - d) / FADE_IN);
     // thickness: a darker disc underneath, then the top face

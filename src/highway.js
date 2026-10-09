@@ -23,6 +23,10 @@ import {
   withAlpha,
   firstIndexAtOrAfter,
   STAR_POWER_NOTE,
+  exitTime,
+  isHeld,
+  tailDashes,
+  heldPulse,
 } from './gfx.js';
 export { firstVisibleIndex } from './gfx.js';
 import { renderLanes3D } from './highway3d.js';
@@ -127,7 +131,7 @@ export class Highway {
     // pedal bars go behind the other notes and sustains
     for (const n of visible) {
       if (n.lane >= 0 && !n.open) continue;
-      const past = t - n.time;
+      const past = t - exitTime(n); // long notes: the exit starts when the tail ends
       if (past > FADE_SEC) continue;
       const k = Math.max(0, past) / FADE_SEC; // same exit animation as the other heads
       const cy = yOf(Math.max(n.time, t));
@@ -153,13 +157,20 @@ export class Highway {
       const cx = x0 + (n.lane + 0.5) * laneW;
       g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.55);
       g.fillRect(cx - radius * 0.35, yTop, radius * 0.7, Math.max(0, yBot - yTop));
+      if (isHeld(n, t)) { // held: a bright core and sparks flowing into the hit line
+        const body = radius * 0.7;
+        g.fillStyle = 'rgba(255,255,255,0.3)';
+        g.fillRect(cx - body * 0.16, yTop, body * 0.32, Math.max(0, yBot - yTop));
+        g.fillStyle = 'rgba(255,255,255,0.75)';
+        for (const tau of tailDashes(n, t, t + ahead)) g.fillRect(cx - body * 0.5, yOf(tau) - 3, body, 6);
+      }
     }
 
     // Heads. Once a note reaches the hit line it stops moving and plays its exit animation:
     // it grows, fades and turns white over FADE_SEC, for pedals too.
     for (const n of visible) {
       if (n.lane < 0 || n.open) continue; // pedals and open notes are drawn above, behind the other notes
-      const past = t - n.time;
+      const past = t - exitTime(n); // long notes: the exit starts when the tail ends
       if (past > FADE_SEC) continue;
       const k = Math.max(0, past) / FADE_SEC; // 0 at the hit line, 1 when gone
       const cy = yOf(Math.max(n.time, t)); // parked on the hit line during the exit
@@ -167,7 +178,16 @@ export class Highway {
       // ghost notes are dimmed, accents are larger (YARG draws them the same way)
       g.globalAlpha = (1 - k) * (n.ghost ? GHOST_ALPHA : 1);
       const cx = x0 + (n.lane + 0.5) * laneW;
-      const r = radius * (1 + 0.4 * k);
+      const held = isHeld(n, t);
+      const r = radius * (1 + 0.4 * k) * (held ? heldPulse(t) : 1);
+      if (held) { // a soft halo while the note is held
+        g.globalCompositeOperation = 'lighter';
+        g.beginPath();
+        g.arc(cx, cy, r * 1.5, 0, Math.PI * 2);
+        g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.28);
+        g.fill();
+        g.globalCompositeOperation = 'source-over';
+      }
       g.beginPath();
       g.arc(cx, cy, r, 0, Math.PI * 2);
       g.fillStyle = tintWhite(n.sp ? STAR_POWER_NOTE : n.tap ? TAP_COLOR : colors[n.lane], white);
