@@ -89,8 +89,8 @@ test('3D note shapes taper with the perspective: the top edge is narrower than t
     assert.ok(Array.isArray(tapered) && tapered.length > 10);
     const top = widthAt(tapered, 400 - 14), bottom = widthAt(tapered, 400 + 14);
     assert.ok(top < bottom, `${style}: top ${top} should be narrower than bottom ${bottom}`);
-    // the widest row keeps about the shape's own width (80 px for the circle, 96 for the rounded rectangle)
-    const full = style === 'rect' ? 96 : 80;
+    // the widest row keeps about the shape's own width (80 px for the circle, 84 for the rounded rectangle)
+    const full = style === 'rect' ? 84 : 80;
     const widest = Math.max(...tapered.map((p) => p[0])) - Math.min(...tapered.map((p) => p[0]));
     assert.ok(widest > full * 0.9 && widest < full * 1.2, `${style}: widest ${widest}`);
   }

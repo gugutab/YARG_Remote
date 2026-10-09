@@ -139,8 +139,8 @@ export const BAR_FLASH_SEC = 0.24; // ... after a pedal or open hit (it lights e
 // vanishing point. In this projection the width at a row is proportional to (row - vanishing row), so each point is
 // scaled around the centre by (y - vy) / dist: the top edge comes out narrower than the bottom one. TAPER_GAIN
 // exaggerates that a little so it is easy to see.
-export const NOTE_RECT_W = 1.2; // half-width of the rounded rectangle relative to rx
-export const NOTE_RECT_H = 0.78; // half-height relative to ry
+export const NOTE_RECT_W = 1.05; // half-width of the rounded rectangle relative to rx (it was 1.2: a bit smaller now)
+export const NOTE_RECT_H = 0.68; // half-height relative to ry (it was 0.78)
 export const TAPER_GAIN = 3;
 
 function outline(x, y, rx, ry, style) {
