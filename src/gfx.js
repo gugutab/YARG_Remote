@@ -82,9 +82,8 @@ export function fillHalo(g, color, inner, outer, strength) {
   const n = parseInt(color.slice(1), 16);
   const rgb = `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
   const grad = g.createRadialGradient(0, 0, inner, 0, 0, outer);
-  grad.addColorStop(0, `rgba(${rgb},${strength})`);
-  grad.addColorStop(0.45, `rgba(${rgb},${strength * 0.4})`);
-  grad.addColorStop(1, `rgba(${rgb},0)`);
+  // eased falloff (smoothstep, see haloProfile): strongest at `inner`, zero slope at both ends, nothing at the edge
+  for (let i = 0; i <= 12; i++) grad.addColorStop(i / 12, `rgba(${rgb},${strength * haloProfile(i / 12)})`);
   g.fillStyle = grad;
   g.beginPath();
   g.arc(0, 0, outer, 0, Math.PI * 2);
