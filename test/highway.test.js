@@ -59,3 +59,14 @@ test('the active look of a long note fades in after the hit and out after the ta
   let last = 0; // continuous: no step bigger than a few percent between 5 ms samples
   for (let x = 9.9; x < 12.4; x += 0.005) { const v = heldAmount(n, x); assert.ok(Math.abs(v - last) < 0.1); last = v; }
 });
+
+import { haloProfile, TAIL_HALO_PROFILE } from '../src/gfx.js';
+test('the tail halo falloff goes from 1 to 0 smoothly, with a gentle (zero-slope) end', () => {
+  assert.equal(haloProfile(0), 1);
+  assert.equal(haloProfile(1), 0);
+  for (let i = 1; i < TAIL_HALO_PROFILE.length; i++) assert.ok(TAIL_HALO_PROFILE[i][1] <= TAIL_HALO_PROFILE[i - 1][1]);
+  // near the end the glow is almost flat: the last step loses far less than the middle steps do
+  const step = (a, b) => haloProfile(a) - haloProfile(b);
+  assert.ok(step(11 / 12, 1) < step(5 / 12, 6 / 12) / 5);
+  assert.ok(step(0, 1 / 12) < step(5 / 12, 6 / 12) / 5);
+});

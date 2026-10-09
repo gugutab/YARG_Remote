@@ -166,7 +166,7 @@ export class Highway {
         g.fillRect(cx - radius * 0.35, yTop, radius * 0.7, Math.max(0, yBot - yTop));
         // soft halo around the tail while it is played, with a rounded end (the cap only if the end is on screen)
         g.globalCompositeOperation = 'lighter';
-        fillTailHalo(g, n.sp ? STAR_POWER_NOTE : colors[n.lane], cx, radius * 0.35, radius * 1.1, yTop, yBot, 0.22 * amt, n.time + n.length <= t + ahead);
+        fillTailHalo(g, n.sp ? STAR_POWER_NOTE : colors[n.lane], cx, radius * 0.35, radius * 1.1, yTop, yBot, 0.11 * amt, n.time + n.length <= t + ahead);
         g.globalCompositeOperation = 'source-over';
       }
     }

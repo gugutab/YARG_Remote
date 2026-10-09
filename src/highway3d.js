@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   GUITAR_LANE_COLORS, KICK_COLOR, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, STAR_POWER_NOTE, exitTime, heldAmount, fillHalo, tailShimmer, heldPulse, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, STAR_POWER_NOTE, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, heldPulse, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha,
 } from './gfx.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the flat view shows 2.5)
@@ -201,12 +201,14 @@ export function renderLanes3D(hw, t, w, h) {
         // soft halo around the tail while it is played: many wider and wider faint strips, added together, each with a
         // rounded end (a half ellipse beyond the tail's end, only when the end is on screen)
         g.globalCompositeOperation = 'lighter';
-        g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.02 * amt);
+        const haloColor = n.sp ? STAR_POWER_NOTE : colors[n.lane];
         const endVisible = n.time + n.length <= t + windowSec;
         const pEnd = scaleAt(dTop);
         const xEnd = xAt(mid, dTop);
         const yEnd = yAt(dTop);
         for (let i = 1; i <= 12; i++) {
+          // each strip adds what the smooth falloff loses between its inner and outer edge, so the sum follows it
+          g.fillStyle = withAlpha(haloColor, 0.12 * amt * (haloProfile((i - 1) / 12) - haloProfile(i / 12)));
           const wl = HEAD_R * (0.38 + 0.08 * i); // half width in lane units
           quad(dBot, dTop, mid - wl, mid + wl);
           g.fill();

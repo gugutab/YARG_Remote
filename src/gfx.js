@@ -92,7 +92,9 @@ export function fillHalo(g, color, inner, outer, strength) {
 }
 
 // Soft falloff of the halo around a held tail: [distance from the strip's edge as a fraction of the reach, strength].
-export const TAIL_HALO_PROFILE = [[0, 1], [0.25, 0.6], [0.55, 0.25], [0.8, 0.08], [1, 0]];
+// Smoothstep falloff: it starts and ends with zero slope, so the glow dies out gently instead of ending abruptly.
+export const haloProfile = (f) => 1 - f * f * (3 - 2 * f);
+export const TAIL_HALO_PROFILE = Array.from({ length: 13 }, (_, i) => [i / 12, haloProfile(i / 12)]);
 
 function hexRgb(color) {
   const n = parseInt(color.slice(1), 16);
