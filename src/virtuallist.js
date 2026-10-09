@@ -240,6 +240,13 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       rail.classList.remove('dragging');
       hideBubble = setTimeout(() => { if (!rail.matches(':hover')) bubble.hidden = true; }, 500); // stays while the pointer is still over the rail
     };
+    // The wheel over the rail scrolls the list like it does over the rows.
+    rail.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? scroller.clientHeight : 1; // lines / pages / pixels
+      scroller.scrollTop += e.deltaY * unit;
+      if (!rail.classList.contains('dragging')) hoverAt(e.clientY);
+    }, { passive: false });
     rail.addEventListener('pointerup', end);
     rail.addEventListener('pointercancel', end);
   }
