@@ -459,7 +459,6 @@ function renderPickers() {
         btn.type = 'button';
         btn.textContent = d.label;
         btn.setAttribute('aria-pressed', String(ins.id === activeId && d.id === els.difficulty.value));
-        btn.dataset.chosen = String(d.id === chosen.id);
         btn.addEventListener('click', () => selectInstrument(ins.id, d.id));
         seg.append(btn);
       }
@@ -550,6 +549,7 @@ function stepSection(dir) {
 }
 
 // ---------- Mixer and settings ----------
+const LONG_PRESS_MS = 500;
 let stemStates = []; // { stem, value, muted, views[] }: one state per stem, shown in the menu and on the info screen
 
 function buildMixer(stems) {
@@ -571,12 +571,34 @@ function mixerRow(st) {
     <button class="icon small-icon reset" type="button" title="Restaurar volume" aria-label="Restaurar volume"><svg><use href="#i-reset"/></svg></button>`;
   const mute = row.querySelector('.stem-btn');
   mute.querySelector('.badge').textContent = stemBadge(st.stem.label);
-  const view = { row, range: row.querySelector('input'), val: row.querySelector('.mix-val'), mute };
+  const view = { row, range: row.querySelector('input'), val: row.querySelector('.mix-val'), mute, reset: row.querySelector('.reset') };
   st.views.push(view);
   view.range.addEventListener('input', () => { st.value = Number(view.range.value); st.muted = false; applyStem(st); }); // moving the slider re-enables the track
-  mute.addEventListener('click', () => { st.muted = !st.muted; applyStem(st); });
+  // Long press solos the stem (mutes all the others); a long press on the only active stem restores them all.
+  let pressTimer = 0;
+  let longPressed = false;
+  mute.addEventListener('pointerdown', () => {
+    longPressed = false;
+    clearTimeout(pressTimer);
+    pressTimer = setTimeout(() => { longPressed = true; soloStem(st); }, LONG_PRESS_MS);
+  });
+  for (const type of ['pointerup', 'pointerleave', 'pointercancel']) mute.addEventListener(type, () => clearTimeout(pressTimer));
+  mute.addEventListener('contextmenu', (e) => e.preventDefault());
+  mute.addEventListener('click', () => {
+    if (longPressed) { longPressed = false; return; } // the press already did its job
+    st.muted = !st.muted;
+    applyStem(st);
+  });
   row.querySelector('.reset').addEventListener('click', () => { st.value = 1; st.muted = false; applyStem(st); });
   return row;
+}
+
+function soloStem(st) {
+  const others = stemStates.filter((o) => o !== st);
+  const alreadySolo = !st.muted && others.every((o) => o.muted);
+  for (const o of others) o.muted = !alreadySolo;
+  st.muted = false;
+  stemStates.forEach(applyStem);
 }
 
 // The slider keeps its value while a stem is muted; every view of the stem is updated together.
@@ -587,7 +609,8 @@ function applyStem(st) {
     v.val.textContent = `${Math.round(st.value * 100)}%`;
     v.row.classList.toggle('muted', st.muted);
     v.mute.setAttribute('aria-pressed', String(st.muted));
-    v.mute.title = `${st.stem.label} — ${st.muted ? 'ativar' : 'desativar'}`;
+    v.mute.title = `${st.stem.label} — ${st.muted ? 'ativar' : 'desativar'} (segure para solo)`;
+    v.reset.disabled = st.value === 1 && !st.muted; // already at the default
     v.mute.setAttribute('aria-label', `${st.muted ? 'Ativar' : 'Desativar'} ${st.stem.label}`);
     v.range.setAttribute('aria-label', `Volume de ${st.stem.label}`);
   }
@@ -605,6 +628,7 @@ function setSetting(name, value) {
   settings[name] = value;
   for (const input of document.querySelectorAll(`[data-setting="${name}"]`)) input.value = value;
   for (const out of document.querySelectorAll(`[data-out="${name}"]`)) out.textContent = SETTING_FORMAT[name](value);
+  for (const btn of document.querySelectorAll(`[data-reset="${name}"]`)) btn.disabled = value === SETTING_DEFAULTS[name];
   if (name === 'speed') player.setRate(value);
   if (name === 'neck') highway.setNeckSpeed(value);
 }
@@ -612,6 +636,7 @@ document.addEventListener('input', (e) => {
   const name = e.target.dataset?.setting;
   if (name) setSetting(name, Number(e.target.value));
 });
+for (const name of Object.keys(SETTING_DEFAULTS)) setSetting(name, SETTING_DEFAULTS[name]); // starts the reset buttons disabled
 for (const btn of document.querySelectorAll('[data-reset]')) {
   btn.addEventListener('click', () => setSetting(btn.dataset.reset, SETTING_DEFAULTS[btn.dataset.reset]));
 }

@@ -317,3 +317,6 @@ button.icon.small-icon svg { width: 16px; height: 16px; }
   .info-head-text { grid-column: 1; }
   .info-head { grid-template-columns: 1fr; }
 }
+
+button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
+.stem-btn { touch-action: manipulation; user-select: none; -webkit-user-select: none; }

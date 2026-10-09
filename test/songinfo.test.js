@@ -50,3 +50,10 @@ test('stem icons and badges', () => {
     ['drum', 'guitar', 'guitar', 'guitar', 'mic', 'keys', 'users', 'music', 'music']);
   assert.deepEqual(['drums_2', 'bass', 'rhythm', 'guitar'].map(stemBadge), ['2', 'B', 'R', '']);
 });
+
+test('header chips start with Álbum, Faixa, Duração, Charter and show the track once', () => {
+  const s = { artist: 'A', album: 'Alb', ini: { genre: 'G', year: 2000, charter: 'C', song_length: 61000, album_track: 3, playlist_track: 9 } };
+  assert.deepEqual(metaRows(s).map((r) => r.label), ['Álbum', 'Faixa', 'Duração', 'Charter', 'Artista', 'Gênero', 'Ano']);
+  assert.equal(metaRows(s)[1].value, '3');
+  assert.equal(metaRows({ ini: { playlist_track: 9 } })[0].value, '9');
+});

@@ -17,31 +17,38 @@ export function formatDuration(ms) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-// [ini key, label, icon id]
-const META_FIELDS = [
-  ['album', 'Álbum', 'disc'], ['artist', 'Artista', 'user'], ['genre', 'Gênero', 'tag'], ['year', 'Ano', 'calendar'],
-  ['charter', 'Charter', 'pen'], ['frets', 'Frets', 'pen'], ['playlist', 'Playlist', 'list'], ['sub_playlist', 'Subplaylist', 'list'],
-  ['playlist_track', 'Faixa', 'hash'], ['album_track', 'Faixa do álbum', 'hash'],
-];
 const SHOWN_KEYS = new Set([
   'name', 'artist', 'album', 'genre', 'year', 'charter', 'frets', 'playlist', 'sub_playlist', 'playlist_track',
   'album_track', 'song_length', 'loading_phrase', 'delay', 'delay_seconds', 'preview_start_time',
   ...DIFF_LABELS.map(([k]) => k),
 ]);
 
+// Header chips, in display order: Álbum, Faixa, Duração, Charter first, then the rest.
+// [ini key, label, icon id]; the track number is shown once, as "Faixa" (album track, else playlist track).
+const META_ORDER = ['album', 'track', 'length', 'charter', 'artist', 'genre', 'year', 'frets', 'playlist', 'sub_playlist', 'delay'];
+
 // [{ label, value, icon }] for the header chips; empty values are left out.
 export function metaRows(song) {
   const ini = song.ini || {};
-  const rows = [];
-  for (const [key, label, icon] of META_FIELDS) {
-    const value = plainText(key === 'artist' || key === 'album' ? song[key] : ini[key]);
-    if (value && value !== '-1') rows.push({ label, value, icon });
-  }
-  const length = formatDuration(ini.song_length);
-  if (length) rows.push({ label: 'Duração', value: length, icon: 'clock' });
+  const text = (v) => {
+    const t = plainText(v);
+    return t && t !== '-1' ? t : '';
+  };
   const delay = Number(ini.delay);
-  if (Number.isFinite(delay) && delay !== 0) rows.push({ label: 'Delay do áudio', value: `${delay} ms`, icon: 'clock' });
-  return rows;
+  const items = {
+    album: ['Álbum', text(song.album), 'disc'],
+    track: ['Faixa', text(ini.album_track) || text(ini.playlist_track), 'hash'],
+    length: ['Duração', formatDuration(ini.song_length), 'clock'],
+    charter: ['Charter', text(ini.charter), 'pen'],
+    artist: ['Artista', text(song.artist), 'user'],
+    genre: ['Gênero', text(ini.genre), 'tag'],
+    year: ['Ano', text(ini.year), 'calendar'],
+    frets: ['Frets', text(ini.frets), 'pen'],
+    playlist: ['Playlist', text(ini.playlist), 'list'],
+    sub_playlist: ['Subplaylist', text(ini.sub_playlist), 'list'],
+    delay: ['Delay do áudio', Number.isFinite(delay) && delay !== 0 ? `${delay} ms` : '', 'clock'],
+  };
+  return META_ORDER.map((k) => ({ label: items[k][0], value: items[k][1], icon: items[k][2] })).filter((r) => r.value);
 }
 
 // song.ini difficulty level (0..6) for a playable instrument option, or null when the ini has none.
