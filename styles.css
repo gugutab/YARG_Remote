@@ -610,3 +610,8 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
 
 /* Round 31: the note-style button sits right under the 3D button, in the corner of the stage */
 button.icon.stage-btn.style-btn { top: 54px; }
+
+/* Long instrument names (e.g. "Bateria (Pro estendida)") shrink with an ellipsis instead of covering the info button and level */
+.icard-top .icard-head { min-width: 0; overflow: hidden; }
+.icard-top .icard-name { overflow: hidden; text-overflow: ellipsis; }
+.icard-top .icard-info { flex: none; }
