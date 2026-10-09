@@ -142,6 +142,7 @@ export const BAR_FLASH_SEC = 0.24; // ... after a pedal or open hit (it lights e
 export const NOTE_RECT_W = 1.05; // half-width of the rounded rectangle relative to rx (it was 1.2: a bit smaller now)
 export const NOTE_RECT_H = 0.68; // half-height relative to ry (it was 0.78)
 export const TAPER_GAIN = 3;
+export const NOTE_RECT_ROUND = 0.8; // corner radius as a fraction of the half-height (1 = a pill); it was 0.55
 
 function outline(x, y, rx, ry, style) {
   const pts = [];
@@ -154,7 +155,7 @@ function outline(x, y, rx, ry, style) {
   }
   const w = rx * NOTE_RECT_W;
   const h = ry * NOTE_RECT_H;
-  const r = Math.min(w, h) * 0.55;
+  const r = Math.min(w, h) * NOTE_RECT_ROUND;
   const corners = [[x + w - r, y - h + r, -90], [x + w - r, y + h - r, 0], [x - w + r, y + h - r, 90], [x - w + r, y - h + r, 180]];
   for (const [cx, cy, start] of corners) {
     for (let k = 0; k <= 6; k++) {
