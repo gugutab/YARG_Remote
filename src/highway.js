@@ -38,6 +38,8 @@ import {
 export { firstVisibleIndex } from './gfx.js';
 import { renderLanes3D } from './highway3d.js';
 
+const RECT_WIDEN_2D = 1.18;
+
 export class Highway {
   constructor(canvas) {
     this.canvas = canvas;
@@ -136,6 +138,7 @@ export class Highway {
     }
     const radius = Math.min(laneW * 0.36, 26);
     const colors = chart.laneColors || GUITAR_LANE_COLORS;
+    const wide = this.noteStyle === 'rect' ? RECT_WIDEN_2D : 1; // 2D rounded rectangles are a bit wider than the shared shape
 
     // hit pads, like the 3D view: a ring per lane at the hit line, lit when a note is hit, while a long note is held,
     // and (every pad) on a pedal or open hit
@@ -153,7 +156,7 @@ export class Highway {
     }
     for (let i = 0; i < chart.lanes; i++) {
       g.beginPath();
-      noteShape(g, x0 + (i + 0.5) * laneW, hitY, radius * 1.05, radius * 1.05, this.noteStyle);
+      noteShape(g, x0 + (i + 0.5) * laneW, hitY, radius * 1.05 * wide, radius * 1.05, this.noteStyle);
       g.fillStyle = withAlpha(colors[i], Math.min(0.9, PAD_FILL_ALPHA + 0.5 * flash[i] + 0.35 * barFlash));
       g.fill();
       g.lineWidth = 2;
@@ -226,7 +229,7 @@ export class Highway {
         g.globalCompositeOperation = 'source-over';
       }
       g.beginPath();
-      noteShape(g, cx, cy, r, r, this.noteStyle);
+      noteShape(g, cx, cy, r * wide, r, this.noteStyle);
       g.fillStyle = tintWhite(n.sp ? STAR_POWER_NOTE : n.tap ? TAP_COLOR : colors[n.lane], white);
       g.fill();
       // accent: same size, with a thicker outline in a darker shade of the note's colour
@@ -241,7 +244,7 @@ export class Highway {
       }
       if (n.cymbal) { // pro drums: cymbal = ring with a white outline, tom = solid pad
         g.beginPath();
-        noteShape(g, cx, cy, r * 0.55, r * 0.55, this.noteStyle);
+        noteShape(g, cx, cy, r * 0.55 * wide, r * 0.55, this.noteStyle);
         g.fillStyle = '#0d1117';
         g.fill();
         g.lineWidth = 3;
