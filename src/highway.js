@@ -40,7 +40,7 @@ export class Highway {
     this.chart = null;
     this.maxLength = 0; // longest sustain in the current chart, in seconds
     this.view = '2d';
-    this.neck = 1; // neck speed: scales distance between notes only; timing is unchanged
+    this.neck = 1.2; // neck speed (the app default): scales distance between notes only; timing is unchanged
   }
 
   // '2d' (flat) or '3d' (perspective). Vocals have no highway and always use the flat view.

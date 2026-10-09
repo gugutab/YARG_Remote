@@ -34,7 +34,7 @@ let sortDesc = false;
 let ready = false; // audio decoded and a chart built: playback is allowed
 let infoOpen = false;
 let loadInfo = { state: 'idle', text: '', fraction: 0 };
-const settings = { speed: 1, neck: 1, chartDelay: 0 };
+const settings = { speed: 1, neck: 1.2, chartDelay: 0 };
 let remote = false; // library comes from server.mjs (/api/library); no folder permission needed
 let detached = false; // list restored from storage without file access (browsers without showDirectoryPicker)
 let pendingSongId = null; // song clicked while detached; opened once the folder is picked again
@@ -879,7 +879,7 @@ function applyStem(st) {
 }
 
 // Settings: one value each, shown by every [data-setting] slider (menu popover and info screen).
-const SETTING_DEFAULTS = { speed: 1, neck: 1, chartDelay: 0 };
+const SETTING_DEFAULTS = { speed: 1, neck: 1.2, chartDelay: 0 };
 const SETTING_FORMAT = {
   speed: (v) => `${v.toFixed(1)}×`,
   neck: (v) => `${v.toFixed(1)}×`,
