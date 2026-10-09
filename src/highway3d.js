@@ -2,7 +2,7 @@
 // so it stays light enough for phones. Only the lane instruments (guitar, bass, keys, drums) have a highway;
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
-  GUITAR_LANE_COLORS, KICK_COLOR, OPEN_COLOR, KICK_BAR_HALF_H, DOUBLE_KICK_GAP, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
+  GUITAR_LANE_COLORS, KICK_COLOR, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
   ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, STAR_POWER_NOTE, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha,
 } from './gfx.js';
 
@@ -14,6 +14,9 @@ const HEAD_R = 0.36; // note head radius, in lane widths
 const HEAD_TILT = 0.55; // vertical squash of the heads (they lie on the road)
 const FADE_IN = 0.14; // fraction of the depth over which notes fade in at the far edge
 const HIT_FLASH_SEC = 0.14;
+const BAR_DEPTH = 0.026; // pedal/open bar thickness along the road, in depth units (it lies flat on the fretboard)
+const BAR_FLASH_SEC = 0.24; // how long the hit pads and the hit bar stay lit after a pedal hit
+const easeOut = (x) => 1 - (1 - x) ** 3;
 
 export function renderLanes3D(hw, t, w, h) {
   const g = hw.g;
@@ -32,7 +35,6 @@ export function renderLanes3D(hw, t, w, h) {
   const xAt = (lx, d) => cx + lx * laneW * scaleAt(d); // lx = lane units from the road's centre
   const depth = (time) => Math.min(1, Math.max(0, (time - t) / windowSec));
   const half = lanes / 2;
-  const unit = laneW / 90; // the flat view is tuned for 90 px lanes; keep thicknesses in proportion
 
   const quad = (d0, d1, lx0, lx1) => {
     g.beginPath();
@@ -99,39 +101,77 @@ export function renderLanes3D(hw, t, w, h) {
 
   // hit zone: a bar across the road and one pad per lane, lit while a note is being hit
   const flash = new Array(lanes).fill(0);
+  let barFlash = 0; // a pedal or open hit lights the whole zone
+  let barColor = KICK_COLOR;
   for (const n of visible) {
     const past = t - n.time;
-    if (past >= 0 && past < HIT_FLASH_SEC && n.lane >= 0) flash[n.lane] = Math.max(flash[n.lane], 1 - past / HIT_FLASH_SEC);
+    if (past < 0) continue;
+    if (n.lane >= 0 && !n.open) {
+      if (past < HIT_FLASH_SEC) flash[n.lane] = Math.max(flash[n.lane], 1 - past / HIT_FLASH_SEC);
+    } else if (past < BAR_FLASH_SEC && 1 - past / BAR_FLASH_SEC > barFlash) {
+      barFlash = 1 - past / BAR_FLASH_SEC;
+      barColor = n.open ? OPEN_COLOR : KICK_COLOR;
+    }
   }
-  g.fillStyle = 'rgba(255,255,255,0.65)';
-  g.fillRect(xAt(-half, 0) - 6, hitY - 1.5, roadW + 12, 3);
+  g.fillStyle = barFlash > 0 ? tintWhite(barColor, 0.5 * barFlash) : 'rgba(255,255,255,0.65)';
+  const hitBarH = 3 + 5 * barFlash;
+  g.fillRect(xAt(-half, 0) - 6, hitY - hitBarH / 2, roadW + 12, hitBarH);
   const padRx = laneW * HEAD_R;
   for (let i = 0; i < lanes; i++) {
     const x = cx + (i + 0.5 - half) * laneW;
     g.beginPath();
     g.ellipse(x, hitY, padRx * 1.05, padRx * 1.05 * HEAD_TILT, 0, 0, Math.PI * 2);
-    g.fillStyle = withAlpha(colors[i], 0.14 + 0.5 * flash[i]);
+    g.fillStyle = withAlpha(colors[i], Math.min(0.9, 0.14 + 0.5 * flash[i] + 0.35 * barFlash));
     g.fill();
     g.lineWidth = 2;
-    g.strokeStyle = withAlpha(colors[i], 0.55 + 0.45 * flash[i]);
+    g.strokeStyle = withAlpha(colors[i], Math.min(1, 0.55 + 0.45 * Math.max(flash[i], barFlash)));
     g.stroke();
   }
 
-  // pedal and open bars sit behind the heads; far ones first
+  // Pedal and open bars lie flat on the road (a quad with real depth, not a screen-space strip) and sit behind
+  // the heads; far ones first. Hit animation (FADE_SEC): white flash, a glow that spreads over the road and the
+  // rails, and a bar that thins out as it fades.
   for (let i = visible.length - 1; i >= 0; i--) {
     const n = visible[i];
     if (n.lane >= 0 && !n.open) continue;
     const past = t - n.time;
     if (past > FADE_SEC) continue;
     const kx = Math.max(0, past) / FADE_SEC;
+    const e = easeOut(kx);
     const d = depth(n.time);
-    const p = scaleAt(d);
-    const hh = KICK_BAR_HALF_H * unit * (1 + 0.4 * kx) * p;
-    g.globalAlpha = (1 - kx) * Math.min(1, (1 - d) / FADE_IN);
-    g.fillStyle = tintWhite(n.open ? OPEN_COLOR : KICK_COLOR, kx);
-    const gap = DOUBLE_KICK_GAP * unit * p;
-    for (const dy of n.doubleKick ? [0, -(2 * hh + gap)] : [0]) {
-      g.fillRect(xAt(-half, d), yAt(d) + dy - hh, roadW * p, hh * 2);
+    const base = n.open ? OPEN_COLOR : KICK_COLOR;
+    const far = Math.min(1, (1 - d) / FADE_IN);
+    const alpha = far * (1 - e * e); // stays solid for a moment, then drops
+    const thick = BAR_DEPTH * (1 - 0.55 * e); // the bar thins as it is "consumed"
+    const white = past > 0 ? 0.85 * (1 - Math.min(1, kx * 3)) : 0; // quick white flash at the moment of the hit, not before
+    const bars = n.doubleKick ? [0, BAR_DEPTH * 1.3] : [0];
+    if (kx > 0) { // glow: a wider, taller, translucent copy that spreads past the rails
+      g.globalAlpha = 0.5 * (1 - kx) * (1 - kx) * far;
+      g.globalCompositeOperation = 'lighter'; // additive, so the glow lights the road instead of greying it
+      g.fillStyle = base;
+      quad(d - BAR_DEPTH * (0.6 + 1.6 * e), d + BAR_DEPTH * (0.6 + 1.6 * e), -half - 0.12 * e, half + 0.12 * e);
+      g.fill();
+      g.globalCompositeOperation = 'source-over';
+    }
+    for (const off of bars) {
+      const d0 = d + off - thick / 2;
+      const d1 = d + off + thick / 2;
+      g.globalAlpha = alpha;
+      g.fillStyle = tintWhite(base, white);
+      quad(d0, d1, -half, half);
+      g.fill();
+      // lit far edge and darker near edge give the bar some body
+      g.lineWidth = Math.max(1, 2 * scaleAt(d1));
+      g.strokeStyle = tintWhite(base, 0.65);
+      g.beginPath();
+      g.moveTo(xAt(-half, d1), yAt(d1));
+      g.lineTo(xAt(half, d1), yAt(d1));
+      g.stroke();
+      g.strokeStyle = darken(base, 0.6);
+      g.beginPath();
+      g.moveTo(xAt(-half, d0), yAt(d0));
+      g.lineTo(xAt(half, d0), yAt(d0));
+      g.stroke();
     }
   }
   g.globalAlpha = 1;
