@@ -529,3 +529,13 @@ button.icon.info-menu {
   -webkit-backdrop-filter: blur(6px);
 }
 button.icon.info-menu:hover { background: var(--panel-2); }
+
+/* ---------- Round 17: grouped stems ---------- */
+.mix-row { grid-template-columns: 36px 1fr 40px 28px 28px; } /* the last column is for the expand button of groups */
+.mix-group { display: flex; flex-direction: column; gap: 6px; }
+.mix-kids { display: flex; flex-direction: column; gap: 6px; margin-left: 14px; padding-left: 8px; border-left: 2px solid var(--line); }
+.mix-kids[hidden] { display: none; }
+.expand-btn svg { transition: transform .15s ease; }
+.expand-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+.expand-btn[aria-expanded="true"] { color: var(--accent); }
+.popover.mix-pop { width: min(360px, calc(100vw - 16px)); }

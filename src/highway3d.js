@@ -14,7 +14,7 @@ const HEAD_TILT = 0.55; // vertical squash of the heads (they lie on the road)
 const FADE_IN = 0.14; // fraction of the depth over which notes fade in at the far edge
 const HIT_FLASH_SEC = 0.14;
 const BAR_DEPTH = 0.0087; // one third of the earlier 0.026 // pedal/open bar thickness along the road, in depth units (it lies flat on the fretboard)
-const GLOW_DEPTH = 0.026; // the hit glow keeps its size, so the animation stays easy to see
+const GLOW_DEPTH = 0.009; // half-height of the hit glow (it was 0.026 and looked too tall)
 const BAR_FLASH_SEC = 0.24; // how long the hit pads and the hit bar stay lit after a pedal hit
 const easeOut = (x) => 1 - (1 - x) ** 3;
 
@@ -115,7 +115,7 @@ export function renderLanes3D(hw, t, w, h) {
     }
   }
   g.fillStyle = barFlash > 0 ? tintWhite(barColor, 0.5 * barFlash) : 'rgba(255,255,255,0.65)';
-  const hitBarH = 3 + 5 * barFlash;
+  const hitBarH = 3 + 3 * barFlash;
   g.fillRect(xAt(-half, 0) - 6, hitY - hitBarH / 2, roadW + 12, hitBarH);
   const padRx = laneW * HEAD_R;
   for (let i = 0; i < lanes; i++) {
@@ -147,7 +147,7 @@ export function renderLanes3D(hw, t, w, h) {
     const white = past > 0 ? 0.85 * (1 - Math.min(1, kx * 3)) : 0; // quick white flash at the moment of the hit, not before
     const bars = n.doubleKick ? [0, BAR_DEPTH * 1.3] : [0];
     if (kx > 0) { // glow: a wider, taller, translucent copy that spreads past the rails
-      g.globalAlpha = 0.5 * (1 - kx) * (1 - kx) * far;
+      g.globalAlpha = 0.55 * (1 - kx) * (1 - kx) * far;
       g.globalCompositeOperation = 'lighter'; // additive, so the glow lights the road instead of greying it
       g.fillStyle = base;
       quad(d - GLOW_DEPTH * (0.6 + 1.6 * e), d + GLOW_DEPTH * (0.6 + 1.6 * e), -half - 0.12 * e, half + 0.12 * e);

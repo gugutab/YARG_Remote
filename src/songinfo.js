@@ -124,6 +124,19 @@ export function stemKind(label) {
   return 'music';
 }
 
+// The instrument a stem belongs to: drums_1, drums_2, drums_kick ... are all "drums"; guitar_2 is "guitar".
+export function stemGroup(label) {
+  const n = String(label).toLowerCase().trim();
+  if (stemKind(n) === 'drum') return 'drums';
+  const base = n.replace(/[\s_\-]*\d+$/, '').replace(/[\s_\-]+$/, '');
+  return base || n;
+}
+
+export function stemGroupLabel(key) {
+  const names = { drums: 'Bateria', vocals: 'Vocal', guitar: 'Guitarra', bass: 'Baixo', rhythm: 'Rhythm', keys: 'Teclado', song: 'Música', crowd: 'Plateia', backing: 'Backing' };
+  return names[key] ?? key;
+}
+
 // Short text that tells apart stems sharing an icon: the trailing number (drums_2 -> "2"), B for bass, R for rhythm.
 export function stemBadge(label) {
   const n = String(label).toLowerCase();

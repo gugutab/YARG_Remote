@@ -44,7 +44,7 @@ test('bpm label, chart counts and per-instrument level', () => {
   assert.equal(metaRows(song).find((r) => r.label === 'Ano').icon, 'calendar');
 });
 
-import { stemKind, stemBadge } from '../src/songinfo.js';
+import { stemKind, stemBadge, stemGroup, stemGroupLabel } from '../src/songinfo.js';
 test('stem icons and badges', () => {
   assert.deepEqual(['drums_2', 'guitar', 'bass', 'rhythm', 'vocals', 'keys', 'crowd', 'song', 'backing'].map(stemKind),
     ['drum', 'guitar', 'guitar', 'guitar', 'mic', 'keys', 'users', 'music', 'music']);
@@ -56,4 +56,11 @@ test('header chips start with Álbum, Faixa, Duração, Charter and show the tra
   assert.deepEqual(metaRows(s).map((r) => r.label), ['Álbum', 'Faixa', 'Duração', 'Charter', 'Artista', 'Gênero', 'Ano']);
   assert.equal(metaRows(s)[1].value, '3');
   assert.equal(metaRows({ ini: { playlist_track: 9 } })[0].value, '9');
+});
+
+test('stems of one instrument share a group', () => {
+  assert.deepEqual(['drums_1', 'drums_2', 'drums_kick', 'drums', 'guitar', 'guitar_2', 'rhythm', 'vocals_1', 'song', 'Crowd'].map(stemGroup),
+    ['drums', 'drums', 'drums', 'drums', 'guitar', 'guitar', 'rhythm', 'vocals', 'song', 'crowd']);
+  assert.equal(stemGroupLabel('drums'), 'Bateria');
+  assert.equal(stemGroupLabel('weird'), 'weird');
 });

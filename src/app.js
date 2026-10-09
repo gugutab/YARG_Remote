@@ -4,7 +4,7 @@ import { MultiTrackPlayer } from './player.js';
 import { Highway } from './highway.js';
 import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, readBytes, serializeSongs, restoreSongs, restoreRemoteSongs } from './library.js';
 import { songDelaySeconds, plainText } from './ini.js';
-import { metaRows, extraRows, chartStats, bpmLabel, instrumentLevel, stemKind, stemBadge } from './songinfo.js';
+import { metaRows, extraRows, chartStats, bpmLabel, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel } from './songinfo.js';
 import { saveLibrary, loadLibrary } from './store.js';
 import { filterSongs, sortSongs, genresOf } from './songlist.js';
 
@@ -679,46 +679,79 @@ function stepSection(dir) {
 const LONG_PRESS_MS = 500;
 // Master volume: one more mixer row (kept across songs) that scales every stem.
 const masterState = { stem: { id: 'master', label: 'Master' }, master: true, value: 1, muted: false, views: [] };
-let stemStates = []; // { stem, value, muted, views[] }: one state per stem, shown in the menu and on the info screen
+let stemStates = []; // { stem, value, muted, group, views[] }: one state per stem, shown in the menu and on the info screen
+let groupList = []; // { key, label, members[], value, muted, expanded, views[] }: stems of one instrument, collapsed by default
+
+const silent = (st) => st.muted || Boolean(st.group?.muted); // not audible because of its own or its group's mute
+const groupSilent = (g) => g.muted || g.members.every((m) => m.muted);
+const effectiveVolume = (st) => (silent(st) ? 0 : st.value * (st.group?.value ?? 1));
 
 function buildMixer(stems) {
-  stemStates = stems.map((stem) => ({ stem, value: 1, muted: false, views: [] }));
+  stemStates = stems.map((stem) => ({ stem, value: 1, muted: false, group: null, views: [] }));
+  const byKey = new Map();
+  for (const st of stemStates) {
+    const key = stemGroup(st.stem.label);
+    if (!byKey.has(key)) byKey.set(key, { key, label: stemGroupLabel(key), members: [], value: 1, muted: false, expanded: false, views: [] });
+    byKey.get(key).members.push(st);
+  }
+  groupList = [...byKey.values()];
+  for (const g of groupList) if (g.members.length > 1) for (const m of g.members) m.group = g;
+  groupList = groupList.filter((g) => g.members.length > 1); // a lone stem needs no group
+
   masterState.views = [];
+  const grouped = new Set(groupList.flatMap((g) => g.members));
   for (const container of [els.mixer, els.mixerInfo]) {
     const master = mixerRow(masterState);
     master.classList.add('master');
-    container.replaceChildren(master, ...stemStates.map(mixerRow));
+    const rows = [master];
+    const done = new Set();
+    for (const st of stemStates) {
+      if (!grouped.has(st)) { rows.push(mixerRow(st)); continue; }
+      if (done.has(st.group)) continue;
+      done.add(st.group);
+      rows.push(groupBlock(st.group));
+    }
+    container.replaceChildren(...rows);
   }
   applyStem(masterState);
+  groupList.forEach(renderGroup);
   stemStates.forEach(applyStem);
 }
 
-function mixerRow(st) {
-  const row = document.createElement('div');
-  row.className = 'mix-row';
-  const kind = st.master ? 'volume' : stemKind(st.stem.label);
-  row.innerHTML = `
+// A long press on a mute button solos what it stands for (mutes everything else); on the only audible one it restores all.
+function pressHandlers(btn, solo, toggle) {
+  let timer = 0;
+  let longPressed = false;
+  btn.addEventListener('pointerdown', () => {
+    longPressed = false;
+    clearTimeout(timer);
+    if (solo) timer = setTimeout(() => { longPressed = true; solo(); }, LONG_PRESS_MS);
+  });
+  for (const type of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(type, () => clearTimeout(timer));
+  btn.addEventListener('contextmenu', (e) => e.preventDefault());
+  btn.addEventListener('click', () => {
+    if (longPressed) { longPressed = false; return; } // the press already did its job
+    toggle();
+  });
+}
+
+const ROW_HTML = (kind) => `
     <button class="stem-btn" type="button" aria-pressed="false"><svg><use href="#i-${kind}"/></svg><b class="badge"></b></button>
     <input type="range" min="0" max="1.5" step="0.01" value="1">
     <span class="mix-val">100%</span>
     <button class="icon small-icon reset" type="button" title="Restaurar volume" aria-label="Restaurar volume"><svg><use href="#i-reset"/></svg></button>`;
+
+function mixerRow(st) {
+  const row = document.createElement('div');
+  row.className = 'mix-row';
+  row.innerHTML = ROW_HTML(st.master ? 'volume' : stemKind(st.stem.label));
   const mute = row.querySelector('.stem-btn');
   mute.querySelector('.badge').textContent = st.master ? '' : stemBadge(st.stem.label);
   const view = { row, range: row.querySelector('input'), val: row.querySelector('.mix-val'), mute, reset: row.querySelector('.reset') };
   st.views.push(view);
   view.range.addEventListener('input', () => { st.value = Number(view.range.value); st.muted = false; applyStem(st); }); // moving the slider re-enables the track
-  // Long press solos the stem (mutes all the others); a long press on the only active stem restores them all.
-  let pressTimer = 0;
-  let longPressed = false;
-  mute.addEventListener('pointerdown', () => {
-    longPressed = false;
-    clearTimeout(pressTimer);
-    if (!st.master) pressTimer = setTimeout(() => { longPressed = true; soloStem(st); }, LONG_PRESS_MS);
-  });
-  for (const type of ['pointerup', 'pointerleave', 'pointercancel']) mute.addEventListener(type, () => clearTimeout(pressTimer));
-  mute.addEventListener('contextmenu', (e) => e.preventDefault());
-  mute.addEventListener('click', () => {
-    if (longPressed) { longPressed = false; return; } // the press already did its job
+  pressHandlers(mute, st.master ? null : () => soloStem(st), () => {
+    if (st.group?.muted) { st.group.muted = false; applyGroup(st.group); return; } // the group was muted: this click turns it back on
     st.muted = !st.muted;
     applyStem(st);
   });
@@ -726,26 +759,99 @@ function mixerRow(st) {
   return row;
 }
 
+// One slider for a whole instrument (it scales every member), with a button that shows the individual sliders.
+function groupBlock(g) {
+  const block = document.createElement('div');
+  block.className = 'mix-group';
+  const row = document.createElement('div');
+  row.className = 'mix-row';
+  row.innerHTML = ROW_HTML(stemKind(g.members[0].stem.label)) + `
+    <button class="icon small-icon expand-btn" type="button" aria-expanded="false"><svg><use href="#i-chevron"/></svg></button>`;
+  const mute = row.querySelector('.stem-btn');
+  mute.querySelector('.badge').textContent = String(g.members.length);
+  const kids = document.createElement('div');
+  kids.className = 'mix-kids';
+  kids.hidden = !g.expanded;
+  for (const m of g.members) kids.append(mixerRow(m));
+  const expand = row.querySelector('.expand-btn');
+  const view = { row, range: row.querySelector('input'), val: row.querySelector('.mix-val'), mute, reset: row.querySelector('.reset'), expand, kids };
+  g.views.push(view);
+  view.range.addEventListener('input', () => { g.value = Number(view.range.value); unmuteGroup(g); applyGroup(g); });
+  pressHandlers(mute, () => soloGroup(g), () => {
+    if (groupSilent(g)) unmuteGroup(g);
+    else g.muted = true;
+    applyGroup(g);
+  });
+  row.querySelector('.reset').addEventListener('click', () => { g.value = 1; unmuteGroup(g); applyGroup(g); });
+  expand.addEventListener('click', () => { g.expanded = !g.expanded; renderGroup(g); });
+  block.append(row, kids);
+  return block;
+}
+
+function unmuteGroup(g) {
+  g.muted = false;
+  for (const m of g.members) m.muted = false;
+}
+
+function applyGroup(g) {
+  renderGroup(g);
+  g.members.forEach(applyStem);
+}
+
+function renderGroup(g) {
+  const muted = groupSilent(g);
+  for (const v of g.views) {
+    v.range.value = g.value;
+    v.val.textContent = `${Math.round(g.value * 100)}%`;
+    v.row.classList.toggle('muted', muted);
+    v.mute.setAttribute('aria-pressed', String(muted));
+    v.mute.title = `${g.label} (${g.members.length} tracks) — ${muted ? 'ativar' : 'desativar'} (segure para solo)`;
+    v.mute.setAttribute('aria-label', `${muted ? 'Ativar' : 'Desativar'} ${g.label}`);
+    v.range.setAttribute('aria-label', `Volume de ${g.label}`);
+    v.reset.disabled = g.value === 1 && !muted;
+    v.kids.hidden = !g.expanded;
+    v.expand.setAttribute('aria-expanded', String(g.expanded));
+    v.expand.title = g.expanded ? 'Recolher tracks' : 'Mostrar cada track';
+    v.expand.setAttribute('aria-label', v.expand.title);
+  }
+}
+
 function soloStem(st) {
   const others = stemStates.filter((o) => o !== st);
-  const alreadySolo = !st.muted && others.every((o) => o.muted);
+  const alreadySolo = !silent(st) && others.every(silent);
+  groupList.forEach((g) => { g.muted = false; });
   for (const o of others) o.muted = !alreadySolo;
   st.muted = false;
+  applyEverything();
+}
+
+function soloGroup(g) {
+  const others = stemStates.filter((o) => o.group !== g);
+  const alreadySolo = g.members.every((m) => !silent(m)) && others.every(silent);
+  groupList.forEach((x) => { x.muted = false; });
+  for (const o of others) o.muted = !alreadySolo;
+  for (const m of g.members) m.muted = false;
+  applyEverything();
+}
+
+function applyEverything() {
+  groupList.forEach(renderGroup);
   stemStates.forEach(applyStem);
 }
 
 // The slider keeps its value while a stem is muted; every view of the stem is updated together.
 function applyStem(st) {
   if (st.master) player.setMaster(st.muted ? 0 : st.value);
-  else player.setVolume(st.stem.id, st.muted ? 0 : st.value);
+  else player.setVolume(st.stem.id, effectiveVolume(st));
+  const off = st.master ? st.muted : silent(st);
   for (const v of st.views) {
     v.range.value = st.value;
     v.val.textContent = `${Math.round(st.value * 100)}%`;
-    v.row.classList.toggle('muted', st.muted);
-    v.mute.setAttribute('aria-pressed', String(st.muted));
-    v.mute.title = `${st.stem.label} — ${st.muted ? 'ativar' : 'desativar'} (segure para solo)`;
-    v.reset.disabled = st.value === 1 && !st.muted; // already at the default
-    v.mute.setAttribute('aria-label', `${st.muted ? 'Ativar' : 'Desativar'} ${st.stem.label}`);
+    v.row.classList.toggle('muted', off);
+    v.mute.setAttribute('aria-pressed', String(off));
+    v.mute.title = `${st.stem.label} — ${off ? 'ativar' : 'desativar'} (segure para solo)`;
+    v.reset.disabled = st.value === 1 && !off; // already at the default
+    v.mute.setAttribute('aria-label', `${off ? 'Ativar' : 'Desativar'} ${st.stem.label}`);
     v.range.setAttribute('aria-label', `Volume de ${st.stem.label}`);
   }
 }
