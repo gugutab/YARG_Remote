@@ -18,3 +18,10 @@ test('heads just past the hit line are kept for the exit animation; older ones a
   const notes = [{ time: 4.5, length: 0 }, { time: 4.9, length: 0 }];
   assert.equal(firstVisibleIndex(notes, 5, 0), 1);
 });
+
+import { markStarPowerNotes } from '../src/highway.js';
+test('notes inside a star power phrase are flagged, others are not', () => {
+  const chart = { notes: [{ time: 0.5 }, { time: 1 }, { time: 1.9 }, { time: 2 }, { time: 5 }], starPower: [{ start: 1, end: 2 }, { start: 4, end: 4.5 }] };
+  markStarPowerNotes(chart);
+  assert.deepEqual(chart.notes.map((n) => n.sp), [false, true, true, false, false]);
+});

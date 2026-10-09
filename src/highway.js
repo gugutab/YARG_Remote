@@ -22,6 +22,7 @@ import {
   darken,
   withAlpha,
   firstIndexAtOrAfter,
+  STAR_POWER_NOTE,
 } from './gfx.js';
 export { firstVisibleIndex } from './gfx.js';
 import { renderLanes3D } from './highway3d.js';
@@ -48,11 +49,12 @@ export class Highway {
   setChart(chart) {
     this.chart = chart;
     this.vRange = null; // vocal view range is re-fitted for each chart
+    if (chart) markStarPowerNotes(chart);
     this.maxLength = chart ? Math.max(0, ...chart.notes.map((n) => n.length || 0)) : 0;
   }
 
   resize() {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2); // phones report 3+; 2 is plenty and keeps the fill rate low
     const w = this.canvas.clientWidth;
     const h = this.canvas.clientHeight;
     if (this.canvas.width !== Math.round(w * dpr) || this.canvas.height !== Math.round(h * dpr)) {
@@ -149,7 +151,7 @@ export class Highway {
         continue;
       }
       const cx = x0 + (n.lane + 0.5) * laneW;
-      g.fillStyle = withAlpha(colors[n.lane], 0.55);
+      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.55);
       g.fillRect(cx - radius * 0.35, yTop, radius * 0.7, Math.max(0, yBot - yTop));
     }
 
@@ -168,11 +170,11 @@ export class Highway {
       const r = radius * (1 + 0.4 * k);
       g.beginPath();
       g.arc(cx, cy, r, 0, Math.PI * 2);
-      g.fillStyle = tintWhite(n.tap ? TAP_COLOR : colors[n.lane], white);
+      g.fillStyle = tintWhite(n.sp ? STAR_POWER_NOTE : n.tap ? TAP_COLOR : colors[n.lane], white);
       g.fill();
       // accent: same size, with a thicker outline in a darker shade of the note's colour
-      g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH : 2;
-      g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : 'rgba(0,0,0,0.5)';
+      g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH : n.sp ? 3 : 2;
+      g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : n.sp ? colors[n.lane] : 'rgba(0,0,0,0.5)'; // star power keeps the lane colour as its outline
       g.stroke();
       if (n.hopo) { // guitar HOPO: a white dot in the head
         g.beginPath();
@@ -302,5 +304,16 @@ export class Highway {
       if (top > h || bottom < 0) continue;
       this.g.fillRect(x0, top, width, bottom - top);
     }
+  }
+}
+
+// Flags the notes that sit inside a star power phrase (n.sp), so both views can colour them like YARG does.
+// Spans and notes are both sorted by time.
+export function markStarPowerNotes(chart) {
+  const spans = chart.starPower || [];
+  let i = 0;
+  for (const n of chart.notes) {
+    while (i < spans.length && spans[i].end <= n.time) i++;
+    n.sp = i < spans.length && n.time >= spans[i].start;
   }
 }

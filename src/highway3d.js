@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   GUITAR_LANE_COLORS, KICK_COLOR, OPEN_COLOR, KICK_BAR_HALF_H, DOUBLE_KICK_GAP, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, STAR_POWER_NOTE, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha,
 } from './gfx.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the flat view shows 2.5)
@@ -146,7 +146,7 @@ export function renderLanes3D(hw, t, w, h) {
       g.fillStyle = withAlpha(OPEN_COLOR, 0.3);
       quad(dBot, dTop, -half, half);
     } else {
-      g.fillStyle = withAlpha(colors[n.lane], 0.6);
+      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.6);
       const mid = n.lane + 0.5 - half;
       quad(dBot, dTop, mid - HEAD_R * 0.38, mid + HEAD_R * 0.38);
     }
@@ -166,20 +166,20 @@ export function renderLanes3D(hw, t, w, h) {
     const y = yAt(d);
     const rx = laneW * HEAD_R * p * (1 + 0.4 * kx);
     const ry = rx * HEAD_TILT;
-    const body = tintWhite(n.tap ? TAP_COLOR : colors[n.lane], kx);
+    const body = tintWhite(n.sp ? STAR_POWER_NOTE : n.tap ? TAP_COLOR : colors[n.lane], kx);
     g.globalAlpha = (1 - kx) * (n.ghost ? GHOST_ALPHA : 1) * Math.min(1, (1 - d) / FADE_IN);
     // thickness: a darker disc underneath, then the top face
     const th = rx * 0.28;
     g.beginPath();
     g.ellipse(x, y + th, rx, ry, 0, 0, Math.PI * 2);
-    g.fillStyle = darken(n.tap ? TAP_COLOR : colors[n.lane], 0.55);
+    g.fillStyle = darken(n.sp ? '#9aa4b0' : n.tap ? TAP_COLOR : colors[n.lane], 0.55);
     g.fill();
     g.beginPath();
     g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
     g.fillStyle = body;
     g.fill();
-    g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH * p : Math.max(1, 1.5 * p);
-    g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : 'rgba(0,0,0,0.5)';
+    g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH * p : Math.max(1, (n.sp ? 3 : 1.5) * p);
+    g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : n.sp ? colors[n.lane] : 'rgba(0,0,0,0.5)';
     g.stroke();
     if (n.hopo) {
       g.beginPath();

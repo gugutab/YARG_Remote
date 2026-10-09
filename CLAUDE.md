@@ -179,5 +179,5 @@ aparece em `5875318f` e `34e01570`. Rolls em `5395826e`. Para testar accent/ghos
 - Bateria Pro: como quase todo pad é prato por padrão, a tela mostra muitos anéis. É o comportamento do YARG.
 - `sectionIndexAt` devolve a primeira seção antes de qualquer início. Não use `-1` para "sem seção" se houver
   seções.
-- A tela de solo/star power é uma faixa de fundo. Não tente fazê-la por nota sem ver o YARG primeiro.
+- Star power: faixa de fundo + notas da frase em branco com contorno da lane (como o YARG; `markStarPowerNotes`). Solo continua só como faixa de fundo. A comparação com o render do YARG e as sugestões estão em `docs/yarg-render-review.md`.
 - O modo de 5 lanes aplica prato (flags) também. O usuário pediu isso explicitamente; não o remova sem pedir.

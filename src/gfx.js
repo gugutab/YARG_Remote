@@ -1,7 +1,8 @@
 // Drawing constants and helpers shared by the 2D and 3D highway renderers.
-export const GUITAR_LANE_COLORS = ['#3fbf3f', '#e5392b', '#f5c518', '#2f80ed', '#f2861e'];
+export const GUITAR_LANE_COLORS = ['#79d304', '#ff1d23', '#ffe900', '#00bfff', '#ff8400']; // YARG.Core ColorProfile.Defaults.cs
 export const KICK_COLOR = '#f2861e';
-export const OPEN_COLOR = '#a66cff';
+export const OPEN_COLOR = '#c800ff'; // YARG's open-note purple
+export const STAR_POWER_NOTE = '#ffffff'; // YARG draws notes inside a star power phrase in the star power colour
 export const HARMONY_COLORS = { 1: '#3fbf9f', 2: '#2fa8a8', 3: '#8fd6c4' }; // harmony parts 1..3, behind the lead
 export const KICK_BAR_HALF_H = 6; // pedal bar is 12 px tall at rest
 export const DOUBLE_KICK_GAP = 4; // px between the two bars of a double kick
