@@ -539,3 +539,36 @@ button.icon.info-menu:hover { background: var(--panel-2); }
 .expand-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
 .expand-btn[aria-expanded="true"] { color: var(--accent); }
 .popover.mix-pop { width: min(360px, calc(100vw - 16px)); }
+
+/* ---------- Round 18: expand button beside the icon, sliders with a default-value marker ---------- */
+.mix-row { grid-template-columns: 36px 1fr 40px 28px; } /* back to four columns: rows without a group button reserve nothing */
+.mix-row.has-expand { grid-template-columns: 36px 24px 1fr 40px 28px; } /* the group slider gets shorter by the button's width */
+.expand-btn { width: 24px; height: 28px; }
+.expand-btn svg { width: 14px; height: 14px; }
+
+/* Custom sliders: a 4 px track filled up to the thumb (--p) and a translucent 2 px marker at the default (--def),
+   like the section marks on the seek bar. */
+.mix-row input[type="range"], .row input[type="range"] {
+  -webkit-appearance: none; appearance: none; height: 18px; margin: 0; padding: 0; background: transparent; cursor: pointer;
+  --p: 0; --def: 0.5;
+}
+.mix-row input[type="range"]::-webkit-slider-runnable-track, .row input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.4)) no-repeat calc(var(--def) * 100% + 6px - var(--def) * 12px) 0 / 2px 100%,
+    linear-gradient(to right, var(--accent) calc(7px + var(--p) * (100% - 14px)), var(--line) calc(7px + var(--p) * (100% - 14px)));
+}
+.mix-row input[type="range"]::-moz-range-track, .row input[type="range"]::-moz-range-track {
+  height: 4px; border-radius: 2px;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.4)) no-repeat calc(var(--def) * 100% + 6px - var(--def) * 12px) 0 / 2px 100%,
+    linear-gradient(to right, var(--accent) calc(7px + var(--p) * (100% - 14px)), var(--line) calc(7px + var(--p) * (100% - 14px)));
+}
+.mix-row input[type="range"]::-webkit-slider-thumb, .row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%;
+  background: var(--accent); border: 2px solid var(--panel);
+}
+.mix-row input[type="range"]::-moz-range-thumb, .row input[type="range"]::-moz-range-thumb {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--accent); border: 2px solid var(--panel);
+}
+.mix-row.muted input[type="range"] { opacity: .4; }

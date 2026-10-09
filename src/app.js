@@ -735,6 +735,14 @@ function pressHandlers(btn, solo, toggle) {
   });
 }
 
+// Sliders draw their fill and a marker at the default value from two CSS variables: --p (current) and --def.
+function paintRange(input, def) {
+  const min = Number(input.min);
+  const span = Number(input.max) - min || 1;
+  input.style.setProperty('--p', String((Number(input.value) - min) / span));
+  if (def !== undefined) input.style.setProperty('--def', String((def - min) / span));
+}
+
 const ROW_HTML = (kind) => `
     <button class="stem-btn" type="button" aria-pressed="false"><svg><use href="#i-${kind}"/></svg><b class="badge"></b></button>
     <input type="range" min="0" max="1.5" step="0.01" value="1">
@@ -748,6 +756,7 @@ function mixerRow(st) {
   const mute = row.querySelector('.stem-btn');
   mute.querySelector('.badge').textContent = st.master ? '' : stemBadge(st.stem.label);
   const view = { row, range: row.querySelector('input'), val: row.querySelector('.mix-val'), mute, reset: row.querySelector('.reset') };
+  paintRange(view.range, st.master ? 1 : 1);
   st.views.push(view);
   view.range.addEventListener('input', () => { st.value = Number(view.range.value); st.muted = false; applyStem(st); }); // moving the slider re-enables the track
   pressHandlers(mute, st.master ? null : () => soloStem(st), () => {
@@ -765,9 +774,10 @@ function groupBlock(g) {
   block.className = 'mix-group';
   const row = document.createElement('div');
   row.className = 'mix-row';
-  row.innerHTML = ROW_HTML(stemKind(g.members[0].stem.label)) + `
-    <button class="icon small-icon expand-btn" type="button" aria-expanded="false"><svg><use href="#i-chevron"/></svg></button>`;
+  row.classList.add('has-expand'); // one more (narrow) column, only on group rows
+  row.innerHTML = ROW_HTML(stemKind(g.members[0].stem.label));
   const mute = row.querySelector('.stem-btn');
+  mute.insertAdjacentHTML('afterend', '<button class="icon small-icon expand-btn" type="button" aria-expanded="false"><svg><use href="#i-chevron"/></svg></button>');
   mute.querySelector('.badge').textContent = String(g.members.length);
   const kids = document.createElement('div');
   kids.className = 'mix-kids';
@@ -775,6 +785,7 @@ function groupBlock(g) {
   for (const m of g.members) kids.append(mixerRow(m));
   const expand = row.querySelector('.expand-btn');
   const view = { row, range: row.querySelector('input'), val: row.querySelector('.mix-val'), mute, reset: row.querySelector('.reset'), expand, kids };
+  paintRange(view.range, 1);
   g.views.push(view);
   view.range.addEventListener('input', () => { g.value = Number(view.range.value); unmuteGroup(g); applyGroup(g); });
   pressHandlers(mute, () => soloGroup(g), () => {
@@ -802,6 +813,7 @@ function renderGroup(g) {
   const muted = groupSilent(g);
   for (const v of g.views) {
     v.range.value = g.value;
+    paintRange(v.range);
     v.val.textContent = `${Math.round(g.value * 100)}%`;
     v.row.classList.toggle('muted', muted);
     v.mute.setAttribute('aria-pressed', String(muted));
@@ -846,6 +858,7 @@ function applyStem(st) {
   const off = st.master ? st.muted : silent(st);
   for (const v of st.views) {
     v.range.value = st.value;
+    paintRange(v.range);
     v.val.textContent = `${Math.round(st.value * 100)}%`;
     v.row.classList.toggle('muted', off);
     v.mute.setAttribute('aria-pressed', String(off));
@@ -866,7 +879,10 @@ const SETTING_FORMAT = {
 };
 function setSetting(name, value) {
   settings[name] = value;
-  for (const input of document.querySelectorAll(`[data-setting="${name}"]`)) input.value = value;
+  for (const input of document.querySelectorAll(`[data-setting="${name}"]`)) {
+    input.value = value;
+    paintRange(input, SETTING_DEFAULTS[name]);
+  }
   for (const out of document.querySelectorAll(`[data-out="${name}"]`)) out.textContent = SETTING_FORMAT[name](value);
   for (const btn of document.querySelectorAll(`[data-reset="${name}"]`)) btn.disabled = value === SETTING_DEFAULTS[name];
   if (name === 'chartDelay') paintSectionTicks();
