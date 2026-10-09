@@ -34,6 +34,17 @@ const CYMBAL_FLAG_FOR_OFFSET = { 2: 110, 3: 111, 4: 112 };
 const DRUM_CYMBAL_FLAGS = [110, 111, 112];
 const DRUM_LANE_COLORS_4 = ['#e5392b', '#f5c518', '#2f80ed', '#3fbf3f']; // red, yellow, blue, green
 const DRUM_LANE_COLORS_5 = ['#e5392b', '#f5c518', '#2f80ed', '#f2861e', '#3fbf3f']; // + orange
+// Extended Pro drums: every pad has its own lane, cymbals and toms no longer share one. Left to right.
+// `pad` is the pad's offset in Pro drums (1 red, 2 yellow, 3 blue, 4 green).
+export const EXTENDED_DRUM_LANES = [
+  { pad: 2, cymbal: true, color: '#f5c518' }, // yellow cymbal (hi-hat)
+  { pad: 1, cymbal: false, color: '#e5392b' }, // red (snare)
+  { pad: 2, cymbal: false, color: '#f5c518' }, // yellow tom
+  { pad: 3, cymbal: false, color: '#2f80ed' }, // blue tom
+  { pad: 4, cymbal: false, color: '#3fbf3f' }, // green tom
+  { pad: 3, cymbal: true, color: '#2f80ed' }, // blue cymbal (ride)
+  { pad: 4, cymbal: true, color: '#3fbf3f' }, // green cymbal (crash)
+];
 const GUITAR_LANE_COLORS = ['#79d304', '#ff1d23', '#ffe900', '#00bfff', '#ff8400']; // YARG.Core ColorProfile.Defaults.cs
 const STAR_POWER_NOTE = 116;
 const MEASURE_NOTE = 12;
@@ -86,7 +97,7 @@ export function findTrack(midi, instrument) {
 export function drumModes(track) {
   switch (drumKind(track)) {
     case 'five': return [{ mode: 'five', label: 'Bateria (5-lanes)' }];
-    case 'pro': return [{ mode: 'pro', label: 'Bateria (Pro)' }, { mode: 'four', label: 'Bateria (4-lanes)' }];
+    case 'pro': return [{ mode: 'pro', label: 'Bateria (Pro)' }, { mode: 'extended', label: 'Bateria (Pro estendida)' }, { mode: 'four', label: 'Bateria (4-lanes)' }];
     default: return [{ mode: 'four', label: 'Bateria (4-lanes)' }];
   }
 }
@@ -202,6 +213,8 @@ export function buildChart(midi, instrument, difficulty) {
   return { mode: 'lanes', lanes: LANES, laneColors: GUITAR_LANE_COLORS, notes, ...commonParts(midi, track, toSec) };
 }
 
+const extendedLane = (pad, cymbal) => EXTENDED_DRUM_LANES.findIndex((l) => l.pad === pad && l.cymbal === cymbal);
+
 // Columns are the pads only: 4 (red, yellow, blue, green) or 5 (5-lane adds orange before green).
 // The kick is not a column; it is a bar across all columns, so its lane is -1.
 // [start, end) tick windows of marker notes (note-on to note-off), as YARG applies them.
@@ -247,8 +260,10 @@ function rollSpans(track, toSec) {
 }
 
 function buildDrumChart(midi, track, kind, difficulty, timed, toSec) {
-  const lanes = kind === 'five' ? 5 : 4;
-  const laneColors = kind === 'five' ? DRUM_LANE_COLORS_5 : DRUM_LANE_COLORS_4;
+  const extended = kind === 'extended';
+  const lanes = extended ? EXTENDED_DRUM_LANES.length : kind === 'five' ? 5 : 4;
+  const laneColors = extended ? EXTENDED_DRUM_LANES.map((l) => l.color) : kind === 'five' ? DRUM_LANE_COLORS_5 : DRUM_LANE_COLORS_4;
+  const padCount = extended ? 4 : lanes; // pads in the MIDI (offsets 1..padCount)
   // Cymbal flags apply to Pro and 5-lane modes; 4-lane mode plays the same notes with no cymbals.
   const cymbalSpans = kind === 'four' ? null : cymbalFlagSpans(track);
 
@@ -267,16 +282,16 @@ function buildDrumChart(midi, track, kind, difficulty, timed, toSec) {
       });
       continue;
     }
-    if (offset < 0 || offset > lanes) continue;
+    if (offset < 0 || offset > padCount) continue;
     const cymbal = cymbalSpans !== null && isCymbal(cymbalSpans, offset, n.tick);
     // Velocity marks dynamics on pads, not the kick (YARG.Core MidReader.ProcessLists.cs, VELOCITY_*).
     pads.push({
-      ...timed(n), length: 0, lane: offset - 1, cymbal,
+      ...timed(n), length: 0, lane: extended ? extendedLane(offset, cymbal) : offset - 1, cymbal,
       accent: n.velocity === VELOCITY_ACCENT, ghost: n.velocity === VELOCITY_GHOST, doubleKick: false,
     });
   }
   const notes = [...kicks.values(), ...pads].sort((a, b) => a.time - b.time);
-  return { mode: 'lanes', lanes, laneColors, drumKind: kind, notes, rolls: rollSpans(track, toSec), ...commonParts(midi, track, toSec) };
+  return { mode: 'lanes', lanes, laneColors, laneKinds: extended ? EXTENDED_DRUM_LANES.map((l) => (l.cymbal ? 'cymbal' : 'tom')) : null, drumKind: kind, notes, rolls: rollSpans(track, toSec), ...commonParts(midi, track, toSec) };
 }
 
 // Tick ranges during which each cymbal flag (110/111/112) is on.

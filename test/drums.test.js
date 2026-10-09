@@ -76,18 +76,18 @@ test('5-lane: yellow, orange cymbal by default, toms under a marker; green is ne
   assert.deepEqual(chart.notes.map((n) => [n.lane, n.cymbal]), [[1, false], [3, false], [3, true], [4, false]]);
 });
 
-test('a pro chart offers Pro and 4-lane drum options; 4-lane mode draws no cymbals', () => {
+test('a pro chart offers Pro, extended Pro and 4-lane drum options; 4-lane mode draws no cymbals', () => {
   const midi = drumsMidi([
     { tick: 0, pitch: 98, len: 120 },
     { tick: 0, pitch: 110, len: 480 },
   ]);
   const labels = instrumentOptions(midi).map((o) => [o.id, o.label]);
-  assert.deepEqual(labels, [['drums-pro', 'Bateria (Pro)'], ['drums-four', 'Bateria (4-lanes)']]);
+  assert.deepEqual(labels, [['drums-pro', 'Bateria (Pro)'], ['drums-extended', 'Bateria (Pro estendida)'], ['drums-four', 'Bateria (4-lanes)']]);
 
   // the yellow note sits under the marker 110 (tom), so Pro shows a tom here
   const pro = buildChart(midi, instrumentOptions(midi)[0], EXPERT);
   assert.deepEqual(pro.notes.map((n) => n.cymbal), [false]);
-  const four = buildChart(midi, instrumentOptions(midi)[1], EXPERT);
+  const four = buildChart(midi, instrumentOptions(midi)[2], EXPERT);
   assert.equal(four.lanes, 4);
   assert.deepEqual(four.notes.map((n) => [n.lane, n.cymbal]), [[1, false]]);
 });
@@ -108,4 +108,35 @@ test('tom markers toggle like YARG: under one marker is a tom, under two overlap
   ]);
   const chart = buildChart(midi, DRUMS, EXPERT);
   assert.deepEqual(chart.notes.map((n) => [n.lane, n.cymbal]), [[1, false], [1, true]]);
+});
+
+test('extended pro drums: toms and cymbals each get their own lane (7 lanes), the kick stays a bar', async () => {
+  const { EXTENDED_DRUM_LANES, drumModes } = await import('../src/chart.js');
+  const midi = drumsMidi([
+    { tick: 0, pitch: 96, len: 120 },    // kick
+    { tick: 480, pitch: 97, len: 120 },  // red
+    { tick: 960, pitch: 98, len: 120 },  // yellow, no marker => cymbal (hi-hat)
+    { tick: 1440, pitch: 98, len: 120 }, // yellow with the marker => tom
+    { tick: 1400, pitch: 110, len: 200 }, // yellow tom marker over tick 1440
+    { tick: 2400, pitch: 99, len: 120 }, // blue, no marker => cymbal
+    { tick: 2880, pitch: 100, len: 120 }, // green, no marker => cymbal
+  ]);
+  assert.ok(drumModes(midi.tracks[0]).some((m) => m.mode === 'extended'));
+  const ext = { ...DRUMS, drumMode: 'extended' };
+  const chart = buildChart(midi, ext, EXPERT);
+  assert.equal(chart.lanes, 7);
+  assert.equal(chart.laneColors.length, 7);
+  assert.deepEqual(chart.laneKinds, EXTENDED_DRUM_LANES.map((l) => (l.cymbal ? 'cymbal' : 'tom')));
+  const laneOf = (tick) => chart.notes.find((n) => Math.abs(n.time - tick / 960) < 1e-6).lane;
+  const lane = (pad, cymbal) => EXTENDED_DRUM_LANES.findIndex((l) => l.pad === pad && l.cymbal === cymbal);
+  assert.equal(laneOf(0), -1);
+  assert.equal(laneOf(480), lane(1, false));
+  assert.equal(laneOf(960), lane(2, true));
+  assert.equal(laneOf(1440), lane(2, false));
+  assert.equal(laneOf(2400), lane(3, true));
+  assert.equal(laneOf(2880), lane(4, true));
+  // every note of the extended chart sits in a distinct lane per (pad, cymbal) pair and agrees with its flag
+  assert.ok(chart.notes.filter((n) => n.lane >= 0).every((n) => chart.laneKinds[n.lane] === (n.cymbal ? 'cymbal' : 'tom')));
+  // the plain 4-lane and Pro charts are unchanged
+  assert.equal(buildChart(midi, { ...DRUMS, drumMode: 'pro' }, EXPERT).lanes, 4);
 });

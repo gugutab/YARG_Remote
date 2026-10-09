@@ -137,7 +137,7 @@ export function renderLanes3D(hw, t, w, h) {
   for (let i = 0; i < lanes; i++) {
     const x = cx + (i + 0.5 - half) * laneW;
     g.beginPath();
-    noteShape(g, x, hitY, padRx * 1.05, padRx * 1.05 * HEAD_TILT, hw.noteStyle, hitY - vy);
+    noteShape(g, x, hitY, padRx * 1.05, padRx * 1.05 * HEAD_TILT, chart.laneKinds?.[i] === 'cymbal' ? 'tri' : hw.noteStyle, hitY - vy);
     g.fillStyle = withAlpha(colors[i], Math.min(0.9, PAD_FILL_ALPHA + 0.5 * flash[i] + 0.35 * barFlash));
     g.fill();
     g.lineWidth = 2;

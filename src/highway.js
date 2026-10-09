@@ -156,7 +156,8 @@ export class Highway {
     }
     for (let i = 0; i < chart.lanes; i++) {
       g.beginPath();
-      noteShape(g, x0 + (i + 0.5) * laneW, hitY, radius * 1.05 * wide, radius * 1.05, this.noteStyle);
+      const cymbalLane = chart.laneKinds?.[i] === 'cymbal'; // extended drums: the cymbal lanes have triangle pads
+      noteShape(g, x0 + (i + 0.5) * laneW, hitY, radius * 1.05 * (cymbalLane ? 1 : wide), radius * 1.05, cymbalLane ? 'tri' : this.noteStyle);
       g.fillStyle = withAlpha(colors[i], Math.min(0.9, PAD_FILL_ALPHA + 0.5 * flash[i] + 0.35 * barFlash));
       g.fill();
       g.lineWidth = 2;
