@@ -872,7 +872,7 @@ function applyStem(st) {
 // Settings: one value each, shown by every [data-setting] slider (menu popover and info screen).
 const SETTING_DEFAULTS = { speed: 1, neck: 1, chartDelay: 0 };
 const SETTING_FORMAT = {
-  speed: (v) => `${v.toFixed(2)}×`,
+  speed: (v) => `${v.toFixed(1)}×`,
   neck: (v) => `${v.toFixed(1)}×`,
   // Chart delay: only the highway is shifted. Positive = notes arrive later than the audio.
   chartDelay: (v) => `${v >= 0 ? '+' : ''}${v.toFixed(2)} s`,
