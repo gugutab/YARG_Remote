@@ -594,3 +594,6 @@ button.icon.small-icon.expand-btn svg { width: 20px; height: 20px; }
 /* Round 23: the arrow is 24 px wide */
 button.icon.small-icon.expand-btn { width: 24px; }
 button.icon.small-icon.expand-btn svg { width: 24px; height: 24px; }
+
+/* Round 24: 2 px of inner margin inside the arrow icon (the 24 px box stays; the glyph is drawn 20 px) */
+button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
