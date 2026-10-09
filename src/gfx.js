@@ -144,7 +144,7 @@ export const NOTE_RECT_H = 0.68; // half-height relative to ry (it was 0.78)
 export const TAPER_GAIN = 3;
 // the cymbal triangle (apex up): half sizes relative to rx / ry, and corner rounding
 export const NOTE_TRI_W = 1.4; // wider than the round note
-export const NOTE_TRI_H = 1.0; // as tall as the round note
+export const NOTE_TRI_H = 0.72; // flatter than the round note (it was 1.0)
 export const NOTE_TRI_ROUND = 0.5;
 export const NOTE_RECT_ROUND = 0.8; // corner radius as a fraction of the half-height (1 = a pill); it was 0.55
 

@@ -109,7 +109,7 @@ test('the cymbal triangle is a rounded polygon pointing up: a tip at the top, wi
   const xs = pts.map((p) => p[0]);
   const ys = pts.map((p) => p[1]);
   assert.ok(Math.min(...xs) >= 100 - 30 * 1.4 - 0.01 && Math.max(...xs) <= 100 + 30 * 1.4 + 0.01);
-  assert.ok(Math.min(...ys) >= 400 - 30 - 0.01 && Math.max(...ys) <= 400 + 30 + 0.01);
+  assert.ok(Math.min(...ys) >= 400 - 30 * 0.72 - 0.01 && Math.max(...ys) <= 400 + 30 * 0.72 + 0.01);
   // still tapers with the perspective like the other shapes
   const t = recordPath(100, 400, 30, 30, 'tri', 900);
   assert.ok(widthAt(t, 400 - 25, 6) < widthAt(pts, 400 - 25, 6) || true);
