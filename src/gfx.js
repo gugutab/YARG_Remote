@@ -131,3 +131,27 @@ export function fillTailHalo(g, color, cx, half, reach, yTop, yBot, strength, wi
 
 export const HIT_FLASH_SEC = 0.14; // how long a hit pad stays lit after a note hit
 export const BAR_FLASH_SEC = 0.24; // ... after a pedal or open hit (it lights every pad)
+
+// Note head shape. 'round' = circle/ellipse (the default), 'rect' = rounded rectangle, a bit wider than tall.
+// Adds the shape to the current path; rx / ry are the half sizes of the round version.
+export const NOTE_RECT_W = 1.2; // half-width of the rounded rectangle relative to rx
+export const NOTE_RECT_H = 0.78; // half-height relative to ry
+export function noteShape(g, x, y, rx, ry, style) {
+  if (style !== 'rect') {
+    g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    return;
+  }
+  const w = rx * NOTE_RECT_W;
+  const h = ry * NOTE_RECT_H;
+  const r = Math.min(w, h) * 0.55; // corner radius
+  g.moveTo(x - w + r, y - h);
+  g.lineTo(x + w - r, y - h);
+  g.arcTo(x + w, y - h, x + w, y - h + r, r);
+  g.lineTo(x + w, y + h - r);
+  g.arcTo(x + w, y + h, x + w - r, y + h, r);
+  g.lineTo(x - w + r, y + h);
+  g.arcTo(x - w, y + h, x - w, y + h - r, r);
+  g.lineTo(x - w, y - h + r);
+  g.arcTo(x - w, y - h, x - w + r, y - h, r);
+  g.closePath();
+}

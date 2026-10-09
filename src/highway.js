@@ -27,6 +27,7 @@ import {
   heldAmount,
   HIT_FLASH_SEC,
   BAR_FLASH_SEC,
+  noteShape,
   fillHalo,
   fillTailHalo,
   tailShimmer,
@@ -42,12 +43,17 @@ export class Highway {
     this.chart = null;
     this.maxLength = 0; // longest sustain in the current chart, in seconds
     this.view = '2d';
+    this.noteStyle = 'round'; // 'round' or 'rect' (rounded rectangles)
     this.neck = 1.2; // neck speed (the app default): scales distance between notes only; timing is unchanged
   }
 
   // '2d' (flat) or '3d' (perspective). Vocals have no highway and always use the flat view.
   setView(view) {
     this.view = view === '3d' ? '3d' : '2d';
+  }
+
+  setNoteStyle(style) {
+    this.noteStyle = style === 'rect' ? 'rect' : 'round';
   }
 
   setNeckSpeed(value) {
@@ -149,7 +155,7 @@ export class Highway {
     }
     for (let i = 0; i < chart.lanes; i++) {
       g.beginPath();
-      g.arc(x0 + (i + 0.5) * laneW, hitY, radius * 1.05, 0, Math.PI * 2);
+      noteShape(g, x0 + (i + 0.5) * laneW, hitY, radius * 1.05, radius * 1.05, this.noteStyle);
       g.fillStyle = withAlpha(colors[i], Math.min(0.9, 0.14 + 0.5 * flash[i] + 0.35 * barFlash));
       g.fill();
       g.lineWidth = 2;
@@ -222,7 +228,7 @@ export class Highway {
         g.globalCompositeOperation = 'source-over';
       }
       g.beginPath();
-      g.arc(cx, cy, r, 0, Math.PI * 2);
+      noteShape(g, cx, cy, r, r, this.noteStyle);
       g.fillStyle = tintWhite(n.sp ? STAR_POWER_NOTE : n.tap ? TAP_COLOR : colors[n.lane], white);
       g.fill();
       // accent: same size, with a thicker outline in a darker shade of the note's colour
@@ -231,13 +237,13 @@ export class Highway {
       g.stroke();
       if (n.hopo) { // guitar HOPO: a white dot in the head
         g.beginPath();
-        g.arc(cx, cy, r * 0.35, 0, Math.PI * 2);
+        noteShape(g, cx, cy, r * 0.35, r * 0.35, this.noteStyle);
         g.fillStyle = `rgba(255,255,255,${0.9 * (1 - k)})`;
         g.fill();
       }
       if (n.cymbal) { // pro drums: cymbal = ring with a white outline, tom = solid pad
         g.beginPath();
-        g.arc(cx, cy, r * 0.55, 0, Math.PI * 2);
+        noteShape(g, cx, cy, r * 0.55, r * 0.55, this.noteStyle);
         g.fillStyle = '#0d1117';
         g.fill();
         g.lineWidth = 3;

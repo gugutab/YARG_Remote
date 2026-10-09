@@ -607,3 +607,6 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
    (margin 14 -> 10), which gives the sub-sliders 4 px more width; the column gaps go back to 8 px */
 .mix-kids { margin-left: 10px; }
 .mix-kids .mix-row { column-gap: 8px; }
+
+/* Round 31: the note-style button sits right under the 3D button, in the corner of the stage */
+button.icon.stage-btn.style-btn { top: 54px; }

@@ -15,7 +15,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'sectionBtn', 'sectionPop', 'sectionText', 'partDiff', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'fullscreen', 'viewBtn', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'fullscreen', 'viewBtn', 'styleBtn', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay', 'infoMenu',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
 ].map((id) => [id, $(id)]));
@@ -570,6 +570,7 @@ function showPlayInfo(on) {
   els.seekbox.hidden = !on;
   els.tools.hidden = !on;
   els.viewBtn.hidden = true; // shown once there is a lane chart (updateChart)
+  els.styleBtn.hidden = true;
 }
 
 function fillInstrumentOptions() {
@@ -600,6 +601,7 @@ function updateChart() {
   highway.setChart(chart);
   fillSectionOptions();
   els.viewBtn.hidden = !chart || chart.mode === 'vocals'; // vocals have no highway to turn 3D
+  els.styleBtn.hidden = els.viewBtn.hidden; // nor note heads to reshape
   renderPickers();
   renderLoadState();
 }
@@ -985,6 +987,16 @@ function setView(view) {
 setView(store.get('view') === '3d' ? '3d' : '2d');
 els.viewBtn.addEventListener('click', () => setView(highway.view === '3d' ? '2d' : '3d'));
 
+// ---------- Note style: circles or rounded rectangles ----------
+function setNoteStyle(style) {
+  highway.setNoteStyle(style);
+  els.styleBtn.setAttribute('aria-pressed', String(style === 'rect'));
+  els.styleBtn.title = style === 'rect' ? 'Notas circulares (N)' : 'Notas retangulares (N)';
+  store.set('noteStyle', style);
+}
+setNoteStyle(store.get('noteStyle') === 'rect' ? 'rect' : 'round');
+els.styleBtn.addEventListener('click', () => setNoteStyle(highway.noteStyle === 'rect' ? 'round' : 'rect'));
+
 // ---------- Fullscreen and idle bar ----------
 let idleTimer = 0;
 function setImmersive() {
@@ -1025,6 +1037,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.code === 'KeyL') setLibraryOpen(!libraryOpen());
   else if (e.code === 'KeyF') toggleFullscreen();
   else if (e.code === 'KeyV') setView(highway.view === '3d' ? '2d' : '3d');
+  else if (e.code === 'KeyN') setNoteStyle(highway.noteStyle === 'rect' ? 'round' : 'rect');
   else if (e.code === 'BracketLeft') stepSection(-1);
   else if (e.code === 'BracketRight') stepSection(1);
   else if (e.code === 'ArrowLeft' && ready) player.seek(Math.max(0, player.currentTime() - 5));

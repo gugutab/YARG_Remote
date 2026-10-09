@@ -85,7 +85,7 @@ Fluxo: pasta → `library.js` (músicas) → clique → `midi.js` (parse) + `cha
 | `index.html`, `styles.css` | UI. IDs dos controles são usados por `app.js`. |
 | `server.mjs` | Servidor opcional (`npm start`): app + `/api/library` + `/songs/*`. O app o usa automaticamente (`startLibrary` em `app.js`). Cache do índice em `.cache/`. |
 | `src/gfx.js` | Constantes e helpers de desenho compartilhados pelas duas visões. |
-| `src/highway3d.js` | Visão 3D da highway (perspectiva no canvas 2D, sem WebGL; vocal usa a visão plana). Botão ⬡ / tecla V; preferência em localStorage. |
+| `src/highway3d.js` | Visão 3D da highway (perspectiva no canvas 2D, sem WebGL; vocal usa a visão plana). Botão ⬡ / tecla V; preferência em localStorage. Estilo das notas (círculos ou retângulos arredondados, `noteShape` em `gfx.js`): botão abaixo do 3D / tecla N, também em localStorage. |
 | `src/songinfo.js` | Dados da tela de info: metadados e níveis do `song.ini`, BPM e contagens do chart (funções puras). |
 | `src/songlist.js` | Busca, filtro e ordenação da lista (funções puras). |
 | `src/app.js` | Eventos, seleção de música/instrumento/dificuldade, loop `frame()` (relógio, seção, highway). |
