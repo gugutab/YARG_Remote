@@ -85,14 +85,17 @@ const widthAt = (pts, y, tol = 1.5) => {
 
 test('3D note shapes taper with the perspective: the top edge is narrower than the bottom one', () => {
   for (const style of ['round', 'rect']) {
-    const flat = recordPath(100, 400, 40, 22, style, 0);
     const tapered = recordPath(100, 400, 40, 22, style, 900);
     assert.ok(Array.isArray(tapered) && tapered.length > 10);
-    const flatTop = widthAt(flat, 400 - 14), flatBottom = widthAt(flat, 400 + 14);
     const top = widthAt(tapered, 400 - 14), bottom = widthAt(tapered, 400 + 14);
-    assert.ok(Math.abs(flatTop - flatBottom) < 1e-6 || style === 'round', 'flat shapes are symmetric');
     assert.ok(top < bottom, `${style}: top ${top} should be narrower than bottom ${bottom}`);
-    // the centre row keeps its width (the taper only changes it away from the centre)
-    assert.ok(Math.abs(widthAt(tapered, 400, 9) - widthAt(flat, 400, 9)) < 6);
+    // the widest row keeps about the shape's own width (80 px for the circle, 96 for the rounded rectangle)
+    const full = style === 'rect' ? 96 : 80;
+    const widest = Math.max(...tapered.map((p) => p[0])) - Math.min(...tapered.map((p) => p[0]));
+    assert.ok(widest > full * 0.9 && widest < full * 1.2, `${style}: widest ${widest}`);
   }
+  // without a vanishing-point distance the circle is a plain ellipse call and the rectangle is symmetric
+  assert.deepEqual(recordPath(100, 400, 40, 22, 'round', 0), ['ellipse']);
+  const flat = recordPath(100, 400, 40, 22, 'rect', 0);
+  assert.ok(Math.abs(widthAt(flat, 400 - 14) - widthAt(flat, 400 + 14)) < 1e-6);
 });
