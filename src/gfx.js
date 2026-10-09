@@ -142,9 +142,52 @@ export const BAR_FLASH_SEC = 0.24; // ... after a pedal or open hit (it lights e
 export const NOTE_RECT_W = 1.05; // half-width of the rounded rectangle relative to rx (it was 1.2: a bit smaller now)
 export const NOTE_RECT_H = 0.68; // half-height relative to ry (it was 0.78)
 export const TAPER_GAIN = 3;
+// the cymbal triangle: half sizes relative to rx / ry (a bit larger than the round note) and corner rounding
+export const NOTE_TRI_W = 1.2;
+export const NOTE_TRI_H = 1.15;
+export const NOTE_TRI_ROUND = 0.5;
 export const NOTE_RECT_ROUND = 0.8; // corner radius as a fraction of the half-height (1 = a pill); it was 0.55
 
+// A polygon with rounded corners, as sampled points: each corner is replaced by an arc of radius r (clamped so it fits).
+function roundedPolygon(verts, r) {
+  const out = [];
+  const n = verts.length;
+  for (let i = 0; i < n; i++) {
+    const V = verts[i];
+    const A = verts[(i + n - 1) % n];
+    const B = verts[(i + 1) % n];
+    const ua = [A[0] - V[0], A[1] - V[1]];
+    const ub = [B[0] - V[0], B[1] - V[1]];
+    const la = Math.hypot(...ua);
+    const lb = Math.hypot(...ub);
+    ua[0] /= la; ua[1] /= la; ub[0] /= lb; ub[1] /= lb;
+    const cos = Math.max(-1, Math.min(1, ua[0] * ub[0] + ua[1] * ub[1]));
+    const theta = Math.acos(cos); // angle at the corner
+    const t = Math.min(r / Math.tan(theta / 2), la * 0.48, lb * 0.48); // distance from the corner to the tangent points
+    const rr = t * Math.tan(theta / 2); // the radius that distance allows
+    const bis = [ua[0] + ub[0], ua[1] + ub[1]];
+    const bl = Math.hypot(...bis) || 1;
+    const dc = rr / Math.sin(theta / 2);
+    const C = [V[0] + (bis[0] / bl) * dc, V[1] + (bis[1] / bl) * dc];
+    const a0 = Math.atan2(V[1] + ua[1] * t - C[1], V[0] + ua[0] * t - C[0]);
+    let a1 = Math.atan2(V[1] + ub[1] * t - C[1], V[0] + ub[0] * t - C[0]);
+    let d = a1 - a0;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    for (let k = 0; k <= 8; k++) {
+      const a = a0 + (d * k) / 8;
+      out.push([C[0] + rr * Math.cos(a), C[1] + rr * Math.sin(a)]);
+    }
+  }
+  return out;
+}
+
 function outline(x, y, rx, ry, style) {
+  if (style === 'tri') { // a rounded triangle pointing down, toward the hit line (cymbal notes)
+    const w = rx * NOTE_TRI_W;
+    const h = ry * NOTE_TRI_H;
+    return roundedPolygon([[x - w, y - h], [x + w, y - h], [x, y + h]], Math.min(w, h) * NOTE_TRI_ROUND);
+  }
   const pts = [];
   if (style !== 'rect') {
     for (let i = 0; i < 40; i++) {
@@ -168,7 +211,7 @@ function outline(x, y, rx, ry, style) {
 
 export function noteShape(g, x, y, rx, ry, style, dist = 0) {
   if (!dist) {
-    if (style !== 'rect') {
+    if (style !== 'rect' && style !== 'tri') {
       g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
       return;
     }

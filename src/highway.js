@@ -229,7 +229,7 @@ export class Highway {
         g.globalCompositeOperation = 'source-over';
       }
       g.beginPath();
-      noteShape(g, cx, cy, r * wide, r, this.noteStyle);
+      noteShape(g, cx, cy, n.cymbal ? r : r * wide, r, n.cymbal ? 'tri' : this.noteStyle); // cymbals: rounded triangle
       g.fillStyle = tintWhite(n.sp ? STAR_POWER_NOTE : n.tap ? TAP_COLOR : colors[n.lane], white);
       g.fill();
       // accent: same size, with a thicker outline in a darker shade of the note's colour
@@ -241,15 +241,6 @@ export class Highway {
         noteShape(g, cx, cy, r * 0.35, r * 0.35, this.noteStyle);
         g.fillStyle = `rgba(255,255,255,${0.9 * (1 - k)})`;
         g.fill();
-      }
-      if (n.cymbal) { // pro drums: cymbal = ring with a white outline, tom = solid pad
-        g.beginPath();
-        noteShape(g, cx, cy, r * 0.55 * wide, r * 0.55, this.noteStyle);
-        g.fillStyle = '#0d1117';
-        g.fill();
-        g.lineWidth = 3;
-        g.strokeStyle = '#ffffff';
-        g.stroke();
       }
     }
     g.globalAlpha = 1;

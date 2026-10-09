@@ -273,11 +273,12 @@ export function renderLanes3D(hw, t, w, h) {
     // thickness: a darker disc underneath, then the top face
     const th = rx * 0.28;
     g.beginPath();
-    noteShape(g, x, y + th, rx, ry, hw.noteStyle, y + th - vy);
+    const headStyle = n.cymbal ? 'tri' : hw.noteStyle; // cymbals: rounded triangle (and no ring)
+    noteShape(g, x, y + th, rx, ry, headStyle, y + th - vy);
     g.fillStyle = darken(n.sp ? '#9aa4b0' : n.tap ? TAP_COLOR : colors[n.lane], 0.55);
     g.fill();
     g.beginPath();
-    noteShape(g, x, y, rx, ry, hw.noteStyle, y - vy);
+    noteShape(g, x, y, rx, ry, headStyle, y - vy);
     g.fillStyle = body;
     g.fill();
     g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH * p : Math.max(1, (n.sp ? 3 : 1.5) * p);
@@ -288,15 +289,6 @@ export function renderLanes3D(hw, t, w, h) {
       noteShape(g, x, y, rx * 0.35, ry * 0.35, hw.noteStyle, y - vy);
       g.fillStyle = `rgba(255,255,255,${0.9 * (1 - kx)})`;
       g.fill();
-    }
-    if (n.cymbal) { // cymbal = ring with a white outline over a dark centre; tom = solid pad
-      g.beginPath();
-      noteShape(g, x, y, rx * 0.55, ry * 0.55, hw.noteStyle, y - vy);
-      g.fillStyle = '#0d1117';
-      g.fill();
-      g.lineWidth = Math.max(1.5, 3 * p);
-      g.strokeStyle = '#ffffff';
-      g.stroke();
     }
   }
   g.globalAlpha = 1;

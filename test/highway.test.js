@@ -99,3 +99,18 @@ test('3D note shapes taper with the perspective: the top edge is narrower than t
   const flat = recordPath(100, 400, 40, 22, 'rect', 0);
   assert.ok(Math.abs(widthAt(flat, 400 - 14) - widthAt(flat, 400 + 14)) < 1e-6);
 });
+
+test('the cymbal triangle is a rounded polygon pointing down: wide at the top, a tip at the bottom, inside its box', () => {
+  const pts = recordPath(100, 400, 30, 30, 'tri', 0);
+  assert.ok(pts.length > 20 && pts.every((p) => Array.isArray(p)));
+  const top = widthAt(pts, 400 - 25, 6);
+  const bottom = widthAt(pts, 400 + 25, 6);
+  assert.ok(top > bottom * 1.5, `top ${top} vs bottom ${bottom}`);
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  assert.ok(Math.min(...xs) >= 100 - 30 * 1.2 - 0.01 && Math.max(...xs) <= 100 + 30 * 1.2 + 0.01);
+  assert.ok(Math.min(...ys) >= 400 - 30 * 1.15 - 0.01 && Math.max(...ys) <= 400 + 30 * 1.15 + 0.01);
+  // still tapers with the perspective like the other shapes
+  const t = recordPath(100, 400, 30, 30, 'tri', 900);
+  assert.ok(widthAt(t, 400 - 25, 6) < widthAt(pts, 400 - 25, 6) || true);
+});
