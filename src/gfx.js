@@ -142,9 +142,9 @@ export const BAR_FLASH_SEC = 0.24; // ... after a pedal or open hit (it lights e
 export const NOTE_RECT_W = 1.05; // half-width of the rounded rectangle relative to rx (it was 1.2: a bit smaller now)
 export const NOTE_RECT_H = 0.68; // half-height relative to ry (it was 0.78)
 export const TAPER_GAIN = 3;
-// the cymbal triangle: half sizes relative to rx / ry (a bit larger than the round note) and corner rounding
-export const NOTE_TRI_W = 1.2;
-export const NOTE_TRI_H = 1.15;
+// the cymbal triangle (apex up): half sizes relative to rx / ry, and corner rounding
+export const NOTE_TRI_W = 1.4; // wider than the round note
+export const NOTE_TRI_H = 1.0; // as tall as the round note
 export const NOTE_TRI_ROUND = 0.5;
 export const NOTE_RECT_ROUND = 0.8; // corner radius as a fraction of the half-height (1 = a pill); it was 0.55
 
@@ -183,10 +183,10 @@ function roundedPolygon(verts, r) {
 }
 
 function outline(x, y, rx, ry, style) {
-  if (style === 'tri') { // a rounded triangle pointing down, toward the hit line (cymbal notes)
+  if (style === 'tri') { // a rounded triangle pointing up (cymbal notes)
     const w = rx * NOTE_TRI_W;
     const h = ry * NOTE_TRI_H;
-    return roundedPolygon([[x - w, y - h], [x + w, y - h], [x, y + h]], Math.min(w, h) * NOTE_TRI_ROUND);
+    return roundedPolygon([[x, y - h], [x + w, y + h], [x - w, y + h]], Math.min(w, h) * NOTE_TRI_ROUND);
   }
   const pts = [];
   if (style !== 'rect') {
