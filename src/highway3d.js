@@ -13,6 +13,7 @@ const HEAD_R = 0.36; // note head radius, in lane widths
 const HEAD_TILT = 0.55; // vertical squash of the heads (they lie on the road)
 const FADE_IN = 0.14; // fraction of the depth over which notes fade in at the far edge
 const HIT_FLASH_SEC = 0.14;
+const ROAD_END = 1.8; // the road runs well past the last visible note, so it has no visible far edge: the fade hides the rest
 const BAR_DEPTH = 0.0087; // one third of the earlier 0.026 // pedal/open bar thickness along the road, in depth units (it lies flat on the fretboard)
 const GLOW_DEPTH = 0.009; // half-height of the hit glow (it was 0.026 and looked too tall)
 const BAR_FLASH_SEC = 0.24; // how long the hit pads and the hit bar stay lit after a pedal hit
@@ -56,11 +57,11 @@ export function renderLanes3D(hw, t, w, h) {
 
   // road
   g.fillStyle = 'rgba(255,255,255,0.045)';
-  quad(0, 1, -half, half);
+  quad(0, ROAD_END, -half, half);
   g.fill();
   g.fillStyle = 'rgba(255,255,255,0.045)';
   for (let i = 0; i < lanes; i += 2) {
-    quad(0, 1, i - half, i + 1 - half);
+    quad(0, ROAD_END, i - half, i + 1 - half);
     g.fill();
   }
   span(chart.starPower, 'rgba(60,160,255,0.16)');
@@ -73,7 +74,7 @@ export function renderLanes3D(hw, t, w, h) {
   g.beginPath();
   for (let i = 1; i < lanes; i++) {
     g.moveTo(xAt(i - half, 0), yAt(0));
-    g.lineTo(xAt(i - half, 1), yAt(1));
+    g.lineTo(xAt(i - half, ROAD_END), yAt(ROAD_END));
   }
   g.stroke();
   g.lineWidth = 2;
@@ -81,7 +82,7 @@ export function renderLanes3D(hw, t, w, h) {
   g.beginPath();
   for (const side of [-half, half]) {
     g.moveTo(xAt(side, 0), yAt(0));
-    g.lineTo(xAt(side, 1), yAt(1));
+    g.lineTo(xAt(side, ROAD_END), yAt(ROAD_END));
   }
   g.stroke();
 
@@ -115,9 +116,12 @@ export function renderLanes3D(hw, t, w, h) {
       barColor = n.open ? OPEN_COLOR : KICK_COLOR;
     }
   }
+  // the hit bar: 4 px shorter than before (2 px each side) and at half its alpha, so it does not cut the pads' colours
+  g.globalAlpha = 0.5;
   g.fillStyle = barFlash > 0 ? tintWhite(barColor, 0.5 * barFlash) : 'rgba(255,255,255,0.65)';
   const hitBarH = 3 + 3 * barFlash;
-  g.fillRect(xAt(-half, 0) - 6, hitY - hitBarH / 2, roadW + 12, hitBarH);
+  g.fillRect(xAt(-half, 0) - 4, hitY - hitBarH / 2, roadW + 8, hitBarH);
+  g.globalAlpha = 1;
   const padRx = laneW * HEAD_R;
   for (let i = 0; i < lanes; i++) {
     const x = cx + (i + 0.5 - half) * laneW;
@@ -287,9 +291,10 @@ export function renderLanes3D(hw, t, w, h) {
   g.globalAlpha = 1;
 
   // far edge fades into the background
-  const grad = g.createLinearGradient(0, 0, 0, h * 0.3);
-  grad.addColorStop(0, 'rgba(13,17,23,1)');
-  grad.addColorStop(1, 'rgba(13,17,23,0)');
+  // (an eased fade, so the board dissolves instead of ending in a visible edge)
+  const fadeH = h * 0.42;
+  const grad = g.createLinearGradient(0, 0, 0, fadeH);
+  for (const [at, a] of [[0, 1], [0.2, 0.95], [0.4, 0.78], [0.6, 0.48], [0.8, 0.18], [0.92, 0.05], [1, 0]]) grad.addColorStop(at, `rgba(13,17,23,${a})`);
   g.fillStyle = grad;
-  g.fillRect(0, 0, w, h * 0.3);
+  g.fillRect(0, 0, w, fadeH);
 }

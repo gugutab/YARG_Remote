@@ -218,6 +218,13 @@ export class Highway {
       }
     }
     g.globalAlpha = 1;
+
+    // the board and the notes entering from the top dissolve into the background (an eased fade)
+    const fadeH = h * 0.2;
+    const fade = g.createLinearGradient(0, 0, 0, fadeH);
+    for (const [at, a] of [[0, 1], [0.25, 0.85], [0.5, 0.5], [0.75, 0.17], [1, 0]]) fade.addColorStop(at, `rgba(13,17,23,${a})`);
+    g.fillStyle = fade;
+    g.fillRect(0, 0, w, fadeH);
   }
 
   // Vocals: pitch on the vertical axis, time on the horizontal axis. Lead notes are bars, harmonies
