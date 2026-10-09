@@ -7,6 +7,7 @@
 // (YARG: SongRunner.AudioTime = AudioPlaybackTime + SongOffset, with SongOffset = -delay).
 // load() shifts each stem by the delay once, so chart time 0 is sample 0 of the aligned stem.
 import { PitchShifter } from '../vendor/soundtouch.js';
+import { positionAt, trimHistory } from './clock.js';
 
 const SHIFTER_BUFFER = 2048; // legacy path: samples per ScriptProcessor block (bigger = fewer dropouts)
 
@@ -102,7 +103,7 @@ class LegacyPlayer {
   async play() {
     if (this.playing || !this.stems.size) return;
     if (this.ctx.state === 'suspended') await this.ctx.resume();
-    if (this.offset >= this.duration) this.offset = 0;
+    if (this.offset >= this.duration - 0.05) this.offset = 0; // at (or within 50 ms of) the end: start over
     this.startSources(this.offset);
   }
 
@@ -155,33 +156,37 @@ class WorkletPlayer {
     this.ctx = ctx;
     this.master = master;
     this.node = null;
-    this.ready = null; // promise of the worklet module
+    this.setupDone = null; // promise of the worklet module and node
     this.ids = []; // stem ids, in the order the worklet knows them
     this.volumes = new Map();
     this.duration = 0;
     this.rate = 1;
     this.playing = false;
     this.offset = 0; // chart position (s) when paused
-    this.report = { frame: 0, time: 0 }; // last position reported by the worklet
+    this.history = []; // recent { time, pos } reports from the worklet (audio time and source seconds)
+    this.epoch = 0; // bumped on load/seek: reports from before are ignored
     this.stems = new Map(); // id -> true (the app only checks that stems exist)
   }
 
-  async setup() {
-    if (this.node) return;
-    if (!this.ctx.audioWorklet) throw Object.assign(new Error('AudioWorklet unavailable'), { workletUnavailable: true });
-    try {
-      this.ready ||= this.ctx.audioWorklet.addModule(new URL('./player-worklet.js', import.meta.url));
-      await this.ready;
-      this.node = new AudioWorkletNode(this.ctx, 'yarg-mix', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
-    } catch (err) {
-      throw Object.assign(err, { workletUnavailable: true });
-    }
-    this.node.connect(this.master);
-    this.node.port.onmessage = (e) => {
-      const m = e.data;
-      if (m.type === 'pos') this.report = { frame: m.frame, time: m.time };
-      if (m.type === 'pos' && m.ended) this.finished = true;
-    };
+  // Loads the worklet module and creates its node once, even if load() is called again meanwhile.
+  setup() {
+    this.setupDone ||= (async () => {
+      if (!this.ctx.audioWorklet) throw Object.assign(new Error('AudioWorklet unavailable'), { workletUnavailable: true });
+      try {
+        await this.ctx.audioWorklet.addModule(new URL('./player-worklet.js', import.meta.url));
+        this.node = new AudioWorkletNode(this.ctx, 'yarg-mix', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
+      } catch (err) {
+        throw Object.assign(err, { workletUnavailable: true });
+      }
+      this.node.connect(this.master);
+      this.node.port.onmessage = (e) => {
+        const m = e.data;
+        if (m.type !== 'pos' || m.epoch !== this.epoch) return;
+        this.history.push({ time: m.time, pos: m.frame / this.ctx.sampleRate });
+        trimHistory(this.history);
+      };
+    })();
+    return this.setupDone;
   }
 
   // stems: [{ id, label, getFile }]; delay in seconds (see songDelaySeconds)
@@ -211,10 +216,11 @@ class WorkletPlayer {
     this.volumes = new Map(ids.map((id) => [id, 1]));
     this.duration = aligned.reduce((m, ch) => Math.max(m, ch[0].length / this.ctx.sampleRate), 0);
     this.offset = 0;
-    this.finished = false;
     // the arrays are moved, not copied: the worklet owns the audio from here on
     const transfer = aligned.flatMap((ch) => ch.map((a) => a.buffer));
-    this.node.port.postMessage({ type: 'load', stems: aligned, rate: this.rate }, transfer);
+    this.epoch++;
+    this.history = [];
+    this.node.port.postMessage({ type: 'load', stems: aligned, rate: this.rate, epoch: this.epoch }, transfer);
     this.postGains();
     return true;
   }
@@ -235,35 +241,31 @@ class WorkletPlayer {
     return Math.min(l, 0.3);
   }
 
+  // The chart clock: the source position being heard right now. That is the position at audio time
+  // `ctx.currentTime - outputLatency`, read from the worklet's recent reports (see clock.js).
   currentTime() {
     if (!this.playing) return this.offset;
-    const r = this.report;
-    const heardFor = Math.max(0, this.ctx.currentTime - this.outputLatency - r.time); // audio time since the report was made
-    return Math.min(this.duration, Math.max(0, r.frame / this.ctx.sampleRate + heardFor * this.rate));
+    const heardAt = this.ctx.currentTime - this.outputLatency;
+    return Math.min(this.duration, Math.max(0, positionAt(this.history, heardAt, this.rate)));
   }
 
   setRate(rate) {
-    if (this.playing) {
-      // re-anchor so the new speed applies from now on
-      this.offset = this.currentTime();
-      this.report = { frame: this.offset * this.ctx.sampleRate, time: this.ctx.currentTime - this.outputLatency };
-    }
-    this.rate = rate;
+    this.rate = rate; // the history already holds exact positions from before the change
     this.node?.port.postMessage({ type: 'rate', rate });
   }
 
   async play() {
     if (this.playing || !this.ids.length) return;
     if (this.ctx.state === 'suspended') await this.ctx.resume();
-    if (this.offset >= this.duration) this.offset = 0;
+    if (this.offset >= this.duration - 0.05) this.offset = 0; // at (or within 50 ms of) the end: start over
     this.startAt(this.offset);
   }
 
   startAt(seconds) {
     const frame = Math.round(seconds * this.ctx.sampleRate);
-    this.finished = false;
-    this.report = { frame, time: this.ctx.currentTime }; // until the worklet reports for real
-    this.node.port.postMessage({ type: 'seek', frame });
+    this.epoch++;
+    this.history = [{ time: this.ctx.currentTime, pos: seconds }]; // until the worklet reports for real
+    this.node.port.postMessage({ type: 'seek', frame, epoch: this.epoch });
     this.node.port.postMessage({ type: 'play' });
     this.offset = seconds;
     this.playing = true;
@@ -281,7 +283,9 @@ class WorkletPlayer {
     if (this.playing) this.startAt(t);
     else {
       this.offset = t;
-      this.node?.port.postMessage({ type: 'seek', frame: Math.round(t * this.ctx.sampleRate) });
+      this.epoch++;
+      this.history = [];
+      this.node?.port.postMessage({ type: 'seek', frame: Math.round(t * this.ctx.sampleRate), epoch: this.epoch });
     }
   }
 

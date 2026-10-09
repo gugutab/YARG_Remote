@@ -170,7 +170,7 @@ aparece em `5875318f` e `34e01570`. Rolls em `5395826e`. Para testar accent/ghos
 
 ## 8. Pontos de atenção
 
-- Áudio: `player.js` usa um `AudioWorklet` (`player-worklet.js` + `mixstretch.js`) que mistura todas as stems e aplica o time-stretch (SoundTouch) uma vez, com uma só posição de leitura; o relógio do chart vem das posições que o worklet reporta, menos a latência de saída. Isso corrigiu a perda de sincronia entre stems e chart do motor antigo (um `ScriptProcessor` por stem na thread principal, ainda presente como `LegacyPlayer` de fallback). Teste do núcleo: `test/mixstretch.test.js`. Não verificado de ouvido: qualidade do stretch e latência real em aparelhos.
+- Áudio: `player.js` usa um `AudioWorklet` (`player-worklet.js` + `mixstretch.js`) que mistura todas as stems e aplica o time-stretch (SoundTouch) uma vez, com uma só posição de leitura; o relógio do chart interpola o histórico de posições que o worklet reporta (`clock.js`), no instante `ctx.currentTime − latência de saída` (extrapolar com a velocidade atual causava saltos ao trocar de velocidade; relatórios chegam à frente do que é ouvido, e `epoch` descarta relatórios anteriores a um seek). Isso corrigiu a perda de sincronia entre stems e chart do motor antigo (um `ScriptProcessor` por stem na thread principal, ainda presente como `LegacyPlayer` de fallback). Teste do núcleo: `test/mixstretch.test.js`. Não verificado de ouvido: qualidade do stretch e latência real em aparelhos.
   trabalho próprio. Ele adiciona latência; o relógio da highway não compensa isso.
 - `showDirectoryPicker` mostra um diálogo nativo do Chrome; a página não consegue suprimi-lo. "Reabrir pasta"
   pede só a permissão de leitura, num clique.

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MixStretcher } from '../src/mixstretch.js';
+import { positionAt, trimHistory } from '../src/clock.js';
 
 const SR = 44100;
 const impulse = (len, at, amp = 1) => {
@@ -94,4 +95,45 @@ test('the stream ends with silence', () => {
   const { L } = renderAll(mix, 3000);
   assert.equal(L[2500], 0);
   assert.ok(mix.ended);
+});
+
+test('changing between two stretched speeds does not make the reported position jump', () => {
+  const pairs = [[0.5, 2], [0.2, 2], [2, 0.2], [1.5, 0.5], [0.75, 1.25]];
+  for (const [from, to] of pairs) {
+    const mix = new MixStretcher(SR);
+    mix.setStems([[new Float32Array(SR * 60)]]);
+    mix.setRate(from);
+    renderAll(mix, SR); // settle
+    const before = mix.audiblePosition();
+    mix.setRate(to);
+    const right = mix.audiblePosition();
+    assert.ok(Math.abs(right - before) < SR * 0.004, `${from}->${to}: jumped ${(right - before) / SR * 1000} ms`);
+    // and it keeps moving forward afterwards
+    let last = right;
+    const L = new Float32Array(128);
+    const R = new Float32Array(128);
+    for (let i = 0; i < 400; i++) {
+      const pos = mix.render(L, R, 128);
+      assert.ok(pos >= last - 1, `${from}->${to}: went backwards at block ${i}`);
+      last = pos;
+    }
+  }
+});
+
+test('clock: positions are interpolated from the report history, exactly across speed changes', () => {
+  // 1x until t=1 (pos 1), then 0.5x: pos(t) = 1 + (t-1)*0.5 ; reports every 0.1 s of audio time
+  const history = [];
+  for (let t = 0; t <= 2.0001; t += 0.1) history.push({ time: t, pos: t <= 1 ? t : 1 + (t - 1) * 0.5 });
+  const rate = 0.5;
+  // asking for a time before the newest report (the sound is behind the render) reads inside the history
+  assert.ok(Math.abs(positionAt(history, 0.55, rate) - 0.55) < 1e-9);
+  assert.ok(Math.abs(positionAt(history, 1.55, rate) - 1.275) < 1e-9);
+  assert.ok(Math.abs(positionAt(history, 1.0, rate) - 1.0) < 1e-9);
+  // beyond the newest report it extrapolates with the current speed
+  assert.ok(Math.abs(positionAt(history, 2.2, rate) - 1.6) < 1e-6);
+  // before the oldest report, backwards at the current speed
+  assert.ok(Math.abs(positionAt([{ time: 5, pos: 3 }], 4.8, 1) - 2.8) < 1e-9);
+  assert.equal(positionAt([], 1, 1), 0);
+  trimHistory(history, 0.5);
+  assert.ok(history[0].time >= 1.5 - 1e-9 && history.length > 3);
 });

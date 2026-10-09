@@ -12,15 +12,17 @@ class MixProcessor extends AudioWorkletProcessor {
     this.playing = false;
     this.quanta = 0;
     this.wasEnded = false;
+    this.epoch = 0; // bumped by the main thread on load/seek; reports carry it so old ones can be ignored
     this.port.onmessage = (e) => {
       const m = e.data;
       if (m.type === 'load') {
         this.playing = false;
+        this.epoch = m.epoch;
         this.core.setStems(m.stems);
         this.core.setRate(m.rate ?? 1);
       } else if (m.type === 'gains') this.core.setGains(m.gains);
       else if (m.type === 'rate') this.core.setRate(m.rate);
-      else if (m.type === 'seek') { this.core.seek(m.frame); this.wasEnded = false; }
+      else if (m.type === 'seek') { this.core.seek(m.frame); this.epoch = m.epoch; this.wasEnded = false; }
       else if (m.type === 'play') this.playing = true;
       else if (m.type === 'pause') this.playing = false;
     };
@@ -41,7 +43,7 @@ class MixProcessor extends AudioWorkletProcessor {
     if (++this.quanta >= REPORT_EVERY || (ended && !this.wasEnded)) {
       this.quanta = 0;
       // `frame` is the audible position at the end of this block, which plays at currentTime + n / sampleRate
-      this.port.postMessage({ type: 'pos', frame, time: currentTime + n / sampleRate, ended });
+      this.port.postMessage({ type: 'pos', frame, time: currentTime + n / sampleRate, ended, epoch: this.epoch });
     }
     if (ended) {
       this.wasEnded = true;

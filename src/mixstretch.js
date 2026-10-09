@@ -19,6 +19,8 @@ export class MixStretcher {
     this.st = new SoundTouch();
     this.st.tempo = 1;
     this.buf = new Float32Array(FEED * 2); // interleaved scratch
+    this.oldOut = 0; // frames still in the output buffer that were made at oldRate (they drain first)
+    this.oldRate = 1;
   }
 
   // channels: array of stems, each an array of 1 or 2 Float32Arrays
@@ -42,6 +44,12 @@ export class MixStretcher {
       // leave the stretcher: continue from where the listener is, dropping what it still buffered
       this.pos = Math.round(this.audiblePosition());
       this.st.clear();
+      this.oldOut = 0;
+    }
+    if (!enteringBypass && this.rate !== 1) {
+      // what is already stretched keeps mapping back at the speed it was produced with
+      this.oldOut = this.st.outputBuffer.frameCount;
+      this.oldRate = this.rate;
     }
     this.rate = rate;
     this.st.tempo = rate;
@@ -50,6 +58,7 @@ export class MixStretcher {
   seek(frame) {
     this.pos = Math.max(0, Math.min(this.length, Math.round(frame)));
     this.st.clear();
+    this.oldOut = 0;
   }
 
   // Source position (in frames) of the sample the listener hears next. In stretch mode the frames still held in
@@ -57,7 +66,9 @@ export class MixStretcher {
   audiblePosition() {
     if (this.rate === 1) return this.pos;
     const st = this.st;
-    const held = st.inputBuffer.frameCount + st._intermediateBuffer.frameCount + st.outputBuffer.frameCount * this.rate;
+    const out = st.outputBuffer.frameCount;
+    const old = Math.min(this.oldOut, out);
+    const held = st.inputBuffer.frameCount + st._intermediateBuffer.frameCount + old * this.oldRate + (out - old) * this.rate;
     return Math.max(0, this.pos - held);
   }
 
@@ -111,6 +122,7 @@ export class MixStretcher {
       const got = Math.min(n, st.outputBuffer.frameCount);
       const out = new Float32Array(got * 2);
       st.outputBuffer.receiveSamples(out, got);
+      this.oldOut = Math.max(0, this.oldOut - got);
       for (let j = 0; j < got; j++) {
         outL[j] = out[2 * j];
         outR[j] = out[2 * j + 1];
