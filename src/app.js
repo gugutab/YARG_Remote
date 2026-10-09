@@ -414,7 +414,12 @@ function renderSongInfo(song) {
   renderMeta(song, null);
   els.instrumentCards.replaceChildren();
   const extras = extraRows(song);
-  els.infoExtra.replaceChildren(...kv(extras));
+  // each property is a label/value pair in its own box, so the list can flow into several columns when there is room
+  els.infoExtra.replaceChildren(...extras.map((r) => {
+    const pair = document.createElement('div');
+    pair.append(...kv([r]));
+    return pair;
+  }));
   els.infoExtra.closest('details').hidden = extras.length === 0;
   els.infoExtra.closest('.info-card').hidden = extras.length === 0; // no empty card when the song.ini has nothing else
 }

@@ -631,3 +631,8 @@ button.icon.stage-btn.style-btn { top: 54px; }
   .info-cols > .card-adjust, .info-cols > .card-volume, .info-cols > .card-extra { grid-column: 1; grid-row: auto; }
 }
 .icards { align-items: start; } /* each instrument card is as tall as its content (no stretched empty cards) */
+
+/* "Outras propriedades do song.ini": as many columns as fit (each at least 190 px) */
+.kv.kv-pairs { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 18px; }
+.kv-pairs > div { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: 0 10px; align-items: baseline; min-width: 0; }
+.kv-pairs dt { overflow-wrap: anywhere; }
