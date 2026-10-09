@@ -36,17 +36,33 @@ export function filterSongs(songs, { query = '', instrument = '', genre = '' } =
 
 // Text keys skip leading punctuation, so "(Don't Fear) The Reaper" sorts under D, like its divider.
 const sortText = (v) => norm(plainText(v)).replace(/^[^a-z0-9]+/, '');
-// Names that differ only by case, accents, punctuation or spacing are the same group, e.g.
-// "(Pronounced 'Lĕh-'nérd 'Skin-'nérd)" and "(Pronounced Leh-nerd Skin-nerd)".
-export const groupKey = (name) => {
-  const text = norm(plainText(name));
-  return text.replace(/[^a-z0-9]+/g, '') || text.trim();
+// Names that are the same artist / album written differently share one group (and one list header):
+// - always: case, accents, punctuation, spacing, "&" = "and", the word "the" ("(Pronounced 'Lĕh-'nérd 'Skin-'nérd)" =
+//   "(Pronounced Leh-nerd Skin-nerd)", "Jackson 5" = "The Jackson 5");
+// - artists: a trailing credit in parentheses ("Queen (WaveGroup)", "The Who (Steve Ouimette)") is dropped;
+// - albums: a trailing edition tag ("Inside (Deluxe Edition)", "Ten (Reissue)", "Permanent Waves (40th Anniversary
+//   Edition)") is dropped. Other parentheses stay, so "Weezer (Blue Album)" and "Weezer (Green Album)" differ.
+// A tag only counts as trailing when text comes before it, so a name that starts with "(...)" is kept whole.
+const EDITION_TAG = /deluxe|edition|reissue|remaster|expanded|anniversary|bonus|explicit/i;
+const TRAILING_TAG = /^(.*?\S)\s*[(\[]([^()\[\]]*)[)\]]\s*$/;
+export const groupKey = (name, kind = 'plain') => {
+  let text = plainText(name);
+  if (kind === 'artist' || kind === 'album') {
+    for (;;) { // "Black Sabbath (Steve Ouimette)" -> "Black Sabbath"
+      const m = text.match(TRAILING_TAG);
+      if (!m || (kind === 'album' && !EDITION_TAG.test(m[2]))) break;
+      text = m[1];
+    }
+  }
+  const flat = norm(text).replace(/&/g, ' and ');
+  const key = flat.replace(/\bthe\b/g, ' ').replace(/[^a-z0-9]+/g, '');
+  return key || flat.replace(/[^a-z0-9]+/g, '') || flat.trim();
 };
 const textKey = (field) => (s) => sortText(s[field]);
 const KEYS = {
   title: textKey('title'),
-  artist: (s) => `${groupKey(s.artist)}\u0000${norm(plainText(s.title))}`,
-  album: (s) => `${groupKey(s.album)}\u0000${norm(plainText(s.title))}`,
+  artist: (s) => `${groupKey(s.artist, 'artist')}\u0000${norm(plainText(s.title))}`,
+  album: (s) => `${groupKey(s.album, 'album')}\u0000${norm(plainText(s.title))}`,
   year: (s) => parseInt(s.ini?.year, 10) || 0,
   length: (s) => Number(s.ini?.song_length) || 0,
 };
@@ -91,20 +107,25 @@ export function groupLabel(song, by = 'title') {
 
 // Songs (already sorted) with a { type: 'head', label } item before each run of the same group.
 export function buildItems(sorted, by = 'title') {
-  // Each group is named by its most common spelling (ties: the first one seen).
+  const kind = by === 'artist' || by === 'album' ? by : 'plain';
+  // Each group is named by its most common spelling, preferring one without a trailing "(credit/edition)"; ties: first seen.
   const spellings = new Map(); // groupKey -> Map(label -> count)
   const labels = sorted.map((song) => groupLabel(song, by));
   for (const label of labels) {
-    const key = groupKey(label);
+    const key = groupKey(label, kind);
     const counts = spellings.get(key) ?? spellings.set(key, new Map()).get(key);
     counts.set(label, (counts.get(label) || 0) + 1);
   }
-  const nameOf = (label) => [...spellings.get(groupKey(label))].reduce((best, e) => (e[1] > best[1] ? e : best))[0];
+  const tagged = (label) => TRAILING_TAG.test(label);
+  const nameOf = (label) => [...spellings.get(groupKey(label, kind))].reduce((best, e) => {
+    if (tagged(e[0]) !== tagged(best[0])) return tagged(e[0]) ? best : e;
+    return e[1] > best[1] ? e : best;
+  })[0];
   const items = [];
   let last = null;
   sorted.forEach((song, i) => {
-    const key = groupKey(labels[i]);
-    if (key !== last) { // near-identical names share a header
+    const key = groupKey(labels[i], kind);
+    if (key !== last) { // equivalent names share a header
       items.push({ type: 'head', label: nameOf(labels[i]) });
       last = key;
     }
@@ -117,6 +138,6 @@ export function buildItems(sorted, by = 'title') {
 export function anchorLabel(label, by = 'title') {
   if (by === 'year') return /^\d{4}s$/.test(label) ? label.slice(2) : '?';
   if (by === 'length') return /^Unknown/.test(label) ? '?' : label.replace(/\s*min$/, '').replace(/\s+/g, '');
-  const text = norm(plainText(label)).replace(/^[^a-z0-9]+/, '');
+  const text = by === 'artist' || by === 'album' ? groupKey(label, by) : norm(plainText(label)).replace(/^[^a-z0-9]+/, ''); // same key as the sort
   return /^[a-z]/.test(text) ? text[0].toUpperCase() : '#';
 }

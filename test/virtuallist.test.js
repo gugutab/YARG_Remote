@@ -136,3 +136,37 @@ test('near-identical album names share one header even with punctuation differen
   assert.equal(heads.length, 1);
   assert.equal(heads[0].label, a); // the most common spelling names the group
 });
+
+test('artist and album equivalence rules from the real library', async () => {
+  const { groupKey } = await import('../src/songlist.js');
+  const same = (kind, a, b) => assert.equal(groupKey(a, kind), groupKey(b, kind), `${a} = ${b}`);
+  const diff = (kind, a, b) => assert.notEqual(groupKey(a, kind), groupKey(b, kind), `${a} != ${b}`);
+  same('artist', 'Queen', 'Queen (WaveGroup)');
+  same('artist', 'Black Sabbath', 'Black Sabbath (Steve Ouimette)');
+  same('artist', 'Foo Fighters', 'The Foo Fighters (WaveGroup)');
+  same('artist', 'Joan Jett And The Blackhearts', 'Joan Jett & The Blackhearts');
+  same('artist', 'Motley Crue', 'Mötley Crüe (WaveGroup)');
+  same('album', 'Inside', 'INSIDE (Deluxe Edition)');
+  same('album', 'Ten', 'Ten (Reissue)');
+  same('album', 'Permanent Waves', 'Permanent Waves (40th Anniversary Edition)');
+  same('album', 'Weezer (Blue Album)', 'Weezer (The Blue Album)');
+  same('album', 'Black Holes & Revelations', 'Black Holes and Revelations');
+  diff('album', 'Weezer (Blue Album)', 'Weezer (Green Album)'); // only edition tags are dropped from albums
+  diff('album', 'Inside', 'Inside (The Songs)');
+  diff('artist', 'Pat Benatar', 'Pat Benetar'); // no fuzzy matching
+  diff('album', 'Chicago II', 'Chicago X');
+  assert.notEqual(groupKey('(Pronounced Leh-nerd)', 'artist'), '');
+});
+
+test('a group is titled by its spelling without a trailing credit', () => {
+  const mk = (title, artist) => ({ title, artist, album: 'x', ini: {} });
+  const sorted = sortSongs([mk('a', 'Queen (WaveGroup)'), mk('b', 'Queen (WaveGroup)'), mk('c', 'Queen')], 'artist');
+  assert.deepEqual(buildItems(sorted, 'artist').filter((i) => i.type === 'head').map((i) => i.label), ['Queen']);
+});
+
+test('rail anchors for artists follow the sort key (leading "The" ignored)', async () => {
+  const { anchorLabel } = await import('../src/songlist.js');
+  assert.equal(anchorLabel('The All-American Rejects', 'artist'), 'A');
+  assert.equal(anchorLabel('Queen (WaveGroup)', 'artist'), 'Q');
+  assert.equal(anchorLabel('The Beatles', 'title'), 'T'); // titles keep their own rule
+});
