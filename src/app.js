@@ -14,13 +14,13 @@ const els = Object.fromEntries([
   'search', 'sortBy', 'sortDir', 'filterInstrument', 'filterGenre', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
-  'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'sectionBtn', 'sectionPop', 'sectionText', 'mixer', 'settingsBtn', 'settingsPop',
+  'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'sectionBtn', 'sectionPop', 'sectionText', 'partDiff', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
   'fullscreen', 'viewBtn', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoClose', 'infoPlay', 'infoMenu',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
 ].map((id) => [id, $(id)]));
 
-for (const img of [els.cover, els.infoCover]) img.addEventListener('error', () => { img.hidden = true; });
+for (const img of [els.cover, els.infoCover, els.infoPopCover]) img.addEventListener('error', () => { img.hidden = true; });
 const player = new MultiTrackPlayer();
 const highway = new Highway(els.highway);
 let songs = [];
@@ -249,6 +249,7 @@ async function selectSong(song) {
   els.artist.textContent = plainText(song.artist);
   els.cover.hidden = true;
   els.infoCover.hidden = true;
+  els.infoPopCover.hidden = true;
   els.instrument.replaceChildren();
   els.difficulty.replaceChildren();
   els.sectionSelect.replaceChildren(new Option('Sem seções', ''));
@@ -285,7 +286,7 @@ async function selectSong(song) {
     return;
   }
   if (els.cover.src.startsWith('blob:')) URL.revokeObjectURL(els.cover.src);
-  for (const img of [els.cover, els.infoCover]) {
+  for (const img of [els.cover, els.infoCover, els.infoPopCover]) {
     img.src = coverUrl || '';
     img.hidden = !coverUrl;
   }
@@ -358,14 +359,16 @@ function renderMeta(song, midi) {
   const rows = metaRows(song).filter((r) => r.label !== 'Artista'); // the artist is the subtitle
   const bpm = bpmLabel(midi?.tempos);
   if (bpm) rows.push({ label: 'BPM', value: bpm, icon: 'pulse' });
-  els.infoMeta.replaceChildren(...rows.map((r) => {
+  const chip = (r) => {
     const li = document.createElement('li');
     li.className = 'chip';
     li.innerHTML = `<svg><use href="#i-${r.icon || 'info'}"/></svg><span class="chip-label"></span><span class="chip-value"></span>`;
     li.querySelector('.chip-label').textContent = r.label;
     li.querySelector('.chip-value').textContent = r.value;
     return li;
-  }));
+  };
+  els.infoMeta.replaceChildren(...rows.map(chip));
+  els.infoPopMeta.replaceChildren(...rows.map(chip)); // the small header in the top-bar popup
   balanceChips();
 }
 
@@ -394,6 +397,8 @@ new ResizeObserver(() => balanceChips()).observe(els.info);
 function renderSongInfo(song) {
   els.infoTitle.textContent = plainText(song.title);
   els.infoArtist.textContent = plainText(song.artist);
+  els.infoPopTitle.textContent = plainText(song.title);
+  els.infoPopArtist.textContent = plainText(song.artist);
   const quote = plainText(song.ini?.loading_phrase);
   els.infoQuote.textContent = quote ? `“${quote}”` : '';
   els.infoQuote.hidden = !quote;
@@ -484,7 +489,11 @@ function renderPartMenu() {
   const ins = currentInstrument();
   const diffLabel = DIFFICULTIES.find((d) => d.id === els.difficulty.value)?.label;
   els.partIcon.setAttribute('href', `#i-${ins ? INSTRUMENT_ICON[ins.base] || 'music' : 'music'}`);
-  els.partText.textContent = !ins ? 'Sem instrumento' : ins.mode === 'vocals' || !diffLabel ? ins.label : `${ins.label} · ${diffLabel}`;
+  els.partText.textContent = ins ? ins.label : 'Sem instrumento';
+  const letter = ins && ins.mode !== 'vocals' && diffLabel ? diffLabel[0] : '';
+  els.partDiff.textContent = letter;
+  els.partDiff.title = diffLabel || '';
+  els.partDiff.hidden = !letter; // difficulty as a single letter, like the list rows
   els.partPop.replaceChildren(...(current?.options ?? []).map((o) => {
     const diffs = availableDifficulties(current.midi, o);
     const wanted = current.diffChoice[o.id];
@@ -515,7 +524,7 @@ function renderPartMenu() {
   }));
 }
 
-els.infoBtn.addEventListener('click', () => { if (current || loadInfo.state !== 'idle') setInfoOpen(!infoOpen); });
+els.infoPopMore.addEventListener('click', () => { closePopovers(); setInfoOpen(true); });
 els.infoMenu.addEventListener('click', () => setLibraryOpen(!libraryOpen()));
 els.infoClose.addEventListener('click', () => setInfoOpen(false));
 els.infoPlay.addEventListener('click', () => togglePlay());
@@ -615,27 +624,33 @@ function stepSection(dir) {
 
 // ---------- Mixer and settings ----------
 const LONG_PRESS_MS = 500;
+// Master volume: one more mixer row (kept across songs) that scales every stem.
+const masterState = { stem: { id: 'master', label: 'Master' }, master: true, value: 1, muted: false, views: [] };
 let stemStates = []; // { stem, value, muted, views[] }: one state per stem, shown in the menu and on the info screen
 
 function buildMixer(stems) {
   stemStates = stems.map((stem) => ({ stem, value: 1, muted: false, views: [] }));
+  masterState.views = [];
   for (const container of [els.mixer, els.mixerInfo]) {
-    container.replaceChildren(...stemStates.map(mixerRow));
+    const master = mixerRow(masterState);
+    master.classList.add('master');
+    container.replaceChildren(master, ...stemStates.map(mixerRow));
   }
+  applyStem(masterState);
   stemStates.forEach(applyStem);
 }
 
 function mixerRow(st) {
   const row = document.createElement('div');
   row.className = 'mix-row';
-  const kind = stemKind(st.stem.label);
+  const kind = st.master ? 'volume' : stemKind(st.stem.label);
   row.innerHTML = `
     <button class="stem-btn" type="button" aria-pressed="false"><svg><use href="#i-${kind}"/></svg><b class="badge"></b></button>
     <input type="range" min="0" max="1.5" step="0.01" value="1">
     <span class="mix-val">100%</span>
     <button class="icon small-icon reset" type="button" title="Restaurar volume" aria-label="Restaurar volume"><svg><use href="#i-reset"/></svg></button>`;
   const mute = row.querySelector('.stem-btn');
-  mute.querySelector('.badge').textContent = stemBadge(st.stem.label);
+  mute.querySelector('.badge').textContent = st.master ? '' : stemBadge(st.stem.label);
   const view = { row, range: row.querySelector('input'), val: row.querySelector('.mix-val'), mute, reset: row.querySelector('.reset') };
   st.views.push(view);
   view.range.addEventListener('input', () => { st.value = Number(view.range.value); st.muted = false; applyStem(st); }); // moving the slider re-enables the track
@@ -645,7 +660,7 @@ function mixerRow(st) {
   mute.addEventListener('pointerdown', () => {
     longPressed = false;
     clearTimeout(pressTimer);
-    pressTimer = setTimeout(() => { longPressed = true; soloStem(st); }, LONG_PRESS_MS);
+    if (!st.master) pressTimer = setTimeout(() => { longPressed = true; soloStem(st); }, LONG_PRESS_MS);
   });
   for (const type of ['pointerup', 'pointerleave', 'pointercancel']) mute.addEventListener(type, () => clearTimeout(pressTimer));
   mute.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -668,7 +683,8 @@ function soloStem(st) {
 
 // The slider keeps its value while a stem is muted; every view of the stem is updated together.
 function applyStem(st) {
-  player.setVolume(st.stem.id, st.muted ? 0 : st.value);
+  if (st.master) player.setMaster(st.muted ? 0 : st.value);
+  else player.setVolume(st.stem.id, st.muted ? 0 : st.value);
   for (const v of st.views) {
     v.range.value = st.value;
     v.val.textContent = `${Math.round(st.value * 100)}%`;
@@ -706,7 +722,7 @@ for (const btn of document.querySelectorAll('[data-reset]')) {
   btn.addEventListener('click', () => setSetting(btn.dataset.reset, SETTING_DEFAULTS[btn.dataset.reset]));
 }
 
-const popovers = [[els.partBtn, els.partPop], [els.sectionBtn, els.sectionPop], [els.mixerBtn, els.mixerPop], [els.settingsBtn, els.settingsPop]];
+const popovers = [[els.infoBtn, els.infoPop], [els.partBtn, els.partPop], [els.sectionBtn, els.sectionPop], [els.mixerBtn, els.mixerPop], [els.settingsBtn, els.settingsPop]];
 function closePopovers(except) {
   for (const [btn, pop] of popovers) {
     if (pop === except) continue;
@@ -718,7 +734,8 @@ function closePopovers(except) {
 function placePopover(btn, pop) {
   const b = btn.getBoundingClientRect();
   const width = pop.offsetWidth;
-  const left = Math.min(Math.max(8, b.right - width), window.innerWidth - width - 8);
+  const anchor = pop.classList.contains('align-left') ? b.left : b.right - width; // popovers near the left edge open to the right
+  const left = Math.min(Math.max(8, anchor), window.innerWidth - width - 8);
   pop.style.left = `${Math.max(8, left)}px`;
   pop.style.top = `${b.bottom + 8}px`;
   pop.style.maxHeight = `${Math.max(120, window.innerHeight - b.bottom - 16)}px`;

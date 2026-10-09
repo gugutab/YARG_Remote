@@ -74,6 +74,10 @@ export class MultiTrackPlayer {
     return out;
   }
 
+  setMaster(value) {
+    this.master.gain.value = value;
+  }
+
   setVolume(id, value) {
     const stem = this.stems.get(id);
     if (!stem) return;

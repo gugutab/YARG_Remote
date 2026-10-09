@@ -7,7 +7,7 @@
   --muted: #8b949e;
   --accent: #2f80ed;
   --lib-w: 320px;
-  --bar-h: 92px;
+  --bar-h: 112px;
 }
 
 @media (prefers-color-scheme: light) {
@@ -328,13 +328,13 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
   grid-template-columns: auto auto minmax(0, 1fr);
   align-items: stretch;
   gap: 0 10px;
-  padding: 0 10px 0 6px;
+  padding: 8px 10px 8px 6px;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
   min-width: 0;
 }
 .menu-btn { align-self: center; }
-.tb-cover { align-self: center; width: 72px; height: 72px; object-fit: cover; border-radius: 10px; }
+.tb-cover { align-self: center; width: 92px; height: 92px; object-fit: cover; border-radius: 10px; }
 .tb-cover[hidden] { display: none; }
 .tb-main { min-width: 0; display: grid; grid-template-rows: 1fr auto 1fr; }
 .tb-top, .tb-bottom { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -383,10 +383,27 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
   .section-wrap { display: none; } /* the previous/next buttons still step through the sections */
 }
 @media (max-width: 700px) {
-  :root { --bar-h: 84px; }
+  :root { --bar-h: 92px; }
   .tb-cover { display: none; }
   .topbar { gap: 0 6px; grid-template-columns: auto minmax(0, 1fr); padding-left: 2px; }
   .transport .time { display: none; }
   #fullscreen { display: none; }
   .chip-btn #partText { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
+
+/* ---------- Round 7: info popup, difficulty badge, master volume ---------- */
+.now { display: flex; align-items: center; gap: 4px; }
+.now-text { flex: 0 1 auto; }
+.now > .pop-wrap { flex: none; }
+.dbadge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 5px; background: var(--accent); color: #fff; font-size: 11px; font-style: normal; font-weight: 700; }
+.info-pop { width: min(380px, calc(100vw - 16px)); gap: 10px; }
+.ip-head { display: flex; gap: 12px; align-items: center; }
+.ip-head img { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; }
+.ip-head img[hidden] { display: none; }
+.ip-text { min-width: 0; }
+.ip-title { font-weight: 700; font-size: 16px; overflow-wrap: anywhere; }
+.ip-artist { color: var(--muted); font-size: 13px; }
+.info-pop .chips-v { margin: 0; gap: 6px; }
+.info-pop .chip { min-height: 28px; font-size: 12px; }
+.info-pop .chip-btn { align-self: flex-start; }
+.mix-row.master { padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }

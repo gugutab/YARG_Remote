@@ -113,12 +113,26 @@
                 <div id="title" class="now-title"></div>
                 <div id="artist" class="now-artist"></div>
               </div>
+              <div class="pop-wrap">
+                <button id="infoBtn" class="icon" type="button" title="Informações da música" aria-label="Informações da música" aria-expanded="false"><svg><use href="#i-info"/></svg></button>
+                <div class="popover info-pop align-left" id="infoPop" hidden>
+                  <div class="ip-head">
+                    <img id="infoPopCover" alt="" hidden>
+                    <div class="ip-text">
+                      <div id="infoPopTitle" class="ip-title"></div>
+                      <div id="infoPopArtist" class="ip-artist"></div>
+                    </div>
+                  </div>
+                  <ul id="infoPopMeta" class="chips-v"></ul>
+                  <button id="infoPopMore" class="chip-btn" type="button"><svg><use href="#i-list"/></svg>Todos os detalhes</button>
+                </div>
+              </div>
             </div>
             <div class="brand" id="brand">YARG Remote</div>
 
             <div class="chips" id="chips" hidden>
               <div class="pop-wrap">
-                <button id="partBtn" class="chip-btn" type="button" title="Instrumento e dificuldade" aria-label="Instrumento e dificuldade" aria-expanded="false"><svg><use id="partIcon" href="#i-guitar"/></svg><span id="partText"></span><svg class="chev"><use href="#i-chevron"/></svg></button>
+                <button id="partBtn" class="chip-btn" type="button" title="Instrumento e dificuldade" aria-label="Instrumento e dificuldade" aria-expanded="false"><svg><use id="partIcon" href="#i-guitar"/></svg><span id="partText"></span><b id="partDiff" class="dbadge" hidden></b><svg class="chev"><use href="#i-chevron"/></svg></button>
                 <div class="popover part-pop" id="partPop" hidden></div>
               </div>
               <div class="pop-wrap section-wrap">
@@ -160,7 +174,7 @@
             </div>
           </div>
               <button id="viewBtn" class="icon" type="button" title="Visão 3D / 2D (V)" aria-label="Alternar visão 3D" aria-pressed="false"><svg><use href="#i-cube"/></svg></button>
-          <button id="infoBtn" class="icon" type="button" title="Informações da música (I)" aria-label="Informações da música"><svg><use href="#i-info"/></svg></button>
+          
           <button id="fullscreen" class="icon" type="button" title="Tela cheia (F)" aria-label="Tela cheia"><svg><use href="#i-expand"/></svg></button>
             </div>
           </div>
