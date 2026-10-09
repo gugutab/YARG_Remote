@@ -15,7 +15,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'mixer', 'settingsBtn', 'settingsPop',
-  'fullscreen', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'fullscreen', 'viewBtn', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoClose', 'infoPlay', 'infoMenu',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
 ].map((id) => [id, $(id)]));
@@ -739,6 +739,16 @@ function syncPlayButton() {
   setImmersive();
 }
 
+// ---------- 2D / 3D view ----------
+function setView(view) {
+  highway.setView(view);
+  els.viewBtn.setAttribute('aria-pressed', String(view === '3d'));
+  els.viewBtn.title = view === '3d' ? 'Visão 2D (V)' : 'Visão 3D (V)';
+  store.set('view', view);
+}
+setView(store.get('view') === '3d' ? '3d' : '2d');
+els.viewBtn.addEventListener('click', () => setView(highway.view === '3d' ? '2d' : '3d'));
+
 // ---------- Fullscreen and idle bar ----------
 let idleTimer = 0;
 function setImmersive() {
@@ -778,6 +788,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.code === 'KeyI' && (current || loadInfo.state !== 'idle')) setInfoOpen(!infoOpen);
   else if (e.code === 'KeyL') setLibraryOpen(!libraryOpen());
   else if (e.code === 'KeyF') toggleFullscreen();
+  else if (e.code === 'KeyV') setView(highway.view === '3d' ? '2d' : '3d');
   else if (e.code === 'BracketLeft') stepSection(-1);
   else if (e.code === 'BracketRight') stepSection(1);
   else if (e.code === 'ArrowLeft' && ready) player.seek(Math.max(0, player.currentTime() - 5));

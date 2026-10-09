@@ -39,6 +39,7 @@
       <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></symbol>
       <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
       <symbol id="i-flag" viewBox="0 0 24 24"><path d="M6 3v18M6 4h12l-2.5 4 2.5 4H6"/></symbol>
+      <symbol id="i-cube" viewBox="0 0 24 24"><path d="M12 3 4 7.5v9L12 21l8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"/></symbol>
       <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
       <symbol id="i-shrink" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></symbol>
       <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
@@ -153,6 +154,7 @@
               <label class="row">Delay do chart <input data-setting="chartDelay" type="range" min="-1" max="1" step="0.01" value="0"><output data-out="chartDelay">+0.00 s</output><button class="icon small-icon reset" type="button" data-reset="chartDelay" title="Restaurar" aria-label="Restaurar delay do chart"><svg><use href="#i-reset"/></svg></button></label>
             </div>
           </div>
+          <button id="viewBtn" class="icon" type="button" title="Visão 3D / 2D (V)" aria-label="Alternar visão 3D" aria-pressed="false"><svg><use href="#i-cube"/></svg></button>
           <button id="infoBtn" class="icon" type="button" title="Informações da música (I)" aria-label="Informações da música"><svg><use href="#i-info"/></svg></button>
           <button id="fullscreen" class="icon" type="button" title="Tela cheia (F)" aria-label="Tela cheia"><svg><use href="#i-expand"/></svg></button>
         </div>

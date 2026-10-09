@@ -1,24 +1,29 @@
 // Canvas renderer for a chart. Drawing is a pure function of the playback time,
 // so seek/pause just means re-rendering at a different `t`.
-const GUITAR_LANE_COLORS = ['#3fbf3f', '#e5392b', '#f5c518', '#2f80ed', '#f2861e'];
-const KICK_COLOR = '#f2861e';
-const OPEN_COLOR = '#a66cff';
-const HARMONY_COLORS = { 1: '#3fbf9f', 2: '#2fa8a8', 3: '#8fd6c4' }; // harmony parts 1..3, behind the lead
-const KICK_BAR_HALF_H = 6; // pedal bar is 12 px tall at rest
-const DOUBLE_KICK_GAP = 4; // px between the two bars of a double kick
-const TAP_COLOR = '#b25cff';
-const ACCENT_OUTLINE_WIDTH = 4;
-const ACCENT_OUTLINE_DARKEN = 0.55; // multiplier applied to the note colour for the accent outline
-const GHOST_ALPHA = 0.45;
-const ROLL_COLORS = {
-  kick: 'rgba(242,134,30,0.14)',
-  tremolo: 'rgba(63,191,63,0.14)',
-  trill: 'rgba(245,197,24,0.14)',
-};
-const FADE_SEC = 0.25; // how long a note takes to fade out after the hit line
-const BASE_LOOKAHEAD_SEC = 2.5; // time from the top edge to the hit line at neck speed 1
-const ENTRY_MARGIN_SEC = 0.3; // extra window above the top edge, so notes are already moving when they enter
-const HIT_Y = 0.88; // hit line position as a fraction of canvas height
+
+import {
+  GUITAR_LANE_COLORS,
+  KICK_COLOR,
+  OPEN_COLOR,
+  HARMONY_COLORS,
+  KICK_BAR_HALF_H,
+  DOUBLE_KICK_GAP,
+  TAP_COLOR,
+  ACCENT_OUTLINE_WIDTH,
+  ACCENT_OUTLINE_DARKEN,
+  GHOST_ALPHA,
+  ROLL_COLORS,
+  FADE_SEC,
+  BASE_LOOKAHEAD_SEC,
+  ENTRY_MARGIN_SEC,
+  HIT_Y,
+  firstVisibleIndex,
+  tintWhite,
+  darken,
+  withAlpha,
+} from './gfx.js';
+export { firstVisibleIndex } from './gfx.js';
+import { renderLanes3D } from './highway3d.js';
 
 export class Highway {
   constructor(canvas) {
@@ -26,7 +31,13 @@ export class Highway {
     this.g = canvas.getContext('2d');
     this.chart = null;
     this.maxLength = 0; // longest sustain in the current chart, in seconds
+    this.view = '2d';
     this.neck = 1; // neck speed: scales distance between notes only; timing is unchanged
+  }
+
+  // '2d' (flat) or '3d' (perspective). Vocals have no highway and always use the flat view.
+  setView(view) {
+    this.view = view === '3d' ? '3d' : '2d';
   }
 
   setNeckSpeed(value) {
@@ -58,6 +69,7 @@ export class Highway {
 
     if (!this.chart) return; // the page shows its own welcome / loading overlay
     if (this.chart.mode === 'vocals') this.renderVocals(t, w, h);
+    else if (this.view === '3d') renderLanes3D(this, t, w, h);
     else this.renderLanes(t, w, h);
   }
 
@@ -253,38 +265,4 @@ export class Highway {
       this.g.fillRect(x0, top, width, bottom - top);
     }
   }
-}
-
-// First note that can still be drawn at time t. Heads stay for FADE_SEC after they pass the hit line,
-// and a sustain stays until its end, so look back by the longest sustain in the chart.
-// Notes must be sorted by time.
-export function firstVisibleIndex(notes, t, maxLength) {
-  return firstIndexAtOrAfter(notes, t - FADE_SEC - maxLength);
-}
-
-function firstIndexAtOrAfter(notes, time) {
-  let lo = 0;
-  let hi = notes.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (notes[mid].time < time) lo = mid + 1; else hi = mid;
-  }
-  return lo;
-}
-
-function tintWhite(hex, amount) {
-  const n = parseInt(hex.slice(1), 16);
-  const mix = (c) => Math.round(c + (255 - c) * amount);
-  return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
-}
-
-function darken(hex, factor) {
-  const n = parseInt(hex.slice(1), 16);
-  const mix = (c) => Math.round(c * factor);
-  return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
-}
-
-function withAlpha(hex, alpha) {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
 }
