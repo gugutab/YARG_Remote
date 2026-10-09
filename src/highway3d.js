@@ -14,7 +14,8 @@ const HEAD_R = 0.36; // note head radius, in lane widths
 const HEAD_TILT = 0.55; // vertical squash of the heads (they lie on the road)
 const FADE_IN = 0.14; // fraction of the depth over which notes fade in at the far edge
 const HIT_FLASH_SEC = 0.14;
-const BAR_DEPTH = 0.026; // pedal/open bar thickness along the road, in depth units (it lies flat on the fretboard)
+const BAR_DEPTH = 0.0087; // one third of the earlier 0.026 // pedal/open bar thickness along the road, in depth units (it lies flat on the fretboard)
+const GLOW_DEPTH = 0.026; // the hit glow keeps its size, so the animation stays easy to see
 const BAR_FLASH_SEC = 0.24; // how long the hit pads and the hit bar stay lit after a pedal hit
 const easeOut = (x) => 1 - (1 - x) ** 3;
 
@@ -149,7 +150,7 @@ export function renderLanes3D(hw, t, w, h) {
       g.globalAlpha = 0.5 * (1 - kx) * (1 - kx) * far;
       g.globalCompositeOperation = 'lighter'; // additive, so the glow lights the road instead of greying it
       g.fillStyle = base;
-      quad(d - BAR_DEPTH * (0.6 + 1.6 * e), d + BAR_DEPTH * (0.6 + 1.6 * e), -half - 0.12 * e, half + 0.12 * e);
+      quad(d - GLOW_DEPTH * (0.6 + 1.6 * e), d + GLOW_DEPTH * (0.6 + 1.6 * e), -half - 0.12 * e, half + 0.12 * e);
       g.fill();
       g.globalCompositeOperation = 'source-over';
     }
