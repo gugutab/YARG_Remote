@@ -128,7 +128,7 @@ Clone de referência usado: `/home/user/yarc-official/yarg.core` (pode não exis
 | Bateria: tipo | 101 presente = 5 lanes; 110–112 presentes = Pro; senão 4 lanes. | `MidiDrumsPreparser.cs` |
 | Bateria: pads | Offsets 0 kick, 1 vermelho, 2 amarelo, 3 azul, 4 laranja (5 lanes) ou verde (4 lanes), 5 verde (5 lanes). | `DrumPadToMidiKey` em `MidReader.ProcessLists.cs` |
 | Prato (Pro) | Amarelo, azul e laranja/verde são **prato por padrão**. Notas 110/111/112 são **marcadores de tom**: a janela de cada uma faz XOR. Prato = número par de marcadores cobrindo a nota. | `DrumPadDefaultFlags`, `PAD_TO_CYMBAL_LOOKUP` em `MidIOHelper.cs`, `ProcessNoteOnEventAsFlagToggle` (`note.flags ^= flags`) |
-| Modo 4 lanes do Pro | Mesmas notas, sem prato. A opção aparece como "Bateria (4 lanes)". Nos seletores (cartões e menu superior) as baterias são um item só, "Bateria", com seletor de modo (4 lanes / 5 lanes / Pro / Pro 7 lanes); `instrumentGroups()` em `app.js`. | `MoonNoteToFourLane` |
+| Modo 4 lanes do Pro | Mesmas notas, sem prato. A opção aparece como "Bateria (4 lanes)". Nos seletores (cartões e menu superior) as baterias são um item só, "Bateria", com seletor de modo (4 lanes / 5 lanes / Pro / Pro 7 lanes); `instrumentGroups()` em `app.js` (vocal e harmonia também são um item "Vocal" com seletor). | `MoonNoteToFourLane` |
 | Accent / ghost | Velocity 127 = accent, 1 = ghost, só em pads (não kick). | `MidIOHelper.VELOCITY_ACCENT/GHOST` |
 | Double kick | Nota uma abaixo do kick da dificuldade (95 no Especialista) vira um kick próprio, no seu tick, com o flag. | `MidReader.ProcessLists.cs` (`key - 1` com `InstrumentPlus`) |
 | Rolls | 125 kick roll, 126 tremolo, 127 trill (faixas de tempo). | `MidIOHelper.cs` |

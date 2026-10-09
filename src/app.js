@@ -293,7 +293,7 @@ async function selectSong(song) {
     img.hidden = !coverUrl;
   }
 
-  current = { song, midi, coverUrl, options: instrumentOptions(midi), diffChoice: {}, statsCache: new Map(), expandedStats: new Set() };
+  current = { song, midi, coverUrl, options: instrumentOptions(midi), diffChoice: {}, statsCache: new Map(), expandedStats: new Set(), modeChoice: {} };
   renderMeta(song, midi); // adds the BPM chip
   renderList(); // highlight the loaded song
   fillInstrumentOptions();
@@ -448,19 +448,20 @@ const INSTRUMENT_ICON = { guitar: 'guitar', bass: 'guitar', rhythm: 'guitar', ke
 // (4 lanes / 5 lanes / Pro / Pro 7 lanes); the other instruments are single items.
 function instrumentGroups() {
   const out = [];
-  const drums = [];
+  const byKey = new Map();
   for (const o of current.options) {
-    if (o.base === 'drums') {
-      if (!drums.length) out.push({ key: 'drums', label: 'Bateria', options: drums });
-      drums.push(o);
-    } else {
-      out.push({ key: o.id, label: o.label, options: [o] });
+    const key = o.base === 'drums' ? 'drums' : o.mode === 'vocals' ? 'vocals' : o.id; // drum modes and vocal parts merge
+    if (!byKey.has(key)) {
+      const g = { key, label: key === 'drums' ? 'Bateria' : key === 'vocals' ? 'Vocal' : o.label, options: [] };
+      byKey.set(key, g);
+      out.push(g);
     }
+    byKey.get(key).options.push(o);
   }
   const activeId = els.instrument.value;
   for (const g of out) {
     g.chosen = g.options.find((o) => o.id === activeId)
-      || g.options.find((o) => o.id === current.drumModeChoice)
+      || g.options.find((o) => o.id === current.modeChoice[g.key])
       || (g.key === 'drums' ? g.options.find((o) => o.drumMode === 'pro') : null)
       || g.options[0];
     g.active = g.options.some((o) => o.id === activeId);
@@ -479,7 +480,7 @@ function renderPickers() {
   const activeId = els.instrument.value;
   if (activeId) current.diffChoice[activeId] = els.difficulty.value;
   const activeIns = currentInstrument();
-  if (activeIns?.base === 'drums') current.drumModeChoice = activeIns.id; // the drum mode the card remembers
+  if (activeIns) current.modeChoice[activeIns.base === 'drums' ? 'drums' : activeIns.mode === 'vocals' ? 'vocals' : activeIns.id] = activeIns.id; // the mode a merged card remembers
   // Vocal parts have a single chart: no difficulty buttons.
   els.instrumentCards.replaceChildren(...instrumentGroups().map((group) => {
     const ins = group.chosen; // the option this card stands for (for drums: the chosen mode)
@@ -536,11 +537,11 @@ function renderPickers() {
       for (const o of group.options) {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.textContent = o.modeLabel;
+        btn.textContent = o.modeLabel ?? o.label;
         btn.setAttribute('aria-pressed', String(group.active && o.id === activeId));
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
-          current.drumModeChoice = o.id;
+          current.modeChoice[group.key] = o.id;
           selectInstrument(o.id, diffFor(o).chosen?.id);
         });
         modes.append(btn);
@@ -609,24 +610,27 @@ function renderPartMenu() {
       row.append(seg);
     }
     if (group.options.length > 1) {
+      const line = document.createElement('div');
+      line.className = 'modes-line';
       const modes = document.createElement('div');
       modes.className = 'seg compact modes';
       for (const m of group.options) {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.textContent = shortMode[m.drumMode] ?? m.modeLabel;
-        btn.title = m.modeLabel;
+        btn.textContent = shortMode[m.drumMode] ?? (m.harmony ? 'H' : 'V');
+        btn.title = m.modeLabel ?? m.label;
         btn.setAttribute('aria-label', m.label);
         btn.setAttribute('aria-pressed', String(group.active && m.id === els.instrument.value));
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
-          current.drumModeChoice = m.id;
+          current.modeChoice[group.key] = m.id;
           selectInstrument(m.id, diffFor(m).chosen?.id);
           closePopovers();
         });
         modes.append(btn);
       }
-      row.append(modes);
+      line.append(modes);
+      row.append(line);
     }
     return row;
   }));
