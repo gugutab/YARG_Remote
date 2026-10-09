@@ -577,3 +577,8 @@ button.icon.info-menu:hover { background: var(--panel-2); }
 .mix-row.has-expand { grid-template-columns: 36px 14px 1fr 40px 28px; }
 button.icon.small-icon.expand-btn { width: 14px; min-width: 0; padding: 0; height: 28px; }
 button.icon.small-icon.expand-btn svg { width: 14px; height: 14px; }
+
+/* Round 20: tighter outer spacing: the 8 px grid gaps around the arrow shrink to 2 px (negative margins let the
+   auto column collapse while the 14 px arrow straddles the gaps) */
+.mix-row.has-expand { grid-template-columns: 36px auto 1fr 40px 28px; }
+button.icon.small-icon.expand-btn { margin-inline: -6px; }
