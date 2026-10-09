@@ -32,18 +32,21 @@ const SOLO_NOTE = 103;
 const FIVE_LANE_GREEN_NOTE = 101;
 const CYMBAL_FLAG_FOR_OFFSET = { 2: 110, 3: 111, 4: 112 };
 const DRUM_CYMBAL_FLAGS = [110, 111, 112];
-const DRUM_LANE_COLORS_4 = ['#e5392b', '#f5c518', '#2f80ed', '#3fbf3f']; // red, yellow, blue, green
-const DRUM_LANE_COLORS_5 = ['#e5392b', '#f5c518', '#2f80ed', '#f2861e', '#3fbf3f']; // + orange
+const DRUM_LANE_COLORS_4 = ['#ff1d23', '#ffe900', '#00bfff', '#79d304']; // red, yellow, blue, green (YARG.Core ColorProfile.Defaults.cs)
+const DRUM_LANE_COLORS_5 = ['#ff1d23', '#ffe900', '#00bfff', '#ff8400', '#79d304']; // + orange
 // Extended Pro drums: every pad has its own lane, cymbals and toms no longer share one. Left to right.
+// YARG builds this per player: "Split" turns each combined pad (yellow, blue, green) into a drum item and a cymbal
+// item, inserted next to each other (Assets/Script/Menu/HighwayConfiguration, DrumsHighwaySpecs.cs); which side the
+// cymbal goes on was not confirmed, so the cymbal follows its tom here. Colours: YARG.Core ColorProfile.Defaults.cs.
 // `pad` is the pad's offset in Pro drums (1 red, 2 yellow, 3 blue, 4 green).
 export const EXTENDED_DRUM_LANES = [
-  { pad: 2, cymbal: true, color: '#f5c518' }, // yellow cymbal (hi-hat)
-  { pad: 1, cymbal: false, color: '#e5392b' }, // red (snare)
-  { pad: 2, cymbal: false, color: '#f5c518' }, // yellow tom
-  { pad: 3, cymbal: false, color: '#2f80ed' }, // blue tom
-  { pad: 4, cymbal: false, color: '#3fbf3f' }, // green tom
-  { pad: 3, cymbal: true, color: '#2f80ed' }, // blue cymbal (ride)
-  { pad: 4, cymbal: true, color: '#3fbf3f' }, // green cymbal (crash)
+  { pad: 1, cymbal: false, color: '#ff1d23' }, // red (snare)
+  { pad: 2, cymbal: false, color: '#ffe900' }, // yellow tom
+  { pad: 2, cymbal: true, color: '#ffd010' }, // yellow cymbal (hi-hat)
+  { pad: 3, cymbal: false, color: '#00bfff' }, // blue tom
+  { pad: 3, cymbal: true, color: '#2090ff' }, // blue cymbal (ride)
+  { pad: 4, cymbal: false, color: '#79d304' }, // green tom
+  { pad: 4, cymbal: true, color: '#a0d010' }, // green cymbal (crash)
 ];
 const GUITAR_LANE_COLORS = ['#79d304', '#ff1d23', '#ffe900', '#00bfff', '#ff8400']; // YARG.Core ColorProfile.Defaults.cs
 const STAR_POWER_NOTE = 116;
