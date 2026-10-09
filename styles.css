@@ -480,3 +480,10 @@ button.icon.primary svg { width: 18px; height: 18px; }
   .tb-bottom { grid-column: 1 / -1; grid-row: 2; }
   .section-wrap .chip-btn { max-width: 130px; }
 }
+
+/* Round 12: on mobile both top-bar chips (instrument and section) share the compact size */
+@media (max-width: 700px) {
+  .topbar .chip-btn { min-height: 28px; height: 28px; padding: 0 6px; gap: 4px; }
+  .topbar .chip-btn svg { width: 15px; height: 15px; }
+  .topbar .chip-btn .chev { width: 12px; height: 12px; }
+}
