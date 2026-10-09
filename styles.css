@@ -602,3 +602,8 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
    gaps shrink by 4 px in total so the sub-sliders keep their width and the value/reset columns stay aligned */
 .mix-kids { margin-left: 18px; }
 .mix-kids .mix-row { column-gap: calc(8px - 4px / 3); }
+
+/* Round 26: the other way: the line under the group icon (with the sub-rows) sits 4 px LEFT of where it was
+   (margin 14 -> 10), which gives the sub-sliders 4 px more width; the column gaps go back to 8 px */
+.mix-kids { margin-left: 10px; }
+.mix-kids .mix-row { column-gap: 8px; }
