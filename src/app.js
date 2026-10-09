@@ -5,12 +5,14 @@ import { Highway } from './highway.js';
 import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, readBytes, serializeSongs, restoreSongs, restoreRemoteSongs } from './library.js';
 import { songDelaySeconds, plainText } from './ini.js';
 import { metaRows, extraRows, chartStats, bpmLabel, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel } from './songinfo.js';
-import { saveLibrary, loadLibrary } from './store.js';
-import { filterSongs, sortSongs, genresOf } from './songlist.js';
+import { saveLibrary, loadLibrary, loadThumb, saveThumb } from './store.js';
+import { filterSongs, sortSongs, genresOf, buildItems } from './songlist.js';
+import { createVirtualList } from './virtuallist.js';
+import { createThumbs, renderCoverThumb } from './thumbs.js';
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
-  'app', 'library', 'toggleLibrary', 'closeLibrary', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
+  'app', 'library', 'toggleLibrary', 'closeLibrary', 'groupLabel', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterInstrument', 'filterGenre', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
@@ -57,7 +59,7 @@ setLibraryOpen(narrow() ? false : store.get('library') !== '0', false);
 // The drawer overlay on narrow screens starts closed; entering that layout closes it.
 window.matchMedia('(max-width: 700px)').addEventListener('change', (e) => { if (e.matches) setLibraryOpen(false, false); });
 els.toggleLibrary.addEventListener('click', () => setLibraryOpen(!libraryOpen()));
-els.closeLibrary.addEventListener('click', () => setLibraryOpen(false, false));
+els.closeLibrary.addEventListener('click', () => setLibraryOpen(false, !narrow())); // the drawer on narrow screens always starts closed
 els.scrim.addEventListener('click', () => setLibraryOpen(false, false));
 els.welcomeOpen.addEventListener('click', () => setLibraryOpen(true));
 
@@ -203,20 +205,18 @@ async function offerSavedFolder() {
   els.resume.hidden = false;
 }
 
-function renderList() {
+// The list is windowed (only the rows near the viewport are in the DOM) and shows album thumbnails.
+const thumbs = createThumbs({ render: (song) => renderCoverThumb(song, findCover), load: loadThumb, save: saveThumb });
+const list = createVirtualList({
+  scroller: els.songs, label: els.groupLabel, thumbs, text: plainText, onSelect: (song) => selectSong(song),
+});
+
+function renderList({ keepScroll = false } = {}) {
   const filters = { query: els.search.value, instrument: els.filterInstrument.value, genre: els.filterGenre.value };
   const shown = sortSongs(filterSongs(songs, filters), els.sortBy.value, sortDesc);
   els.sortDir.textContent = sortDesc ? 'Z→A' : 'A→Z';
-  els.songs.replaceChildren(...shown.map((song) => {
-    const li = document.createElement('li');
-    li.className = current?.song === song ? 'active' : '';
-    li.setAttribute('role', 'option');
-    li.innerHTML = '<div class="song-title"></div><div class="song-artist"></div>';
-    li.querySelector('.song-title').textContent = plainText(song.title);
-    li.querySelector('.song-artist').textContent = plainText(song.artist);
-    li.addEventListener('click', () => selectSong(song));
-    return li;
-  }));
+  list.setActive(current?.song ?? null);
+  list.setItems(buildItems(shown, els.sortBy.value), { keepScroll });
   els.count.textContent = songs.length ? `${shown.length} of ${songs.length} songs` : '';
   els.empty.hidden = songs.length > 0;
 }
@@ -241,7 +241,7 @@ async function selectSong(song) {
   current = null;
   chart = null;
   highway.setChart(null);
-  renderList();
+  renderList({ keepScroll: true });
   if (narrow()) setLibraryOpen(false, false);
 
   els.welcome.hidden = true;
@@ -295,7 +295,7 @@ async function selectSong(song) {
 
   current = { song, midi, coverUrl, options: instrumentOptions(midi), diffChoice: {}, statsCache: new Map(), expandedStats: new Set(), modeChoice: {} };
   renderMeta(song, midi); // adds the BPM chip
-  renderList(); // highlight the loaded song
+  renderList({ keepScroll: true }); // highlight the loaded song
   fillInstrumentOptions();
   updateChart(); // the chart exists as soon as the MIDI is read; only playback waits for the audio
   const stems = audioStemsOf(song);

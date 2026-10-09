@@ -34,7 +34,9 @@ export function filterSongs(songs, { query = '', instrument = '', genre = '' } =
   });
 }
 
-const textKey = (field) => (s) => norm(plainText(s[field]));
+// Text keys skip leading punctuation, so "(Don't Fear) The Reaper" sorts under D, like its divider.
+const sortText = (v) => norm(plainText(v)).replace(/^[^a-z0-9]+/, '');
+const textKey = (field) => (s) => sortText(s[field]);
 const KEYS = {
   title: textKey('title'),
   artist: (s) => `${norm(plainText(s.artist))}\u0000${norm(plainText(s.title))}`,
@@ -56,4 +58,38 @@ export function sortSongs(songs, by = 'title', desc = false) {
 export function genresOf(songs) {
   const set = new Set(songs.map((s) => s.ini?.genre).filter((g) => typeof g === 'string' && g));
   return [...set].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+}
+
+// Divider label for a song under the current sort key (what the list headers show).
+export function groupLabel(song, by = 'title') {
+  if (by === 'year') {
+    const y = parseInt(song.ini?.year, 10);
+    return y > 0 ? `${Math.floor(y / 10) * 10}s` : 'Unknown year';
+  }
+  if (by === 'length') {
+    const min = (Number(song.ini?.song_length) || 0) / 60000;
+    if (min <= 0) return 'Unknown length';
+    if (min < 3) return '< 3 min';
+    if (min < 4) return '3–4 min';
+    if (min < 5) return '4–5 min';
+    if (min < 7) return '5–7 min';
+    return '7+ min';
+  }
+  const text = norm(plainText(song[by === 'artist' || by === 'album' ? by : 'title'])).replace(/^[^a-z0-9]+/, '');
+  return /^[a-z]/.test(text) ? text[0].toUpperCase() : '#';
+}
+
+// Songs (already sorted) with a { type: 'head', label } item before each run of the same group.
+export function buildItems(sorted, by = 'title') {
+  const items = [];
+  let last = null;
+  for (const song of sorted) {
+    const label = groupLabel(song, by);
+    if (label !== last) {
+      items.push({ type: 'head', label });
+      last = label;
+    }
+    items.push({ type: 'song', song });
+  }
+  return items;
 }

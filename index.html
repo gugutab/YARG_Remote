@@ -58,7 +58,7 @@
         <span class="lib-tools">
           <button id="pick" class="icon" type="button" title="Choose songs folder" aria-label="Choose songs folder"><svg><use href="#i-folder"/></svg></button>
           <button id="rescan" class="icon" type="button" title="Refresh list" aria-label="Refresh list" hidden><svg><use href="#i-refresh"/></svg></button>
-          <button id="closeLibrary" class="icon only-narrow" type="button" title="Close" aria-label="Close library"><svg><use href="#i-x"/></svg></button>
+          <button id="closeLibrary" class="icon" type="button" title="Close (L)" aria-label="Close library"><svg><use href="#i-x"/></svg></button>
         </span>
         <input id="folderInput" type="file" webkitdirectory hidden>
       </div>
@@ -95,7 +95,10 @@
         </label>
       </div>
       <div id="count" class="count"></div>
-      <ul id="songs" role="listbox"></ul>
+      <div class="songs-wrap">
+        <div id="groupLabel" class="group-label" hidden></div>
+        <ul id="songs" role="listbox" aria-label="Songs"></ul>
+      </div>
       <p id="empty" class="hint">Choose the folder (e.g. A:\music\Songs) to list the songs.<br>Use Chrome or Edge.</p>
       <div id="status" class="status" role="status"></div>
     </aside>
