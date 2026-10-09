@@ -21,6 +21,7 @@ import {
   tintWhite,
   darken,
   withAlpha,
+  firstIndexAtOrAfter,
 } from './gfx.js';
 export { firstVisibleIndex } from './gfx.js';
 import { renderLanes3D } from './highway3d.js';
@@ -46,6 +47,7 @@ export class Highway {
 
   setChart(chart) {
     this.chart = chart;
+    this.vRange = null; // vocal view range is re-fitted for each chart
     this.maxLength = chart ? Math.max(0, ...chart.notes.map((n) => n.length || 0)) : 0;
   }
 
@@ -198,7 +200,7 @@ export class Highway {
     const chart = this.chart;
     const hitX = w * 0.15;
     const pxPerSec = (w * 0.85) / BASE_LOOKAHEAD_SEC;
-    const [lo, hi] = [36, 84];
+    const [lo, hi] = this.vocalRange(t, BASE_LOOKAHEAD_SEC + 1.5);
     const top = h * 0.08; // pitch area: top 8% to 76% of the canvas
     const bottom = h * 0.76;
     const yOfPitch = (p) => bottom - ((p - lo) / (hi - lo)) * (bottom - top);
@@ -247,12 +249,48 @@ export class Highway {
     g.font = '18px system-ui';
     g.textAlign = 'left';
     g.textBaseline = 'middle';
-    for (const l of chart.lyrics) {
-      if (l.time < t - 0.3 || l.time > t + ahead) continue;
-      g.fillStyle = l.time <= t ? '#f5c518' : '#e6edf3';
+    // colours as in YARG's static lyrics (VocalStaticLyricPhraseElement): past grey, present teal, future white
+    const lyrics = chart.lyrics;
+    for (let i = 0; i < lyrics.length; i++) {
+      const l = lyrics[i];
+      if (l.time < t - 0.6 || l.time > t + ahead) continue;
+      const next = lyrics[i + 1]?.time ?? Infinity;
+      g.fillStyle = l.time > t ? '#ffffff' : t < next ? '#13f0a6' : '#595959';
       g.fillText(l.text, xOf(l.time), lyricY);
     }
     g.textBaseline = 'alphabetic';
+  }
+
+  // Pitch range shown by the vocal view, as YARG's VocalTrack does: the notes coming up, at least
+  // 20 semitones tall, padded by 10% on each side, and eased so range changes slide instead of jumping.
+  vocalRange(t, windowSec) {
+    let lo = Infinity;
+    let hi = -Infinity;
+    const scan = (notes) => {
+      for (let i = firstIndexAtOrAfter(notes, t - 1); i < notes.length && notes[i].time <= t + windowSec; i++) {
+        lo = Math.min(lo, notes[i].pitch);
+        hi = Math.max(hi, notes[i].pitch);
+      }
+    };
+    scan(this.chart.notes);
+    for (const h of this.chart.harmonies || []) scan(h.notes);
+    if (lo === Infinity) [lo, hi] = this.vRange || [48, 72]; // nothing ahead: keep the last range
+    lo -= 0.75; // half a note width of padding, like NOTE_WIDTH_MULTIPLIER / 2
+    hi += 0.75;
+    if (hi - lo < 20) {
+      const mid = (hi + lo) / 2;
+      lo = mid - 10;
+      hi = mid + 10;
+    }
+    const pad = (hi - lo) * 0.1;
+    const target = [lo - pad, hi + pad];
+    const now = performance.now();
+    const dt = Math.min(0.25, (now - (this.vRangeAt || now)) / 1000);
+    this.vRangeAt = now;
+    if (!this.vRange || dt === 0) this.vRange = this.vRange || target;
+    const k = 1 - Math.exp(-dt / 0.15);
+    this.vRange = [this.vRange[0] + (target[0] - this.vRange[0]) * k, this.vRange[1] + (target[1] - this.vRange[1]) * k];
+    return this.vRange;
   }
 
   fillSpans(spans, t, ahead, yOf, x0, width, h, color) {
