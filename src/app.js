@@ -593,7 +593,7 @@ function renderPartMenu() {
     row.dataset.active = String(group.active);
     row.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[o.base] || 'music'}"/></svg><span class="prow-name"></span>`;
     row.querySelector('.prow-name').textContent = group.label;
-    row.addEventListener('click', () => { selectInstrument(o.id, chosen?.id); closePopovers(); });
+    row.addEventListener('click', () => { selectInstrument(o.id, chosen?.id); });
     if (o.mode !== 'vocals') {
       const seg = document.createElement('div');
       seg.className = 'seg compact';
@@ -604,7 +604,7 @@ function renderPartMenu() {
         btn.title = d.label;
         btn.setAttribute('aria-label', `${group.label}, ${d.label}`);
         btn.setAttribute('aria-pressed', String(group.active && d.id === els.difficulty.value));
-        btn.addEventListener('click', (e) => { e.stopPropagation(); selectInstrument(o.id, d.id); closePopovers(); });
+        btn.addEventListener('click', (e) => { e.stopPropagation(); selectInstrument(o.id, d.id); });
         seg.append(btn);
       }
       row.append(seg);
@@ -625,12 +625,15 @@ function renderPartMenu() {
           e.stopPropagation();
           current.modeChoice[group.key] = m.id;
           selectInstrument(m.id, diffFor(m).chosen?.id);
-          closePopovers();
         });
         modes.append(btn);
       }
-      line.append(modes);
-      row.append(line);
+      if (o.mode === 'vocals') { // no difficulty buttons: the modes take the same line as the name
+        row.append(modes);
+      } else {
+        line.append(modes);
+        row.append(line);
+      }
     }
     return row;
   }));
