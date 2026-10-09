@@ -262,6 +262,7 @@ async function selectSong(song) {
   els.mixerInfo.replaceChildren();
   els.mixer.replaceChildren();
   renderSongInfo(song);
+  infoScroll.scrollTop = 0; // a new song starts at the top
   setInfoOpen(true); // the info screen opens right away and the load runs behind it
   setLoadState('loading', 'Lendo o chart…', 0.02);
 
@@ -339,11 +340,17 @@ function renderLoadState() {
   if (overlay) els.loading.textContent = text;
 }
 
+// The floating menu button only gets a background once content scrolls under it.
+const infoScroll = els.info.querySelector('.info-scroll');
+function syncInfoScrolled() { els.info.classList.toggle('scrolled', infoScroll.scrollTop > 4); }
+infoScroll.addEventListener('scroll', syncInfoScrolled, { passive: true });
+
 function setInfoOpen(open) {
   infoOpen = open;
   els.info.hidden = !open;
   els.app.classList.toggle('info-open', open); // the top bar is redundant while the info screen shows everything
   els.infoBtn.setAttribute('aria-pressed', String(open));
+  syncInfoScrolled();
   closePopovers();
   renderLoadState();
 }

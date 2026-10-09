@@ -515,3 +515,17 @@ button.icon.info-menu:hover { background: var(--panel-2); }
 button.icon.stage-btn { background: rgba(13, 17, 23, 0.55); border: 1px solid var(--line); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 button.icon.stage-btn:hover { background: rgba(13, 17, 23, 0.8); }
 button.icon.stage-btn[aria-pressed="true"] { border-color: var(--accent); }
+
+/* Round 16: the floating menu button shows its background only while content scrolls under it */
+button.icon.info-menu {
+  background: transparent; border-color: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.info.scrolled button.icon.info-menu {
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border-color: var(--line);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+button.icon.info-menu:hover { background: var(--panel-2); }
