@@ -363,7 +363,29 @@ function renderMeta(song, midi) {
     li.querySelector('.chip-value').textContent = r.value;
     return li;
   }));
+  balanceChips();
 }
+
+// Wrapped chips look unbalanced when the last row holds one chip. Find the narrowest width that keeps the
+// same number of rows, so the rows come out even.
+function balanceChips() {
+  const list = els.infoMeta;
+  list.style.maxWidth = '';
+  const items = [...list.children];
+  if (items.length < 2 || list.offsetParent === null) return;
+  const rowsAt = () => new Set(items.map((li) => li.offsetTop)).size;
+  const rows = rowsAt();
+  if (rows < 2) return;
+  let lo = Math.max(...items.map((li) => li.offsetWidth));
+  let hi = list.clientWidth;
+  while (hi - lo > 4) {
+    const mid = Math.floor((lo + hi) / 2);
+    list.style.maxWidth = `${mid}px`;
+    if (rowsAt() > rows) lo = mid; else hi = mid;
+  }
+  list.style.maxWidth = `${hi}px`;
+}
+new ResizeObserver(() => balanceChips()).observe(els.info);
 
 // The parts of the screen that depend only on the song (song.ini), shown before anything is loaded.
 function renderSongInfo(song) {
