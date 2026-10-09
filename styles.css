@@ -572,3 +572,8 @@ button.icon.info-menu:hover { background: var(--panel-2); }
   width: 10px; height: 10px; border-radius: 50%; background: var(--accent); border: 2px solid var(--panel);
 }
 .mix-row.muted input[type="range"] { opacity: .4; }
+
+/* Round 19: the group button is only as wide as its arrow (no horizontal padding; it also beat the 28 px rule of small-icon buttons) */
+.mix-row.has-expand { grid-template-columns: 36px 14px 1fr 40px 28px; }
+button.icon.small-icon.expand-btn { width: 14px; min-width: 0; padding: 0; height: 28px; }
+button.icon.small-icon.expand-btn svg { width: 14px; height: 14px; }
