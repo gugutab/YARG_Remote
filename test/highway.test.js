@@ -70,3 +70,29 @@ test('the tail halo falloff goes from 1 to 0 smoothly, with a gentle (zero-slope
   assert.ok(step(11 / 12, 1) < step(5 / 12, 6 / 12) / 5);
   assert.ok(step(0, 1 / 12) < step(5 / 12, 6 / 12) / 5);
 });
+
+import { noteShape } from '../src/gfx.js';
+const recordPath = (...args) => {
+  const pts = [];
+  const g = { moveTo: (x, y) => pts.push([x, y]), lineTo: (x, y) => pts.push([x, y]), closePath() {}, ellipse() { pts.push('ellipse'); } };
+  noteShape(g, ...args);
+  return pts;
+};
+const widthAt = (pts, y, tol = 1.5) => {
+  const row = pts.filter((p) => Math.abs(p[1] - y) < tol).map((p) => p[0]);
+  return Math.max(...row) - Math.min(...row);
+};
+
+test('3D note shapes taper with the perspective: the top edge is narrower than the bottom one', () => {
+  for (const style of ['round', 'rect']) {
+    const flat = recordPath(100, 400, 40, 22, style, 0);
+    const tapered = recordPath(100, 400, 40, 22, style, 900);
+    assert.ok(Array.isArray(tapered) && tapered.length > 10);
+    const flatTop = widthAt(flat, 400 - 14), flatBottom = widthAt(flat, 400 + 14);
+    const top = widthAt(tapered, 400 - 14), bottom = widthAt(tapered, 400 + 14);
+    assert.ok(Math.abs(flatTop - flatBottom) < 1e-6 || style === 'round', 'flat shapes are symmetric');
+    assert.ok(top < bottom, `${style}: top ${top} should be narrower than bottom ${bottom}`);
+    // the centre row keeps its width (the taper only changes it away from the centre)
+    assert.ok(Math.abs(widthAt(tapered, 400, 9) - widthAt(flat, 400, 9)) < 6);
+  }
+});

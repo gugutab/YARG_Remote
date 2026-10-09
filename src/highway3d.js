@@ -124,7 +124,7 @@ export function renderLanes3D(hw, t, w, h) {
   for (let i = 0; i < lanes; i++) {
     const x = cx + (i + 0.5 - half) * laneW;
     g.beginPath();
-    noteShape(g, x, hitY, padRx * 1.05, padRx * 1.05 * HEAD_TILT, hw.noteStyle);
+    noteShape(g, x, hitY, padRx * 1.05, padRx * 1.05 * HEAD_TILT, hw.noteStyle, hitY - vy);
     g.fillStyle = withAlpha(colors[i], Math.min(0.9, 0.14 + 0.5 * flash[i] + 0.35 * barFlash));
     g.fill();
     g.lineWidth = 2;
@@ -260,11 +260,11 @@ export function renderLanes3D(hw, t, w, h) {
     // thickness: a darker disc underneath, then the top face
     const th = rx * 0.28;
     g.beginPath();
-    noteShape(g, x, y + th, rx, ry, hw.noteStyle);
+    noteShape(g, x, y + th, rx, ry, hw.noteStyle, y + th - vy);
     g.fillStyle = darken(n.sp ? '#9aa4b0' : n.tap ? TAP_COLOR : colors[n.lane], 0.55);
     g.fill();
     g.beginPath();
-    noteShape(g, x, y, rx, ry, hw.noteStyle);
+    noteShape(g, x, y, rx, ry, hw.noteStyle, y - vy);
     g.fillStyle = body;
     g.fill();
     g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH * p : Math.max(1, (n.sp ? 3 : 1.5) * p);
@@ -272,13 +272,13 @@ export function renderLanes3D(hw, t, w, h) {
     g.stroke();
     if (n.hopo) {
       g.beginPath();
-      noteShape(g, x, y, rx * 0.35, ry * 0.35, hw.noteStyle);
+      noteShape(g, x, y, rx * 0.35, ry * 0.35, hw.noteStyle, y - vy);
       g.fillStyle = `rgba(255,255,255,${0.9 * (1 - kx)})`;
       g.fill();
     }
     if (n.cymbal) { // cymbal = ring with a white outline over a dark centre; tom = solid pad
       g.beginPath();
-      noteShape(g, x, y, rx * 0.55, ry * 0.55, hw.noteStyle);
+      noteShape(g, x, y, rx * 0.55, ry * 0.55, hw.noteStyle, y - vy);
       g.fillStyle = '#0d1117';
       g.fill();
       g.lineWidth = Math.max(1.5, 3 * p);

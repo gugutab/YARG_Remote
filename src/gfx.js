@@ -134,24 +134,57 @@ export const BAR_FLASH_SEC = 0.24; // ... after a pedal or open hit (it lights e
 
 // Note head shape. 'round' = circle/ellipse (the default), 'rect' = rounded rectangle, a bit wider than tall.
 // Adds the shape to the current path; rx / ry are the half sizes of the round version.
+//
+// `dist` (optional) makes the shape follow the 3D perspective: the distance, in px, from the shape's centre to the
+// vanishing point. In this projection the width at a row is proportional to (row - vanishing row), so each point is
+// scaled around the centre by (y - vy) / dist: the top edge comes out narrower than the bottom one. TAPER_GAIN
+// exaggerates that a little so it is easy to see.
 export const NOTE_RECT_W = 1.2; // half-width of the rounded rectangle relative to rx
 export const NOTE_RECT_H = 0.78; // half-height relative to ry
-export function noteShape(g, x, y, rx, ry, style) {
+export const TAPER_GAIN = 3;
+
+function outline(x, y, rx, ry, style) {
+  const pts = [];
   if (style !== 'rect') {
-    g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
-    return;
+    for (let i = 0; i < 40; i++) {
+      const a = (i / 40) * Math.PI * 2;
+      pts.push([x + rx * Math.cos(a), y + ry * Math.sin(a)]);
+    }
+    return pts;
   }
   const w = rx * NOTE_RECT_W;
   const h = ry * NOTE_RECT_H;
-  const r = Math.min(w, h) * 0.55; // corner radius
-  g.moveTo(x - w + r, y - h);
-  g.lineTo(x + w - r, y - h);
-  g.arcTo(x + w, y - h, x + w, y - h + r, r);
-  g.lineTo(x + w, y + h - r);
-  g.arcTo(x + w, y + h, x + w - r, y + h, r);
-  g.lineTo(x - w + r, y + h);
-  g.arcTo(x - w, y + h, x - w, y + h - r, r);
-  g.lineTo(x - w, y - h + r);
-  g.arcTo(x - w, y - h, x - w + r, y - h, r);
+  const r = Math.min(w, h) * 0.55;
+  const corners = [[x + w - r, y - h + r, -90], [x + w - r, y + h - r, 0], [x - w + r, y + h - r, 90], [x - w + r, y - h + r, 180]];
+  for (const [cx, cy, start] of corners) {
+    for (let k = 0; k <= 6; k++) {
+      const a = ((start + (k / 6) * 90) * Math.PI) / 180;
+      pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+  }
+  return pts;
+}
+
+export function noteShape(g, x, y, rx, ry, style, dist = 0) {
+  if (!dist) {
+    if (style !== 'rect') {
+      g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+      return;
+    }
+    const pts = outline(x, y, rx, ry, style);
+    g.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
+    g.closePath();
+    return;
+  }
+  const pts = outline(x, y, rx, ry, style);
+  for (let i = 0; i < pts.length; i++) {
+    const [px, py] = pts[i];
+    const true_ = (dist + (py - y)) / dist; // exact perspective factor at this row
+    const f = 1 + TAPER_GAIN * (true_ - 1);
+    const X = x + (px - x) * f;
+    if (i === 0) g.moveTo(X, py);
+    else g.lineTo(X, py);
+  }
   g.closePath();
 }
