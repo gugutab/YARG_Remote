@@ -27,6 +27,8 @@ import {
   heldAmount,
   HIT_FLASH_SEC,
   BAR_FLASH_SEC,
+  PAD_FILL_ALPHA,
+  PAD_RING_ALPHA,
   noteShape,
   fillHalo,
   fillTailHalo,
@@ -156,10 +158,10 @@ export class Highway {
     for (let i = 0; i < chart.lanes; i++) {
       g.beginPath();
       noteShape(g, x0 + (i + 0.5) * laneW, hitY, radius * 1.05, radius * 1.05, this.noteStyle);
-      g.fillStyle = withAlpha(colors[i], Math.min(0.9, 0.14 + 0.5 * flash[i] + 0.35 * barFlash));
+      g.fillStyle = withAlpha(colors[i], Math.min(0.9, PAD_FILL_ALPHA + 0.5 * flash[i] + 0.35 * barFlash));
       g.fill();
       g.lineWidth = 2;
-      g.strokeStyle = withAlpha(colors[i], Math.min(1, 0.55 + 0.45 * Math.max(flash[i], barFlash)));
+      g.strokeStyle = withAlpha(colors[i], Math.min(1, PAD_RING_ALPHA + (1 - PAD_RING_ALPHA) * Math.max(flash[i], barFlash)));
       g.stroke();
     }
 
