@@ -823,3 +823,8 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 .song-icons { display: flex; gap: 5px; flex: none; margin-left: auto; padding-right: 4px; }
 .song-icons .inst svg { width: 13px; height: 13px; }
 #songs li.row.normal .song-text { flex: 1; }
+
+/* Round 60: on large screens the album image of the detail screen is twice as big (160 -> 320 px) */
+@media (min-width: 1800px) {
+  .info-head img { width: 320px; height: 320px; }
+}
