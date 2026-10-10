@@ -22,7 +22,6 @@ import {
   darken,
   withAlpha,
   firstIndexAtOrAfter,
-  STAR_POWER_NOTE,
   exitTime,
   heldAmount,
   HIT_FLASH_SEC,
@@ -33,6 +32,7 @@ import {
   fillHalo,
   fillTailHalo,
   noteScale,
+  noteColor,
   tailShimmer,
   heldPulse,
 } from './gfx.js';
@@ -197,14 +197,14 @@ export class Highway {
       const rad = radius * noteScale(n); // HOPO notes are smaller
       // held (active): the whole tail is lighter, more opaque and slowly brightens and dims (no extra shapes)
       const amt = heldAmount(n, t); // fades in after the hit
-      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.55 + 0.25 * amt);
+      g.fillStyle = withAlpha(noteColor(n, colors), 0.55 + 0.25 * amt);
       g.fillRect(cx - rad * 0.35, yTop, rad * 0.7, Math.max(0, yBot - yTop));
       if (amt > 0) {
         g.fillStyle = `rgba(255,255,255,${amt * (0.3 + 0.12 * tailShimmer(t))})`;
         g.fillRect(cx - rad * 0.35, yTop, rad * 0.7, Math.max(0, yBot - yTop));
         // soft halo around the tail while it is played, with a rounded end (the cap only if the end is on screen)
         g.globalCompositeOperation = 'lighter';
-        fillTailHalo(g, n.sp ? STAR_POWER_NOTE : colors[n.lane], cx, rad * 0.35, rad * 1.1, yTop, yBot, 0.11 * amt, n.time + n.length <= t + ahead);
+        fillTailHalo(g, noteColor(n, colors), cx, rad * 0.35, rad * 1.1, yTop, yBot, 0.11 * amt, n.time + n.length <= t + ahead);
         g.globalCompositeOperation = 'source-over';
       }
     }
@@ -227,13 +227,13 @@ export class Highway {
         g.globalCompositeOperation = 'lighter';
         g.save();
         g.translate(cx, cy);
-        fillHalo(g, n.sp ? STAR_POWER_NOTE : colors[n.lane], r * 0.7, r * 1.7, 0.45 * amt); // radial fade-out
+        fillHalo(g, noteColor(n, colors), r * 0.7, r * 1.7, 0.45 * amt); // radial fade-out
         g.restore();
         g.globalCompositeOperation = 'source-over';
       }
       g.beginPath();
       noteShape(g, cx, cy, n.cymbal ? r : r * wide, r, n.cymbal ? 'tri' : this.noteStyle); // cymbals: rounded triangle
-      g.fillStyle = tintWhite(n.sp ? STAR_POWER_NOTE : n.tap ? TAP_COLOR : colors[n.lane], white);
+      g.fillStyle = tintWhite(n.sp ? noteColor(n, colors) : n.tap ? TAP_COLOR : colors[n.lane], white);
       g.fill();
       // accent: same size, with a thicker outline in a darker shade of the note's colour
       g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH : n.sp ? 3 : 2;

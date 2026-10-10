@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   GUITAR_LANE_COLORS, KICK_COLOR, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, STAR_POWER_NOTE, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha, noteScale,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha, noteScale, noteColor,
 } from './gfx.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the flat view shows 2.5)
@@ -206,7 +206,7 @@ export function renderLanes3D(hw, t, w, h) {
     } else {
       // held (active): the whole tail is lighter, more opaque and slowly brightens and dims (no extra shapes)
       const amt = heldAmount(n, t); // fades in after the hit
-      g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.6 + 0.25 * amt);
+      g.fillStyle = withAlpha(noteColor(n, colors), 0.6 + 0.25 * amt);
       const mid = n.lane + 0.5 - half;
       const hr = HEAD_R * noteScale(n); // HOPO notes are smaller
       taperedStrip(dBot, dTop, mid, hr * 0.38, dBot);
@@ -218,7 +218,7 @@ export function renderLanes3D(hw, t, w, h) {
         // soft halo around the tail while it is played: many wider and wider faint strips, added together, each with a
         // rounded end (a half ellipse beyond the tail's end, only when the end is on screen)
         g.globalCompositeOperation = 'lighter';
-        const haloColor = n.sp ? STAR_POWER_NOTE : colors[n.lane];
+        const haloColor = noteColor(n, colors);
         const endVisible = n.time + n.length <= t + windowSec;
         const pEnd = scaleAt(dTop);
         const xEnd = xAt(mid, dTop);
@@ -265,15 +265,15 @@ export function renderLanes3D(hw, t, w, h) {
       g.save();
       g.translate(x, y);
       g.scale(1, HEAD_TILT); // the halo lies on the road: a circle squashed like the head
-      fillHalo(g, n.sp ? STAR_POWER_NOTE : colors[n.lane], rx * 0.7, rx * 1.7, 0.45 * amt); // radial fade-out
+      fillHalo(g, noteColor(n, colors), rx * 0.7, rx * 1.7, 0.45 * amt); // radial fade-out
       g.restore();
       g.globalCompositeOperation = 'source-over';
     }
-    const body = tintWhite(n.sp ? STAR_POWER_NOTE : n.tap ? TAP_COLOR : colors[n.lane], Math.min(1, kx + amt * (0.32 + 0.12 * tailShimmer(t)))); // an active long note's head is lighter, like its tail
+    const body = tintWhite(n.sp ? noteColor(n, colors) : n.tap ? TAP_COLOR : colors[n.lane], Math.min(1, kx + amt * (0.32 + 0.12 * tailShimmer(t)))); // an active long note's head is lighter, like its tail
     g.globalAlpha = (1 - kx) * (n.ghost ? GHOST_ALPHA : 1) * Math.min(1, (1 - d) / FADE_IN);
     // thickness: a darker disc underneath, then the top face. A soft shadow cast on the road goes under both; all of it
     // moves, grows and fades with the note (same position, size and alpha), also through the exit animation.
-    const th = rx * 0.36;
+    const th = Math.max(0.5, rx * 0.36 - 4 * p); // 4 px less than before (at the nearest row; it shrinks with the perspective)
     const headStyle = n.cymbal ? 'tri' : hw.noteStyle; // cymbals: rounded triangle (and no ring)
     g.save();
     g.translate(x, y + th * 1.7);
@@ -282,7 +282,7 @@ export function renderLanes3D(hw, t, w, h) {
     g.restore();
     g.beginPath();
     noteShape(g, x, y + th, rx, ry, headStyle, y + th - vy);
-    g.fillStyle = darken(n.sp ? '#9aa4b0' : n.tap ? TAP_COLOR : colors[n.lane], 0.45);
+    g.fillStyle = darken(n.sp ? noteColor(n, colors) : n.tap ? TAP_COLOR : colors[n.lane], 0.45);
     g.fill();
     g.beginPath();
     noteShape(g, x, y, rx, ry, headStyle, y - vy);
