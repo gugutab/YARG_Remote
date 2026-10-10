@@ -271,15 +271,9 @@ export function renderLanes3D(hw, t, w, h) {
     }
     const body = tintWhite(n.sp ? noteColor(n, colors) : n.tap ? TAP_COLOR : colors[n.lane], Math.min(1, kx + amt * (0.32 + 0.12 * tailShimmer(t)))); // an active long note's head is lighter, like its tail
     g.globalAlpha = (1 - kx) * (n.ghost ? GHOST_ALPHA : 1) * Math.min(1, (1 - d) / FADE_IN);
-    // thickness: a darker disc underneath, then the top face. A soft shadow cast on the road goes under both; all of it
-    // moves, grows and fades with the note (same position, size and alpha), also through the exit animation.
-    const th = Math.max(0.5, rx * 0.36 - 4 * p); // 4 px less than before (at the nearest row; it shrinks with the perspective)
+    // thickness: a thin darker edge underneath the top face (no cast shadow; all of it moves, grows and fades with the note)
+    const th = Math.max(0.5, rx * 0.16);
     const headStyle = n.cymbal ? 'tri' : hw.noteStyle; // cymbals: rounded triangle (and no ring)
-    g.save();
-    g.translate(x, y + th * 1.7);
-    g.scale(1, HEAD_TILT * 0.95);
-    fillHalo(g, '#000000', rx * 0.5, rx * 1.55, 0.5);
-    g.restore();
     g.beginPath();
     noteShape(g, x, y + th, rx, ry, headStyle, y + th - vy);
     g.fillStyle = darken(n.sp ? noteColor(n, colors) : n.tap ? TAP_COLOR : colors[n.lane], 0.45);
