@@ -276,7 +276,7 @@ export function renderLanes3D(hw, t, w, h) {
     const headStyle = n.cymbal ? 'tri' : hw.noteStyle; // cymbals: rounded triangle (and no ring)
     g.beginPath();
     noteShape(g, x, y + th, rx, ry, headStyle, y + th - vy);
-    g.fillStyle = darken(n.sp ? noteColor(n, colors) : n.tap ? TAP_COLOR : colors[n.lane], 0.45);
+    g.fillStyle = darken(n.tap && !n.sp ? TAP_COLOR : colors[n.lane], 0.45); // the edge keeps the plain lane colour (no star power overlay)
     g.fill();
     g.beginPath();
     noteShape(g, x, y, rx, ry, headStyle, y - vy);
