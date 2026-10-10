@@ -17,7 +17,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'sectionBtn', 'sectionPop', 'sectionText', 'partDiff', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'fullscreen', 'barHide', 'barShow', 'viewBtn', 'styleBtn', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'fullscreen', 'barHide', 'barShow', 'fretBtn', 'fretPop', 'viewChoice', 'noteChoice', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay', 'infoMenu',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
 ].map((id) => [id, $(id)]));
@@ -746,8 +746,8 @@ function showPlayInfo(on) {
   els.transport.hidden = !on;
   els.seekbox.hidden = !on;
   els.tools.hidden = !on;
-  els.viewBtn.hidden = true; // shown once there is a lane chart (updateChart)
-  els.styleBtn.hidden = true;
+  els.fretBtn.hidden = true; // shown once there is a lane chart (updateChart)
+  els.fretPop.hidden = true;
 }
 
 function fillInstrumentOptions() {
@@ -777,8 +777,8 @@ function updateChart() {
   chart = ins && diff ? buildChart(current.midi, ins, diff) : null;
   highway.setChart(chart);
   fillSectionOptions();
-  els.viewBtn.hidden = !chart || chart.mode === 'vocals'; // vocals have no highway to turn 3D
-  els.styleBtn.hidden = els.viewBtn.hidden; // nor note heads to reshape
+  els.fretBtn.hidden = !chart || chart.mode === 'vocals'; // vocals have no highway to turn 3D or note heads to reshape
+  if (els.fretBtn.hidden) els.fretPop.hidden = true;
   renderPickers();
   renderLoadState();
 }
@@ -1085,7 +1085,7 @@ for (const btn of document.querySelectorAll('[data-reset]')) {
   btn.addEventListener('click', () => setSetting(btn.dataset.reset, SETTING_DEFAULTS[btn.dataset.reset]));
 }
 
-const popovers = [[els.infoBtn, els.infoPop], [els.partBtn, els.partPop], [els.sectionBtn, els.sectionPop], [els.mixerBtn, els.mixerPop], [els.settingsBtn, els.settingsPop]];
+const popovers = [[els.infoBtn, els.infoPop], [els.partBtn, els.partPop], [els.sectionBtn, els.sectionPop], [els.mixerBtn, els.mixerPop], [els.settingsBtn, els.settingsPop], [els.fretBtn, els.fretPop]];
 function closePopovers(except) {
   for (const [btn, pop] of popovers) {
     if (pop === except) continue;
@@ -1208,22 +1208,20 @@ function syncPlayButton() {
 // ---------- 2D / 3D view ----------
 function setView(view) {
   highway.setView(view);
-  els.viewBtn.setAttribute('aria-pressed', String(view === '3d'));
-  els.viewBtn.title = view === '3d' ? '2D view (V)' : '3D view (V)';
+  for (const b of els.viewChoice.querySelectorAll('[data-view]')) b.setAttribute('aria-pressed', String(b.dataset.view === view));
   store.set('view', view);
 }
 setView(store.get('view') === '3d' ? '3d' : '2d');
-els.viewBtn.addEventListener('click', () => setView(highway.view === '3d' ? '2d' : '3d'));
+els.viewChoice.addEventListener('click', (e) => { const b = e.target.closest('[data-view]'); if (b) setView(b.dataset.view); });
 
 // ---------- Note style: circles or rounded rectangles ----------
 function setNoteStyle(style) {
   highway.setNoteStyle(style);
-  els.styleBtn.setAttribute('aria-pressed', String(style === 'rect'));
-  els.styleBtn.title = style === 'rect' ? 'Round notes (N)' : 'Rectangular notes (N)';
+  for (const b of els.noteChoice.querySelectorAll('[data-note]')) b.setAttribute('aria-pressed', String(b.dataset.note === style));
   store.set('noteStyle', style);
 }
 setNoteStyle(store.get('noteStyle') === 'rect' ? 'rect' : 'round');
-els.styleBtn.addEventListener('click', () => setNoteStyle(highway.noteStyle === 'rect' ? 'round' : 'rect'));
+els.noteChoice.addEventListener('click', (e) => { const b = e.target.closest('[data-note]'); if (b) setNoteStyle(b.dataset.note); });
 
 // ---------- Hide / show the top bar (the chart takes its space) ----------
 function setBarHidden(hidden) {

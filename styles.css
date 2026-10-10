@@ -755,3 +755,13 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .bar-hide:hover { opacity: 1; }
 button.icon.stage-btn.bar-show { left: 10px; right: auto; top: 10px; width: 28px; height: 28px; min-width: 0; padding: 0; }
 button.icon.stage-btn.bar-show svg { width: 16px; height: 16px; }
+
+/* Round 53: one settings button on the stage (top-left, under the "show bar" tab when that is visible) */
+button.icon.stage-btn.fret-btn { left: 10px; right: auto; top: 10px; width: 28px; height: 28px; min-width: 0; padding: 0; }
+button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
+.app.bar-hidden button.icon.stage-btn.fret-btn { top: 46px; }
+.fret-pop { width: min(220px, calc(100vw - 16px)); gap: 12px; padding: 12px; }
+.fret-seg { align-self: stretch; }
+.fret-seg button { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 8px; font-size: 13px; font-weight: 600; color: var(--text); }
+.fret-seg button svg { width: 16px; height: 16px; }
+.fret-seg button[aria-pressed="true"] { color: #fff; }
