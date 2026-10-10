@@ -101,8 +101,8 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 #songs li.row:hover { background: var(--panel-2); }
 #songs li.row.active { background: var(--panel-2); }
 #songs li.row.active::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); z-index: 1; } /* drawn over the thumbnail: the rows have no horizontal padding */
-#songs li.divider { display: flex; align-items: center; padding: 0; font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--accent); background: var(--bg); border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.group-label { position: absolute; z-index: 2; top: 0; left: 0; right: 0; height: 26px; display: flex; align-items: center; padding: 0; box-sizing: border-box; font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--accent); background: var(--bg); border-bottom: 1px solid var(--line); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#songs li.divider { display: flex; align-items: center; padding: 0 10px; font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--accent); background: var(--bg); border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.group-label { position: absolute; z-index: 2; top: 0; left: 0; right: 0; height: 26px; display: flex; align-items: center; padding: 0 10px; box-sizing: border-box; font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--accent); background: var(--bg); border-bottom: 1px solid var(--line); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .thumb { flex: none; width: 42px; height: 42px; border-radius: 6px; background: var(--panel-2); overflow: hidden; }
 .thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .song-text { display: flex; flex-direction: column; min-width: 0; }
@@ -811,3 +811,7 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 .stage-btn, button.icon.stage-btn.bar-show, button.icon.stage-btn.fret-btn { right: var(--stage-btn-right, 10px); }
 .app.bar-hidden button.icon.stage-btn.bar-show { top: 18px; }
 .app.bar-hidden button.icon.stage-btn.fret-btn { top: 54px; }
+
+/* Round 59: the results list bleeds to the left edge of the library panel (the panel's 10 px padding is cancelled on that
+   side only; the scrollbar rail keeps its place); the group headers get their own inner padding instead */
+.songs-wrap { margin-left: -10px; }
