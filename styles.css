@@ -815,3 +815,4 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 /* Round 59: the results list bleeds to the left edge of the library panel (the panel's 10 px padding is cancelled on that
    side only; the scrollbar rail keeps its place); the group headers get their own inner padding instead */
 .songs-wrap { margin-left: -10px; margin-right: -10px; } /* the rail also reaches the panel's right edge */
+.status:empty { display: none; } /* no empty strip under the list */

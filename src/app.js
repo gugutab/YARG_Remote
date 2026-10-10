@@ -203,7 +203,7 @@ async function loadRemoteLibrary(refresh) {
     detached = false;
     els.pick.hidden = true;
     els.resume.hidden = true;
-    setStatus(`"${data.rootName}" on the server`);
+    setStatus(''); // nothing to report: the library comes from the server
     afterLibraryLoaded();
     return true;
   } catch {
