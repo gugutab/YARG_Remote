@@ -109,6 +109,23 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     el.innerHTML = '<span class="thumb"><img alt="" decoding="async" hidden></span><span class="song-text"><span class="song-title"></span><span class="song-artist"></span></span>';
     el.querySelector('.song-title').textContent = text(song.title);
     el.querySelector('.song-artist').textContent = text(song.artist);
+    if (mode === 'normal') { // the instruments the song has, as small icons to the right of the artist
+      const sub = document.createElement('span');
+      sub.className = 'song-sub';
+      const artist = el.querySelector('.song-artist');
+      artist.replaceWith(sub);
+      sub.append(artist);
+      const icons = document.createElement('span');
+      icons.className = 'song-icons';
+      for (const i of describe(song).instruments) {
+        const ic = document.createElement('span');
+        ic.className = 'inst';
+        ic.title = `${i.label}: level ${i.level}`;
+        ic.innerHTML = `<svg><use href="#i-${i.icon}"/></svg>${i.badge ? `<sup>${i.badge}</sup>` : ''}`;
+        icons.append(ic);
+      }
+      sub.append(icons);
+    }
     if (mode === 'large') {
       const d = describe(song);
       const facts = [d.album, d.year, d.length, d.genre].filter(Boolean);

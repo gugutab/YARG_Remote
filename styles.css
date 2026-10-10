@@ -816,3 +816,10 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
    side only; the scrollbar rail keeps its place); the group headers get their own inner padding instead */
 .songs-wrap { margin-left: -10px; margin-right: -10px; } /* the rail also reaches the panel's right edge */
 .status:empty { display: none; } /* no empty strip under the list */
+
+/* Normal cards: the artist and, to its right, one small icon per instrument the song has */
+.song-sub { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.song-sub .song-artist { flex: 1 1 auto; min-width: 0; }
+.song-icons { display: flex; gap: 5px; flex: none; margin-left: auto; padding-right: 4px; }
+.song-icons .inst svg { width: 13px; height: 13px; }
+#songs li.row.normal .song-text { flex: 1; }
