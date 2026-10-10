@@ -127,6 +127,6 @@ test('star power notes are the lane colour under a 50% white overlay', async () 
   const { starPowerColor, noteColor } = await import('../src/gfx.js');
   assert.equal(starPowerColor('#ff0000'), '#ff8080');
   assert.equal(starPowerColor('#000000'), '#808080');
-  assert.equal(noteColor({ sp: true, lane: 0 }, ['#79d304']), '#bce981');
+  assert.equal(noteColor({ sp: true, lane: 0 }, ['#79d304']), '#bce982');
   assert.equal(noteColor({ sp: false, lane: 0 }, ['#79d304']), '#79d304');
 });
