@@ -777,7 +777,7 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
   .topbar > .tb-main { grid-column: auto; }
 }
 
-/* Round 56: large and wide screens. The library and the detail screen use the extra room, the top bar keeps its controls
+/* Round 56: large and wide screens. The library uses the extra room, the detail screen stops growing at 1400 px, the top bar keeps its controls
    together instead of spreading them to both edges, and the 2D lanes grow with the stage height (highway.js). */
 @media (min-width: 1800px) {
   :root { --lib-w: 360px; }
@@ -788,10 +788,8 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 @media (min-width: 2300px) {
   :root { --lib-w: 420px; }
   .tb-main { max-width: 1700px; }
-  .info-grid { max-width: 1800px; }
 }
 @media (min-width: 3000px) {
   :root { --lib-w: 480px; }
   .tb-main { max-width: 2000px; }
-  .info-grid { max-width: 2300px; }
 }
