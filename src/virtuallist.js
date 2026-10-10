@@ -2,7 +2,7 @@
 // thumbnails scroll smoothly and stay light on memory. Items are fixed-height song rows and group headers.
 
 // Row heights per card style: compact (one text line), normal (thumb + 2 lines), large (big thumb + details).
-export const ROW_HEIGHTS = { compact: 32, normal: 56, large: 104 };
+export const ROW_HEIGHTS = { compact: 32, normal: 56, large: 108 };
 export const ROW_H = ROW_HEIGHTS.normal;
 export const HEAD_H = 26;
 const OVERSCAN_PX = 5 * ROW_H;
