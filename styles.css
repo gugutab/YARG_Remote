@@ -97,7 +97,7 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 #songs { position: relative; list-style: none; margin: 0; padding: 0; overflow: auto; flex: 1; min-height: 0; }
 #songs li { position: absolute; left: 0; box-sizing: border-box; }
 #songs li.spacer { position: static; pointer-events: none; }
-#songs li.row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+#songs li.row { display: flex; align-items: center; gap: 10px; padding: 6px 0 6px 6px; border-bottom: 1px solid var(--line); cursor: pointer; }
 #songs li.row:hover { background: var(--panel-2); }
 #songs li.row.active { background: var(--panel-2); }
 #songs li.row.active::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); z-index: 1; } /* drawn over the thumbnail: the rows have no horizontal padding */
@@ -709,11 +709,11 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .view-seg button[aria-pressed="true"] { color: #fff; }
 
 /* Card styles of the song list (row heights live in virtuallist.js ROW_HEIGHTS) */
-#songs li.row.compact { padding: 0; }
+#songs li.row.compact { padding: 0 0 0 6px; }
 .song-line { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .song-line .song-title, .song-line .song-artist { display: inline; font-size: 13px; }
 .song-line .song-artist { font-weight: 400; }
-#songs li.row.large { gap: 12px; padding: 8px 0; align-items: flex-start; }
+#songs li.row.large { gap: 12px; padding: 8px 0 8px 6px; align-items: flex-start; }
 #songs li.row.large .thumb { width: 92px; height: 92px; border-radius: 8px; }
 #songs li.row.large .song-text { flex: 1; gap: 2px; padding-top: 1px; }
 #songs li.row.large .song-title { font-size: 15px; }
