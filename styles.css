@@ -793,3 +793,12 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
   :root { --lib-w: 480px; }
   .tb-main { max-width: 2000px; }
 }
+
+/* Round 57: in the wide "Stem volume" card each row also shows the instrument name (hidden in the narrow card and in the popover) */
+.mix-name { display: none; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.card-volume { container-type: inline-size; container-name: volume; }
+@container volume (min-width: 440px) {
+  .mix-name { display: block; }
+  .mix-row { grid-template-columns: 36px 84px 1fr 40px 28px; }
+  .mix-row.has-expand { grid-template-columns: 36px auto 84px 1fr 40px 28px; }
+}

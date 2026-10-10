@@ -929,6 +929,7 @@ function paintRange(input, def) {
 
 const ROW_HTML = (kind) => `
     <button class="stem-btn" type="button" aria-pressed="false"><svg><use href="#i-${kind}"/></svg><b class="badge"></b></button>
+    <span class="mix-name"></span>
     <input type="range" min="0" max="1.5" step="0.01" value="1">
     <span class="mix-val">100%</span>
     <button class="icon small-icon reset" type="button" title="Reset volume" aria-label="Reset volume"><svg><use href="#i-reset"/></svg></button>`;
@@ -939,6 +940,8 @@ function mixerRow(st) {
   row.innerHTML = ROW_HTML(st.master ? 'volume' : stemKind(st.stem.label));
   const mute = row.querySelector('.stem-btn');
   mute.querySelector('.badge').textContent = st.master ? '' : stemBadge(st.stem.label);
+  const number = st.master ? '' : /^\d+$/.test(stemBadge(st.stem.label)) ? ` ${stemBadge(st.stem.label)}` : '';
+  row.querySelector('.mix-name').textContent = st.master ? 'Master' : `${stemGroupLabel(stemGroup(st.stem.label))}${number}`; // shown only in wide cards
   const view = { row, range: row.querySelector('input'), val: row.querySelector('.mix-val'), mute, reset: row.querySelector('.reset') };
   paintRange(view.range, st.master ? 1 : 1);
   st.views.push(view);
@@ -963,6 +966,7 @@ function groupBlock(g) {
   const mute = row.querySelector('.stem-btn');
   mute.insertAdjacentHTML('afterend', '<button class="icon small-icon expand-btn" type="button" aria-expanded="false"><svg><use href="#i-chevron"/></svg></button>');
   mute.querySelector('.badge').textContent = String(g.members.length);
+  row.querySelector('.mix-name').textContent = g.label;
   const kids = document.createElement('div');
   kids.className = 'mix-kids';
   kids.hidden = !g.expanded;
