@@ -1,15 +1,17 @@
 // A windowed list for the library: only the rows near the viewport exist in the DOM, so ~750 songs with album
 // thumbnails scroll smoothly and stay light on memory. Items are fixed-height song rows and group headers.
 
-export const ROW_H = 56;
+// Row heights per card style: compact (one text line), normal (thumb + 2 lines), large (big thumb + details).
+export const ROW_HEIGHTS = { compact: 32, normal: 56, large: 104 };
+export const ROW_H = ROW_HEIGHTS.normal;
 export const HEAD_H = 26;
 const OVERSCAN_PX = 5 * ROW_H;
 const THUMB_DELAY_MS = 120; // a row asks for its thumbnail only after it stayed visible this long (skips flings)
 
 // offsets[i] = top of item i, offsets[n] = total height.
-export function layoutOffsets(items) {
+export function layoutOffsets(items, rowH = ROW_H) {
   const offsets = new Float64Array(items.length + 1);
-  for (let i = 0; i < items.length; i++) offsets[i + 1] = offsets[i] + (items[i].type === 'head' ? HEAD_H : ROW_H);
+  for (let i = 0; i < items.length; i++) offsets[i + 1] = offsets[i] + (items[i].type === 'head' ? HEAD_H : rowH);
   return offsets;
 }
 
@@ -58,9 +60,11 @@ export function railScroll(y, range, railH, thumbH) {
   return Math.min(1, Math.max(0, f)) * range;
 }
 
-export function createVirtualList({ scroller, label, rail, thumbs, onSelect, text, anchor = (l) => l[0] }) {
+export function createVirtualList({ scroller, label, rail, thumbs, onSelect, text, describe = () => ({ instruments: [] }), anchor = (l) => l[0], mode: initialMode = 'normal' }) {
+  let mode = initialMode;
+  let rowH = ROW_HEIGHTS[mode];
   let items = [];
-  let offsets = layoutOffsets(items);
+  let offsets = layoutOffsets(items, rowH);
   const rows = new Map(); // index -> { el, timer }
   let activeSong = null;
   let frame = 0;
@@ -88,19 +92,46 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       return { el, timer: 0 };
     }
     const song = item.song;
-    el.className = 'row' + (song === activeSong ? ' active' : '');
-    el.style.height = `${ROW_H}px`;
+    el.className = `row ${mode}` + (song === activeSong ? ' active' : '');
+    el.style.height = `${rowH}px`;
     el.setAttribute('role', 'option');
     el.setAttribute('aria-selected', String(song === activeSong));
+    if (mode === 'compact') { // one line: Title — Artist
+      el.innerHTML = '<span class="song-line"><span class="song-title"></span><span class="song-artist"></span></span>';
+      el.querySelector('.song-title').textContent = text(song.title);
+      el.querySelector('.song-artist').textContent = ` — ${text(song.artist)}`;
+      el.title = `${text(song.title)} — ${text(song.artist)}`;
+      el.addEventListener('click', () => onSelect(song));
+      return { el, timer: 0 };
+    }
     el.innerHTML = '<span class="thumb"><img alt="" decoding="async" hidden></span><span class="song-text"><span class="song-title"></span><span class="song-artist"></span></span>';
     el.querySelector('.song-title').textContent = text(song.title);
     el.querySelector('.song-artist').textContent = text(song.artist);
+    if (mode === 'large') {
+      const d = describe(song);
+      const facts = [d.album, d.year, d.length, d.genre].filter(Boolean);
+      const text2 = el.querySelector('.song-text');
+      const meta = document.createElement('span');
+      meta.className = 'song-meta';
+      meta.textContent = facts.join(' · ');
+      text2.append(meta);
+      const insts = document.createElement('span');
+      insts.className = 'song-insts';
+      for (const i of d.instruments) {
+        const chip = document.createElement('span');
+        chip.className = 'inst';
+        chip.title = `${i.label}: level ${i.level}`;
+        chip.innerHTML = `<svg><use href="#i-${i.icon}"/></svg>${i.badge ? `<sup>${i.badge}</sup>` : ''}<span class="mini-pips">${Array.from({ length: 6 }, (_, k) => `<i${k < i.level ? ' class="on"' : ''}></i>`).join('')}</span>`;
+        insts.append(chip);
+      }
+      text2.append(insts);
+    }
     el.addEventListener('click', () => onSelect(song));
     const entry = { el, timer: 0 };
     const cached = thumbs.peek(song);
     const img = el.querySelector('img');
     const show = (url) => { if (url && rows.get(index) === entry) { img.src = url; img.hidden = false; } };
-    if (cached) show(cached);
+    if (cached) { img.src = cached; img.hidden = false; } // already in memory: show it right away (the row is not in the map yet)
     else {
       entry.timer = setTimeout(() => {
         entry.timer = 0;
@@ -254,7 +285,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
   return {
     setItems(next, { keepScroll = false } = {}) {
       items = next;
-      offsets = layoutOffsets(items);
+      offsets = layoutOffsets(items, rowH);
       groups = items.flatMap((it, index) => (it.type === 'head' ? [{ index, label: it.label, anchor: anchor(it.label) }] : []));
       for (const entry of rows.values()) { clearTimeout(entry.timer); entry.el.remove(); }
       rows.clear();
@@ -272,12 +303,25 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
         el.setAttribute('aria-selected', String(on));
       }
     },
+    setMode(next) { // card style: the list keeps the item at the top of the view
+      if (next === mode || !ROW_HEIGHTS[next]) return;
+      const top = itemAt(offsets, scroller.scrollTop);
+      mode = next;
+      rowH = ROW_HEIGHTS[mode];
+      offsets = layoutOffsets(items, rowH);
+      for (const entry of rows.values()) { clearTimeout(entry.timer); entry.el.remove(); }
+      rows.clear();
+      spacer.style.height = `${offsets[items.length]}px`;
+      scroller.scrollTop = offsets[Math.min(top, items.length)] ?? 0;
+      drawRail();
+      render();
+    },
     scrollToSong(song) { // only when the row is not already fully visible
       const i = items.findIndex((it) => it.type === 'song' && it.song === song);
       if (i < 0) return;
       const top = offsets[i];
       const h = scroller.clientHeight;
-      if (top < scroller.scrollTop || top + ROW_H > scroller.scrollTop + h) scroller.scrollTop = Math.max(0, top - h / 2);
+      if (top < scroller.scrollTop || top + rowH > scroller.scrollTop + h) scroller.scrollTop = Math.max(0, top - h / 2);
     },
     get renderedCount() { return rows.size; },
   };

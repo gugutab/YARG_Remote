@@ -55,14 +55,16 @@ export function createThumbs({
     pump();
   });
 
-  return {
+  const api = {
     peek(song) { return lru.get(song.id); },
     get(song, wanted = () => true) {
       const id = song.id;
       const hit = lru.get(id);
       if (hit) return Promise.resolve(hit);
       if (missing.has(id)) return Promise.resolve(null);
-      if (pending.has(id)) return pending.get(id);
+      if (pending.has(id)) { // join the running job; if it was dropped for another (gone) row, try again for this one
+        return pending.get(id).then((url) => url || (missing.has(id) || !wanted() ? null : api.get(song, wanted)));
+      }
       const p = enqueue(async () => {
         if (!wanted()) return null; // scrolled away before it started: nothing was spent
         let blob = await load(id);
@@ -80,10 +82,11 @@ export function createThumbs({
     },
     get cached() { return lru.size; },
   };
+  return api;
 }
 
 // Browser side: cover file -> square JPEG blob of `size` px (center-cropped), or null when the song has no cover.
-export async function renderCoverThumb(song, findCover, size = 96) {
+export async function renderCoverThumb(song, findCover, size = 128) {
   const entry = findCover(song);
   if (!entry) return null;
   let blob;

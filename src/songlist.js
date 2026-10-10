@@ -23,15 +23,117 @@ export function hasInstrument(song, instrument) {
   return typeof song.ini?.[keys[0]] !== 'number';
 }
 
-export function filterSongs(songs, { query = '', instrument = '', genre = '' } = {}) {
-  const terms = norm(query).split(/\s+/).filter(Boolean);
+export const INSTRUMENTS = ['guitar', 'bass', 'rhythm', 'keys', 'drums', 'vocals'];
+const INSTRUMENT_ALIASES = {
+  guitar: 'guitar', guitars: 'guitar', bass: 'bass', rhythm: 'rhythm', keys: 'keys', key: 'keys', keyboard: 'keys',
+  drums: 'drums', drum: 'drums', vocals: 'vocals', vocal: 'vocals', vox: 'vocals', harmony: 'vocals',
+};
+
+// Level 0..6 from the song.ini difficulty keys of one instrument, or null when the ini has none (or -1).
+export function levelOf(song, instrument) {
+  const values = (DIFF_KEYS[instrument] || []).map((k) => song.ini?.[k]).filter((v) => typeof v === 'number' && v >= 0);
+  return values.length ? Math.min(6, Math.max(...values)) : null;
+}
+
+// Short facts for the big list card: album, year, length and the instruments with a known level.
+export function songSummary(song) {
+  const ms = Number(song.ini?.song_length) || 0;
+  const secs = Math.round(ms / 1000);
+  const year = parseInt(song.ini?.year, 10) || 0;
+  return {
+    album: plainText(song.album).trim(),
+    year: year > 0 ? year : null,
+    length: secs > 0 ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '',
+    genre: typeof song.ini?.genre === 'string' ? song.ini.genre : '',
+    instruments: INSTRUMENTS.map((base) => ({ base, level: levelOf(song, base) })).filter((i) => i.level !== null),
+  };
+}
+
+// Search text -> free terms plus field filters. Fields: title: artist: album: genre: charter: year: len: inst:/has: no:
+// (a leading "-" negates one). Values may be quoted ("iron maiden"). Examples: `artist:queen year:1975-1982`,
+// `inst:drums len:<4`, `genre:metal -artist:metallica`.
+const TEXT_FIELDS = { title: (s) => s.title, artist: (s) => s.artist, album: (s) => s.album, genre: (s) => s.ini?.genre, charter: (s) => s.ini?.charter };
+const QUERY_FIELDS = new Set([...Object.keys(TEXT_FIELDS), 'year', 'len', 'length', 'inst', 'has', 'no']);
+export function parseQuery(text = '') {
+  const terms = [];
+  const fields = [];
+  for (const tok of String(text).match(/-?[a-z]+:"[^"]*"|-?[a-z]+:\S*|"[^"]*"|\S+/gi) || []) {
+    const m = tok.match(/^(-?)([a-z]+):(.*)$/i);
+    const field = m?.[2].toLowerCase();
+    if (m && QUERY_FIELDS.has(field)) {
+      const value = m[3].replace(/^"|"$/g, '').trim();
+      if (value) fields.push({ field: field === 'length' ? 'len' : field, value, negate: m[1] === '-' });
+    } else {
+      const t = tok.replace(/^"|"$/g, '');
+      if (t) terms.push(t);
+    }
+  }
+  return { terms, fields };
+}
+
+// "1990", "1990-1999", "1990..1999", "1970s", ">=1990", "<2000" -> [min, max] (null = open), numbers scaled by `unit`.
+function numberRange(value, unit = 1) {
+  const v = value.replace(/\s+/g, '');
+  let m;
+  if ((m = v.match(/^(\d{4})s$/))) return [Number(m[1]), Number(m[1]) + 9];
+  if ((m = v.match(/^(<=|>=|<|>)(\d+(?:\.\d+)?)$/))) {
+    const n = Number(m[2]) * unit;
+    return m[1] === '<' ? [null, n - 1e-9] : m[1] === '<=' ? [null, n] : m[1] === '>' ? [n + 1e-9, null] : [n, null];
+  }
+  if ((m = v.match(/^(\d+(?:\.\d+)?)(?:-|\.\.)(\d+(?:\.\d+)?)$/))) return [Number(m[1]) * unit, Number(m[2]) * unit];
+  if ((m = v.match(/^(\d+(?:\.\d+)?)$/))) return unit === 1 ? [Number(m[1]), Number(m[1])] : [Number(m[1]) * unit, (Number(m[1]) + 1) * unit - 1e-9]; // "4" min = 4:00-4:59
+  return null;
+}
+
+function matchesField(song, { field, value }) {
+  if (field in TEXT_FIELDS) return norm(plainText(TEXT_FIELDS[field](song))).includes(norm(value));
+  if (field === 'year' || field === 'len') {
+    const range = numberRange(value, field === 'len' ? 60000 : 1);
+    const n = field === 'len' ? Number(song.ini?.song_length) || 0 : parseInt(song.ini?.year, 10) || 0;
+    if (!range) return true; // not a number yet while typing: do not hide everything
+    if (!n) return false;
+    return (range[0] === null || n >= range[0]) && (range[1] === null || n <= range[1]);
+  }
+  const inst = INSTRUMENT_ALIASES[norm(value)];
+  return inst ? hasInstrument(song, inst) : true; // inst: / has: / no:
+}
+
+// filters: { query, instruments: [], minLevel, genre, decade, instrument (old single value) }
+export function filterSongs(songs, { query = '', instruments = [], instrument = '', minLevel = 0, genre = '', decade = 0 } = {}) {
+  const { terms, fields } = parseQuery(query);
+  const wanted = [...new Set([...instruments, ...(instrument ? [instrument] : [])])];
+  const normTerms = terms.map(norm);
   return songs.filter((s) => {
-    if (instrument && !hasInstrument(s, instrument)) return false;
+    for (const inst of wanted) if (!hasInstrument(s, inst)) return false;
+    if (minLevel > 0) { // every selected instrument reaches the level; with none selected, any instrument does
+      const reaches = (i) => (levelOf(s, i) ?? -1) >= minLevel;
+      if (!(wanted.length ? wanted.every(reaches) : INSTRUMENTS.some(reaches))) return false;
+    }
     if (genre && s.ini?.genre !== genre) return false;
-    if (!terms.length) return true;
+    if (decade) {
+      const y = parseInt(s.ini?.year, 10) || 0;
+      if (y < decade || y > decade + 9) return false;
+    }
+    for (const f of fields) {
+      let pass = matchesField(s, f);
+      if (f.field === 'no') pass = !pass; // no:drums keeps songs without drums
+      if (f.negate) pass = !pass;
+      if (!pass) return false;
+    }
+    if (!normTerms.length) return true;
     const hay = norm(plainText(`${s.title} ${s.artist} ${s.album}`));
-    return terms.every((t) => hay.includes(t));
+    return normTerms.every((t) => hay.includes(t));
   });
+}
+
+// Decades present in the library (1970, 1980, ...), newest first.
+export function decadesOf(songs) {
+  const set = new Set();
+  for (const s of songs) {
+    const y = parseInt(s.ini?.year, 10);
+    if (y > 0) set.add(Math.floor(y / 10) * 10);
+  }
+  return [...set].sort((a, b) => b - a);
 }
 
 // Text keys skip leading punctuation, so "(Don't Fear) The Reaper" sorts under D, like its divider.

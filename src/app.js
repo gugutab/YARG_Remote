@@ -6,14 +6,14 @@ import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, re
 import { songDelaySeconds, plainText } from './ini.js';
 import { metaRows, extraRows, chartStats, bpmLabel, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel } from './songinfo.js';
 import { saveLibrary, loadLibrary, loadThumb, saveThumb } from './store.js';
-import { filterSongs, sortSongs, genresOf, buildItems, anchorLabel } from './songlist.js';
+import { filterSongs, sortSongs, genresOf, decadesOf, songSummary, buildItems, anchorLabel } from './songlist.js';
 import { createVirtualList } from './virtuallist.js';
 import { createThumbs, renderCoverThumb } from './thumbs.js';
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
   'app', 'library', 'toggleLibrary', 'closeLibrary', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
-  'search', 'sortBy', 'sortDir', 'filterInstrument', 'filterGenre', 'count', 'songs', 'empty',
+  'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'sectionBtn', 'sectionPop', 'sectionText', 'partDiff', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
@@ -67,7 +67,67 @@ els.pick.addEventListener('click', pickFolder);
 els.resume.addEventListener('click', reopenFolder);
 els.rescan.addEventListener('click', rescanFolder);
 els.folderInput.addEventListener('change', () => loadEntries(entriesFromFileList(els.folderInput.files)));
-for (const el of [els.search, els.filterInstrument, els.filterGenre]) el.addEventListener('input', renderList);
+// Filters: instrument chips (all selected must be present), minimum level, genre, decade; the search box adds
+// field syntax (artist:, year:, len:, inst:...). Everything here only changes what renderList() shows.
+const filters = { instruments: new Set(), minLevel: 0 };
+const INSTRUMENT_NAMES = { guitar: 'Guitar', bass: 'Bass', rhythm: 'Rhythm', keys: 'Keys', drums: 'Drums', vocals: 'Vocals' };
+const filterCount = () => (filters.instruments.size ? 1 : 0) + (filters.minLevel ? 1 : 0) + (els.filterGenre.value ? 1 : 0) + (els.filterDecade.value ? 1 : 0);
+function syncFilterUi() {
+  for (const b of els.instChips.querySelectorAll('[data-inst]')) b.setAttribute('aria-pressed', String(filters.instruments.has(b.dataset.inst)));
+  for (const b of els.levelSeg.querySelectorAll('[data-level]')) b.setAttribute('aria-pressed', String(Number(b.dataset.level) === filters.minLevel));
+  const n = filterCount();
+  els.filterBadge.textContent = String(n);
+  els.filterBadge.hidden = n === 0;
+  els.filterClear.disabled = n === 0;
+  const chips = [];
+  const add = (text, remove) => chips.push({ text, remove });
+  for (const i of filters.instruments) add(INSTRUMENT_NAMES[i], () => filters.instruments.delete(i));
+  if (filters.minLevel) add(`Level ${filters.minLevel}+`, () => { filters.minLevel = 0; });
+  if (els.filterGenre.value) add(els.filterGenre.value, () => { els.filterGenre.value = ''; });
+  if (els.filterDecade.value) add(`${els.filterDecade.value}s`, () => { els.filterDecade.value = ''; });
+  els.activeFilters.hidden = chips.length === 0;
+  els.activeFilters.replaceChildren(...chips.map(({ text, remove }) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip on';
+    b.title = 'Remove filter';
+    b.innerHTML = '<span></span><svg><use href="#i-x"/></svg>';
+    b.querySelector('span').textContent = text;
+    b.addEventListener('click', () => { remove(); syncFilterUi(); renderList(); });
+    return b;
+  }));
+}
+els.search.addEventListener('input', renderList);
+for (const el of [els.filterGenre, els.filterDecade]) el.addEventListener('input', () => { syncFilterUi(); renderList(); });
+els.instChips.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-inst]');
+  if (!b) return;
+  filters.instruments[filters.instruments.has(b.dataset.inst) ? 'delete' : 'add'](b.dataset.inst);
+  syncFilterUi();
+  renderList();
+});
+els.levelSeg.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-level]');
+  if (!b) return;
+  filters.minLevel = Number(b.dataset.level);
+  syncFilterUi();
+  renderList();
+});
+els.filterClear.addEventListener('click', () => {
+  filters.instruments.clear();
+  filters.minLevel = 0;
+  els.filterGenre.value = '';
+  els.filterDecade.value = '';
+  syncFilterUi();
+  renderList();
+});
+els.filterBtn.addEventListener('click', () => {
+  const open = els.filterPanel.hidden;
+  els.filterPanel.hidden = !open;
+  els.filterBtn.setAttribute('aria-expanded', String(open));
+  els.filterBtn.classList.toggle('on', open);
+});
+syncFilterUi();
 els.sortBy.value = store.get('sortBy') || 'title';
 els.sortBy.addEventListener('change', () => { store.set('sortBy', els.sortBy.value); renderList(); });
 els.sortDir.addEventListener('click', () => {
@@ -184,8 +244,11 @@ async function loadEntries(entries) {
 function afterLibraryLoaded() {
   els.rescan.hidden = !connectedRoot && !remote;
   const genres = genresOf(songs);
-  els.filterGenre.replaceChildren(new Option('Genres', ''), ...genres.map((g) => new Option(g, g)));
+  els.filterGenre.replaceChildren(new Option('Genre', ''), ...genres.map((g) => new Option(g, g)));
   els.filterGenre.closest('label').hidden = genres.length === 0;
+  els.filterDecade.replaceChildren(new Option('Decade', ''), ...decadesOf(songs).map((d) => new Option(`${d}s`, String(d))));
+  els.filterDecade.closest('label').hidden = els.filterDecade.options.length < 2;
+  syncFilterUi();
   renderList();
 }
 
@@ -206,15 +269,42 @@ async function offerSavedFolder() {
 }
 
 // The list is windowed (only the rows near the viewport are in the DOM) and shows album thumbnails.
-const thumbs = createThumbs({ render: (song) => renderCoverThumb(song, findCover), load: loadThumb, save: saveThumb });
+// 128 px thumbnails serve every card size; the stored key carries the size so a future change rebuilds them.
+const thumbs = createThumbs({ render: (song) => renderCoverThumb(song, findCover, 128), load: (id) => loadThumb(`${id}@128`), save: (id, blob) => saveThumb(`${id}@128`, blob) });
+// Card style: compact (one line) / normal / large (big cover + instruments). Remembered between visits.
+const CARD_MODES = ['compact', 'normal', 'large'];
+const CARD_INSTRUMENTS = {
+  guitar: { icon: 'guitar', label: 'Guitar' }, bass: { icon: 'guitar', label: 'Bass', badge: 'B' }, rhythm: { icon: 'guitar', label: 'Rhythm', badge: 'R' },
+  keys: { icon: 'keys', label: 'Keys' }, drums: { icon: 'drum', label: 'Drums' }, vocals: { icon: 'mic', label: 'Vocals' },
+};
+const describeSong = (song) => {
+  const d = songSummary(song);
+  return { ...d, instruments: d.instruments.map((i) => ({ ...CARD_INSTRUMENTS[i.base], level: i.level })) };
+};
+const savedMode = store.get('cardMode');
 const list = createVirtualList({
+  mode: CARD_MODES.includes(savedMode) ? savedMode : 'normal', describe: describeSong,
   scroller: els.songs, label: els.groupLabel, rail: els.rail, thumbs, text: plainText, onSelect: (song) => selectSong(song),
   anchor: (label) => anchorLabel(label, els.sortBy.value),
 });
 
+function syncViewSeg() {
+  for (const b of els.viewSeg.querySelectorAll('[data-mode]')) b.setAttribute('aria-pressed', String(b.dataset.mode === (store.get('cardMode') || 'normal')));
+}
+els.viewSeg.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-mode]');
+  if (!b) return;
+  store.set('cardMode', b.dataset.mode);
+  list.setMode(b.dataset.mode);
+  syncViewSeg();
+  if (current) list.scrollToSong(current.song);
+});
+syncViewSeg();
+
 function renderList({ keepScroll = false } = {}) {
-  const filters = { query: els.search.value, instrument: els.filterInstrument.value, genre: els.filterGenre.value };
-  const shown = sortSongs(filterSongs(songs, filters), els.sortBy.value, sortDesc);
+  const shown = sortSongs(filterSongs(songs, {
+    query: els.search.value, instruments: [...filters.instruments], minLevel: filters.minLevel, genre: els.filterGenre.value, decade: Number(els.filterDecade.value) || 0,
+  }), els.sortBy.value, sortDesc);
   els.sortDir.textContent = sortDesc ? 'Z→A' : 'A→Z';
   list.setActive(current?.song ?? null);
   list.setItems(buildItems(shown, els.sortBy.value), { keepScroll });

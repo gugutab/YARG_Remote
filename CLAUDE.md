@@ -99,7 +99,8 @@ Flow: folder → `library.js` (songs) → click → `midi.js` (parse) + `chart.j
 | `src/library.js` | Folder scan (FSA or input), serializable index, `resolveFile`. |
 | `src/store.js` | IndexedDB: folder handle, index and album thumbnails (`thumbs` store, db v2). Failures are silent. |
 | `src/virtuallist.js` | Windowed library list with a custom scrollbar rail (group ticks, short anchor labels, press/drag to jump, snaps to headers). Fixed-height rows and headers; `ROW_H`/`HEAD_H` must match the CSS. |
-| `src/thumbs.js` | Library thumbnails: ~96 px JPEG made in the browser, LRU of object URLs (cap 300) + IndexedDB, 3 jobs at a time, dropped if the row scrolled away. |
+| `src/songlist.js` | Search/filter/sort/group of the library list. Search accepts fields (`artist:`, `album:`, `genre:`, `charter:`, `year:1990-1999`, `len:<4` in minutes, `inst:drums`, `no:vocals`, `-field:` to exclude); filters: instrument chips (all selected), minimum level, genre, decade. `songSummary()` feeds the large card. |
+| `src/thumbs.js` | Library thumbnails: 128 px JPEG (stored under `id@128`) made in the browser, LRU of object URLs (cap 300) + IndexedDB, 3 jobs at a time, dropped if the row scrolled away. |
 | `src/ini.js` | `song.ini` and `songDelaySeconds` (`delay` in ms or `delay_seconds`). |
 | `vendor/` | SoundTouchJS 0.1.30 (LGPL-2.1), no build. License included. |
 | `test/` | `node:test` tests. `smf.js` writes synthetic MIDIs. |

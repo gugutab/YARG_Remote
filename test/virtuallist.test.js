@@ -170,3 +170,16 @@ test('rail anchors for artists follow the sort key (leading "The" ignored)', asy
   assert.equal(anchorLabel('Queen (WaveGroup)', 'artist'), 'Q');
   assert.equal(anchorLabel('The Beatles', 'title'), 'T'); // titles keep their own rule
 });
+
+test('thumbs: a request joining a job dropped for a gone row is retried for the new row', async () => {
+  let renders = 0;
+  const t = createThumbs({ render: async () => { renders++; return { id: 'x' }; }, makeUrl: (b) => `blob:${b.id}`, revoke: () => {}, concurrency: 1 });
+  const song = { id: 'a' };
+  let first = true;
+  const p1 = t.get(song, () => !first ? true : false); // the old row is already gone when its job starts
+  first = false; // ...but joining requests use their own (live) check
+  const p2 = t.get(song, () => true);
+  assert.equal(await p1, null);
+  assert.equal(await p2, 'blob:x');
+  assert.equal(renders, 1);
+});
