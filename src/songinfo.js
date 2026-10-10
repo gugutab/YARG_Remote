@@ -119,7 +119,9 @@ export function stemKind(label) {
   if (/drum|kick|snare|cymbal|\btom|percus/.test(n)) return 'drum';
   if (/vocal|vox|harm|sing/.test(n)) return 'mic';
   if (/key|piano|organ|synth/.test(n)) return 'keys';
-  if (/guitar|bass|rhythm|lead/.test(n)) return 'guitar';
+  if (/bass/.test(n)) return 'bass';
+  if (/rhythm/.test(n)) return 'rhythm';
+  if (/guitar|lead/.test(n)) return 'guitar';
   if (/crowd|audience/.test(n)) return 'users';
   return 'music';
 }
@@ -137,12 +139,10 @@ export function stemGroupLabel(key) {
   return names[key] ?? key;
 }
 
-// Short text that tells apart stems sharing an icon: the trailing number (drums_2 -> "2"), B for bass, R for rhythm.
+// Short text that tells apart stems sharing an icon: the trailing number (drums_2 -> "2"). Bass and rhythm have their own icons.
 export function stemBadge(label) {
   const n = String(label).toLowerCase();
   const digits = /(\d+)$/.exec(n);
   if (digits) return digits[1];
-  if (/bass/.test(n)) return 'B';
-  if (/rhythm/.test(n)) return 'R';
   return '';
 }

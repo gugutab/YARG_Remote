@@ -188,3 +188,4 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - The 5-lane mode applies cymbal (flags) too. The user asked for this explicitly; do not remove it without asking.
 
 - Large/wide screens (§ Round 56 in `styles.css`): breakpoints at 1800, 2300 and 3000 px widen the library (`--lib-w`) and the top bar's content cap (`.tb-main`); the detail screen (`.info-grid`) is capped at 1400 px; the 2D lanes grow with the stage height (`laneW` in `highway.js`). CSS `zoom` was tried and rejected: it breaks coordinates for popovers, the scrollbar rail and the canvas.
+- Instrument icons (`i-guitar`, `i-bass`, `i-rhythm`, `i-keys`, `i-drum`, `i-mic`, `i-harmony` in `index.html`) are traced from YARG's icon sheet (LGPL-3.0, see `vendor/README.md`); regenerate with `scripts/build-yarg-icons.py`. The ids are used by `INSTRUMENT_ICON`/`CARD_INSTRUMENTS` in `app.js` and by `stemKind` in `songinfo.js`.

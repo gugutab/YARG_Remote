@@ -71,7 +71,7 @@ els.folderInput.addEventListener('change', () => loadEntries(entriesFromFileList
 // field syntax (artist:, year:, len:, inst:...). Everything here only changes what renderList() shows.
 const filters = { instruments: new Set(), minLevel: 0 };
 const selectSyncs = []; // refresh the custom dropdowns after the code changes a <select> (see customSelect)
-const FILTER_ICONS = { guitar: 'guitar', bass: 'guitar', rhythm: 'guitar', keys: 'keys', drums: 'drum', vocals: 'mic' };
+const FILTER_ICONS = { guitar: 'guitar', bass: 'bass', rhythm: 'rhythm', keys: 'keys', drums: 'drum', vocals: 'mic' };
 const INSTRUMENT_NAMES = { guitar: 'Guitar', bass: 'Bass', rhythm: 'Rhythm', keys: 'Keys', drums: 'Drums', vocals: 'Vocals' };
 const filterCount = () => (filters.instruments.size ? 1 : 0) + (filters.minLevel ? 1 : 0) + (els.filterGenre.value ? 1 : 0) + (els.filterDecade.value ? 1 : 0);
 function syncFilterUi() {
@@ -277,7 +277,7 @@ const thumbs = createThumbs({ render: (song) => renderCoverThumb(song, findCover
 // Card style: compact (one line) / normal / large (big cover + instruments). Remembered between visits.
 const CARD_MODES = ['compact', 'normal', 'large'];
 const CARD_INSTRUMENTS = {
-  guitar: { icon: 'guitar', label: 'Guitar' }, bass: { icon: 'guitar', label: 'Bass', badge: 'B' }, rhythm: { icon: 'guitar', label: 'Rhythm', badge: 'R' },
+  guitar: { icon: 'guitar', label: 'Guitar' }, bass: { icon: 'bass', label: 'Bass' }, rhythm: { icon: 'rhythm', label: 'Rhythm' },
   keys: { icon: 'keys', label: 'Keys' }, drums: { icon: 'drum', label: 'Drums' }, vocals: { icon: 'mic', label: 'Vocals' },
 };
 const describeSong = (song) => {
@@ -536,7 +536,7 @@ function cardStats(ins, diff) {
   return current.statsCache.get(key);
 }
 
-const INSTRUMENT_ICON = { guitar: 'guitar', bass: 'guitar', rhythm: 'guitar', keys: 'keys', drums: 'drum', vocals: 'mic', harmony: 'mic' };
+const INSTRUMENT_ICON = { guitar: 'guitar', bass: 'bass', rhythm: 'rhythm', keys: 'keys', drums: 'drum', vocals: 'mic', harmony: 'harmony' };
 
 // The instruments as the pickers show them: every drum mode is one item ("Drums") with a mode selector
 // (4 lanes / 5 lanes / Pro / Pro 7 lanes); the other instruments are single items.

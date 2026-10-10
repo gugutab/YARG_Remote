@@ -47,8 +47,8 @@ test('bpm label, chart counts and per-instrument level', () => {
 import { stemKind, stemBadge, stemGroup, stemGroupLabel } from '../src/songinfo.js';
 test('stem icons and badges', () => {
   assert.deepEqual(['drums_2', 'guitar', 'bass', 'rhythm', 'vocals', 'keys', 'crowd', 'song', 'backing'].map(stemKind),
-    ['drum', 'guitar', 'guitar', 'guitar', 'mic', 'keys', 'users', 'music', 'music']);
-  assert.deepEqual(['drums_2', 'bass', 'rhythm', 'guitar'].map(stemBadge), ['2', 'B', 'R', '']);
+    ['drum', 'guitar', 'bass', 'rhythm', 'mic', 'keys', 'users', 'music', 'music']);
+  assert.deepEqual(['drums_2', 'bass', 'rhythm', 'guitar'].map(stemBadge), ['2', '', '', '']);
 });
 
 test('header chips start with Album, Track, Length, Charter and show the track once', () => {

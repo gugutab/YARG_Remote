@@ -722,7 +722,7 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .song-insts { display: flex; flex-wrap: wrap; gap: 3px 10px; margin-top: 4px; }
 .inst { display: inline-flex; align-items: center; gap: 3px; color: var(--muted); }
 .inst svg { width: 14px; height: 14px; }
-.inst sup { font-size: 8px; font-weight: 700; margin-left: -2px; align-self: flex-start; color: var(--accent); }
+
 .mini-pips { display: inline-flex; gap: 1px; }
 .mini-pips i { width: 4px; height: 8px; border-radius: 1px; background: var(--line); }
 .mini-pips i.on { background: var(--accent); }
@@ -828,3 +828,4 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 @media (min-width: 1800px) {
   .info-head img { width: 320px; height: 320px; }
 }
+.stem-btn .badge:empty { display: none; } /* no empty dot on stems without a number */
