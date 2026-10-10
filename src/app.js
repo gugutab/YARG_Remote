@@ -70,11 +70,13 @@ els.folderInput.addEventListener('change', () => loadEntries(entriesFromFileList
 // Filters: instrument chips (all selected must be present), minimum level, genre, decade; the search box adds
 // field syntax (artist:, year:, len:, inst:...). Everything here only changes what renderList() shows.
 const filters = { instruments: new Set(), minLevel: 0 };
+const selectSyncs = []; // refresh the custom dropdowns after the code changes a <select> (see customSelect)
 const INSTRUMENT_NAMES = { guitar: 'Guitar', bass: 'Bass', rhythm: 'Rhythm', keys: 'Keys', drums: 'Drums', vocals: 'Vocals' };
 const filterCount = () => (filters.instruments.size ? 1 : 0) + (filters.minLevel ? 1 : 0) + (els.filterGenre.value ? 1 : 0) + (els.filterDecade.value ? 1 : 0);
 function syncFilterUi() {
   for (const b of els.instChips.querySelectorAll('[data-inst]')) b.setAttribute('aria-pressed', String(filters.instruments.has(b.dataset.inst)));
   for (const b of els.levelSeg.querySelectorAll('[data-level]')) b.setAttribute('aria-pressed', String(Number(b.dataset.level) === filters.minLevel));
+  for (const sync of selectSyncs) sync();
   const n = filterCount();
   els.filterBadge.textContent = String(n);
   els.filterBadge.hidden = n === 0;
@@ -1101,7 +1103,7 @@ function placePopover(btn, pop) {
   pop.style.maxHeight = `${Math.max(120, window.innerHeight - b.bottom - 16)}px`;
 }
 window.addEventListener('resize', () => closePopovers());
-for (const [btn, pop] of popovers) {
+function registerPopover(btn, pop) {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     if (e.detail > 0) btn.blur(); // keep the keyboard shortcuts working after a mouse click
@@ -1115,6 +1117,57 @@ for (const [btn, pop] of popovers) {
   });
   pop.addEventListener('click', (e) => e.stopPropagation());
 }
+for (const [btn, pop] of popovers) registerPopover(btn, pop);
+
+// The library's <select>s (sort, genre, decade) keep their native element as the value holder but are shown and
+// picked through a popover in the same style as the section and instrument lists (the native list ignores the theme).
+function customSelect(select) {
+  const label = select.closest('label');
+  const icon = label.querySelector('svg').cloneNode(true);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'chip-btn select-btn';
+  btn.title = label.title;
+  btn.setAttribute('aria-label', select.getAttribute('aria-label'));
+  btn.setAttribute('aria-expanded', 'false');
+  const text = document.createElement('span');
+  const chev = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  chev.setAttribute('class', 'chev');
+  chev.innerHTML = '<use href="#i-chevron"/>';
+  btn.append(icon, text, chev);
+  const pop = document.createElement('div');
+  pop.className = 'popover part-pop sel-pop align-left';
+  pop.hidden = true;
+  label.classList.add('enhanced');
+  label.append(btn);
+  document.body.append(pop); // fixed popovers must not live inside the sliding drawer (a transformed ancestor)
+  const placeholder = () => select.options[0]?.value === '' ? select.options[0].textContent : '';
+  const sync = () => {
+    const chosen = select.selectedOptions[0];
+    text.textContent = chosen ? chosen.textContent : '';
+    pop.replaceChildren(...[...select.options].map((o) => {
+      const row = document.createElement('div');
+      row.className = 'prow';
+      row.dataset.active = String(o.value === select.value);
+      row.setAttribute('role', 'option');
+      row.innerHTML = '<span class="prow-name"></span>';
+      row.querySelector('.prow-name').textContent = o.value === '' ? `Any ${placeholder().toLowerCase()}` : o.textContent;
+      row.addEventListener('click', () => {
+        select.value = o.value;
+        select.dispatchEvent(new Event('input', { bubbles: true }));
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        sync();
+        closePopovers();
+      });
+      return row;
+    }));
+  };
+  popovers.push([btn, pop]);
+  registerPopover(btn, pop);
+  selectSyncs.push(sync);
+  sync();
+}
+for (const s of [els.sortBy, els.filterGenre, els.filterDecade]) customSelect(s);
 document.addEventListener('click', (e) => {
   closePopovers();
   // Drop focus from clicked buttons so Space and the other shortcuts keep working afterwards.

@@ -725,3 +725,20 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .mini-pips { display: inline-flex; gap: 1px; }
 .mini-pips i { width: 4px; height: 8px; border-radius: 1px; background: var(--line); }
 .mini-pips i.on { background: var(--accent); }
+
+/* Round 51: library dropdowns use the same popover list as the section / instrument pickers */
+.chip-select.enhanced { display: contents; }
+.chip-select.enhanced[hidden] { display: none; }
+.chip-select.enhanced > svg, .chip-select.enhanced > select { display: none; }
+.chip-btn.select-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.chip-btn.select-btn .chev { margin-left: auto; flex: none; }
+.fp-row .chip-btn.select-btn { flex: 1 1 110px; min-width: 0; justify-content: flex-start; background: var(--panel); }
+.lib-bar .chip-btn.select-btn { max-width: 130px; }
+.sel-pop { width: max-content; min-width: 170px; max-width: min(300px, calc(100vw - 16px)); }
+/* Popover lists: slim dark scrollbar without arrows (same as the library list) */
+.popover::-webkit-scrollbar { width: 8px; }
+.popover::-webkit-scrollbar-track { background: transparent; }
+.popover::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+.popover::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+.popover::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+@supports not selector(::-webkit-scrollbar) { .popover { scrollbar-width: thin; scrollbar-color: var(--line) transparent; } }
