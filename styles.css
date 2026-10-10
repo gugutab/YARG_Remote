@@ -767,3 +767,12 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 .fret-seg button[aria-pressed="true"] { color: #fff; }
 
 /* Round 54: the stage buttons sit in the top-right corner */
+
+/* Round 55: each top-bar item keeps its own grid column, so hiding the menu button (library open) or the cover (none)
+   leaves an empty zero-width column instead of pushing the content into the wrong one and leaving space on the right */
+.topbar > .menu-btn { grid-column: 1; }
+.topbar > .tb-cover { grid-column: 2; }
+.topbar > .tb-main { grid-column: 3; }
+@media (max-width: 700px) {
+  .topbar > .tb-main { grid-column: auto; }
+}
