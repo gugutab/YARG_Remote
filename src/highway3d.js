@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   GUITAR_LANE_COLORS, KICK_COLOR, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, STAR_POWER_NOTE, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, STAR_POWER_NOTE, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha, noteScale,
 } from './gfx.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the flat view shows 2.5)
@@ -208,11 +208,12 @@ export function renderLanes3D(hw, t, w, h) {
       const amt = heldAmount(n, t); // fades in after the hit
       g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.6 + 0.25 * amt);
       const mid = n.lane + 0.5 - half;
-      taperedStrip(dBot, dTop, mid, HEAD_R * 0.38, dBot);
+      const hr = HEAD_R * noteScale(n); // HOPO notes are smaller
+      taperedStrip(dBot, dTop, mid, hr * 0.38, dBot);
       g.fill();
       if (amt > 0) {
         g.fillStyle = `rgba(255,255,255,${amt * (0.3 + 0.12 * tailShimmer(t))})`;
-        taperedStrip(dBot, dTop, mid, HEAD_R * 0.38, dBot);
+        taperedStrip(dBot, dTop, mid, hr * 0.38, dBot);
         g.fill();
         // soft halo around the tail while it is played: many wider and wider faint strips, added together, each with a
         // rounded end (a half ellipse beyond the tail's end, only when the end is on screen)
@@ -225,7 +226,7 @@ export function renderLanes3D(hw, t, w, h) {
         for (let i = 1; i <= 12; i++) {
           // each strip adds what the smooth falloff loses between its inner and outer edge, so the sum follows it
           g.fillStyle = withAlpha(haloColor, 0.12 * amt * (haloProfile((i - 1) / 12) - haloProfile(i / 12)));
-          const wl = HEAD_R * (0.38 + 0.08 * i); // half width in lane units
+          const wl = hr * (0.38 + 0.08 * i); // half width in lane units
           taperedStrip(dBot, dTop, mid, wl, dBot);
           g.fill();
           if (endVisible) {
@@ -257,7 +258,7 @@ export function renderLanes3D(hw, t, w, h) {
     const x = xAt(n.lane + 0.5 - half, d);
     const y = yAt(d);
     const amt = heldAmount(n, t);
-    const rx = laneW * HEAD_R * p * (1 + 0.4 * kx) * (1 + (heldPulse(t) - 1) * amt);
+    const rx = laneW * HEAD_R * noteScale(n) * p * (1 + 0.4 * kx) * (1 + (heldPulse(t) - 1) * amt);
     const ry = rx * HEAD_TILT;
     if (amt > 0) { // a soft halo while the note is held
       g.globalCompositeOperation = 'lighter';

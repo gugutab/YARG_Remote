@@ -236,3 +236,7 @@ export function noteShape(g, x, y, rx, ry, style, dist = 0) {
 // Resting look of the hit pads at the bottom of the board (fill and ring alpha); they light up from here.
 export const PAD_FILL_ALPHA = 0.26; // originally 0.14: the resting pads are more opaque now
 export const PAD_RING_ALPHA = 0.8; // originally 0.55
+
+// Hammer-on / pull-off notes (and their tails) are drawn 20% smaller than strummed ones.
+export const HOPO_SCALE = 0.8;
+export const noteScale = (n) => (n.hopo ? HOPO_SCALE : 1);

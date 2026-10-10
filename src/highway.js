@@ -32,6 +32,7 @@ import {
   noteShape,
   fillHalo,
   fillTailHalo,
+  noteScale,
   tailShimmer,
   heldPulse,
 } from './gfx.js';
@@ -193,16 +194,17 @@ export class Highway {
         continue;
       }
       const cx = x0 + (n.lane + 0.5) * laneW;
+      const rad = radius * noteScale(n); // HOPO notes are smaller
       // held (active): the whole tail is lighter, more opaque and slowly brightens and dims (no extra shapes)
       const amt = heldAmount(n, t); // fades in after the hit
       g.fillStyle = withAlpha(n.sp ? STAR_POWER_NOTE : colors[n.lane], 0.55 + 0.25 * amt);
-      g.fillRect(cx - radius * 0.35, yTop, radius * 0.7, Math.max(0, yBot - yTop));
+      g.fillRect(cx - rad * 0.35, yTop, rad * 0.7, Math.max(0, yBot - yTop));
       if (amt > 0) {
         g.fillStyle = `rgba(255,255,255,${amt * (0.3 + 0.12 * tailShimmer(t))})`;
-        g.fillRect(cx - radius * 0.35, yTop, radius * 0.7, Math.max(0, yBot - yTop));
+        g.fillRect(cx - rad * 0.35, yTop, rad * 0.7, Math.max(0, yBot - yTop));
         // soft halo around the tail while it is played, with a rounded end (the cap only if the end is on screen)
         g.globalCompositeOperation = 'lighter';
-        fillTailHalo(g, n.sp ? STAR_POWER_NOTE : colors[n.lane], cx, radius * 0.35, radius * 1.1, yTop, yBot, 0.11 * amt, n.time + n.length <= t + ahead);
+        fillTailHalo(g, n.sp ? STAR_POWER_NOTE : colors[n.lane], cx, rad * 0.35, rad * 1.1, yTop, yBot, 0.11 * amt, n.time + n.length <= t + ahead);
         g.globalCompositeOperation = 'source-over';
       }
     }
@@ -220,7 +222,7 @@ export class Highway {
       // ghost notes are dimmed, accents are larger (YARG draws them the same way)
       g.globalAlpha = (1 - k) * (n.ghost ? GHOST_ALPHA : 1);
       const cx = x0 + (n.lane + 0.5) * laneW;
-      const r = radius * (1 + 0.4 * k) * (1 + (heldPulse(t) - 1) * amt);
+      const r = radius * noteScale(n) * (1 + 0.4 * k) * (1 + (heldPulse(t) - 1) * amt);
       if (amt > 0) { // a soft halo while the note is held
         g.globalCompositeOperation = 'lighter';
         g.save();

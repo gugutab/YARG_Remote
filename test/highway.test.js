@@ -114,3 +114,11 @@ test('the cymbal triangle is a rounded polygon pointing up: a tip at the top, wi
   const t = recordPath(100, 400, 30, 30, 'tri', 900);
   assert.ok(widthAt(t, 400 - 25, 6) < widthAt(pts, 400 - 25, 6) || true);
 });
+
+test('hammer-on / pull-off notes are drawn 20% smaller', async () => {
+  const { noteScale, HOPO_SCALE } = await import('../src/gfx.js');
+  assert.equal(HOPO_SCALE, 0.8);
+  assert.equal(noteScale({ hopo: true }), 0.8);
+  assert.equal(noteScale({ hopo: false }), 1);
+  assert.equal(noteScale({}), 1);
+});
