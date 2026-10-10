@@ -5,6 +5,8 @@
 export const ROW_HEIGHTS = { compact: 32, normal: 56, large: 108 };
 export const ROW_H = ROW_HEIGHTS.normal;
 export const HEAD_H = 26;
+// The rail is 4px wider than before: the letters and ticks sit 4px further in from the right edge (the handle does not move).
+const RAIL_PAD = 4;
 const OVERSCAN_PX = 5 * ROW_H;
 const THUMB_DELAY_MS = 120; // a row asks for its thumbnail only after it stayed visible this long (skips flings)
 
@@ -172,12 +174,12 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       const isAnchor = gr.anchor !== lastText;
       if (isAnchor && y - lastY >= 11) {
         g.fillStyle = muted;
-        g.fillText(gr.anchor, 8, y);
+        g.fillText(gr.anchor, 8 + RAIL_PAD / 2, y);
         lastY = y;
       }
       if (isAnchor) lastText = gr.anchor;
       g.fillStyle = isAnchor ? muted : tick;
-      g.fillRect(W - 6, Math.round(y), isAnchor ? 5 : 3, 1);
+      g.fillRect(W - 6 - RAIL_PAD, Math.round(y), isAnchor ? 5 : 3, 1);
     }
     railThumb.style.height = `${th}px`;
   }

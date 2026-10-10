@@ -659,7 +659,7 @@ button.icon.stage-btn.style-btn { top: 54px; }
 /* Library list: the native scrollbar is hidden; the rail on the right is the scrollbar (thumb), the group index (ticks
    and short labels) and a quick-navigation strip (press or drag). --rail-w also sets the right edge of the rows and
    of the sticky group label, so they always line up. */
-.songs-wrap { --rail-w: 24px; }
+.songs-wrap { --rail-w: 28px; } /* 24 + RAIL_PAD (virtuallist.js) */
 #songs { scrollbar-width: none; }
 #songs::-webkit-scrollbar { display: none; }
 #songs li { right: var(--rail-w); }
