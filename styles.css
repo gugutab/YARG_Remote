@@ -746,3 +746,12 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .active-filters .chip { padding-left: 7px; }
 .active-filters .chip svg.kind { width: 14px; height: 14px; color: var(--accent); }
 .active-filters .chip svg.x { width: 12px; height: 12px; color: var(--muted); }
+
+/* Round 52: the top bar can be hidden; the stage then takes the whole height and a small tab brings the bar back */
+.app.bar-hidden .topbar { display: none; }
+.app.bar-hidden.info-open #barShow { display: none; }
+.bar-hide svg { transform: rotate(180deg); }
+.bar-hide { align-self: center; opacity: .7; }
+.bar-hide:hover { opacity: 1; }
+button.icon.stage-btn.bar-show { left: 10px; right: auto; top: 10px; width: 28px; height: 28px; min-width: 0; padding: 0; }
+button.icon.stage-btn.bar-show svg { width: 16px; height: 16px; }

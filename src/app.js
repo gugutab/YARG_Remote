@@ -17,7 +17,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'sectionBtn', 'sectionPop', 'sectionText', 'partDiff', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'fullscreen', 'viewBtn', 'styleBtn', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'fullscreen', 'barHide', 'barShow', 'viewBtn', 'styleBtn', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay', 'infoMenu',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
 ].map((id) => [id, $(id)]));
@@ -1225,6 +1225,17 @@ function setNoteStyle(style) {
 setNoteStyle(store.get('noteStyle') === 'rect' ? 'rect' : 'round');
 els.styleBtn.addEventListener('click', () => setNoteStyle(highway.noteStyle === 'rect' ? 'round' : 'rect'));
 
+// ---------- Hide / show the top bar (the chart takes its space) ----------
+function setBarHidden(hidden) {
+  els.app.classList.toggle('bar-hidden', hidden);
+  els.barShow.hidden = !hidden;
+  store.set('barHidden', hidden ? '1' : '0');
+  closePopovers();
+}
+setBarHidden(store.get('barHidden') === '1');
+els.barHide.addEventListener('click', () => setBarHidden(true));
+els.barShow.addEventListener('click', () => setBarHidden(false));
+
 // ---------- Fullscreen and idle bar ----------
 let idleTimer = 0;
 function setImmersive() {
@@ -1263,6 +1274,7 @@ document.addEventListener('keydown', (e) => {
   if (e.code === 'Space' && ready) { e.preventDefault(); togglePlay(); }
   else if (e.code === 'KeyI' && (current || loadInfo.state !== 'idle')) setInfoOpen(!infoOpen);
   else if (e.code === 'KeyL') setLibraryOpen(!libraryOpen());
+  else if (e.code === 'KeyB') setBarHidden(!els.app.classList.contains('bar-hidden'));
   else if (e.code === 'KeyF') toggleFullscreen();
   else if (e.code === 'KeyV') setView(highway.view === '3d' ? '2d' : '3d');
   else if (e.code === 'KeyN') setNoteStyle(highway.noteStyle === 'rect' ? 'round' : 'rect');
