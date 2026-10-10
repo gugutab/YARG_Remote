@@ -748,7 +748,10 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .active-filters .chip svg.x { width: 12px; height: 12px; color: var(--muted); }
 
 /* Round 52: the top bar can be hidden; the stage then takes the whole height and a small tab brings the bar back */
-.app.bar-hidden .topbar { display: none; }
+.app.bar-hidden .topbar { height: 0; padding: 0; min-height: 0; } /* collapsed: only the seek bar (and its section ticks) stays, as a thin line */
+.app.bar-hidden .topbar > *, .app.bar-hidden .tb-main > * { visibility: hidden; } /* hidden but laid out, so the buttons keep the same horizontal limit */
+.app.bar-hidden .tb-main > .seekbox { visibility: visible; }
+.app.bar-hidden .topbar > .tb-main { visibility: visible; }
 .app.bar-hidden.info-open #barShow { display: none; }
 .bar-hide svg { transform: rotate(180deg); }
 .bar-hide { align-self: center; opacity: .7; }
@@ -802,3 +805,8 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
   .mix-row { grid-template-columns: 36px 84px 1fr 40px 28px; }
   .mix-row.has-expand { grid-template-columns: 36px auto 84px 1fr 40px 28px; }
 }
+
+/* Round 58: the stage buttons keep to the same right limit as the top bar's content (set from app.js) */
+.stage-btn, button.icon.stage-btn.bar-show, button.icon.stage-btn.fret-btn { right: var(--stage-btn-right, 10px); }
+.app.bar-hidden button.icon.stage-btn.bar-show { top: 18px; }
+.app.bar-hidden button.icon.stage-btn.fret-btn { top: 54px; }

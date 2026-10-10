@@ -1228,11 +1228,26 @@ setNoteStyle(store.get('noteStyle') === 'rect' ? 'rect' : 'round');
 els.noteChoice.addEventListener('click', (e) => { const b = e.target.closest('[data-note]'); if (b) setNoteStyle(b.dataset.note); });
 
 // ---------- Hide / show the top bar (the chart takes its space) ----------
+// The stage buttons line up with the right edge of the top bar's content (which stops growing on wide screens).
+function alignStageButtons() {
+  const main = document.querySelector('.tb-main');
+  const stage = els.stage ?? document.getElementById('stage');
+  const right = Math.round(stage.getBoundingClientRect().right - main.getBoundingClientRect().right);
+  stage.style.setProperty('--stage-btn-right', `${Math.max(10, right)}px`);
+}
+if (typeof ResizeObserver !== 'undefined') {
+  const ro = new ResizeObserver(alignStageButtons);
+  ro.observe(document.getElementById('stage'));
+  ro.observe(document.querySelector('.tb-main'));
+}
+window.addEventListener('resize', alignStageButtons);
+els.app.addEventListener('transitionend', alignStageButtons); // the library slides in and out
 function setBarHidden(hidden) {
   els.app.classList.toggle('bar-hidden', hidden);
   els.barShow.hidden = !hidden;
   store.set('barHidden', hidden ? '1' : '0');
   closePopovers();
+  alignStageButtons();
 }
 setBarHidden(store.get('barHidden') === '1');
 els.barHide.addEventListener('click', () => setBarHidden(true));
