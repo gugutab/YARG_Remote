@@ -98,7 +98,7 @@ export class Highway {
   renderLanes(t, w, h) {
     const g = this.g;
     const chart = this.chart;
-    const laneW = Math.min(90, (w * 0.8) / chart.lanes);
+    const laneW = Math.min(Math.min(190, Math.max(90, h * 0.13)), (w * 0.8) / chart.lanes); // lanes grow with the stage height on big screens
     const x0 = (w - laneW * chart.lanes) / 2;
     const hitY = h * HIT_Y;
     const pxPerSec = (hitY / BASE_LOOKAHEAD_SEC) * this.neck;

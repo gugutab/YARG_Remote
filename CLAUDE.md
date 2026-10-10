@@ -186,3 +186,5 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
   sections.
 - Star power: background band + the phrase's notes in white with the lane outline (like YARG; `markStarPowerNotes`). Solo remains only a background band. The comparison with YARG's render and the suggestions are in `docs/yarg-render-review.md`.
 - The 5-lane mode applies cymbal (flags) too. The user asked for this explicitly; do not remove it without asking.
+
+- Large/wide screens (§ Round 56 in `styles.css`): breakpoints at 1800, 2300 and 3000 px widen the library (`--lib-w`), the detail screen (`.info-grid`) and cap the top bar's content (`.tb-main`); the 2D lanes grow with the stage height (`laneW` in `highway.js`). CSS `zoom` was tried and rejected: it breaks coordinates for popovers, the scrollbar rail and the canvas.
