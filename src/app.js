@@ -71,6 +71,7 @@ els.folderInput.addEventListener('change', () => loadEntries(entriesFromFileList
 // field syntax (artist:, year:, len:, inst:...). Everything here only changes what renderList() shows.
 const filters = { instruments: new Set(), minLevel: 0 };
 const selectSyncs = []; // refresh the custom dropdowns after the code changes a <select> (see customSelect)
+const FILTER_ICONS = { guitar: 'guitar', bass: 'guitar', rhythm: 'guitar', keys: 'keys', drums: 'drum', vocals: 'mic' };
 const INSTRUMENT_NAMES = { guitar: 'Guitar', bass: 'Bass', rhythm: 'Rhythm', keys: 'Keys', drums: 'Drums', vocals: 'Vocals' };
 const filterCount = () => (filters.instruments.size ? 1 : 0) + (filters.minLevel ? 1 : 0) + (els.filterGenre.value ? 1 : 0) + (els.filterDecade.value ? 1 : 0);
 function syncFilterUi() {
@@ -82,18 +83,18 @@ function syncFilterUi() {
   els.filterBadge.hidden = n === 0;
   els.filterClear.disabled = n === 0;
   const chips = [];
-  const add = (text, remove) => chips.push({ text, remove });
-  for (const i of filters.instruments) add(INSTRUMENT_NAMES[i], () => filters.instruments.delete(i));
-  if (filters.minLevel) add(`Level ${filters.minLevel}+`, () => { filters.minLevel = 0; });
-  if (els.filterGenre.value) add(els.filterGenre.value, () => { els.filterGenre.value = ''; });
-  if (els.filterDecade.value) add(`${els.filterDecade.value}s`, () => { els.filterDecade.value = ''; });
+  const add = (text, remove, icon) => chips.push({ text, remove, icon });
+  for (const i of filters.instruments) add(INSTRUMENT_NAMES[i], () => filters.instruments.delete(i), FILTER_ICONS[i]);
+  if (filters.minLevel) add(`Level ${filters.minLevel}+`, () => { filters.minLevel = 0; }, 'sort');
+  if (els.filterGenre.value) add(els.filterGenre.value, () => { els.filterGenre.value = ''; }, 'list');
+  if (els.filterDecade.value) add(`${els.filterDecade.value}s`, () => { els.filterDecade.value = ''; }, 'calendar');
   els.activeFilters.hidden = chips.length === 0;
-  els.activeFilters.replaceChildren(...chips.map(({ text, remove }) => {
+  els.activeFilters.replaceChildren(...chips.map(({ text, remove, icon }) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'chip on';
     b.title = 'Remove filter';
-    b.innerHTML = '<span></span><svg><use href="#i-x"/></svg>';
+    b.innerHTML = `<svg class="kind"><use href="#i-${icon}"/></svg><span></span><svg class="x"><use href="#i-x"/></svg>`;
     b.querySelector('span').textContent = text;
     b.addEventListener('click', () => { remove(); syncFilterUi(); renderList(); });
     return b;

@@ -358,7 +358,7 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
 .transport .time { margin-left: 8px; }
 .time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
 .tools { display: flex; align-items: center; gap: 2px; }
-.section-wrap .chip-btn { max-width: 200px; }
+.section-wrap .chip-btn { max-width: 150px; }
 .section-wrap .chip-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip-btn:disabled { opacity: .5; cursor: default; }
 
@@ -385,7 +385,7 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
 /* section list: same rows as the instrument list, with the start time */
 .prow-time { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; min-width: 38px; }
 .prow[data-active="true"] .prow-time { color: inherit; }
-.sec-pop { width: min(340px, calc(100vw - 16px)); }
+.sec-pop { width: min(240px, calc(100vw - 16px)); }
 
 @media (max-width: 700px) {
   :root { --bar-h: 92px; }
@@ -742,3 +742,7 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .popover::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 .popover::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 @supports not selector(::-webkit-scrollbar) { .popover { scrollbar-width: thin; scrollbar-color: var(--line) transparent; } }
+
+.active-filters .chip { padding-left: 7px; }
+.active-filters .chip svg.kind { width: 14px; height: 14px; color: var(--accent); }
+.active-filters .chip svg.x { width: 12px; height: 12px; color: var(--muted); }
