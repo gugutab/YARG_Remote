@@ -236,7 +236,7 @@ export class Highway {
       g.fillStyle = tintWhite(n.sp ? noteColor(n, colors) : n.tap ? TAP_COLOR : colors[n.lane], white);
       g.fill();
       // accent: same size, with a thicker outline in a darker shade of the note's colour
-      g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH : n.sp ? 3 : 2;
+      g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH : n.sp ? 4 : 2;
       g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : n.sp ? colors[n.lane] : 'rgba(0,0,0,0.5)'; // star power keeps the lane colour as its outline
       g.stroke();
       if (n.hopo) { // guitar HOPO: a white dot in the head

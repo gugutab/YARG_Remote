@@ -241,8 +241,8 @@ export const PAD_RING_ALPHA = 0.8; // originally 0.55
 export const HOPO_SCALE = 0.8;
 export const noteScale = (n) => (n.hopo ? HOPO_SCALE : 1);
 
-// Star power notes: a white overlay at 50% over the lane colour (the colour and the centre still show through).
-export const STAR_POWER_OVERLAY = 0.5;
+// Star power notes: a white overlay at 80% over the lane colour (the colour and the centre still show through).
+export const STAR_POWER_OVERLAY = 0.8;
 export function starPowerColor(hex) {
   const n = parseInt(hex.slice(1), 16);
   const mix = (c) => Math.round(c + (255 - c) * STAR_POWER_OVERLAY).toString(16).padStart(2, '0');

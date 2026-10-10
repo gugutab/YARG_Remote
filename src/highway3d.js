@@ -288,7 +288,7 @@ export function renderLanes3D(hw, t, w, h) {
     noteShape(g, x, y, rx, ry, headStyle, y - vy);
     g.fillStyle = body;
     g.fill();
-    g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH * p : Math.max(1, (n.sp ? 3 : 1.5) * p);
+    g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH * p : Math.max(1, (n.sp ? 4.5 : 1.5) * p);
     g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : n.sp ? colors[n.lane] : 'rgba(0,0,0,0.5)';
     g.stroke();
     if (n.hopo) {
