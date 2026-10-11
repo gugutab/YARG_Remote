@@ -97,7 +97,7 @@ export const SECTIONS = [
     description: 'What the app does when it starts and when a song opens.',
     items: [
       { id: 'general.restoreLast', type: 'toggle', label: 'Reopen the last song', help: 'At startup, open the song you were on.', default: false, keywords: 'startup resume session' },
-      { id: 'general.autoplay', type: 'toggle', label: 'Play as soon as a song has loaded', help: 'Skips the Play button on the details screen.', default: false, keywords: 'autoplay start' },
+      { id: 'general.autoplay', type: 'toggle', label: 'Load and play as soon as I pick a song', help: 'Skips the Play button: the loading screen appears right away.', default: false, keywords: 'autoplay start' },
     ],
   },
   {

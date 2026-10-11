@@ -18,7 +18,7 @@ import { createThumbs, renderCoverThumb } from './thumbs.js';
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
-  'app', 'library', 'toggleLibrary', 'closeLibrary', 'splitter', 'libTab', 'songTab', 'closeSong', 'closeSongInfo', 'npPlay', 'npSeek', 'npTime', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
+  'app', 'library', 'toggleLibrary', 'closeLibrary', 'splitter', 'libTab', 'songTab', 'closeSong', 'closeSongInfo', 'npPlay', 'npSeek', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
@@ -123,7 +123,7 @@ els.songTab.addEventListener('click', () => setSongPanelOpen(true));
 els.closeSong.addEventListener('click', () => setSongPanelOpen(false));
 els.closeSongInfo.addEventListener('click', () => setSongPanelOpen(false));
 els.npPlay.addEventListener('click', async () => { // the Listen card: play here, without leaving the details
-  if (!ready) return;
+  if (!player.playing && !(await ensureAudio())) return; // loads the audio the first time
   if (player.playing) player.pause(); else await player.play();
   syncPlayButton();
 });
@@ -455,6 +455,7 @@ async function selectSong(song) {
   player.pause();
   syncPlayButton();
   ready = false;
+  audioLoad = null;
   current = null;
   chart = null;
   highway.setChart(null);
@@ -520,27 +521,45 @@ async function selectSong(song) {
   const stems = audioStemsOf(song);
   buildMixer(stems);
 
-  setLoadState('loading', 'Loading audio…', 0.1);
-  let loaded = false;
-  try {
-    loaded = await player.load(stems, {
-      delay: songDelaySeconds(song.ini),
-      onProgress: (p) => {
-        if (token === loadToken) setLoadState('loading', `Loading audio… ${Math.round(p * 100)}%`, 0.1 + p * 0.9);
-      },
-    });
-  } catch (err) {
-    if (token === loadToken) setLoadState('error', `Failed to decode audio: ${err.message}`);
-    return;
-  }
-  if (token !== loadToken || !loaded) return;
-  els.seek.max = player.duration.toFixed(2);
-  els.timeTotal.textContent = fmt(player.duration);
-  paintSectionTicks(); // the slider range is known now
-  stemStates.forEach(applyStem); // volumes chosen while loading
-  ready = true;
-  setLoadState('ready', chart ? 'Ready to play' : 'No playable instrument in this song.', 1);
-  if (chart && prefs.get('general.autoplay')) togglePlay(); // "Play as soon as a song has loaded"
+  current.stems = stems;
+  setLoadState('idle', 'The audio loads when you press Play.', 0); // nothing is decoded until then
+  if (chart && prefs.get('general.autoplay')) togglePlay(); // "Start playing as soon as I pick a song"
+}
+
+// The audio (the heavy part) loads on demand: Play, the Listen card or Space. A loading screen covers the song panel meanwhile.
+let audioLoad = null; // { song, promise } while a load runs
+function ensureAudio() {
+  if (ready) return Promise.resolve(true);
+  if (!current || !chart) return Promise.resolve(false);
+  if (audioLoad?.song === current.song) return audioLoad.promise;
+  const token = loadToken;
+  const song = current.song;
+  const promise = (async () => {
+    setLoadState('loading', 'Loading audio…', 0.02);
+    let loaded = false;
+    try {
+      loaded = await player.load(current.stems, {
+        delay: songDelaySeconds(song.ini),
+        onProgress: (p) => { if (token === loadToken) setLoadState('loading', `Loading audio… ${Math.round(p * 100)}%`, 0.02 + p * 0.98); },
+      });
+    } catch (err) {
+      if (token === loadToken) { setLoadState('error', `Failed to decode audio: ${err.message}`); setInfoOpen(true); }
+      return false;
+    } finally {
+      if (audioLoad?.song === song) audioLoad = null;
+    }
+    if (token !== loadToken || !loaded) return false;
+    els.seek.max = player.duration.toFixed(2);
+    els.timeTotal.textContent = fmt(player.duration);
+    paintSectionTicks(); // the slider range is known now
+    stemStates.forEach(applyStem); // volumes chosen while loading
+    ready = true;
+    setLoadState('ready', 'Ready to play', 1);
+    return true;
+  })();
+  audioLoad = { song, promise };
+  renderLoadState();
+  return promise;
 }
 
 // ---------- Info screen ----------
@@ -554,9 +573,19 @@ function renderLoadState() {
   els.infoState.textContent = text;
   els.infoBar.style.width = `${Math.round(fraction * 100)}%`;
   els.infoProgress.dataset.state = state;
-  els.play.disabled = els.infoPlay.disabled = els.npPlay.disabled = els.npSeek.disabled = !(ready && chart);
+  els.play.disabled = els.infoPlay.disabled = els.npPlay.disabled = !chart || (!ready && !!audioLoad);
+  els.npSeek.disabled = !(ready && chart);
   els.npSeek.max = String(player.duration || 1);
-  const overlay = !infoOpen && (state === 'loading' || state === 'error');
+  const screen = !!audioLoad && state === 'loading';
+  els.loadScreen.hidden = !screen;
+  if (screen) {
+    els.lsTitle.textContent = `${plainText(current.song.title)} — ${plainText(current.song.artist)}`;
+    els.lsBar.style.width = `${Math.round(fraction * 100)}%`;
+    els.lsText.textContent = text;
+    els.lsCover.src = els.cover.src || '';
+    els.lsCover.hidden = !els.cover.src || els.cover.hidden;
+  }
+  const overlay = !infoOpen && !screen && state === 'error';
   els.loading.hidden = !overlay;
   if (overlay) els.loading.textContent = text;
 }
@@ -1363,10 +1392,11 @@ els.seek.addEventListener('input', () => {
 els.seek.addEventListener('change', () => { player.seek(Number(els.seek.value)); seeking = false; });
 
 async function togglePlay() {
-  if (!ready || !chart) return; // playback waits for the audio to finish loading
+  if (!chart) return;
   if (player.playing) player.pause();
   else {
     if (infoOpen) setInfoOpen(false); // starting from the details goes to the chart
+    if (!(await ensureAudio())) return; // the first Play loads the audio behind the loading screen
     await player.play();
   }
   syncPlayButton();
@@ -1464,7 +1494,7 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(tag)) return;
-  if (e.code === 'Space' && ready) { e.preventDefault(); togglePlay(); }
+  if (e.code === 'Space' && chart) { e.preventDefault(); togglePlay(); }
   else if (e.code === 'KeyI' && (current || loadInfo.state !== 'idle')) setInfoOpen(!infoOpen);
   else if (e.code === 'KeyL') setLibraryOpen(!libraryOpen());
   else if (e.code === 'KeyD') setSongPanelOpen(!songPanelOpen());
