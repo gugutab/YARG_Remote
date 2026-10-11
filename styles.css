@@ -842,3 +842,7 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 
 /* Pack sort: the rail is wider so every pack has a readable code */
 .songs-wrap.even-rail { --rail-w: 42px; }
+
+/* Round 62: the rail's name bubble opens to the right of the rail when there is room (it then floats over the stage) */
+.rail { z-index: 5; }
+.rail-bubble.right { right: auto; left: calc(100% + 6px); }
