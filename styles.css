@@ -1012,3 +1012,28 @@ body.settings-open { overflow: hidden; }
 .song-icons .inst svg, .song-insts .inst svg { width: var(--card-icon, 15px); height: var(--card-icon, 15px); }
 .songs-wrap.no-rail { --rail-w: 8px; }
 .songs-wrap.no-rail .rail { display: none; }
+
+.sp-multi { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+/* ---------- Round 71: the details screen follows the settings (data attributes on #info) ---------- */
+.info-grid { max-width: var(--info-max, 1400px) !important; }
+#info[data-hide~="instruments"] .info-wide { display: none; }
+#info[data-hide~="adjust"] .card-adjust, #info[data-hide~="volume"] .card-volume, #info[data-hide~="extra"] .card-extra { display: none; }
+#info[data-hide~="volume"] .info-cols, #info[data-layout="stacked"] .info-cols { grid-template-columns: 1fr; grid-template-rows: none; }
+#info[data-hide~="volume"] .info-cols > *, #info[data-layout="stacked"] .info-cols > * { grid-column: 1 !important; grid-row: auto !important; }
+#info[data-cover="none"] #infoCover { display: none; }
+#info[data-cover="none"] .info-head { grid-template-columns: 1fr; }
+#info[data-cover="small"] .info-head img { width: 96px; height: 96px; }
+#info[data-cover="medium"] .info-head img { width: 160px; height: 160px; }
+#info[data-cover="large"] .info-head img { width: 240px; height: 240px; }
+#info[data-quote="off"] .info-quote { display: none; }
+#info.compact .info-grid { gap: 8px; }
+#info.compact .info-card { padding: 10px 12px; }
+#info.compact .info-scroll { padding: 10px; }
+#info.compact .icard { padding: 7px; }
+#info[data-names="never"] .mix-name { display: none !important; }
+#info[data-names="never"] .mix-row { grid-template-columns: 36px 1fr 40px 28px !important; }
+#info[data-names="never"] .mix-row.has-expand { grid-template-columns: 36px auto 1fr 40px 28px !important; }
+#info[data-names="always"] .card-volume .mix-name { display: block; }
+#info[data-names="always"] .card-volume .mix-row { grid-template-columns: 36px 84px 1fr 40px 28px; }
+#info[data-names="always"] .card-volume .mix-row.has-expand { grid-template-columns: 36px auto 84px 1fr 40px 28px; }

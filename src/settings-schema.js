@@ -10,6 +10,7 @@
 //   `when(get)` hides the item unless it returns true; `keywords` feed the search box.
 
 import { PRESETS } from './themes.js';
+import { DETAIL_CHIPS } from './songinfo.js';
 
 export const FONT_OPTIONS = [
   { value: 'system', label: 'System', css: "system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" },
@@ -55,6 +56,20 @@ export const SECTIONS = [
       { id: 'cards.large.pack', group: 'Large cards', type: 'toggle', label: 'Pack', default: true },
       { id: 'cards.large.instruments', group: 'Large cards', type: 'toggle', label: 'Instruments', default: true },
       { id: 'cards.large.levels', group: 'Large cards', type: 'toggle', label: 'Difficulty bars', help: 'The six bars next to each instrument.', default: true, when: (get) => get('cards.large.instruments') },
+    ],
+  },
+  {
+    id: 'details', title: 'Song details', icon: 'info',
+    description: 'The screen that opens when you pick a song.',
+    items: [
+      { id: 'details.chips', group: 'Header', type: 'multi', label: 'Information chips', help: 'Which facts appear under the title (when the song has them).', options: DETAIL_CHIPS, default: ['pack', 'album', 'track', 'length', 'charter', 'genre', 'year', 'bpm'], keywords: 'header pack album year genre charter bpm' },
+      { id: 'details.cover', group: 'Header', type: 'choice', label: 'Album cover', help: 'Auto is bigger on large screens.', options: [{ value: 'auto', label: 'Auto' }, { value: 'none', label: 'Hidden' }, { value: 'small', label: 'Small' }, { value: 'medium', label: 'Medium' }, { value: 'large', label: 'Large' }], default: 'auto' },
+      { id: 'details.quote', group: 'Header', type: 'toggle', label: 'Loading phrase', help: 'The quote some songs carry in song.ini.', default: true },
+      { id: 'details.sections', group: 'Sections', type: 'multi', label: 'Sections shown', options: [{ value: 'instruments', label: 'Instrument and difficulty' }, { value: 'adjust', label: 'Settings' }, { value: 'volume', label: 'Stem volume' }, { value: 'extra', label: 'Other song.ini properties' }], default: ['instruments', 'adjust', 'volume', 'extra'], keywords: 'cards hide show' },
+      { id: 'details.layout', group: 'Sections', type: 'choice', label: 'Lower cards', help: 'Settings, stem volume and properties: side by side, or one under the other.', options: [{ value: 'columns', label: 'Two columns' }, { value: 'stacked', label: 'One column' }], default: 'columns' },
+      { id: 'details.stemNames', group: 'Sections', type: 'choice', label: 'Instrument names in Stem volume', options: [{ value: 'auto', label: 'When wide' }, { value: 'always', label: 'Always' }, { value: 'never', label: 'Never' }], default: 'auto' },
+      { id: 'details.maxWidth', group: 'Size', type: 'range', label: 'Maximum width', help: 'The content stops growing at this width on big screens.', min: 800, max: 2400, step: 50, unit: 'px', default: 1400 },
+      { id: 'details.compact', group: 'Size', type: 'toggle', label: 'Compact spacing', help: 'Tighter cards, so more fits on the screen.', default: false },
     ],
   },
   {

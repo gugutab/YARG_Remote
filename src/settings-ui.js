@@ -63,6 +63,18 @@ export function mountSettings({ root, settings, sections, renderers = {}, onClos
       refreshers.push(() => { sel.value = String(settings.get(id)); });
       return sel;
     }
+    if (item.type === 'multi') {
+      const box = el('div', { class: 'sp-multi', role: 'group', 'aria-label': item.label });
+      for (const o of item.options) {
+        box.append(el('button', { type: 'button', class: 'chip', 'data-value': o.value, text: o.label, onclick: () => {
+          const now = new Set(settings.get(id));
+          if (now.has(o.value)) now.delete(o.value); else now.add(o.value);
+          settings.set(id, item.options.map((x) => x.value).filter((v) => now.has(v))); // keeps the option order
+        } }));
+      }
+      refreshers.push(() => { const on = new Set(settings.get(id)); for (const b of box.children) b.setAttribute('aria-pressed', String(on.has(b.dataset.value))); });
+      return box;
+    }
     if (item.type === 'range') {
       const out = el('output', { class: 'sp-out' });
       const input = el('input', { type: 'range', min: item.min, max: item.max, step: item.step ?? 1, 'aria-label': item.label });
@@ -91,7 +103,9 @@ export function mountSettings({ root, settings, sections, renderers = {}, onClos
       const render = renderers[item.id];
       if (render) refreshers.push(render(host, { settings, item }) ?? (() => {}));
     } else {
-      row = el('div', { class: 'sp-row' }, text, el('span', { class: 'sp-ctl' }, control(item), resetButton(item)));
+      row = item.type === 'multi'
+        ? el('div', { class: 'sp-row sp-row-custom' }, el('div', { class: 'sp-row-head' }, text, resetButton(item)), control(item))
+        : el('div', { class: 'sp-row' }, text, el('span', { class: 'sp-ctl' }, control(item), resetButton(item)));
     }
     row.dataset.search = `${item.label} ${item.help ?? ''} ${item.keywords ?? ''}`.toLowerCase();
     if (item.when) visibility.push({ row, item });

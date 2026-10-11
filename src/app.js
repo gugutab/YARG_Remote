@@ -540,9 +540,11 @@ const kv = (rows) => rows.flatMap((r) => {
 
 // Header chips: a vertical list of icon + label + value. The BPM chip joins once the MIDI has been read.
 function renderMeta(song, midi) {
+  const shown = new Set(prefs.get('details.chips')); // the "Information chips" setting
   const rows = metaRows(song).filter((r) => r.label !== 'Artist'); // the artist is the subtitle
   const bpm = bpmLabel(midi?.tempos);
-  if (bpm) rows.push({ label: 'BPM', value: bpm, icon: 'pulse' });
+  if (bpm) rows.push({ key: 'bpm', label: 'BPM', value: bpm, icon: 'pulse' });
+  rows.splice(0, rows.length, ...rows.filter((r) => shown.has(r.key)));
   const chip = (r) => {
     const li = document.createElement('li');
     li.className = 'chip';
@@ -1469,7 +1471,22 @@ const applyColumns = () => {
   if (c === 'auto') list.setColumns(1, { minWidth: 'auto' });
   else list.setColumns(Number(c));
 };
+const COVER_SIZES = { small: 96, medium: 160, large: 240 };
+function applyDetails() {
+  const info = els.info;
+  const hidden = ['instruments', 'adjust', 'volume', 'extra'].filter((s) => !prefs.get('details.sections').includes(s));
+  info.dataset.hide = hidden.join(' ');
+  info.dataset.layout = prefs.get('details.layout');
+  info.dataset.cover = prefs.get('details.cover');
+  info.dataset.quote = prefs.get('details.quote') ? 'on' : 'off';
+  info.dataset.names = prefs.get('details.stemNames');
+  info.classList.toggle('compact', prefs.get('details.compact'));
+  info.style.setProperty('--info-max', `${prefs.get('details.maxWidth')}px`);
+  if (current) renderMeta(current.song, current.midi); // the chips
+}
 const EFFECTS = {
+  'details.chips': applyDetails, 'details.cover': applyDetails, 'details.quote': applyDetails, 'details.sections': applyDetails,
+  'details.layout': applyDetails, 'details.stemNames': applyDetails, 'details.maxWidth': applyDetails, 'details.compact': applyDetails,
   'library.cardStyle': (v) => { list.setMode(v); syncViewSeg(); },
   'library.sort': (v) => { if (els.sortBy.value !== v) els.sortBy.value = v; syncFilterUi(); renderList(); },
   'library.sortDesc': (v) => { sortDesc = v; renderList(); },

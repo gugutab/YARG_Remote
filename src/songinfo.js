@@ -49,7 +49,7 @@ export function metaRows(song) {
     sub_playlist: ['Subplaylist', text(ini.sub_playlist), 'list'],
     delay: ['Audio delay', Number.isFinite(delay) && delay !== 0 ? `${delay} ms` : '', 'clock'],
   };
-  return META_ORDER.map((k) => ({ label: items[k][0], value: items[k][1], icon: items[k][2] })).filter((r) => r.value);
+  return META_ORDER.map((k) => ({ key: k, label: items[k][0], value: items[k][1], icon: items[k][2] })).filter((r) => r.value);
 }
 
 // song.ini difficulty level (0..6) for a playable instrument option, or null when the ini has none.
@@ -147,3 +147,10 @@ export function stemBadge(label) {
   if (digits) return digits[1];
   return '';
 }
+
+// The header chips a user can switch on and off: [{ value, label }] (the keys of metaRows, plus 'bpm' added by the app).
+export const DETAIL_CHIPS = [
+  { value: 'pack', label: 'Pack' }, { value: 'album', label: 'Album' }, { value: 'track', label: 'Track' }, { value: 'length', label: 'Length' },
+  { value: 'charter', label: 'Charter' }, { value: 'genre', label: 'Genre' }, { value: 'year', label: 'Year' }, { value: 'bpm', label: 'BPM' },
+  { value: 'frets', label: 'Frets' }, { value: 'playlist', label: 'Playlist' }, { value: 'sub_playlist', label: 'Subplaylist' }, { value: 'delay', label: 'Audio delay' },
+];
