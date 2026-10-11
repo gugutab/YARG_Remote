@@ -200,4 +200,4 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - `prefs` (store in `src/settings.js`, only non-default values in `localStorage['yargremote.settings']`) is not the playback `settings` object (`speed/neck/chartDelay`).
 - Themes: `src/themes.js` (presets, derive, resolve/apply as CSS variables on `<html>`), theme studio in `src/settings-custom.js`.
 - Cards: `DEFAULT_CARDS`/`cardHeight`/`setCards` in `src/virtuallist.js`. Details screen: `applyDetails()` sets `data-*` attributes on `#info`.
-- Panels: library and song panel close/reopen (`setLibraryOpen`, `setSongPanelOpen`, keys L and D, edge tabs, mini player); never both closed on desktop; state in `yargremote.panelState`.
+- Panels: library and song panel close/reopen (`setLibraryOpen`, `setSongPanelOpen`, keys L and D, edge tabs); never both closed on desktop; state in `yargremote.panelState`.

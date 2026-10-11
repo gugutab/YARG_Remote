@@ -18,7 +18,7 @@ import { createThumbs, renderCoverThumb } from './thumbs.js';
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
-  'app', 'library', 'toggleLibrary', 'closeLibrary', 'splitter', 'libTab', 'songTab', 'closeSong', 'closeSongInfo', 'nowPlaying', 'npCover', 'npTitle', 'npArtist', 'npPlay', 'npSeek', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
+  'app', 'library', 'toggleLibrary', 'closeLibrary', 'splitter', 'libTab', 'songTab', 'closeSong', 'closeSongInfo', 'npPlay', 'npSeek', 'npTime', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
@@ -91,23 +91,11 @@ function setLibraryOpen(open, persist = true) {
   syncPanelUi();
   if (persist) savePanelState();
 }
-// Edge tabs reopen a closed panel; the mini player keeps the music in reach while the song panel is closed.
+// Edge tabs reopen a closed panel.
 function syncPanelUi() {
   const tabs = prefs.get('panels.tabs') && !narrow();
   els.libTab.hidden = !(tabs && !libraryOpen());
   els.songTab.hidden = !(tabs && !songPanelOpen());
-  const mini = !narrow() && !songPanelOpen() && !!current && prefs.get('panels.nowPlaying');
-  els.nowPlaying.hidden = !mini;
-  if (mini) syncNowPlaying();
-}
-function syncNowPlaying() {
-  if (!current) return;
-  els.npTitle.textContent = plainText(current.song.title);
-  els.npArtist.textContent = plainText(current.song.artist);
-  els.npCover.src = els.cover.src || '';
-  els.npCover.hidden = !els.cover.src || els.cover.hidden;
-  els.npPlay.querySelector('use').setAttribute('href', player.playing ? '#i-pause' : '#i-play');
-  els.npSeek.max = String(player.duration || 1);
 }
 (() => { // the panels at startup: open, closed, or as they were last time (the "Panels" settings)
   if (narrow()) { setLibraryOpen(false, false); return; }
@@ -134,7 +122,11 @@ els.libTab.addEventListener('click', () => setLibraryOpen(true));
 els.songTab.addEventListener('click', () => setSongPanelOpen(true));
 els.closeSong.addEventListener('click', () => setSongPanelOpen(false));
 els.closeSongInfo.addEventListener('click', () => setSongPanelOpen(false));
-els.npPlay.addEventListener('click', () => togglePlay());
+els.npPlay.addEventListener('click', async () => { // the Listen card: play here, without leaving the details
+  if (!ready) return;
+  if (player.playing) player.pause(); else await player.play();
+  syncPlayButton();
+});
 els.npSeek.addEventListener('input', () => player.seek(Number(els.npSeek.value)));
 
 // The divider between the two panels: drag to resize the library panel (remembered); double-click restores the default.
@@ -562,7 +554,8 @@ function renderLoadState() {
   els.infoState.textContent = text;
   els.infoBar.style.width = `${Math.round(fraction * 100)}%`;
   els.infoProgress.dataset.state = state;
-  els.play.disabled = els.infoPlay.disabled = !(ready && chart);
+  els.play.disabled = els.infoPlay.disabled = els.npPlay.disabled = els.npSeek.disabled = !(ready && chart);
+  els.npSeek.max = String(player.duration || 1);
   const overlay = !infoOpen && (state === 'loading' || state === 'error');
   els.loading.hidden = !overlay;
   if (overlay) els.loading.textContent = text;
@@ -1383,6 +1376,7 @@ function syncPlayButton() {
   const playing = player.playing;
   els.play.querySelector('use').setAttribute('href', playing ? '#i-pause' : '#i-play');
   els.play.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  els.npPlay.querySelector('use').setAttribute('href', playing ? '#i-pause' : '#i-play');
   setImmersive();
 }
 
@@ -1501,9 +1495,9 @@ function frame() {
       paintSeek();
       els.timeNow.textContent = fmt(t);
     }
-    if (!els.nowPlaying.hidden) { // the mini player (song panel closed)
+    if (infoOpen) { // the Listen card
       if (document.activeElement !== els.npSeek) els.npSeek.value = t;
-      els.npPlay.querySelector('use').setAttribute('href', player.playing ? '#i-pause' : '#i-play');
+      els.npTime.textContent = `${fmt(t)} / ${fmt(player.duration)}`;
     }
   } else {
     highway.render(0);
@@ -1534,7 +1528,7 @@ const applyColumns = () => {
 const COVER_SIZES = { small: 96, medium: 160, large: 240 };
 function applyDetails() {
   const info = els.info;
-  const hidden = ['instruments', 'adjust', 'volume', 'extra'].filter((s) => !prefs.get('details.sections').includes(s));
+  const hidden = ['listen', 'instruments', 'adjust', 'volume', 'extra'].filter((s) => !prefs.get('details.sections').includes(s));
   info.dataset.hide = hidden.join(' ');
   info.dataset.layout = prefs.get('details.layout');
   info.dataset.cover = prefs.get('details.cover');
@@ -1547,7 +1541,7 @@ function applyDetails() {
 const EFFECTS = {
   'highway.view': (v) => { if (highway.view !== v) setView(v); },
   'highway.noteStyle': (v) => setNoteStyle(v),
-  'panels.tabs': syncPanelUi, 'panels.nowPlaying': syncPanelUi,
+  'panels.tabs': syncPanelUi,
   'details.chips': applyDetails, 'details.cover': applyDetails, 'details.quote': applyDetails, 'details.sections': applyDetails,
   'details.layout': applyDetails, 'details.stemNames': applyDetails, 'details.maxWidth': applyDetails, 'details.compact': applyDetails,
   'library.cardStyle': (v) => { list.setMode(v); syncViewSeg(); },
