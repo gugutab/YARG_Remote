@@ -47,6 +47,7 @@ export function songSummary(song) {
     year: year > 0 ? year : null,
     length: secs > 0 ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '',
     genre: typeof song.ini?.genre === 'string' ? song.ini.genre : '',
+    charter: typeof song.ini?.charter === 'string' ? song.ini.charter : '',
     // the instruments the chart has (server index) or, without that, the ones with a level in song.ini; level can be null
     instruments: INSTRUMENTS.map((base) => ({ base, level: levelOf(song, base) }))
       .filter((i) => (song.parts?.length ? song.parts.includes(i.base) : i.level !== null)),

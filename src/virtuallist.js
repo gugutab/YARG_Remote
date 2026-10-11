@@ -6,6 +6,25 @@ import { evenPerRow } from './songlist.js';
 // Row heights per card style: compact (one text line), normal (thumb + 2 lines), large (big thumb + details).
 export const ROW_HEIGHTS = { compact: 32, normal: 56, large: 128 };
 export const ROW_H = ROW_HEIGHTS.normal;
+
+// What the cards show and how big they are (the settings page edits this; the list gets it through setCards()).
+export const DEFAULT_CARDS = {
+  thumbs: true, scale: 1, iconSize: 15,
+  compact: { artist: true, pack: false },
+  normal: { artist: true, pack: true, icons: true },
+  large: { album: true, year: true, length: true, genre: true, charter: false, pack: true, instruments: true, levels: true },
+};
+
+// Height of a card of a style with a configuration: it follows the lines the card shows and the thumbnail size.
+export function cardHeight(mode, cards = DEFAULT_CARDS) {
+  const { thumbs, scale } = cards;
+  if (mode === 'compact') return Math.max(22, Math.round(ROW_HEIGHTS.compact * scale));
+  if (mode === 'normal') return Math.max(46, thumbs ? Math.round(42 * scale + 14) : 0);
+  const l = cards.large;
+  const meta = l.album || l.year || l.length || l.genre || l.charter;
+  const text = 20 + 17 + (meta ? 15 : 0) + (l.pack ? 15 : 0) + (l.instruments ? 45 : 0); // title, artist, meta, pack, chips (2 lines)
+  return Math.max(thumbs ? Math.round(92 * scale + 16) : 0, text + 16);
+}
 // Narrowest a card of each style may get before the list drops a column (the grid appears as soon as two cards fit).
 export const CARD_MIN_WIDTHS = { compact: 300, normal: 360, large: 400 };
 export const HEAD_H = 26;
@@ -121,11 +140,11 @@ export function railScroll(y, range, railH, thumbH) {
 // How many instrument chips (icon + level bars) fit on a line of the large card's text column.
 const CHIP_W = 50;
 const CHIP_GAP = 10;
-const CARD_TEXT_INSET = 6 + 92 + 12 + 6; // left margin, cover, gap, safety
 
 export function createVirtualList({ scroller, label, rail, thumbs, onSelect, text, describe = () => ({ instruments: [] }), anchor = (l) => l[0], mode: initialMode = 'normal' }) {
   let mode = initialMode;
-  let rowH = ROW_HEIGHTS[mode];
+  let cards = DEFAULT_CARDS;
+  let rowH = cardHeight(mode, cards);
   let items = [];
   let offsets = layoutOffsets(items, rowH);
   let bottoms = null; // set when the list has several columns
@@ -190,82 +209,110 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     el.style.height = `${rowH}px`;
     el.setAttribute('role', 'option');
     el.setAttribute('aria-selected', String(song === activeSong));
-    if (mode === 'compact') { // one line: Title — Artist
-      el.innerHTML = '<span class="song-line"><span class="song-title"></span><span class="song-artist"></span></span>';
-      el.querySelector('.song-title').textContent = text(song.title);
-      el.querySelector('.song-artist').textContent = ` — ${text(song.artist)}`;
-      el.title = `${text(song.title)} — ${text(song.artist)}`;
+    const d = describe(song);
+    if (mode === 'compact') { // one line: Title - Artist (· pack)
+      const c = cards.compact;
+      const line = document.createElement('span');
+      line.className = 'song-line';
+      const title = document.createElement('span');
+      title.className = 'song-title';
+      title.textContent = text(song.title);
+      line.append(title);
+      if (c.artist) {
+        const artist = document.createElement('span');
+        artist.className = 'song-artist';
+        artist.textContent = ` — ${text(song.artist)}`;
+        line.append(artist);
+      }
+      if (c.pack && d.pack) {
+        const pack = document.createElement('span');
+        pack.className = 'song-artist song-inline-pack';
+        pack.textContent = ` · ${d.pack}`;
+        line.append(pack);
+      }
+      el.append(line);
+      el.title = `${text(song.title)} — ${text(song.artist)}${d.pack ? ` · ${d.pack}` : ''}`;
       el.addEventListener('click', () => onSelect(song));
       return { el, timer: 0 };
     }
-    el.innerHTML = '<span class="thumb"><img alt="" decoding="async" hidden></span><span class="song-text"><span class="song-title"></span><span class="song-artist"></span></span>';
-    el.querySelector('.song-title').textContent = text(song.title);
-    el.querySelector('.song-artist').textContent = text(song.artist);
-    if (mode === 'normal') { // the pack at the top right, next to the title
-      const packName = describe(song).pack;
-      if (packName) {
-        const top = document.createElement('span');
-        top.className = 'song-top';
-        const title = el.querySelector('.song-title');
-        title.replaceWith(top);
-        const pack = document.createElement('span');
-        pack.className = 'song-packtag';
-        pack.textContent = packName;
-        pack.title = packName;
-        top.append(title, pack);
-      }
+    if (cards.thumbs) {
+      const thumb = document.createElement('span');
+      thumb.className = 'thumb';
+      thumb.innerHTML = '<img alt="" decoding="async" hidden>';
+      el.append(thumb);
     }
-    if (mode === 'normal') { // the instruments the song has, as small icons to the right of the artist
-      const sub = document.createElement('span');
-      sub.className = 'song-sub';
-      const artist = el.querySelector('.song-artist');
-      artist.replaceWith(sub);
-      sub.append(artist);
+    const textBox = document.createElement('span');
+    textBox.className = 'song-text';
+    el.append(textBox);
+    const mk = (cls, txt) => {
+      const e = document.createElement('span');
+      e.className = cls;
+      e.textContent = txt;
+      return e;
+    };
+    const titleEl = mk('song-title', text(song.title));
+    const artistEl = mk('song-artist', text(song.artist));
+    const iconList = (withBadge = true) => {
       const icons = document.createElement('span');
       icons.className = 'song-icons';
-      for (const i of describe(song).instruments) {
+      for (const i of d.instruments) {
         const ic = document.createElement('span');
         ic.className = 'inst';
         ic.dataset.label = i.label; // shown by the hover tip: the name and the difficulty level
         ic.dataset.level = i.level === null ? '' : String(i.level);
-        ic.innerHTML = `<svg><use href="#i-${i.icon}"/></svg>${i.badge ? `<sup>${i.badge}</sup>` : ''}`;
+        ic.innerHTML = `<svg><use href="#i-${i.icon}"/></svg>${withBadge && i.badge ? `<sup>${i.badge}</sup>` : ''}`;
         icons.append(ic);
       }
-      sub.append(icons);
-    }
-    if (mode === 'large') {
-      const d = describe(song);
-      const facts = [d.album, d.year, d.length, d.genre].filter(Boolean);
-      const text2 = el.querySelector('.song-text');
-      const meta = document.createElement('span');
-      meta.className = 'song-meta';
-      meta.textContent = facts.join(' · ');
-      text2.append(meta);
-      if (d.pack) {
+      return icons;
+    };
+    if (mode === 'normal') {
+      const n = cards.normal;
+      if (n.pack && d.pack) { // the pack at the top right, next to the title
+        const top = document.createElement('span');
+        top.className = 'song-top';
+        top.append(titleEl, Object.assign(mk('song-packtag', d.pack), { title: d.pack }));
+        textBox.append(top);
+      } else textBox.append(titleEl);
+      if (n.icons && d.instruments.length) { // the instruments the song has, as small icons to the right of the artist
+        const sub = document.createElement('span');
+        sub.className = 'song-sub';
+        if (n.artist) sub.append(artistEl);
+        sub.append(iconList());
+        textBox.append(sub);
+      } else if (n.artist) textBox.append(artistEl);
+    } else { // large
+      const l = cards.large;
+      textBox.append(titleEl, artistEl);
+      const facts = [l.album && d.album, l.year && d.year, l.length && d.length, l.genre && d.genre, l.charter && d.charter && `by ${d.charter}`].filter(Boolean);
+      if (facts.length) textBox.append(mk('song-meta', facts.join(' · ')));
+      if (l.pack && d.pack) {
         const pack = document.createElement('span');
         pack.className = 'song-pack';
         pack.innerHTML = '<svg><use href="#i-package"/></svg><span></span>';
         pack.querySelector('span').textContent = d.pack;
-        text2.append(pack);
+        textBox.append(pack);
       }
-      const insts = document.createElement('span');
-      insts.className = 'song-insts';
-      insts.style.setProperty('--per', String(evenPerRow(d.instruments.length, chipsPerLine()))); // 4 chips with room for 3: 2 + 2
-      for (const i of d.instruments) {
-        const chip = document.createElement('span');
-        chip.className = 'inst';
-        chip.title = i.level === null ? i.label : `${i.label}: level ${i.level}`;
-        const pips = i.level === null ? '' : `<span class="mini-pips">${Array.from({ length: 6 }, (_, k) => `<i${k < i.level ? ' class="on"' : ''}></i>`).join('')}</span>`; // no pips when song.ini has no level
-        chip.innerHTML = `<svg><use href="#i-${i.icon}"/></svg>${i.badge ? `<sup>${i.badge}</sup>` : ''}${pips}`;
-        insts.append(chip);
+      if (l.instruments && d.instruments.length) {
+        const insts = document.createElement('span');
+        insts.className = 'song-insts';
+        insts.style.setProperty('--per', String(evenPerRow(d.instruments.length, chipsPerLine()))); // 4 chips with room for 3: 2 + 2
+        for (const i of d.instruments) {
+          const chip = document.createElement('span');
+          chip.className = 'inst';
+          chip.title = i.level === null ? i.label : `${i.label}: level ${i.level}`;
+          const pips = !l.levels || i.level === null ? '' : `<span class="mini-pips">${Array.from({ length: 6 }, (_, k) => `<i${k < i.level ? ' class="on"' : ''}></i>`).join('')}</span>`; // no pips when song.ini has no level
+          chip.innerHTML = `<svg><use href="#i-${i.icon}"/></svg>${i.badge ? `<sup>${i.badge}</sup>` : ''}${pips}`;
+          insts.append(chip);
+        }
+        textBox.append(insts);
       }
-      text2.append(insts);
     }
     el.addEventListener('click', () => onSelect(song));
     const entry = { el, timer: 0 };
     const cached = thumbs.peek(song);
     const img = el.querySelector('img');
-    const show = (url) => { if (url && rows.get(index) === entry) { img.src = url; img.hidden = false; } };
+    const show = (url) => { if (url && img && rows.get(index) === entry) { img.src = url; img.hidden = false; } };
+    if (!img) return entry; // thumbnails are switched off
     if (cached) { img.src = cached; img.hidden = false; } // already in memory: show it right away (the row is not in the map yet)
     else {
       entry.timer = setTimeout(() => {
@@ -437,7 +484,9 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
   const railWidth = () => parseFloat(getComputedStyle(scroller.closest('.songs-wrap') ?? scroller).getPropertyValue('--rail-w')) || 0;
   function chipsPerLine() {
     const cardW = (scroller.clientWidth - railWidth()) / cols;
-    return Math.max(1, Math.floor((cardW - CARD_TEXT_INSET + CHIP_GAP) / (CHIP_W + CHIP_GAP)));
+    const inset = cards.thumbs ? 6 + Math.round(92 * cards.scale) + 12 + 6 : 12; // margin, cover, gap, safety
+    const chipW = (cards.large.levels ? CHIP_W : 24) + Math.max(0, cards.iconSize - 15);
+    return Math.max(1, Math.floor((cardW - inset + CHIP_GAP) / (chipW + CHIP_GAP)));
   }
   let lastWidth = 0;
   new ResizeObserver(() => { // a width change can change the line breaks of the large cards: rebuild the visible rows
@@ -456,6 +505,13 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(autoColumns).observe(scroller);
 
   return {
+    setCards(next) { // what the cards show / how big: rebuild the visible rows (the list keeps its place)
+      cards = next;
+      rowH = cardHeight(mode, cards);
+      scroller.style.setProperty('--card-scale', String(cards.scale));
+      scroller.style.setProperty('--card-icon', `${cards.iconSize}px`);
+      relayout(true);
+    },
     setColumns(n, { minWidth = 0 } = {}) { // fixed number of columns, or (minWidth) as many as fit
       minColW = minWidth;
       cols = Math.max(1, n);
@@ -494,7 +550,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     setMode(next) { // card style: the list keeps the item at the top of the view
       if (next === mode || !ROW_HEIGHTS[next]) return;
       mode = next;
-      rowH = ROW_HEIGHTS[mode];
+      rowH = cardHeight(mode, cards);
       relayout(true);
       autoColumns(); // the card style changes how many columns fit
     },

@@ -100,7 +100,14 @@ export function mountSettings({ root, settings, sections, renderers = {}, onClos
 
   const sectionEls = [];
   for (const section of sections) {
-    const body = el('div', { class: 'sp-section-body' }, section.items.map(buildRow));
+    const rowsAndGroups = [];
+    let lastGroup = null;
+    for (const item of section.items) {
+      if (item.group && item.group !== lastGroup) rowsAndGroups.push(el('h4', { class: 'sp-group', text: item.group }));
+      lastGroup = item.group ?? null;
+      rowsAndGroups.push(buildRow(item));
+    }
+    const body = el('div', { class: 'sp-section-body' }, rowsAndGroups);
     const sec = el('section', { class: 'sp-section', id: `sp-sec-${section.id}` }, el('h3', {}, icon(section.icon), section.title), section.description ? el('p', { class: 'sp-desc', text: section.description }) : null, body);
     content.append(sec);
     const link = el('button', { type: 'button', class: 'sp-nav-btn', onclick: () => { search.value = ''; applyQuery(''); sec.scrollIntoView({ block: 'start', behavior: 'smooth' }); } }, icon(section.icon), el('span', { text: section.title }));
@@ -117,6 +124,12 @@ export function mountSettings({ root, settings, sections, renderers = {}, onClos
         const match = !query || row.dataset.search.includes(query) || section.title.toLowerCase().includes(query);
         row.hidden = !match;
         if (match) shown++;
+      }
+      for (const g of sec.querySelectorAll('.sp-group')) { // a group heading stays while one of its rows is shown
+        let n = g.nextElementSibling;
+        let any = false;
+        while (n && !n.classList.contains('sp-group')) { if (!n.hidden) any = true; n = n.nextElementSibling; }
+        g.hidden = !any;
       }
       sec.hidden = shown === 0;
       any ||= shown > 0;

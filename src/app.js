@@ -13,7 +13,7 @@ import { mountSettings } from './settings-ui.js';
 import { renderThemeStudio, renderDataTools } from './settings-custom.js';
 import { saveLibrary, loadLibrary, loadThumb, saveThumb, clearThumbs } from './store.js';
 import { filterSongs, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, anchorLabel } from './songlist.js';
-import { createVirtualList } from './virtuallist.js';
+import { createVirtualList, DEFAULT_CARDS } from './virtuallist.js';
 import { createThumbs, renderCoverThumb } from './thumbs.js';
 
 const $ = (id) => document.getElementById(id);
@@ -38,7 +38,7 @@ let savedRecord = null; // folder and index stored from the last visit
 let chart = null; // chart for the selected instrument and difficulty
 let seeking = false;
 let loadToken = 0; // bumped on every song selection, so a slow load cannot overwrite a newer one
-let sortDesc = false;
+let sortDesc = false; // the "Reverse the order" setting
 let ready = false; // audio decoded and a chart built: playback is allowed
 let infoOpen = false;
 let loadInfo = { state: 'idle', text: '', fraction: 0 };
@@ -192,10 +192,12 @@ els.filterBtn.addEventListener('click', () => {
   els.filterBtn.classList.toggle('on', open);
 });
 syncFilterUi();
-els.sortBy.value = store.get('sortBy') || 'title';
-els.sortBy.addEventListener('change', () => { store.set('sortBy', els.sortBy.value); renderList(); });
+els.sortBy.value = prefs.get('library.sort');
+sortDesc = prefs.get('library.sortDesc');
+els.sortBy.addEventListener('change', () => { prefs.set('library.sort', els.sortBy.value); }); // the effect re-renders
 els.sortDir.addEventListener('click', () => {
   sortDesc = !sortDesc;
+  prefs.set('library.sortDesc', sortDesc);
   renderList();
 });
 startLibrary();
@@ -352,7 +354,12 @@ const describeSong = (song) => {
   const d = songSummary(song);
   return { ...d, instruments: d.instruments.map((i) => ({ ...CARD_INSTRUMENTS[i.base], level: i.level })) };
 };
-const savedMode = store.get('cardMode');
+// Legacy preferences (before the settings page) move into the settings once.
+for (const [legacy, id] of [['cardMode', 'library.cardStyle'], ['sortBy', 'library.sort']]) {
+  const old = store.get(legacy);
+  if (old && prefs.isDefault(id)) prefs.set(id, old);
+}
+const savedMode = prefs.get('library.cardStyle');
 const list = createVirtualList({
   mode: CARD_MODES.includes(savedMode) ? savedMode : 'normal', describe: describeSong,
   scroller: els.songs, label: els.groupLabel, rail: els.rail, thumbs, text: plainText, onSelect: (song) => selectSong(song),
@@ -362,17 +369,15 @@ const list = createVirtualList({
 function syncViewSeg() {
   for (const b of els.viewSeg.querySelectorAll('[data-mode]')) b.setAttribute('aria-pressed', String(b.dataset.mode === cardMode()));
 }
-const cardMode = () => (CARD_MODES.includes(store.get('cardMode')) ? store.get('cardMode') : 'normal');
+const cardMode = () => (CARD_MODES.includes(prefs.get('library.cardStyle')) ? prefs.get('library.cardStyle') : 'normal');
 els.viewSeg.addEventListener('click', (e) => {
   const b = e.target.closest('[data-mode]');
   if (!b) return;
-  store.set('cardMode', b.dataset.mode);
-  list.setMode(b.dataset.mode);
-  syncViewSeg();
+  prefs.set('library.cardStyle', b.dataset.mode); // the effect below applies it
   if (current) list.scrollToSong(current.song);
 });
 // A wide panel flows the cards into columns as soon as two fit (the minimum card width depends on the card style).
-list.setColumns(1, { minWidth: 'auto' });
+// (the columns come from the "Columns" setting: see applyColumns)
 syncViewSeg();
 
 function renderList({ keepScroll = false } = {}) {
@@ -382,7 +387,8 @@ function renderList({ keepScroll = false } = {}) {
   els.sortDir.classList.toggle('desc', sortDesc); // the arrow points up when descending
   els.sortDir.title = sortDesc ? 'Descending (click to reverse)' : 'Ascending (click to reverse)';
   list.setActive(current?.song ?? null);
-  list.setItems(buildItems(shown, els.sortBy.value), { keepScroll, evenGroups: els.sortBy.value === 'pack' }); // pack sort: every pack gets a label on the rail
+  const heads = prefs.get('library.dividers');
+  list.setItems(heads ? buildItems(shown, els.sortBy.value) : shown.map((song) => ({ type: 'song', song })), { keepScroll, evenGroups: heads && els.sortBy.value === 'pack' }); // pack sort: every pack gets a label on the rail
   els.count.textContent = songs.length ? `${shown.length} of ${songs.length} songs` : '';
   els.empty.hidden = songs.length > 0;
 }
@@ -1451,7 +1457,27 @@ function fmt(sec) {
 
 // ---------- Settings: what each setting does, and the settings page ----------
 const fontCss = (key) => (FONT_OPTIONS.find((f) => f.value === key) ?? FONT_OPTIONS[0]).css;
+const cardsConfig = () => ({
+  thumbs: prefs.get('library.thumbs'), scale: prefs.get('library.cardScale') / 100, iconSize: prefs.get('library.iconSize'),
+  compact: { artist: prefs.get('cards.compact.artist'), pack: prefs.get('cards.compact.pack') },
+  normal: { artist: prefs.get('cards.normal.artist'), pack: prefs.get('cards.normal.pack'), icons: prefs.get('cards.normal.icons') },
+  large: Object.fromEntries(Object.keys(DEFAULT_CARDS.large).map((k) => [k, prefs.get(`cards.large.${k}`)])),
+});
+const applyCards = () => list.setCards(cardsConfig());
+const applyColumns = () => {
+  const c = prefs.get('library.columns');
+  if (c === 'auto') list.setColumns(1, { minWidth: 'auto' });
+  else list.setColumns(Number(c));
+};
 const EFFECTS = {
+  'library.cardStyle': (v) => { list.setMode(v); syncViewSeg(); },
+  'library.sort': (v) => { if (els.sortBy.value !== v) els.sortBy.value = v; syncFilterUi(); renderList(); },
+  'library.sortDesc': (v) => { sortDesc = v; renderList(); },
+  'library.columns': applyColumns,
+  'library.dividers': () => renderList(),
+  'library.rail': (v) => document.querySelector('.songs-wrap').classList.toggle('no-rail', !v),
+  'library.thumbs': applyCards, 'library.cardScale': applyCards, 'library.iconSize': applyCards,
+  ...Object.fromEntries(['compact.artist', 'compact.pack', 'normal.artist', 'normal.pack', 'normal.icons', ...Object.keys(DEFAULT_CARDS.large).map((k) => `large.${k}`)].map((k) => [`cards.${k}`, applyCards])),
   'theme.preset': applyThemeSetting,
   'theme.overrides': applyThemeSetting,
   'theme.saved': applyThemeSetting,
