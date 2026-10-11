@@ -108,7 +108,11 @@ function harmonyTracks(midi) {
 //                  being a solo); anything else is 116.
 //   endEvents      end_events (Clone Hero: false ignores the [end] event). YARG.Core declares the key but never reads it.
 const HOPOFREQ_DENOMINATORS = [24, 16, 12, 8, 6, 4];
-export function chartSettings(ini = {}, division = 480) {
+// `format` is 'chart' for notes.chart songs (src/chartfile.js), which differ from .mid in three ways (YARG.Core
+// SongEntry.IniBase.cs ScanChart + ParseSettings.Default_Chart): the HOPO threshold gets resolution / 192 extra ticks
+// (65 at 192) instead of the +1 MidReader adds, a missing sustain_cutoff_threshold means no cutoff at all (0), and star
+// power is always the phrase S 2 (no legacy note 103).
+export function chartSettings(ini = {}, division = 480, format = 'mid') {
   const num = (v) => (v === undefined || v === '' ? NaN : Number(v));
   let hopoThreshold;
   const freq = num(ini.hopo_frequency);
@@ -119,10 +123,16 @@ export function chartSettings(ini = {}, division = 480) {
   else if (Number.isInteger(hopofreq) && hopofreq >= 0 && hopofreq < HOPOFREQ_DENOMINATORS.length) hopoThreshold = Math.floor(4 * division / HOPOFREQ_DENOMINATORS[hopofreq]);
   else hopoThreshold = Math.floor(division / 3);
 
-  const cutoff = num(ini.sustain_cutoff_threshold);
-  const sustainCutoff = Number.isFinite(cutoff) && cutoff >= 0 ? Math.max(1, Math.floor(cutoff)) : Math.floor(division / 3);
+  const isChart = format === 'chart';
+  // naturalHopo adds 1 to the threshold (the .mid leniency), so a .chart takes it off again.
+  if (isChart) hopoThreshold += Math.floor(division / 192) - 1;
 
-  const note = num(ini.multiplier_note ?? ini.star_power_note);
+  const cutoff = num(ini.sustain_cutoff_threshold);
+  const sustainCutoff = Number.isFinite(cutoff) && cutoff >= 0
+    ? (isChart ? Math.floor(cutoff) : Math.max(1, Math.floor(cutoff)))
+    : (isChart ? 0 : Math.floor(division / 3));
+
+  const note = isChart ? NaN : num(ini.multiplier_note ?? ini.star_power_note);
   return {
     hopoThreshold,
     sustainCutoff,
@@ -193,7 +203,7 @@ function drumSpan(track, instrument, ini) {
 export function drumKind(track, ini = {}) {
   const five = iniBool(ini.five_lane_drums);
   if (five === true) return 'five';
-  if (five === undefined && track.notes.some((n) => n.pitch === FIVE_LANE_GREEN_NOTE)) return 'five';
+  if (five === undefined && (track.fiveLane || track.notes.some((n) => n.pitch === FIVE_LANE_GREEN_NOTE))) return 'five'; // track.fiveLane: notes.chart with a green (N 5) pad
   if (track.notes.some((n) => DRUM_CYMBAL_FLAGS.includes(n.pitch))) return 'pro';
   return 'four';
 }
@@ -202,7 +212,7 @@ export function buildChart(midi, instrument, difficulty, ini = {}) {
   const track = findTrack(midi, instrument);
   if (!track) return null;
   const toSec = midi.toSeconds;
-  const settings = chartSettings(ini, midi.division);
+  const settings = chartSettings(ini, midi.division, midi.source);
   const sustainCutoff = settings.sustainCutoff; // YARG.Core MidReader.cs: shorter notes have no sustain (SustainCutoffThreshold)
   const timed = (n) => {
     const time = toSec(n.tick);
@@ -242,10 +252,12 @@ export function buildChart(midi, instrument, difficulty, ini = {}) {
     const lane = enhancedOpen ? 0 : n.pitch - difficulty.base;
     if (lane < 0 || lane >= LANES) continue;
     const open = enhancedOpen || inWindows(openWindowsHere, n.tick);
-    const tap = inWindows(tapWindows, n.tick);
+    // notes.chart notes carry their own flags (src/chartfile.js): tap (N 6) and forced (N 5), which flips the natural HOPO
+    // (MoonNote.IsHopo: IsNaturalHopo != forced). Both are per difficulty, unlike the .mid windows.
+    const tap = Boolean(n.tap) || inWindows(tapWindows, n.tick);
     // A forced strum wins over a forced HOPO; without either, the note is a HOPO only if it is natural.
     const hopo = !tap && (inWindows(strumWindows, n.tick) ? false
-      : inWindows(hopoWindows, n.tick) ? true : natural.get(n));
+      : inWindows(hopoWindows, n.tick) ? true : natural.get(n) !== Boolean(n.forced));
     notes.push({ ...timed(n), lane, cymbal: false, tap, hopo: Boolean(hopo), open });
   }
   return { mode: 'lanes', lanes: LANES, laneColors: GUITAR_LANE_COLORS, notes, ...commonParts(midi, track, toSec, settings) };
@@ -360,7 +372,7 @@ function isCymbal(spans, offset, tick) {
 
 export { displayLyric }; // lyric text as shown (vocals.js)
 
-function commonParts(midi, track, toSec, settings = chartSettings({}, midi.division), mode = 'guitar') {
+function commonParts(midi, track, toSec, settings = chartSettings({}, midi.division, midi.source), mode = 'guitar') {
   const spans = (pitch) => spansOf(track.notes.filter((n) => n.pitch === pitch), toSec);
   const beatTrack = midi.tracks.find((t) => t.name.toUpperCase() === 'BEAT');
   let beats = beatTrack

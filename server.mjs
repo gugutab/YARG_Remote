@@ -7,13 +7,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseSongIni } from './src/ini.js';
 import { parseMidi } from './src/midi.js';
+import { parseChart } from './src/chartfile.js';
 import { instrumentOptions } from './src/chart.js';
 
 const APP_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP_FILES = new Set(['index.html', 'styles.css']);
 const APP_DIRS = ['src', 'vendor'];
 // Bump when the index gets new fields: older cache files are then rebuilt.
-const INDEX_VERSION = 2;
+const INDEX_VERSION = 3;
 const SONG_MARKERS = ['song.ini', 'notes.mid', 'notes.chart'];
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
@@ -22,11 +23,11 @@ const TYPES = {
   '.m4a': 'audio/mp4', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.mid': 'audio/midi',
 };
 
-// The instruments a notes.mid really has (tracks with notes), like the picker of the app: guitar, bass, rhythm, keys, drums,
+// The instruments a notes.mid (or notes.chart) really has (tracks with notes), like the picker of the app: guitar, bass, rhythm, keys, drums,
 // vocals (harmony counts as vocals). song.ini often has no difficulty levels, or -1 for everything, while the chart is fine.
-export function partsOf(midiBytes) {
+export function partsOf(midiBytes, isChart = false) {
   try {
-    const bases = instrumentOptions(parseMidi(midiBytes)).map((o) => (o.base === 'harmony' ? 'vocals' : o.base));
+    const bases = instrumentOptions(isChart ? parseChart(midiBytes) : parseMidi(midiBytes)).map((o) => (o.base === 'harmony' ? 'vocals' : o.base));
     return [...new Set(bases)];
   } catch {
     return [];
@@ -55,9 +56,10 @@ export async function scanLibrary(songsDir) {
       }
       const folderName = rel.split('/').pop() || path.basename(dir);
       let parts = [];
-      if (lower.has('notes.mid')) {
+      const chartFile = lower.has('notes.mid') ? 'notes.mid' : lower.has('notes.chart') ? 'notes.chart' : null; // .mid wins, as in the app
+      if (chartFile) {
         try {
-          parts = partsOf(await fs.promises.readFile(path.join(dir, lower.get('notes.mid'))));
+          parts = partsOf(await fs.promises.readFile(path.join(dir, lower.get(chartFile))), chartFile === 'notes.chart');
         } catch { /* unreadable chart: no parts */ }
       }
       songs.push({

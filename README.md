@@ -14,7 +14,7 @@ npm test             # tests for the MIDI parser / song.ini / chart
 - Use **Chrome or Edge** (folder selection uses the File System Access API). In other browsers the
   button falls back to `<input webkitdirectory>`, which works but does not keep the folder between sessions.
 - The folder is read by the browser, not by path: the button opens the picker and you choose `A:\music\Songs`.
-- Each song is a folder with `song.ini` + `notes.mid` + audio stems (`song.ogg`, `guitar.ogg`,
+- Each song is a folder with `song.ini` + `notes.mid` (or `notes.chart`) + audio stems (`song.ogg`, `guitar.ogg`,
   `drums.ogg`, `vocals.ogg`, `bass.ogg`…). Any `.ogg/.mp3/.opus/.wav/.flac` in the folder becomes a track
   in the mixer.
 
@@ -85,7 +85,7 @@ YARG.Core serves as a format reference, not as a dependency.
 
 ## Limitations
 
-- Only `notes.mid`; `.chart` files are not read.
+- `notes.chart` is read too (notes.mid wins when both exist), except GHL (6-fret) tracks and co-op guitar; its lyrics show as non-pitched notes.
 - Pro guitar and bass, Pro keys and Elite Drums are not drawn.
 - Open via the "enhanced opens" mode (text) is not handled; open via SysEx is.
 - Drum fills, BRE and coda are not drawn; venue and lights are not either.

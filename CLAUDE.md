@@ -32,7 +32,7 @@ accent and ghost; double kick; rolls (tremolo, trill, kick roll); solos and star
 UI labels (English): instruments Guitar, Bass, Rhythm, Keys, Drums, Vocals, Harmony; difficulties Easy, Medium, Hard, Expert; drum modes "Drums (4 lanes)", "Drums (5 lanes)", "Drums (Pro)", "Drums (Pro 7 lanes)"; panels Library, Settings, Stem volume, Other song.ini properties.
 
 **Not supported** (pending items, in order of likely value):
-- `.chart` files (only `notes.mid`);
+- `.chart` is read (`src/chartfile.js`), but not GHL tracks, co-op guitar (`DoubleGuitar`), per-difficulty star power or cymbal flags that differ between difficulties at the same tick, and the vocal pitches (a .chart has lyrics only, drawn as talkie notes);
 - Pro guitar and bass (`PART REAL_GUITAR`, `REAL_BASS`) and Pro keys (`PART REAL_KEYS_*`);
 - open by 5-lane note pattern (only the SysEx and `[ENHANCED_OPENS]` forms are read);
 - fill / BRE only as a faint band; no BRE-specific graphics or scoring, and no coda `Coda` phrase;
@@ -93,6 +93,7 @@ Flow: folder → `library.js` (songs) → click → `midi.js` (parse) + `chart.j
 | `src/songlist.js` | List search, filter and sorting (pure functions). |
 | `src/app.js` | Events, song/instrument/difficulty selection, `frame()` loop (clock, section, highway). |
 | `src/midi.js` | SMF parser: notes with `tick`/`endTick`/`velocity`, `texts` (meta 0x01), `lyrics` (meta 0x05), `sysex` (F0), `tempos`; `toSeconds` converts tick to seconds. |
+| `src/chartfile.js` | notes.chart reader (YARG.Core `MoonscraperChartParser/IO/Chart`). Returns the same shape as `parseMidi` by translating .chart events into MIDI-convention notes (tap/forced travel as `n.tap`/`n.forced`, open as the enhanced-open note, cymbal flags as inverted tom markers, `source: 'chart'` selects the .chart HOPO threshold, sustain and star power defaults in `chartSettings`). `notes.mid` wins when a song has both. |
 | `src/chart.js` | YARG rules (see §5). Exports `instrumentOptions`, `buildChart`, `availableDifficulties`, `phraseWindows`, `naturalHopo`, `parseSectionName`, `sectionIndexAt`, `displayLyric`, `drumKind`. |
 | `src/highway.js` | Canvas drawing. `render(t)` keeps no time state. Drawing order matters: hit line → pedals/open → sustains → heads. Visual constants at the top. |
 | `src/player.js` | `MultiTrackPlayer`: stems in `AudioBuffer`, aligned to the chart (`alignChannel`) and played by `PitchShifter` (SoundTouch, `vendor/`). Speed via `tempo`. |

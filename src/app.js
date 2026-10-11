@@ -1,4 +1,5 @@
 import { parseMidi } from './midi.js';
+import { parseChart } from './chartfile.js';
 import { DIFFICULTIES, EXTENDED_DRUM_LANES, instrumentOptions, availableDifficulties, buildChart, sectionIndexAt } from './chart.js';
 import { MultiTrackPlayer } from './player.js';
 import { Highway } from './highway.js';
@@ -500,16 +501,19 @@ async function selectSong(song) {
   setInfoOpen(true); // the info screen opens right away and the load runs behind it
   setLoadState('loading', 'Reading the chart…', 0.02);
 
-  const midiEntry = song.files.get('notes.mid');
+  const isMidi = song.files.has('notes.mid'); // notes.mid wins when both exist; notes.chart is read by chartfile.js
+  const chartName = isMidi ? 'notes.mid' : 'notes.chart';
+  const midiEntry = song.files.get(chartName);
   if (!midiEntry) {
-    setLoadState('error', 'This song has no notes.mid (.chart-only is not supported in this version).');
+    setLoadState('error', 'This song has no notes.mid or notes.chart.');
     return;
   }
   let midi;
   try {
-    midi = parseMidi(await readBytes(midiEntry));
+    const bytes = await readBytes(midiEntry);
+    midi = isMidi ? parseMidi(bytes) : parseChart(bytes);
   } catch (err) {
-    if (token === loadToken) setLoadState('error', `Could not read notes.mid: ${err.message}`);
+    if (token === loadToken) setLoadState('error', `Could not read ${chartName}: ${err.message}`);
     return;
   }
   const coverEntry = findCover(song);

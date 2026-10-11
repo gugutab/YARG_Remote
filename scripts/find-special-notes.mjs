@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Finds special notes in .mid files under a folder (recursively), to pick test examples.
+// Finds special notes in .mid (and notes.chart) files under a folder (recursively), to pick test examples.
 //
 //   node scripts/find-special-notes.mjs <folder> [--max N] [--json]
 //
@@ -13,6 +13,7 @@ import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, relative, dirname } from 'node:path';
 import { parseSongIni } from '../src/ini.js';
 import { parseMidi } from '../src/midi.js';
+import { parseChart } from '../src/chartfile.js';
 import { buildChart, instrumentOptions, availableDifficulties, sectionIndexAt, DIFFICULTIES } from '../src/chart.js';
 
 const args = process.argv.slice(2);
@@ -39,6 +40,7 @@ function* midiFiles(dir) {
     const path = join(dir, name);
     if (statSync(path).isDirectory()) yield* midiFiles(path);
     else if (name.toLowerCase().endsWith('.mid')) yield path;
+    else if (name.toLowerCase() === 'notes.chart' && !existsSync(join(dir, 'notes.mid'))) yield path; // .mid wins, as in the app
   }
 }
 
@@ -48,7 +50,7 @@ function formatTime(sec) {
 }
 
 function scanSong(path) {
-  const midi = parseMidi(readFileSync(path));
+  const midi = path.toLowerCase().endsWith('.chart') ? parseChart(readFileSync(path)) : parseMidi(readFileSync(path));
   const iniPath = join(dirname(path), 'song.ini'); // song.ini keys (HOPO threshold, drum mode, ...) change the chart
   const ini = existsSync(iniPath) ? parseSongIni(readFileSync(iniPath)) : {};
   const rows = [];
