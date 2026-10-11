@@ -254,7 +254,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     const tick = css('--line', '#2a3140');
     const muted = css('--muted', '#8b95a7');
     g.font = `600 ${bounds ? 8 : 9}px system-ui, sans-serif`;
-    g.textAlign = bounds ? 'left' : 'center'; // even rail: wider, labels start at the left edge
+    g.textAlign = 'right'; // the labels end right before the ticks
     g.textBaseline = 'middle';
     let lastText = null;
     let lastY = -99;
@@ -263,7 +263,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       const isAnchor = gr.anchor !== lastText;
       if (isAnchor && y - lastY >= 11) {
         g.fillStyle = muted;
-        g.fillText(gr.anchor, bounds ? 3 : 8 + RAIL_PAD / 2, y);
+        g.fillText(gr.anchor, W - 6 - RAIL_PAD - 3, y);
         lastY = y;
       }
       if (isAnchor) lastText = gr.anchor;
