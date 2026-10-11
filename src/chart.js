@@ -6,6 +6,7 @@
 // Several rules can be changed by song.ini keys (see chartSettings); every builder takes the parsed ini as an optional
 // last argument and behaves as before when a key is absent.
 import { iniBool } from './ini.js';
+import { buildVocals, displayLyric } from './vocals.js';
 
 export const INSTRUMENTS = [
   { id: 'guitar', label: 'Guitar', tracks: ['PART GUITAR'], mode: 'lanes' },
@@ -64,8 +65,6 @@ const ENHANCED_OPENS_TEXT = 'ENHANCED_OPENS'; // MidIOHelper.ENHANCED_OPENS_TEXT
 const VELOCITY_ACCENT = 127; // drum pads: accent (bigger) and ghost (dim), as YARG.Core MidIOHelper.cs
 const VELOCITY_GHOST = 1;
 const VOCAL_RANGE = [36, 84];
-const PERCUSSION_NOTE = 96;
-const NONPLAYED_PERCUSSION_NOTE = 97;
 const PHRASE_OPEN = 0x01; // PhaseShift SysEx phrase codes (YARG.Core PhaseShiftSysEx.cs)
 
 // [start, end) tick windows for one phrase code, per difficulty index 0..3.
@@ -213,32 +212,9 @@ export function buildChart(midi, instrument, difficulty, ini = {}) {
   };
 
   if (instrument.mode === 'vocals') {
-    const vocalNotes = (vocalTrack) => vocalTrack.notes
-      .filter((n) => inRange(n.pitch, VOCAL_RANGE))
-      .map((n) => ({ ...timed(n), pitch: n.pitch }));
-    // Solo vocals use PART VOCALS alone; the harmony part leads with HARM1 and adds HARM2/HARM3 behind it.
-    const notes = vocalNotes(track);
-    const soloTrack = midi.tracks.find((t) => t.name.toUpperCase() === 'PART VOCALS');
-    // Percussion (YARG.Core VocalsTrack): 96 is played, 97 is not played.
-    const percussionTrack = track.notes.some((n) => n.pitch === PERCUSSION_NOTE || n.pitch === NONPLAYED_PERCUSSION_NOTE) || !soloTrack ? track : soloTrack;
-    const percussion = percussionTrack.notes
-      .filter((n) => n.pitch === PERCUSSION_NOTE || n.pitch === NONPLAYED_PERCUSSION_NOTE)
-      .map((n) => ({ time: toSec(n.tick), played: n.pitch === PERCUSSION_NOTE }));
-    // Lyrics are meta type 5 events when present (most charts). Some charts put them in text events
-    // instead, where bracketed texts are sections or states, not lyrics.
-    const lyricSource = (t) => (t.lyrics.length > 0 ? t.lyrics : t.texts.filter((x) => !x.text.startsWith('[')));
-    let lyricEvents = lyricSource(track);
-    if (lyricEvents.length === 0 && soloTrack && soloTrack !== track) lyricEvents = lyricSource(soloTrack); // harmony charts keep lyrics on PART VOCALS
-    // Symbols that only mark timing or scoring are not shown (YARG.Core LyricSymbols.cs). Events left
-    // empty by that (a lone '+', say) are dropped.
-    const lyrics = lyricEvents
-      .map((t) => ({ time: toSec(t.tick), text: displayLyric(t.text) }))
-      .filter((l) => l.text !== '');
-    // Harmony parts HARM1..HARM3 (or PART HARM1..3), drawn beside the lead.
-    const harmonies = instrument.harmony
-      ? harmonyTracks(midi).filter((h) => h.part > 1).map((h) => ({ part: h.part, notes: vocalNotes(h.track) }))
-      : [];
-    return { mode: 'vocals', notes, harmonies, percussion, lyrics, ...commonParts(midi, track, toSec, settings, 'vocals') };
+    const harmonyParts = instrument.harmony ? harmonyTracks(midi) : [];
+    const vocals = buildVocals({ midi, track, harmonyParts, toSec, timed });
+    return { mode: 'vocals', ...vocals, ...commonParts(midi, track, toSec, settings, 'vocals') };
   }
 
   if (instrument.mode === 'drums') {
@@ -382,11 +358,7 @@ function isCymbal(spans, offset, tick) {
   return markers % 2 === 0;
 }
 
-// Text shown for a lyric syllable: markers are removed, '=' is a hyphen and '§' joins two syllables.
-const LYRIC_MARKERS = /[+#^*%/\$]/g;
-export function displayLyric(text) {
-  return text.replace(LYRIC_MARKERS, '').replace(/=/g, '-').replace(/§/g, '‿').trim();
-}
+export { displayLyric }; // lyric text as shown (vocals.js)
 
 function commonParts(midi, track, toSec, settings = chartSettings({}, midi.division), mode = 'guitar') {
   const spans = (pitch) => spansOf(track.notes.filter((n) => n.pitch === pitch), toSec);

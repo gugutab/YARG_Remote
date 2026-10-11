@@ -211,7 +211,7 @@ export class Highway {
   // Karaoke: only the lyrics. The line being sung fills from left to right, the next line waits underneath.
   renderKaraoke(t, w, h, pane) {
     const g = this.g;
-    pane.karaoke ??= buildKaraokeLines(pane.chart.lyrics || []);
+    pane.karaoke ??= buildKaraokeLines(pane.chart.lyrics || [], pane.chart.phrases);
     if (!pane.karaoke.length) {
       g.font = '600 16px system-ui';
       g.textAlign = 'center';
@@ -448,6 +448,7 @@ export class Highway {
     const top = h * 0.08; // pitch area: top 8% to 76% of the canvas
     const bottom = h * 0.76;
     const yOfPitch = (p) => bottom - ((p - lo) / (hi - lo)) * (bottom - top);
+    const mid = (top + bottom) / 2; // talkies (unpitched notes) sit in the middle of the pitch area
     const lyricY = bottom + h * 0.04; // lyrics sit right under the note area
     const percussionY = h * 0.92;
     const xOf = (time) => hitX + (time - t) * pxPerSec;
@@ -459,21 +460,10 @@ export class Highway {
     // harmonies first, so the lead is drawn on top
     for (const harmony of chart.harmonies || []) {
       g.fillStyle = HARMONY_COLORS[harmony.part] || HARMONY_COLORS[1];
-      for (const n of harmony.notes) {
-        if (n.end < t - 0.2 || n.time > t + ahead) continue;
-        const x1 = xOf(n.time);
-        const x2 = Math.max(x1 + 6, xOf(n.end));
-        g.fillRect(x1, yOfPitch(n.pitch) - 4, x2 - x1, 8);
-      }
+      g.strokeStyle = g.fillStyle;
+      this.vocalNotes(harmony.notes, t, ahead, xOf, yOfPitch, mid, 4, null);
     }
-
-    for (const n of chart.notes) {
-      if (n.end < t - 0.2 || n.time > t + ahead) continue;
-      const x1 = xOf(n.time);
-      const x2 = Math.max(x1 + 6, xOf(n.end));
-      g.fillStyle = n.time <= t && n.end >= t ? '#f5c518' : '#5b8def';
-      g.fillRect(x1, yOfPitch(n.pitch) - 6, x2 - x1, 12);
-    }
+    this.vocalNotes(chart.notes, t, ahead, xOf, yOfPitch, mid, 6, ['#f5c518', '#5b8def']);
 
     // percussion: a diamond per hit, white when played, grey when not
     for (const p of chart.percussion || []) {
@@ -498,26 +488,75 @@ export class Highway {
     for (let i = 0; i < lyrics.length; i++) {
       const l = lyrics[i];
       if (l.time < t - 0.6 || l.time > t + ahead) continue;
-      const next = lyrics[i + 1]?.time ?? Infinity;
-      g.fillStyle = l.time > t ? '#ffffff' : t < next ? '#13f0a6' : '#595959';
+      const sungUntil = l.end > l.time ? l.end : lyrics[i + 1]?.time ?? Infinity; // the paired note's end, else the next syllable
+      g.fillStyle = l.time > t ? '#ffffff' : t < sungUntil ? '#13f0a6' : '#595959';
       g.fillText(l.text, xOf(l.time), lyricY);
     }
     g.textBaseline = 'alphabetic';
   }
 
-  // Pitch range shown by the vocal view, as YARG's VocalTrack does: the notes coming up, at least
-  // 20 semitones tall, padded by 10% on each side, and eased so range changes slide instead of jumping.
+  // Notes of a vocal part: pitched bars, a line joining a pitch slide to the note before it, and talkies (unpitched
+  // notes, '#', '^', '*') as a dashed outline in the middle of the pitch area. colors = [active, idle], or null to keep the fill.
+  vocalNotes(notes, t, ahead, xOf, yOfPitch, mid, half, colors) {
+    const g = this.g;
+    const keep = g.fillStyle;
+    for (let i = 0; i < notes.length; i++) {
+      const n = notes[i];
+      if (n.end < t - 0.2 || n.time > t + ahead) continue;
+      const x1 = xOf(n.time);
+      const x2 = Math.max(x1 + 6, xOf(n.end));
+      const active = n.time <= t && n.end >= t;
+      if (colors) g.fillStyle = colors[active ? 0 : 1];
+      else g.fillStyle = keep;
+      g.strokeStyle = g.fillStyle;
+      if (n.talkie) {
+        g.save();
+        g.globalAlpha *= 0.35;
+        g.fillRect(x1, mid - half * 2, x2 - x1, half * 4);
+        g.restore();
+        g.setLineDash([4, 3]);
+        g.lineWidth = 2;
+        g.strokeRect(x1, mid - half * 2, x2 - x1, half * 4);
+        g.setLineDash([]);
+        continue;
+      }
+      const prev = notes[i - 1];
+      if (n.slide && prev && !prev.talkie) { // continues the previous note: join the two bars
+        g.lineWidth = half;
+        g.beginPath();
+        g.moveTo(xOf(prev.end), yOfPitch(prev.pitch));
+        g.lineTo(x1, yOfPitch(n.pitch));
+        g.stroke();
+      }
+      g.fillRect(x1, yOfPitch(n.pitch) - half, x2 - x1, half * 2);
+    }
+  }
+
+  // Pitch range shown by the vocal view. Charts with range shifts (note 0, [range_shift], '%' lyrics; YARG.Core
+  // GetRangeShifts) use the range of the shift in force at `t`; the others use the notes coming up, as YARG's
+  // VocalTrack does. Either way: at least 20 semitones tall, padded by 10% on each side, and eased so range
+  // changes slide instead of jumping (over the length of the shift when the chart gives one).
   vocalRange(t, windowSec) {
     let lo = Infinity;
     let hi = -Infinity;
-    const scan = (notes) => {
-      for (let i = firstIndexAtOrAfter(notes, t - 1); i < notes.length && notes[i].time <= t + windowSec; i++) {
-        lo = Math.min(lo, notes[i].pitch);
-        hi = Math.max(hi, notes[i].pitch);
-      }
-    };
-    scan(this.chart.notes);
-    for (const h of this.chart.harmonies || []) scan(h.notes);
+    let slide = 0.15; // easing time constant, seconds
+    const shifts = this.chart.rangeShifts || [];
+    if (shifts.length > 1) {
+      let active = shifts[0];
+      for (const r of shifts) if (r.time <= t) active = r;
+      [lo, hi] = [active.min, active.max];
+      slide = Math.max(slide, active.length / 3);
+    } else {
+      const scan = (notes) => {
+        for (let i = firstIndexAtOrAfter(notes, t - 1); i < notes.length && notes[i].time <= t + windowSec; i++) {
+          if (notes[i].talkie) continue;
+          lo = Math.min(lo, notes[i].pitch);
+          hi = Math.max(hi, notes[i].pitch);
+        }
+      };
+      scan(this.chart.notes);
+      for (const h of this.chart.harmonies || []) scan(h.notes);
+    }
     if (lo === Infinity) [lo, hi] = this.vRange || [48, 72]; // nothing ahead: keep the last range
     lo -= 0.75; // half a note width of padding, like NOTE_WIDTH_MULTIPLIER / 2
     hi += 0.75;
@@ -532,7 +571,7 @@ export class Highway {
     const dt = Math.min(0.25, (now - (this.vRangeAt || now)) / 1000);
     this.vRangeAt = now;
     if (!this.vRange || dt === 0) this.vRange = this.vRange || target;
-    const k = 1 - Math.exp(-dt / 0.15);
+    const k = 1 - Math.exp(-dt / slide);
     this.vRange = [this.vRange[0] + (target[0] - this.vRange[0]) * k, this.vRange[1] + (target[1] - this.vRange[1]) * k];
     return this.vRange;
   }

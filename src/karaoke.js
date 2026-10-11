@@ -1,38 +1,42 @@
 // Karaoke view: the lyrics of a vocal chart as lines of syllables, with the progress through the line at a time `t`.
 // Pure functions (the canvas drawing lives in highway.js).
 
-const LINE_GAP_SEC = 1.2; // a pause this long between two syllables starts a new line
-const LINE_MAX_CHARS = 44; // and so does a word boundary past this many characters
-const MAX_SYLLABLE_SEC = 1.2; // the fill of a syllable never takes longer than this, even before a long rest
+import { splitPhrase } from './lyricphrases.js';
 
-// lyrics: [{ time, text }] sorted by time (text as chart.js displays it: "-" and "‿" join a syllable to the next).
+const MAX_SYLLABLE_SEC = 1.2; // without a paired note, the fill of a syllable never takes longer than this
+
+// lyrics: [{ time, text, end?, join? }] (text as chart.js displays it: a trailing "-" joins a syllable to the next).
+// phrases: chart.phrases, [{ from, to }] index ranges into `lyrics`, YARG's static lyric lines (see vocals.js).
 // Returns [{ start, end, syl: [{ time, end, text, join }] }]; `join` = no space before the next syllable.
-export function buildKaraokeLines(lyrics) {
+// Without phrases the lines come from the lyrics alone, split like YARG does (gaps of 0.4 s or more, then 50 characters).
+export function buildKaraokeLines(lyrics, phrases) {
+  const usable = phrases?.length && phrases.every((p) => p.from >= 0 && p.to <= lyrics.length);
+  const groups = usable
+    ? phrases.map((p) => lyrics.slice(p.from, p.to))
+    : splitPhrase(rawPhrase(lyrics)).map((p) => p.lyrics);
   const lines = [];
-  let line = null;
-  let chars = 0;
-  for (let i = 0; i < lyrics.length; i++) {
-    const raw = lyrics[i].text;
-    if (!raw) continue;
-    const join = /[-‿]$/.test(raw);
-    const text = raw.replace(/[-‿]$/, '');
-    if (!text) continue;
-    const time = lyrics[i].time;
-    const nextTime = lyrics[i + 1]?.time ?? time + 0.5;
-    const end = Math.min(nextTime, time + MAX_SYLLABLE_SEC);
-    const prev = line?.syl[line.syl.length - 1];
-    const gap = prev ? time - prev.end : 0;
-    const breakHere = !line || gap >= LINE_GAP_SEC || (chars >= LINE_MAX_CHARS && !prev.join);
-    if (breakHere) {
-      line = { start: time, end, syl: [] };
-      lines.push(line);
-      chars = 0;
+  for (const group of groups) {
+    const syl = [];
+    for (const l of group) {
+      const join = l.join ?? /[-‿]$/.test(l.text);
+      const text = join ? l.text.replace(/[-‿]$/, '') : l.text;
+      if (text) syl.push({ time: l.time, end: l.end, text, join });
     }
-    line.syl.push({ time, end, text, join });
-    line.end = end;
-    chars += text.length + (join ? 0 : 1);
+    if (syl.length) lines.push({ start: syl[0].time, end: syl[syl.length - 1].end, syl });
   }
   return lines;
+}
+
+// A single phrase holding all the lyrics, with the syllable ends estimated from the next syllable.
+function rawPhrase(lyrics) {
+  const list = lyrics
+    .filter((l) => l.text)
+    .map((l, i, all) => {
+      const next = all[i + 1]?.time ?? l.time + 0.5;
+      const end = l.end > l.time ? l.end : Math.min(next, l.time + MAX_SYLLABLE_SEC);
+      return { ...l, end, tick: l.time, tickEnd: end, join: l.join ?? /[-‿]$/.test(l.text) };
+    });
+  return { time: list[0]?.time ?? 0, timeEnd: list.at(-1)?.end ?? 0, tick: 0, tickEnd: 0, lyrics: list };
 }
 
 // Which lines to show at `t`: the one being sung (or just sung) and the one coming up.
