@@ -18,7 +18,7 @@ import { createThumbs, renderCoverThumb } from './thumbs.js';
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
-  'app', 'library', 'toggleLibrary', 'closeLibrary', 'splitter', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
+  'app', 'library', 'toggleLibrary', 'closeLibrary', 'splitter', 'libTab', 'songTab', 'closeSong', 'closeSongInfo', 'nowPlaying', 'npCover', 'npTitle', 'npArtist', 'npPlay', 'npSeek', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
@@ -69,20 +69,73 @@ const store = {
 
 // ---------- Library panel ----------
 // `persist` is false for the automatic closes on narrow screens, so they do not become the saved preference.
-function setLibraryOpen(open, persist = true) {
-  els.app.classList.toggle('lib-closed', !open);
-  if (persist) store.set('library', open ? '1' : '0');
-  // Let the layout settle, then the canvas resizes itself on the next frame.
-}
+// Panels: the library (left) and the song (right) can each be closed and reopened. On a desktop screen one of them is
+// always open: closing the last open one opens the other. On a phone the song is always there and the library is a drawer.
 const narrow = () => window.matchMedia('(max-width: 700px)').matches;
 const libraryOpen = () => !els.app.classList.contains('lib-closed');
-setLibraryOpen(!narrow(), false); // two panels: the library starts open on a desktop screen (collapsing it only lasts for the session)
+const songPanelOpen = () => !els.app.classList.contains('song-closed');
+function savePanelState() {
+  if (narrow()) return;
+  try { localStorage.setItem('yargremote.panelState', JSON.stringify({ library: libraryOpen(), song: songPanelOpen() })); } catch { /* optional */ }
+}
+function setSongPanelOpen(open) {
+  if (narrow()) return; // a phone shows one thing at a time
+  if (!open && !libraryOpen()) setLibraryOpen(true); // never both closed
+  els.app.classList.toggle('song-closed', !open);
+  syncPanelUi();
+  savePanelState();
+}
+function setLibraryOpen(open, persist = true) {
+  if (!open && !narrow() && !songPanelOpen()) setSongPanelOpen(true); // never both closed
+  els.app.classList.toggle('lib-closed', !open);
+  syncPanelUi();
+  if (persist) savePanelState();
+}
+// Edge tabs reopen a closed panel; the mini player keeps the music in reach while the song panel is closed.
+function syncPanelUi() {
+  const tabs = prefs.get('panels.tabs') && !narrow();
+  els.libTab.hidden = !(tabs && !libraryOpen());
+  els.songTab.hidden = !(tabs && !songPanelOpen());
+  const mini = !narrow() && !songPanelOpen() && !!current && prefs.get('panels.nowPlaying');
+  els.nowPlaying.hidden = !mini;
+  if (mini) syncNowPlaying();
+}
+function syncNowPlaying() {
+  if (!current) return;
+  els.npTitle.textContent = plainText(current.song.title);
+  els.npArtist.textContent = plainText(current.song.artist);
+  els.npCover.src = els.cover.src || '';
+  els.npCover.hidden = !els.cover.src || els.cover.hidden;
+  els.npPlay.querySelector('use').setAttribute('href', player.playing ? '#i-pause' : '#i-play');
+  els.npSeek.max = String(player.duration || 1);
+}
+(() => { // the panels at startup: open, closed, or as they were last time (the "Panels" settings)
+  if (narrow()) { setLibraryOpen(false, false); return; }
+  let last = {};
+  try { last = JSON.parse(localStorage.getItem('yargremote.panelState')) || {}; } catch { /* none */ }
+  const want = (start, was) => (start === 'last' ? was !== false : start !== 'closed');
+  let lib = want(prefs.get('panels.libraryStart'), last.library);
+  const song = want(prefs.get('panels.songStart'), last.song);
+  if (!lib && !song) lib = true; // never both closed
+  els.app.classList.toggle('lib-closed', !lib);
+  els.app.classList.toggle('song-closed', !song);
+})();
 // The drawer overlay on narrow screens starts closed; entering that layout closes it.
-window.matchMedia('(max-width: 700px)').addEventListener('change', (e) => { if (e.matches) setLibraryOpen(false, false); });
+window.matchMedia('(max-width: 700px)').addEventListener('change', (e) => {
+  if (e.matches) { els.app.classList.remove('song-closed'); setLibraryOpen(false, false); } // a phone: the song panel is the screen
+  else { try { const last = JSON.parse(localStorage.getItem('yargremote.panelState')) || {}; els.app.classList.toggle('song-closed', last.song === false && last.library !== false); } catch { /* keep */ } }
+  syncPanelUi();
+});
 els.toggleLibrary.addEventListener('click', () => setLibraryOpen(!libraryOpen(), false));
 els.closeLibrary.addEventListener('click', () => setLibraryOpen(false, false));
 els.scrim.addEventListener('click', () => setLibraryOpen(false, false));
 els.welcomeOpen.addEventListener('click', () => setLibraryOpen(true));
+els.libTab.addEventListener('click', () => setLibraryOpen(true));
+els.songTab.addEventListener('click', () => setSongPanelOpen(true));
+els.closeSong.addEventListener('click', () => setSongPanelOpen(false));
+els.closeSongInfo.addEventListener('click', () => setSongPanelOpen(false));
+els.npPlay.addEventListener('click', () => togglePlay());
+els.npSeek.addEventListener('input', () => player.seek(Number(els.npSeek.value)));
 
 // The divider between the two panels: drag to resize the library panel (remembered); double-click restores the default.
 const MIN_LIB_W = 300;
@@ -415,6 +468,7 @@ async function selectSong(song) {
   highway.setChart(null);
   renderList({ keepScroll: true });
   if (narrow()) setLibraryOpen(false, false);
+  else if (!songPanelOpen() && prefs.get('panels.openSongOnSelect')) setSongPanelOpen(true); // picking a song shows it
 
   els.welcome.hidden = true;
   showPlayInfo(true);
@@ -1418,6 +1472,7 @@ document.addEventListener('keydown', (e) => {
   if (e.code === 'Space' && ready) { e.preventDefault(); togglePlay(); }
   else if (e.code === 'KeyI' && (current || loadInfo.state !== 'idle')) setInfoOpen(!infoOpen);
   else if (e.code === 'KeyL') setLibraryOpen(!libraryOpen());
+  else if (e.code === 'KeyD') setSongPanelOpen(!songPanelOpen());
   else if (e.code === 'KeyB') setBarHidden(!els.app.classList.contains('bar-hidden'));
   else if (e.code === 'KeyF') toggleFullscreen();
   else if (e.code === 'KeyV') setView(highway.view === '3d' ? '2d' : '3d');
@@ -1444,6 +1499,10 @@ function frame() {
       els.seek.value = t;
       paintSeek();
       els.timeNow.textContent = fmt(t);
+    }
+    if (!els.nowPlaying.hidden) { // the mini player (song panel closed)
+      if (document.activeElement !== els.npSeek) els.npSeek.value = t;
+      els.npPlay.querySelector('use').setAttribute('href', player.playing ? '#i-pause' : '#i-play');
     }
   } else {
     highway.render(0);
@@ -1485,6 +1544,7 @@ function applyDetails() {
   if (current) renderMeta(current.song, current.midi); // the chips
 }
 const EFFECTS = {
+  'panels.tabs': syncPanelUi, 'panels.nowPlaying': syncPanelUi,
   'details.chips': applyDetails, 'details.cover': applyDetails, 'details.quote': applyDetails, 'details.sections': applyDetails,
   'details.layout': applyDetails, 'details.stemNames': applyDetails, 'details.maxWidth': applyDetails, 'details.compact': applyDetails,
   'library.cardStyle': (v) => { list.setMode(v); syncViewSeg(); },

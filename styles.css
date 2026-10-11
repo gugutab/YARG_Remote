@@ -1037,3 +1037,28 @@ body.settings-open { overflow: hidden; }
 #info[data-names="always"] .card-volume .mix-name { display: block; }
 #info[data-names="always"] .card-volume .mix-row { grid-template-columns: 36px 84px 1fr 40px 28px; }
 #info[data-names="always"] .card-volume .mix-row.has-expand { grid-template-columns: 36px auto 84px 1fr 40px 28px; }
+
+/* ---------- Round 72: panels that close and reopen ---------- */
+.app.song-closed .main { display: none; }
+.app.song-closed .library, .app.song-closed.lib-closed .library { flex: 1; width: auto; margin-left: 0; }
+.app.song-closed .splitter { display: none; }
+.app.song-closed .songs-wrap { margin-right: 0; }
+.close-song, .close-song-info { opacity: .8; }
+.close-song:hover, .close-song-info:hover { opacity: 1; }
+button.icon.close-song-info { position: absolute; top: 10px; right: 14px; z-index: 3; background: var(--panel); border-color: var(--line); }
+.edge-tab { position: fixed; top: 50%; transform: translateY(-50%); z-index: 40; width: 26px; height: 76px; padding: 0; display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); color: var(--muted); cursor: pointer; }
+.edge-tab[hidden] { display: none; }
+.edge-tab:hover { color: var(--accent); background: var(--panel-2); }
+.edge-tab svg { width: 18px; height: 18px; }
+.edge-left { left: 0; border-left: 0; border-radius: 0 10px 10px 0; }
+.edge-right { right: 0; border-right: 0; border-radius: 10px 0 0 10px; }
+@media (max-width: 700px) { .edge-tab, .close-song, .close-song-info { display: none !important; } }
+.now-playing { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-top: 1px solid var(--line); background: var(--panel-2); margin: 0 -10px; }
+.now-playing[hidden] { display: none; }
+.now-playing img { width: 38px; height: 38px; border-radius: 6px; object-fit: cover; flex: none; }
+.np-text { display: flex; flex-direction: column; min-width: 0; flex: 1 1 30%; }
+.np-text b, .np-text span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.np-text b { font-size: 13px; }
+.np-text span { font-size: 11.5px; color: var(--muted); }
+.now-playing input[type="range"] { flex: 1 1 40%; min-width: 60px; accent-color: var(--accent); }
+.now-playing .icon.primary { width: 32px; height: 32px; flex: none; }

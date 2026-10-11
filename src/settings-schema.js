@@ -73,6 +73,17 @@ export const SECTIONS = [
     ],
   },
   {
+    id: 'panels', title: 'Panels', icon: 'panels',
+    description: 'The library (left) and the song (right) can each be closed and reopened. Keys: L library, D song panel.',
+    items: [
+      { id: 'panels.libraryStart', group: 'At startup', type: 'choice', label: 'Library panel', options: [{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }, { value: 'last', label: 'As I left it' }], default: 'open' },
+      { id: 'panels.songStart', group: 'At startup', type: 'choice', label: 'Song panel', options: [{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }, { value: 'last', label: 'As I left it' }], default: 'open' },
+      { id: 'panels.openSongOnSelect', group: 'Behaviour', type: 'toggle', label: 'Open the song panel when I pick a song', help: 'Only matters when the song panel is closed.', default: true },
+      { id: 'panels.nowPlaying', group: 'Behaviour', type: 'toggle', label: 'Mini player while the song panel is closed', help: 'Title, play/pause and a position slider at the bottom of the library.', default: true },
+      { id: 'panels.tabs', group: 'Behaviour', type: 'toggle', label: 'Reopen tabs on the screen edges', help: 'A small tab on the edge where a closed panel was.', default: true },
+    ],
+  },
+  {
     id: 'general', title: 'General', icon: 'gear',
     description: 'What the app does when it starts and when a song opens.',
     items: [
