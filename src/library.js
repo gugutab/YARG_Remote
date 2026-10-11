@@ -1,7 +1,8 @@
 // Finds song folders inside a user-picked directory.
 // Works with the File System Access API (Chromium) and with <input webkitdirectory> (fallback).
-// A song folder is any directory containing song.ini, notes.mid or notes.chart.
+// A song folder is any directory containing song.ini, notes.mid or notes.chart; a .sng file is a song by itself (see sng.js).
 import { parseSongIni } from './ini.js';
+import { parseSng, blobSource, readSngBytes, findSngFile, isSngName } from './sng.js';
 
 export const AUDIO_EXT = ['ogg', 'mp3', 'opus', 'wav', 'flac', 'm4a'];
 const SONG_MARKERS = ['song.ini', 'notes.mid', 'notes.chart'];
@@ -28,10 +29,12 @@ export function entriesFromFileList(fileList) {
 // Groups flat entries into songs. `entries` may be an async iterable or an array.
 export async function scanSongs(entries) {
   const byDir = new Map();
+  const sngEntries = [];
   for await (const entry of entries) {
     const slash = entry.path.lastIndexOf('/');
     const dir = slash < 0 ? '' : entry.path.slice(0, slash);
     const name = entry.path.slice(slash + 1);
+    if (isSngName(name)) sngEntries.push(entry);
     if (!byDir.has(dir)) byDir.set(dir, new Map());
     byDir.get(dir).set(name.toLowerCase(), { name, path: entry.path, getFile: entry.getFile });
   }
@@ -51,8 +54,48 @@ export async function scanSongs(entries) {
       files,
     });
   }
+  for (const entry of sngEntries) {
+    const song = await sngSong(entry);
+    if (song) songs.push(song);
+  }
   songs.sort((a, b) => a.title.localeCompare(b.title, 'en', { sensitivity: 'base' }));
   return songs;
+}
+
+const SNG_TYPES = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp', ogg: 'audio/ogg', opus: 'audio/ogg', mp3: 'audio/mpeg', wav: 'audio/wav', flac: 'audio/flac', m4a: 'audio/mp4' };
+
+// One inner file of a .sng as a File, read (and unmasked) only now. `sngBlob` is the .sng itself.
+export async function readSngInner(sngBlob, name) {
+  const source = blobSource(sngBlob);
+  const sng = await parseSng(source);
+  const inner = findSngFile(sng, name);
+  if (!inner) throw new Error(`${name}: not in the .sng`);
+  const bytes = await readSngBytes(source, sng, inner);
+  return new File([bytes], inner.name, { type: SNG_TYPES[inner.name.split('.').pop().toLowerCase()] || '' });
+}
+
+// A .sng becomes one song: metadata replaces song.ini and the inner files are listed as if they sat in a folder named
+// after the .sng, so `path` is "<pack>/<song>.sng/<inner name>" (the same URL scheme server.mjs serves). Unreadable
+// .sng files are skipped.
+async function sngSong(entry) {
+  try {
+    const sng = await parseSng(blobSource(await entry.getFile()));
+    const files = new Map();
+    for (const f of sng.files) {
+      files.set(f.name.toLowerCase(), {
+        name: f.name, path: `${entry.path}/${f.name}`, sng: entry.path,
+        getFile: async () => readSngInner(await entry.getFile(), f.name),
+      });
+    }
+    const ini = sng.metadata;
+    return {
+      id: entry.path, folder: entry.path,
+      title: String(ini.name || entry.path.split('/').pop().replace(/\.sng$/i, '')), artist: String(ini.artist || ''), album: String(ini.album || ''),
+      ini, files,
+    };
+  } catch {
+    return null;
+  }
 }
 
 // The scanned library as plain data (no file handles), so it can be stored and shown again without a rescan.
@@ -64,7 +107,7 @@ export function serializeSongs(songs) {
     artist: s.artist,
     album: s.album,
     ini: s.ini,
-    files: [...s.files.values()].map((f) => ({ name: f.name, path: f.path })),
+    files: [...s.files.values()].map((f) => (f.sng ? { name: f.name, path: f.path, sng: f.sng } : { name: f.name, path: f.path })),
   }));
 }
 
@@ -74,7 +117,7 @@ export function restoreSongs(index, root) {
     ...s,
     files: new Map(s.files.map((f) => [
       f.name.toLowerCase(),
-      { name: f.name, path: f.path, getFile: () => resolveFile(root, f.path) },
+      { name: f.name, path: f.path, ...(f.sng ? { sng: f.sng } : {}), getFile: f.sng ? async () => readSngInner(await resolveFile(root, f.sng), f.name) : () => resolveFile(root, f.path) },
     ])),
   }));
 }

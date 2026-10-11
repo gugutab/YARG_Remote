@@ -14,6 +14,7 @@ npm test             # tests for the MIDI parser / song.ini / chart
 - Use **Chrome or Edge** (folder selection uses the File System Access API). In other browsers the
   button falls back to `<input webkitdirectory>`, which works but does not keep the folder between sessions.
 - The folder is read by the browser, not by path: the button opens the picker and you choose `A:\music\Songs`.
+- A song can also be a single `.sng` file (metadata, chart, stems and cover packed together; the plain public format, not YARG's encrypted variant).
 - Each song is a folder with `song.ini` + `notes.mid` (or `notes.chart`) + audio stems (`song.ogg`, `guitar.ogg`,
   `drums.ogg`, `vocals.ogg`, `bass.ogg`…). Any `.ogg/.mp3/.opus/.wav/.flac` in the folder becomes a track
   in the mixer.

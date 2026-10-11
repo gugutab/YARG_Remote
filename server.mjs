@@ -9,19 +9,40 @@ import { parseSongIni } from './src/ini.js';
 import { parseMidi } from './src/midi.js';
 import { parseChart } from './src/chartfile.js';
 import { instrumentOptions } from './src/chart.js';
+import { parseSng, readSngBytes, findSngFile, isSngName } from './src/sng.js';
 
 const APP_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP_FILES = new Set(['index.html', 'styles.css']);
 const APP_DIRS = ['src', 'vendor'];
 // Bump when the index gets new fields: older cache files are then rebuilt.
-const INDEX_VERSION = 3;
+const INDEX_VERSION = 4; // 4: .sng songs
 const SONG_MARKERS = ['song.ini', 'notes.mid', 'notes.chart'];
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.txt': 'text/plain; charset=utf-8',
   '.ogg': 'audio/ogg', '.opus': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.flac': 'audio/flac',
   '.m4a': 'audio/mp4', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.mid': 'audio/midi',
+  '.webp': 'image/webp', '.gif': 'image/gif', '.bmp': 'image/bmp', '.chart': 'text/plain; charset=utf-8', '.ini': 'text/plain; charset=utf-8',
 };
+
+// A source for sng.js over a file on disk (reads only the requested ranges).
+async function withSngSource(file, fn) {
+  const fh = await fs.promises.open(file, 'r');
+  try {
+    const { size } = await fh.stat();
+    const source = {
+      size,
+      read: async (start, end) => {
+        const buf = Buffer.alloc(Math.max(0, end - start));
+        const { bytesRead } = await fh.read(buf, 0, buf.length, start);
+        return buf.subarray(0, bytesRead);
+      },
+    };
+    return await fn(source);
+  } finally {
+    await fh.close();
+  }
+}
 
 // The instruments a notes.mid (or notes.chart) really has (tracks with notes), like the picker of the app: guitar, bass, rhythm, keys, drums,
 // vocals (harmony counts as vocals). song.ini often has no difficulty levels, or -1 for everything, while the chart is fine.
@@ -32,6 +53,27 @@ export function partsOf(midiBytes, isChart = false) {
   } catch {
     return [];
   }
+}
+
+// A .sng container is one song: metadata replaces song.ini, inner files are served at /songs/<rel>/<inner name>.
+async function scanSng(file, rel) {
+  return withSngSource(file, async (source) => {
+    const sng = await parseSng(source);
+    const ini = sng.metadata;
+    const byName = new Map(sng.files.map((f) => [f.name.toLowerCase(), f]));
+    const chartName = byName.has('notes.mid') ? 'notes.mid' : byName.has('notes.chart') ? 'notes.chart' : null;
+    let parts = [];
+    if (chartName) {
+      try {
+        parts = partsOf(await readSngBytes(source, sng, byName.get(chartName)), chartName === 'notes.chart');
+      } catch { /* unreadable chart: no parts */ }
+    }
+    return {
+      id: rel, folder: rel,
+      title: String(ini.name || path.basename(rel, path.extname(rel))), artist: String(ini.artist || ''), album: String(ini.album || ''),
+      ini, parts, files: sng.files.map((f) => ({ name: f.name, path: `${rel}/${f.name}` })),
+    };
+  });
 }
 
 // Walks songsDir; a song is any folder holding song.ini, notes.mid or notes.chart (same rule as src/library.js).
@@ -67,6 +109,11 @@ export async function scanLibrary(songsDir) {
         title: String(ini.name || folderName), artist: String(ini.artist || ''), album: String(ini.album || ''),
         ini, parts, files: files.map((name) => ({ name, path: rel ? `${rel}/${name}` : name })),
       });
+    }
+    for (const name of files) {
+      if (!isSngName(name)) continue;
+      const song = await scanSng(path.join(dir, name), rel ? `${rel}/${name}` : name).catch(() => null); // unreadable .sng: skipped
+      if (song) songs.push(song);
     }
     for (const e of entries) {
       if (e.isDirectory()) await walk(path.join(dir, e.name), rel ? `${rel}/${e.name}` : e.name);
@@ -128,6 +175,58 @@ function sendFile(req, res, file) {
   });
 }
 
+// /songs/<...>/<name>.sng/<inner file>: the inner file, unmasked, with byte ranges like sendFile. Returns false when
+// the path has no .sng folder segment (then it is a plain file).
+async function sendSngInner(req, res, songsDir, urlPath) {
+  const segs = urlPath.split('/');
+  const at = segs.findIndex((s) => { try { return isSngName(decodeURIComponent(s)); } catch { return false; } });
+  if (at < 0 || at === segs.length - 1) return false;
+  const sngFile = safeJoin(songsDir, segs.slice(0, at + 1).join('/'));
+  if (!sngFile) return res.writeHead(403).end('Forbidden'), true;
+  let innerName;
+  try {
+    innerName = decodeURIComponent(segs.slice(at + 1).join('/'));
+  } catch {
+    return res.writeHead(400).end(), true;
+  }
+  try {
+    await withSngSource(sngFile, async (source) => {
+      const sng = await parseSng(source);
+      const inner = findSngFile(sng, innerName);
+      if (!inner) return res.writeHead(404).end('Not found');
+      const size = inner.size;
+      const headers = { 'Content-Type': TYPES[path.extname(innerName).toLowerCase()] || 'application/octet-stream', 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-cache' };
+      let start = 0;
+      let end = size - 1;
+      const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+      let partial = false;
+      if (range && (range[1] || range[2])) {
+        if (range[1]) {
+          start = Number(range[1]);
+          if (range[2]) end = Math.min(Number(range[2]), end);
+        } else {
+          start = Math.max(0, size - Number(range[2]));
+        }
+        if (start > end || start >= size) return res.writeHead(416, { 'Content-Range': `bytes */${size}` }).end();
+        partial = true;
+      }
+      if (partial) res.writeHead(206, { ...headers, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': end - start + 1 });
+      else res.writeHead(200, { ...headers, 'Content-Length': size });
+      if (req.method === 'HEAD') return res.end();
+      const CHUNK = 1 << 20;
+      for (let pos = start; pos <= end && !res.destroyed; pos += CHUNK) {
+        const bytes = await readSngBytes(source, sng, inner, pos, Math.min(pos + CHUNK, end + 1));
+        if (!res.write(bytes)) await new Promise((r) => res.once('drain', r));
+      }
+      res.end();
+    });
+  } catch (err) {
+    if (res.headersSent) res.destroy();
+    else res.writeHead(err.code === 'ENOENT' ? 404 : 500).end('Not found');
+  }
+  return true;
+}
+
 export function createServer({ songsDir, appRoot = APP_ROOT }) {
   const cacheFile = path.join(appRoot, '.cache', 'library.json');
   let library = null; // song index in memory
@@ -163,6 +262,7 @@ export function createServer({ songsDir, appRoot = APP_ROOT }) {
         res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
         res.end(JSON.stringify({ rootName: path.basename(songsDir), songs }));
       } else if (pathname.startsWith('/songs/')) {
+        if (await sendSngInner(req, res, songsDir, pathname.slice('/songs/'.length))) return;
         const file = safeJoin(songsDir, pathname.slice('/songs/'.length));
         file ? sendFile(req, res, file) : res.writeHead(403).end('Forbidden');
       } else {
