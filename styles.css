@@ -872,3 +872,11 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 .sel-pop .all-row[data-active="true"] { color: var(--accent); }
 .sel-pop .all-row[data-partial="true"] .check { border-color: var(--accent); }
 .sel-pop .all-row[data-partial="true"] .check::after { content: ""; width: 8px; height: 2px; border-radius: 1px; background: var(--accent); } /* a dash: some are selected */
+
+/* Round 64: the active filter chips take at most three rows, then scroll (many multi-select values can pile up) */
+.active-filters { max-height: 87px; overflow-y: auto; overscroll-behavior: contain; align-content: flex-start; flex: none; }
+.active-filters::-webkit-scrollbar { width: 6px; }
+.active-filters::-webkit-scrollbar-track { background: transparent; }
+.active-filters::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+.active-filters::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+@supports not selector(::-webkit-scrollbar) { .active-filters { scrollbar-width: thin; scrollbar-color: var(--line) transparent; } }
