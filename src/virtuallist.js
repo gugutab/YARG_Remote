@@ -109,7 +109,20 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     el.innerHTML = '<span class="thumb"><img alt="" decoding="async" hidden></span><span class="song-text"><span class="song-title"></span><span class="song-artist"></span></span>';
     el.querySelector('.song-title').textContent = text(song.title);
     el.querySelector('.song-artist').textContent = text(song.artist);
-    if (mode === 'normal') el.title = describe(song).pack || ''; // the pack, as a tooltip
+    if (mode === 'normal') { // the pack at the top right, next to the title
+      const packName = describe(song).pack;
+      if (packName) {
+        const top = document.createElement('span');
+        top.className = 'song-top';
+        const title = el.querySelector('.song-title');
+        title.replaceWith(top);
+        const pack = document.createElement('span');
+        pack.className = 'song-packtag';
+        pack.textContent = packName;
+        pack.title = packName;
+        top.append(title, pack);
+      }
+    }
     if (mode === 'normal') { // the instruments the song has, as small icons to the right of the artist
       const sub = document.createElement('span');
       sub.className = 'song-sub';

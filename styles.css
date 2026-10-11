@@ -834,3 +834,8 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 .song-pack { display: flex; align-items: center; gap: 4px; min-width: 0; color: var(--accent); font-size: 11.5px; font-weight: 600; }
 .song-pack svg { width: 12px; height: 12px; flex: none; }
 .song-pack span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Normal cards: the title with the pack at the top right */
+.song-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.song-top .song-title { flex: 1 1 auto; min-width: 0; }
+.song-packtag { flex: 0 1 auto; max-width: 42%; padding-right: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; font-weight: 600; color: var(--accent); }
