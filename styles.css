@@ -906,6 +906,6 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 .app.bar-hidden .topbar, .app.bar-hidden .tb-main { pointer-events: none; }
 .app.bar-hidden .tb-main > .seekbox { pointer-events: auto; }
 
-/* Multi-column list: a line on the left of every card (the first column had none) and one more after the last column */
-#songs.multi li.row { border-left: 1px solid var(--line); border-right: 0; }
-#songs.multi li.row.last-col { border-right: 1px solid var(--line); }
+/* Multi-column list: separator lines between and around the cards */
+#songs.multi li.row { border-right: 1px solid var(--line); } /* every card closes its own right side (also a lone card in the last row) */
+#songs.multi li.row.first-col { border-left: 1px solid var(--line); } /* the first column also has the left line */

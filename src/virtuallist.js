@@ -168,7 +168,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     const el = document.createElement('li');
     el.style.top = `${offsets[index]}px`;
     if (colOf) el.style.setProperty('--col', String(colOf[index]));
-    const lastCol = item.type !== 'head' && cols > 1 && colOf?.[index] === cols - 1; // the closing line of the grid
+    const firstCol = item.type !== 'head' && cols > 1 && colOf?.[index] === 0; // gets the line on the left of the grid
     if (item.type === 'head') {
       el.className = 'divider';
       el.style.height = `${HEAD_H}px`;
@@ -177,7 +177,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       return { el, timer: 0 };
     }
     const song = item.song;
-    el.className = `row ${mode}` + (song === activeSong ? ' active' : '') + (lastCol ? ' last-col' : '');
+    el.className = `row ${mode}` + (song === activeSong ? ' active' : '') + (firstCol ? ' first-col' : '');
     el.style.height = `${rowH}px`;
     el.setAttribute('role', 'option');
     el.setAttribute('aria-selected', String(song === activeSong));
