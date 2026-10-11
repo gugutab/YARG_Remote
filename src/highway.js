@@ -50,6 +50,14 @@ export class Highway {
     this.view = '2d';
     this.noteStyle = 'round'; // 'round' or 'rect' (rounded rectangles)
     this.neck = 1.2; // neck speed (the app default): scales distance between notes only; timing is unchanged
+    this.bg = '#0d1117'; // chart background and the colour its fades dissolve into (the theme's "stage" colour)
+    this.bgRgb = '13, 17, 23';
+  }
+
+  setBackground(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    this.bg = hex;
+    this.bgRgb = `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
   }
 
   // '2d' (flat) or '3d' (perspective). Vocals have no highway and always use the flat view.
@@ -87,7 +95,7 @@ export class Highway {
   render(t) {
     const { w, h } = this.resize();
     const g = this.g;
-    g.fillStyle = '#0d1117';
+    g.fillStyle = this.bg;
     g.fillRect(0, 0, w, h);
 
     if (!this.chart) return; // the page shows its own welcome / loading overlay
@@ -253,7 +261,7 @@ export class Highway {
     const fadeStart = Math.max(hitY + radius * 1.05, h - bottomFade);
     if (h - fadeStart > 2) {
       const bf = g.createLinearGradient(0, fadeStart, 0, h);
-      for (const [at, a] of [[0, 0], [0.3, 0.2], [0.6, 0.6], [0.85, 0.92], [1, 1]]) bf.addColorStop(at, `rgba(13,17,23,${a})`);
+      for (const [at, a] of [[0, 0], [0.3, 0.2], [0.6, 0.6], [0.85, 0.92], [1, 1]]) bf.addColorStop(at, `rgba(${this.bgRgb},${a})`);
       g.fillStyle = bf;
       g.fillRect(0, fadeStart, w, h - fadeStart);
     }
@@ -261,7 +269,7 @@ export class Highway {
     // the board and the notes entering from the top dissolve into the background (an eased fade)
     const fadeH = h * 0.2;
     const fade = g.createLinearGradient(0, 0, 0, fadeH);
-    for (const [at, a] of [[0, 1], [0.25, 0.85], [0.5, 0.5], [0.75, 0.17], [1, 0]]) fade.addColorStop(at, `rgba(13,17,23,${a})`);
+    for (const [at, a] of [[0, 1], [0.25, 0.85], [0.5, 0.5], [0.75, 0.17], [1, 0]]) fade.addColorStop(at, `rgba(${this.bgRgb},${a})`);
     g.fillStyle = fade;
     g.fillRect(0, 0, w, fadeH);
   }

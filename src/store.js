@@ -73,6 +73,12 @@ export async function loadThumb(id) {
   }
 }
 
+export async function clearThumbs() {
+  try {
+    await thumbRun('readwrite', (s) => s.clear());
+  } catch { /* nothing stored */ }
+}
+
 export async function saveThumb(id, blob) {
   try {
     await thumbRun('readwrite', (s) => s.put(blob, id));

@@ -6,7 +6,12 @@ import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, re
 import { songDelaySeconds, plainText } from './ini.js';
 import { metaRows, extraRows, chartStats, bpmLabel, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel } from './songinfo.js';
 import { parseRoute, formatRoute } from './route.js';
-import { saveLibrary, loadLibrary, loadThumb, saveThumb } from './store.js';
+import { createSettings } from './settings.js';
+import { SECTIONS, buildDefaults, FONT_OPTIONS } from './settings-schema.js';
+import { resolveTheme, applyTheme } from './themes.js';
+import { mountSettings } from './settings-ui.js';
+import { renderThemeStudio, renderDataTools } from './settings-custom.js';
+import { saveLibrary, loadLibrary, loadThumb, saveThumb, clearThumbs } from './store.js';
 import { filterSongs, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, anchorLabel } from './songlist.js';
 import { createVirtualList } from './virtuallist.js';
 import { createThumbs, renderCoverThumb } from './thumbs.js';
@@ -41,6 +46,21 @@ const settings = { speed: 1, neck: 1.2, chartDelay: 0 };
 let remote = false; // library comes from server.mjs (/api/library); no folder permission needed
 let detached = false; // list restored from storage without file access (browsers without showDirectoryPicker)
 let pendingSongId = null; // song clicked while detached; opened once the folder is picked again
+
+// ---------- Settings and theme (applied first, so the first frame already has the right colours) ----------
+const prefs = createSettings({ defaults: buildDefaults(), storage: (() => { try { return localStorage; } catch { return null; } })() });
+const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+function applyThemeSetting() {
+  const theme = resolveTheme({ preset: prefs.get('theme.preset'), overrides: prefs.get('theme.overrides'), saved: prefs.get('theme.saved') }, darkQuery.matches);
+  applyTheme(theme);
+  highway.setBackground(theme.vars.stage);
+  try { // read by the inline script in index.html before the first paint
+    const css = {};
+    for (const k of ['--bg', '--panel', '--panel-2', '--line', '--text', '--muted', '--accent', '--accent-text', '--stage', '--stage-rgb', 'color-scheme']) css[k] = document.documentElement.style.getPropertyValue(k);
+    localStorage.setItem('yargremote.themeCache', JSON.stringify({ scheme: theme.scheme, css }));
+  } catch { /* the cache is optional */ }
+}
+darkQuery.addEventListener('change', () => { if (prefs.get('theme.preset') === 'auto') applyThemeSetting(); });
 
 const store = {
   get(key) { try { return localStorage.getItem(`yargremote.${key}`); } catch { return null; } },
@@ -297,6 +317,10 @@ function afterLibraryLoaded() {
   syncFilterUi();
   renderList();
   openFromHash(); // a #/song/... link opened at startup (does nothing once a song is open)
+  if (!current && parseRoute(location.hash).view === 'library' && prefs.get('general.restoreLast')) { // "Reopen the last song"
+    const last = songs.find((s) => s.id === store.get('lastSong'));
+    if (last) selectSong(last);
+  }
 }
 
 // On the first load, offer to reopen the folder from the last visit (no picker, one click).
@@ -464,6 +488,7 @@ async function selectSong(song) {
   stemStates.forEach(applyStem); // volumes chosen while loading
   ready = true;
   setLoadState('ready', chart ? 'Ready to play' : 'No playable instrument in this song.', 1);
+  if (chart && prefs.get('general.autoplay')) togglePlay(); // "Play as soon as a song has loaded"
 }
 
 // ---------- Info screen ----------
@@ -1372,6 +1397,10 @@ document.addEventListener('mousemove', wake);
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tag = e.target.tagName;
+  if (typeof settingsPage !== 'undefined' && settingsPage.isOpen()) { // the settings page owns the keyboard while it is open
+    if (e.code === 'Escape') settingsPage.close();
+    return;
+  }
   if (e.code === 'Escape') {
     if (popovers.every(([, pop]) => pop.hidden) && infoOpen && loadInfo.state !== 'idle') setInfoOpen(false); // details -> chart
     closePopovers();
@@ -1420,11 +1449,40 @@ function fmt(sec) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+// ---------- Settings: what each setting does, and the settings page ----------
+const fontCss = (key) => (FONT_OPTIONS.find((f) => f.value === key) ?? FONT_OPTIONS[0]).css;
+const EFFECTS = {
+  'theme.preset': applyThemeSetting,
+  'theme.overrides': applyThemeSetting,
+  'theme.saved': applyThemeSetting,
+  'ui.radius': (v) => document.documentElement.style.setProperty('--radius', `${v}px`),
+  'ui.font': (v) => document.documentElement.style.setProperty('--font', fontCss(v)),
+  'ui.animations': (v) => { document.documentElement.dataset.motion = v ? 'on' : 'off'; },
+};
+for (const [id, fn] of Object.entries(EFFECTS)) fn(prefs.get(id));
+prefs.subscribe((id, value) => EFFECTS[id]?.(value));
+
+const settingsPage = mountSettings({
+  root: document.getElementById('settingsPage'), settings: prefs, sections: SECTIONS,
+  renderers: {
+    theme: (host, ctx) => renderThemeStudio(host, { ...ctx, prefersDark: () => darkQuery.matches, notify: setStatus }),
+    'data.tools': (host, ctx) => renderDataTools(host, {
+      ...ctx, notify: setStatus,
+      extra: [{ label: 'Clear thumbnail cache', help: 'Album thumbnails are rebuilt as you scroll.', run: async () => { await clearThumbs(); return 'Thumbnail cache cleared; thumbnails are rebuilt as you scroll.'; } }],
+    }),
+  },
+});
+document.getElementById('openSettings').addEventListener('click', () => settingsPage.open());
+document.addEventListener('keydown', (e) => {
+  if (e.key === ',' && !e.ctrlKey && !e.metaKey && !e.altKey && !['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) { e.preventDefault(); settingsPage.isOpen() ? settingsPage.close() : settingsPage.open(); }
+});
+
 // ---------- Deep links: the URL hash names the open song ----------
 // The hash is only replaced (no history entries): a reload or a shared link opens the same song, and the two panels
 // stay in place. #/song/<id> opens the details, #/song/<id>/play the chart.
 function syncUrl() {
   if (!current) return;
+  store.set('lastSong', current.song.id); // for "Reopen the last song"
   const hash = formatRoute({ view: infoOpen ? 'song' : 'play', id: current.song.id });
   if (location.hash !== hash) history.replaceState(null, '', hash);
   document.title = `${plainText(current.song.title)} - ${plainText(current.song.artist)} · YARG Remote`;
