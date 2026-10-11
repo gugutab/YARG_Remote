@@ -107,17 +107,21 @@ export function filterSongs(songs, { query = '', instruments = [], instrument = 
   const { terms, fields } = parseQuery(query);
   const wanted = [...new Set([...instruments, ...(instrument ? [instrument] : [])])];
   const normTerms = terms.map(norm);
+  const list = (v) => (Array.isArray(v) ? v : v ? [v] : []);
+  const genres = list(genre);
+  const packList = list(pack);
+  const decades = list(decade).map(Number).filter(Boolean);
   return songs.filter((s) => {
     for (const inst of wanted) if (!hasInstrument(s, inst)) return false;
     if (minLevel > 0) { // every selected instrument reaches the level; with none selected, any instrument does
       const reaches = (i) => (levelOf(s, i) ?? -1) >= minLevel;
       if (!(wanted.length ? wanted.every(reaches) : INSTRUMENTS.some(reaches))) return false;
     }
-    if (genre && s.ini?.genre !== genre) return false;
-    if (pack && packOf(s) !== pack) return false;
-    if (decade) {
+    if (genres.length && !genres.includes(s.ini?.genre)) return false; // within one filter any value matches; filters combine with AND
+    if (packList.length && !packList.includes(packOf(s))) return false;
+    if (decades.length) {
       const y = parseInt(s.ini?.year, 10) || 0;
-      if (y < decade || y > decade + 9) return false;
+      if (!decades.some((d) => y >= d && y <= d + 9)) return false;
     }
     for (const f of fields) {
       let pass = matchesField(s, f);

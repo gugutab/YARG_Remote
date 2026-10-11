@@ -102,3 +102,15 @@ test('the pack is the top-level folder: shown, searchable, filterable and sortab
   assert.equal(metaRows(songs[0])[0].label, 'Pack');
   assert.equal(metaRows(songs[0])[0].value, 'Rock Band 2 DLC');
 });
+
+test('genre, pack and decade filters take several values: any of them matches, filters combine with AND', () => {
+  const mk = (id, genre, year) => ({ id, title: id, artist: 'a', album: 'b', ini: { genre, year } });
+  const songs = [mk('Rock Band 1/a', 'Rock', 1975), mk('Rock Band 2/b', 'Metal', 1985), mk('Guitar Hero III/c', 'Rock', 1995), mk('Guitar Hero III/d', 'Pop', 2005)];
+  const ids = (f) => filterSongs(songs, f).map((s) => s.id.split('/')[1]);
+  assert.deepEqual(ids({ genre: ['Rock', 'Metal'] }), ['a', 'b', 'c']);
+  assert.deepEqual(ids({ pack: ['Rock Band 1', 'Rock Band 2'] }), ['a', 'b']);
+  assert.deepEqual(ids({ decade: ['1970', '1990'] }), ['a', 'c']);
+  assert.deepEqual(ids({ genre: ['Rock', 'Metal'], pack: ['Guitar Hero III'], decade: ['1990', '2000'] }), ['c']);
+  assert.deepEqual(ids({ genre: 'Pop' }), ['d']); // a single value still works
+  assert.deepEqual(ids({ genre: [] }), ['a', 'b', 'c', 'd']);
+});

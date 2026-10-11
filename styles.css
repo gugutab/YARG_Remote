@@ -862,3 +862,10 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 .sort-dir { padding: 0 8px; }
 .sort-dir svg { transition: transform .15s; }
 .sort-dir.desc svg { transform: rotate(180deg); }
+
+/* Multi-select dropdowns (genre, pack, decade): a check box column; the selection stays highlighted */
+.sel-pop .check { flex: none; display: grid; place-items: center; width: 16px; height: 16px; border: 1.5px solid var(--muted); border-radius: 4px; }
+.sel-pop .check svg { width: 12px; height: 12px; opacity: 0; color: #fff; }
+.sel-pop .prow[data-active="true"] .check { background: var(--accent); border-color: var(--accent); }
+.sel-pop .prow[data-active="true"] .check svg { opacity: 1; }
+.sel-pop .clear-row { color: var(--muted); font-weight: 500; font-size: 13px; border-bottom: 1px solid var(--line); border-radius: 8px 8px 0 0; margin-bottom: 2px; }

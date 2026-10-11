@@ -73,7 +73,10 @@ const filters = { instruments: new Set(), minLevel: 0 };
 const selectSyncs = []; // refresh the custom dropdowns after the code changes a <select> (see customSelect)
 const FILTER_ICONS = { guitar: 'guitar', bass: 'bass', rhythm: 'rhythm', keys: 'keys', drums: 'drum', vocals: 'mic' };
 const INSTRUMENT_NAMES = { guitar: 'Guitar', bass: 'Bass', rhythm: 'Rhythm', keys: 'Keys', drums: 'Drums', vocals: 'Vocals' };
-const filterCount = () => (filters.instruments.size ? 1 : 0) + (filters.minLevel ? 1 : 0) + (els.filterGenre.value ? 1 : 0) + (els.filterDecade.value ? 1 : 0) + (els.filterPack.value ? 1 : 0);
+// Genre, pack and decade take several values at once: the hidden <select multiple> holds the selection.
+const picked = (select) => [...select.selectedOptions].map((o) => o.value);
+const clearPicked = (select) => { for (const o of select.options) o.selected = false; };
+const filterCount = () => filters.instruments.size + (filters.minLevel ? 1 : 0) + picked(els.filterGenre).length + picked(els.filterDecade).length + picked(els.filterPack).length;
 function syncFilterUi() {
   for (const b of els.instChips.querySelectorAll('[data-inst]')) b.setAttribute('aria-pressed', String(filters.instruments.has(b.dataset.inst)));
   for (const b of els.levelSeg.querySelectorAll('[data-level]')) b.setAttribute('aria-pressed', String(Number(b.dataset.level) === filters.minLevel));
@@ -86,9 +89,12 @@ function syncFilterUi() {
   const add = (text, remove, icon) => chips.push({ text, remove, icon });
   for (const i of filters.instruments) add(INSTRUMENT_NAMES[i], () => filters.instruments.delete(i), FILTER_ICONS[i]);
   if (filters.minLevel) add(`Level ${filters.minLevel}+`, () => { filters.minLevel = 0; }, 'sort');
-  if (els.filterPack.value) add(els.filterPack.value, () => { els.filterPack.value = ''; }, 'package');
-  if (els.filterGenre.value) add(els.filterGenre.value, () => { els.filterGenre.value = ''; }, 'list');
-  if (els.filterDecade.value) add(`${els.filterDecade.value}s`, () => { els.filterDecade.value = ''; }, 'calendar');
+  const addEach = (select, icon, textOf = (v) => v) => {
+    for (const o of select.selectedOptions) add(textOf(o.value), () => { o.selected = false; }, icon); // one chip per selected value
+  };
+  addEach(els.filterPack, 'package');
+  addEach(els.filterGenre, 'list');
+  addEach(els.filterDecade, 'calendar', (v) => `${v}s`);
   els.activeFilters.hidden = chips.length === 0;
   els.activeFilters.replaceChildren(...chips.map(({ text, remove, icon }) => {
     const b = document.createElement('button');
@@ -120,9 +126,7 @@ els.levelSeg.addEventListener('click', (e) => {
 els.filterClear.addEventListener('click', () => {
   filters.instruments.clear();
   filters.minLevel = 0;
-  els.filterGenre.value = '';
-  els.filterDecade.value = '';
-  els.filterPack.value = '';
+  for (const s of [els.filterGenre, els.filterDecade, els.filterPack]) clearPicked(s);
   syncFilterUi();
   renderList();
 });
@@ -249,12 +253,12 @@ async function loadEntries(entries) {
 function afterLibraryLoaded() {
   els.rescan.hidden = !connectedRoot && !remote;
   const genres = genresOf(songs);
-  els.filterGenre.replaceChildren(new Option('Genre', ''), ...genres.map((g) => new Option(g, g)));
+  els.filterGenre.replaceChildren(...genres.map((g) => new Option(g, g)));
   els.filterGenre.closest('label').hidden = genres.length === 0;
-  els.filterDecade.replaceChildren(new Option('Decade', ''), ...decadesOf(songs).map((d) => new Option(`${d}s`, String(d))));
-  els.filterDecade.closest('label').hidden = els.filterDecade.options.length < 2;
-  els.filterPack.replaceChildren(new Option('Pack', ''), ...packsOf(songs).map((p) => new Option(p, p)));
-  els.filterPack.closest('label').hidden = els.filterPack.options.length < 2;
+  els.filterDecade.replaceChildren(...decadesOf(songs).map((d) => new Option(`${d}s`, String(d))));
+  els.filterDecade.closest('label').hidden = els.filterDecade.options.length < 1;
+  els.filterPack.replaceChildren(...packsOf(songs).map((p) => new Option(p, p)));
+  els.filterPack.closest('label').hidden = els.filterPack.options.length < 1;
   syncFilterUi();
   renderList();
 }
@@ -310,7 +314,7 @@ syncViewSeg();
 
 function renderList({ keepScroll = false } = {}) {
   const shown = sortSongs(filterSongs(songs, {
-    query: els.search.value, instruments: [...filters.instruments], minLevel: filters.minLevel, genre: els.filterGenre.value, decade: Number(els.filterDecade.value) || 0, pack: els.filterPack.value,
+    query: els.search.value, instruments: [...filters.instruments], minLevel: filters.minLevel, genre: picked(els.filterGenre), decade: picked(els.filterDecade), pack: picked(els.filterPack),
   }), els.sortBy.value, sortDesc);
   els.sortDir.classList.toggle('desc', sortDesc); // the arrow points up when descending
   els.sortDir.title = sortDesc ? 'Descending (click to reverse)' : 'Ascending (click to reverse)';
@@ -1131,7 +1135,7 @@ for (const [btn, pop] of popovers) registerPopover(btn, pop);
 
 // The library's <select>s (sort, genre, decade) keep their native element as the value holder but are shown and
 // picked through a popover in the same style as the section and instrument lists (the native list ignores the theme).
-function customSelect(select) {
+function customSelect(select, { multi = false, placeholder = '' } = {}) {
   const label = select.closest('label');
   const icon = label.querySelector('svg').cloneNode(true);
   const btn = document.createElement('button');
@@ -1148,36 +1152,60 @@ function customSelect(select) {
   const pop = document.createElement('div');
   pop.className = 'popover part-pop sel-pop align-left';
   pop.hidden = true;
+  if (multi) select.multiple = true; // the native select only holds the options and the selection
   label.classList.add('enhanced');
   label.append(btn);
   document.body.append(pop); // fixed popovers must not live inside the sliding drawer (a transformed ancestor)
-  const placeholder = () => select.options[0]?.value === '' ? select.options[0].textContent : '';
+  const notify = () => {
+    select.dispatchEvent(new Event('input', { bubbles: true }));
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  };
   const sync = () => {
-    const chosen = select.selectedOptions[0];
-    text.textContent = chosen ? chosen.textContent : '';
-    pop.replaceChildren(...[...select.options].map((o) => {
+    const chosen = [...select.selectedOptions];
+    // several values: "Genre · 3"; one: its name; none: the placeholder
+    text.textContent = multi ? (chosen.length === 0 ? placeholder : chosen.length === 1 ? chosen[0].textContent : `${placeholder} · ${chosen.length}`) : (chosen[0]?.textContent ?? '');
+    const rows = [];
+    if (multi && chosen.length) { // a first row to drop the whole selection
+      const clear = document.createElement('div');
+      clear.className = 'prow clear-row';
+      clear.innerHTML = '<span class="prow-name">Clear selection</span>';
+      clear.addEventListener('click', () => { for (const o of select.options) o.selected = false; notify(); sync(); });
+      rows.push(clear);
+    }
+    for (const o of select.options) {
       const row = document.createElement('div');
       row.className = 'prow';
-      row.dataset.active = String(o.value === select.value);
+      row.dataset.active = String(o.selected);
       row.setAttribute('role', 'option');
-      row.innerHTML = '<span class="prow-name"></span>';
-      row.querySelector('.prow-name').textContent = o.value === '' ? `Any ${placeholder().toLowerCase()}` : o.textContent;
+      row.setAttribute('aria-selected', String(o.selected));
+      row.innerHTML = `${multi ? '<span class="check"><svg><use href="#i-check"/></svg></span>' : ''}<span class="prow-name"></span>`;
+      row.querySelector('.prow-name').textContent = o.textContent;
       row.addEventListener('click', () => {
+        if (multi) {
+          o.selected = !o.selected; // toggles; the list stays open for the next pick
+          notify();
+          sync();
+          return;
+        }
         select.value = o.value;
-        select.dispatchEvent(new Event('input', { bubbles: true }));
-        select.dispatchEvent(new Event('change', { bubbles: true }));
+        notify();
         sync();
         closePopovers();
       });
-      return row;
-    }));
+      rows.push(row);
+    }
+    pop.replaceChildren(...rows);
   };
   popovers.push([btn, pop]);
   registerPopover(btn, pop);
   selectSyncs.push(sync);
   sync();
 }
-for (const s of [els.sortBy, els.filterGenre, els.filterDecade, els.filterPack]) customSelect(s);
+customSelect(els.sortBy);
+customSelect(els.filterPack, { multi: true, placeholder: 'Pack' });
+customSelect(els.filterGenre, { multi: true, placeholder: 'Genre' });
+customSelect(els.filterDecade, { multi: true, placeholder: 'Decade' });
+
 document.addEventListener('click', (e) => {
   closePopovers();
   // Drop focus from clicked buttons so Space and the other shortcuts keep working afterwards.
