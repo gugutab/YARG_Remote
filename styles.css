@@ -822,7 +822,7 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 .song-sub .song-artist { flex: 1 1 auto; min-width: 0; }
 .song-icons { display: flex; gap: 5px; flex: none; margin-left: auto; padding-right: 4px; }
 .song-icons { gap: 6px; align-items: center; }
-.song-icons .inst svg { width: 19px; height: 19px; } /* with the pack name above, the icons fill the height of the right side */
+.song-icons .inst svg { width: 15px; height: 15px; } /* with the pack name above, the icons fill the height of the right side */
 #songs li.row.normal .song-text { flex: 1; }
 
 /* Round 60: on large screens the album image of the detail screen is twice as big (160 -> 320 px) */
@@ -837,7 +837,7 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 .song-pack span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Normal cards: the title with the pack at the top right */
-.song-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.song-top { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
 .song-top .song-title { flex: 1 1 auto; min-width: 0; }
 .song-packtag { flex: 0 1 auto; max-width: 42%; padding-right: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; font-weight: 600; color: var(--accent); }
 
@@ -853,3 +853,7 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 .inst-tip b { font-weight: 600; }
 .inst-tip em { color: var(--muted); font-style: normal; font-size: 11px; }
 .inst-tip .mini-pips i { width: 6px; height: 10px; }
+
+/* Round 63: the instrument icons are 15px in the normal and in the large card; the pack tag sits at the top of the normal card */
+.song-insts .inst svg { width: 15px; height: 15px; }
+.song-packtag { margin-top: -6px; } /* the text block is centred in the 56px card (11px from the top): the pack sits 4px from the top edge */

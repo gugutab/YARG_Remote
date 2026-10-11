@@ -263,7 +263,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       const isAnchor = gr.anchor !== lastText;
       if (isAnchor && y - lastY >= 11) {
         g.fillStyle = muted;
-        g.fillText(gr.anchor, W - 6 - RAIL_PAD - 3, y);
+        g.fillText(gr.anchor, W - 6 - RAIL_PAD - 5, y); // 5px between a label and its tick
         lastY = y;
       }
       if (isAnchor) lastText = gr.anchor;
