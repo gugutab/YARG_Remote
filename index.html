@@ -73,7 +73,6 @@
         <span class="lib-tools">
           <button id="pick" class="icon" type="button" title="Choose songs folder" aria-label="Choose songs folder"><svg><use href="#i-folder"/></svg></button>
           <button id="rescan" class="icon" type="button" title="Refresh list" aria-label="Refresh list" hidden><svg><use href="#i-refresh"/></svg></button>
-          <button id="libExpand" class="icon" type="button" title="Wide view: the library as a full page" aria-label="Wide library view" aria-pressed="false"><svg><use href="#i-grid"/></svg></button>
           <button id="closeLibrary" class="icon" type="button" title="Close (L)" aria-label="Close library"><svg><use href="#i-x"/></svg></button>
         </span>
         <input id="folderInput" type="file" webkitdirectory hidden>
@@ -151,6 +150,7 @@
       <div id="status" class="status" role="status"></div>
     </aside>
     <div class="scrim" id="scrim"></div>
+    <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize the library panel" title="Drag to resize (double-click to reset)"></div>
 
     <div class="main">
       <!-- Top menu + play info -->
@@ -160,7 +160,6 @@
 
         <div class="tb-main">
           <div class="tb-top">
-            <button id="homeBtn" class="chip-btn home-btn" type="button" title="Back to the library (H)" aria-label="Back to the library"><svg><use href="#i-grid"/></svg><span>Library</span></button>
             <div class="now" id="now" hidden>
               <div class="now-text">
                 <div id="title" class="now-title"></div>
@@ -259,7 +258,7 @@
         </div>
         <div id="loading" class="loading" hidden></div>
         <section id="info" class="info" hidden aria-label="Song info">
-          <button id="infoMenu" class="chip-btn info-back" type="button" title="Back to the library (Esc)" aria-label="Back to the library"><svg><use href="#i-arrow-left"/></svg><span>Library</span></button>
+          <button id="infoMenu" class="icon info-menu" type="button" title="Library (L)" aria-label="Open or close the library"><svg><use href="#i-menu"/></svg></button>
           <div class="info-scroll">
             <div class="info-grid">
               <header class="info-card info-head">
@@ -306,7 +305,7 @@
         </section>
         <div id="welcome" class="welcome">
           <svg><use href="#i-music"/></svg>
-          <p>Open the library and choose a song.</p>
+          <p>Choose a song in the list.</p>
           <button id="welcomeOpen" type="button">Open library</button>
         </div>
       </main>

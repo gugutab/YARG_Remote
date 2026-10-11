@@ -654,7 +654,7 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .prow .seg.compact button { width: 34px; min-width: 0; padding: 3px 0; text-align: center; } /* mode and difficulty buttons share one size */
 
 /* The library's own close button replaces the hamburger while the library is open */
-.app:not(.lib-closed) #toggleLibrary { display: none; }
+.app:not(.lib-closed) #toggleLibrary, .app:not(.lib-closed) #infoMenu { display: none; }
 
 /* Library list: the native scrollbar is hidden; the rail on the right is the scrollbar (thumb), the group index (ticks
    and short labels) and a quick-navigation strip (press or drag). --rail-w also sets the right edge of the rows and
@@ -887,20 +887,7 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 #songs li.divider { right: auto; left: 0; width: calc(100% - var(--rail-w)); }
 #songs.multi li.row { border-right: 1px solid var(--line); }
 
-/* Round 65: the home screen: the library as a full page (see setHome in app.js) */
-.app.home .main, .app.home .scrim { display: none !important; }
-.app.home .library, .app.home.lib-closed .library {
-  position: static; flex: 1; width: auto; margin-left: 0; transform: none; box-shadow: none; border-right: 0; min-width: 0;
-  padding: 24px max(24px, calc((100vw - 1500px) / 2)); gap: 14px;
-}
-.app.home #closeLibrary { display: none !important; }
-.app.home .lib-head strong { font-size: 24px; }
-.app.home .search input { font-size: 18px; padding-top: 13px; padding-bottom: 13px; padding-left: 44px; border-radius: 12px; }
-.app.home .search > svg { left: 15px; top: 15px; width: 20px; height: 20px; }
-.app.home .search .filter-btn { top: 8px; right: 8px; }
-.app.home .filter-panel { max-width: 720px; }
-.app.home .songs-wrap { margin: 0; border-top: 0; }
-.app.home #songs li.divider { font-size: 12px; }
+
 
 /* Round 66: with the top bar collapsed its (invisible) boxes must not catch clicks meant for the stage buttons; only the seek bar does */
 .app.bar-hidden .topbar, .app.bar-hidden .tb-main { pointer-events: none; }
@@ -910,11 +897,13 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 #songs.multi li.row { border-right: 1px solid var(--line); } /* every card closes its own right side (also a lone card in the last row) */
 #songs.multi li.row.first-col { border-left: 1px solid var(--line); } /* the first column also has the left line */
 
-/* Round 67: navigation buttons: "Library" in the player bar and a labelled back button on the details screen */
-.tb-top { justify-content: flex-start; }
-.tb-top > :last-child { margin-left: auto; }
-.home-btn { flex: none; }
-.home-btn span { font-weight: 600; }
-button.chip-btn.info-back { position: absolute; top: 10px; left: 12px; z-index: 2; background: var(--panel); }
-.info-back span { font-weight: 600; }
-@media (max-width: 700px) { .home-btn span { display: none; } .home-btn { padding: 0 6px; } }
+
+
+/* Round 68: two panels. The library is a panel next to the song panel (details or player), with a draggable divider */
+.splitter { flex: none; width: 9px; margin: 0 -5px 0 -4px; position: relative; z-index: 6; cursor: col-resize; touch-action: none; }
+.splitter::after { content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; background: transparent; transition: background .15s; }
+.splitter:hover::after, .splitter.dragging::after { background: var(--accent); }
+.app.lib-closed .splitter { display: none; }
+@media (max-width: 700px) { .splitter { display: none; } }
+.app:not(.lib-closed) #welcomeOpen { display: none; } /* the list is already on screen */
+body.resizing { cursor: col-resize; user-select: none; }

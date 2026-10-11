@@ -13,13 +13,13 @@ import { createThumbs, renderCoverThumb } from './thumbs.js';
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
-  'app', 'library', 'toggleLibrary', 'closeLibrary', 'libExpand', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
+  'app', 'library', 'toggleLibrary', 'closeLibrary', 'splitter', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'sectionBtn', 'sectionPop', 'sectionText', 'partDiff', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
   'fullscreen', 'barHide', 'barShow', 'fretBtn', 'fretPop', 'viewChoice', 'noteChoice', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
-  'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay', 'infoMenu', 'homeBtn',
+  'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay', 'infoMenu',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
 ].map((id) => [id, $(id)]));
 
@@ -56,13 +56,41 @@ function setLibraryOpen(open, persist = true) {
 }
 const narrow = () => window.matchMedia('(max-width: 700px)').matches;
 const libraryOpen = () => !els.app.classList.contains('lib-closed');
-setLibraryOpen(narrow() ? false : store.get('library') !== '0', false);
+setLibraryOpen(!narrow(), false); // two panels: the library starts open on a desktop screen (collapsing it only lasts for the session)
 // The drawer overlay on narrow screens starts closed; entering that layout closes it.
 window.matchMedia('(max-width: 700px)').addEventListener('change', (e) => { if (e.matches) setLibraryOpen(false, false); });
-els.toggleLibrary.addEventListener('click', () => setLibraryOpen(!libraryOpen()));
-els.closeLibrary.addEventListener('click', () => setLibraryOpen(false, !narrow())); // the drawer on narrow screens always starts closed
+els.toggleLibrary.addEventListener('click', () => setLibraryOpen(!libraryOpen(), false));
+els.closeLibrary.addEventListener('click', () => setLibraryOpen(false, false));
 els.scrim.addEventListener('click', () => setLibraryOpen(false, false));
 els.welcomeOpen.addEventListener('click', () => setLibraryOpen(true));
+
+// The divider between the two panels: drag to resize the library panel (remembered); double-click restores the default.
+const MIN_LIB_W = 300;
+function setLibWidth(px) {
+  if (px == null) document.documentElement.style.removeProperty('--lib-w');
+  else document.documentElement.style.setProperty('--lib-w', `${Math.round(px)}px`);
+}
+const savedLibW = Number(store.get('libWidth'));
+if (savedLibW >= MIN_LIB_W && !narrow()) setLibWidth(savedLibW);
+els.splitter.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  els.splitter.setPointerCapture(e.pointerId);
+  els.splitter.classList.add('dragging');
+  document.body.classList.add('resizing');
+});
+els.splitter.addEventListener('pointermove', (e) => {
+  if (!els.splitter.classList.contains('dragging')) return;
+  setLibWidth(Math.min(Math.max(e.clientX, MIN_LIB_W), Math.min(window.innerWidth * 0.7, 900))); // at most 70% of the window
+});
+const endDrag = () => {
+  if (!els.splitter.classList.contains('dragging')) return;
+  els.splitter.classList.remove('dragging');
+  document.body.classList.remove('resizing');
+  store.set('libWidth', String(Math.round(els.library.getBoundingClientRect().width)));
+};
+els.splitter.addEventListener('pointerup', endDrag);
+els.splitter.addEventListener('pointercancel', endDrag);
+els.splitter.addEventListener('dblclick', () => { setLibWidth(null); store.set('libWidth', ''); });
 
 els.pick.addEventListener('click', pickFolder);
 els.resume.addEventListener('click', reopenFolder);
@@ -116,7 +144,7 @@ els.instChips.addEventListener('click', (e) => {
   filters.instruments[filters.instruments.has(b.dataset.inst) ? 'delete' : 'add'](b.dataset.inst);
   syncFilterUi();
   renderList();
-  openPendingRoute(); // a #/song/... link opened at startup
+  openFromHash(); // a #/song/... link opened at startup
 });
 els.levelSeg.addEventListener('click', (e) => {
   const b = e.target.closest('[data-level]');
@@ -297,40 +325,24 @@ const describeSong = (song) => {
 const savedMode = store.get('cardMode');
 const list = createVirtualList({
   mode: CARD_MODES.includes(savedMode) ? savedMode : 'normal', describe: describeSong,
-  scroller: els.songs, label: els.groupLabel, rail: els.rail, thumbs, text: plainText, onSelect: (song) => navigate({ view: 'song', id: song.id }),
+  scroller: els.songs, label: els.groupLabel, rail: els.rail, thumbs, text: plainText, onSelect: (song) => selectSong(song),
   anchor: (label) => anchorLabel(label, els.sortBy.value),
 });
 
 function syncViewSeg() {
   for (const b of els.viewSeg.querySelectorAll('[data-mode]')) b.setAttribute('aria-pressed', String(b.dataset.mode === cardMode()));
 }
-// The home screen (before any song is open, or with the "wide view" button) is the library as a full page: a big search
-// and the results as large cards in as many columns as fit. It has its own card style (large) and never persists it.
-let homeMode = false;
-let homeCard = 'large';
-const cardMode = () => (homeMode ? homeCard : (CARD_MODES.includes(store.get('cardMode')) ? store.get('cardMode') : 'normal'));
+const cardMode = () => (CARD_MODES.includes(store.get('cardMode')) ? store.get('cardMode') : 'normal');
 els.viewSeg.addEventListener('click', (e) => {
   const b = e.target.closest('[data-mode]');
   if (!b) return;
-  if (homeMode) homeCard = b.dataset.mode;
-  else store.set('cardMode', b.dataset.mode);
+  store.set('cardMode', b.dataset.mode);
   list.setMode(b.dataset.mode);
   syncViewSeg();
   if (current) list.scrollToSong(current.song);
 });
-function setHome(on) {
-  if (on === homeMode) return;
-  homeMode = on;
-  els.app.classList.toggle('home', on);
-  els.libExpand.setAttribute('aria-pressed', String(on));
-  closePopovers();
-  list.setMode(cardMode());
-  list.setColumns(on ? 3 : 1, { minWidth: on ? 420 : 0 }); // as many columns as fit, cards at least 420px wide
-  syncViewSeg();
-  syncHomeButton();
-}
-const syncHomeButton = () => { els.libExpand.hidden = !current && homeMode; }; // nothing to go back to before the first song
-els.libExpand.addEventListener('click', () => navigate(homeMode ? (current ? { view: lastSongView, id: current.song.id } : { view: 'library' }) : { view: 'library' }));
+// A wide panel flows the cards into columns (cards at least 440px wide); the usual panel stays one column.
+list.setColumns(1, { minWidth: 440 });
 syncViewSeg();
 
 function renderList({ keepScroll = false } = {}) {
@@ -351,7 +363,6 @@ function setStatus(text) {
 
 // ---------- Song and chart selection ----------
 async function selectSong(song) {
-  if (!detached) setHome(false); // opening a song leaves the full-page library
   if (detached) {
     pendingSongId = song.id;
     setStatus('Choose the songs folder to open this song.');
@@ -420,8 +431,8 @@ async function selectSong(song) {
 
   current = { song, midi, coverUrl, options: instrumentOptions(midi), diffChoice: {}, statsCache: new Map(), expandedStats: new Set(), modeChoice: {} };
   renderMeta(song, midi); // adds the BPM chip
-  syncHomeButton();
   renderList({ keepScroll: true }); // highlight the loaded song
+  syncUrl();
   fillInstrumentOptions();
   updateChart(); // the chart exists as soon as the MIDI is read; only playback waits for the audio
   const stems = audioStemsOf(song);
@@ -479,6 +490,7 @@ function setInfoOpen(open) {
   syncInfoScrolled();
   closePopovers();
   renderLoadState();
+  syncUrl();
 }
 
 const kv = (rows) => rows.flatMap((r) => {
@@ -779,9 +791,8 @@ function renderPartMenu() {
   }));
 }
 
-els.infoPopMore.addEventListener('click', () => { closePopovers(); if (current) navigate({ view: 'song', id: current.song.id }); else setInfoOpen(true); });
-els.infoMenu.addEventListener('click', () => navigate({ view: 'library' }));
-els.homeBtn.addEventListener('click', () => navigate({ view: 'library' }));
+els.infoPopMore.addEventListener('click', () => { closePopovers(); setInfoOpen(true); });
+els.infoMenu.addEventListener('click', () => setLibraryOpen(!libraryOpen()));
 els.infoPlay.addEventListener('click', () => togglePlay());
 
 function showPlayInfo(on) {
@@ -1269,7 +1280,7 @@ async function togglePlay() {
   if (!ready || !chart) return; // playback waits for the audio to finish loading
   if (player.playing) player.pause();
   else {
-    if (infoOpen && current) navigate({ view: 'play', id: current.song.id }); // starting from the details goes to the chart
+    if (infoOpen) setInfoOpen(false); // starting from the details goes to the chart
     await player.play();
   }
   syncPlayButton();
@@ -1356,14 +1367,13 @@ document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tag = e.target.tagName;
   if (e.code === 'Escape') {
-    if (popovers.every(([, pop]) => pop.hidden)) { goBack(); return; } // Esc is Back (after closing an open popover)
+    if (popovers.every(([, pop]) => pop.hidden) && infoOpen && loadInfo.state !== 'idle') setInfoOpen(false); // details -> chart
     closePopovers();
     return;
   }
   if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(tag)) return;
   if (e.code === 'Space' && ready) { e.preventDefault(); togglePlay(); }
-  else if (e.code === 'KeyI' && current && !homeMode) navigate({ view: infoOpen ? 'play' : 'song', id: current.song.id });
-  else if (e.code === 'KeyH') navigate({ view: 'library' });
+  else if (e.code === 'KeyI' && (current || loadInfo.state !== 'idle')) setInfoOpen(!infoOpen);
   else if (e.code === 'KeyL') setLibraryOpen(!libraryOpen());
   else if (e.code === 'KeyB') setBarHidden(!els.app.classList.contains('bar-hidden'));
   else if (e.code === 'KeyF') toggleFullscreen();
@@ -1404,62 +1414,21 @@ function fmt(sec) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-// ---------- Navigation: Library -> Song details -> Player, addressed by the URL hash ----------
-// Every change of screen is a history entry, so the browser's Back/Forward and Esc walk through them and a reload (or a
-// shared link) opens the same screen. The low-level switches are setHome() and setInfoOpen(); this layer decides which.
-let lastSongView = 'song'; // the song screen to come back to from the library: details or player
-let navDepth = 0; // entries pushed by the app: Esc/Back stays inside the app while this is > 0
-let pendingRoute = parseRoute(location.hash); // a link opened at startup, applied when the library is there
-
-function applyRoute(route) {
-  document.title = 'YARG Remote - Viewer';
-  if (route.view === 'library') {
-    if (current && lastSongView === 'play') { player.pause(); syncPlayButton(); } // leaving the chart: stop the music
-    setHome(true);
-    return;
-  }
+// ---------- Deep links: the URL hash names the open song ----------
+// The hash is only replaced (no history entries): a reload or a shared link opens the same song, and the two panels
+// stay in place. #/song/<id> opens the details, #/song/<id>/play the chart.
+function syncUrl() {
+  if (!current) return;
+  const hash = formatRoute({ view: infoOpen ? 'song' : 'play', id: current.song.id });
+  if (location.hash !== hash) history.replaceState(null, '', hash);
+  document.title = `${plainText(current.song.title)} - ${plainText(current.song.artist)} · YARG Remote`;
+}
+function openFromHash() {
+  const route = parseRoute(location.hash);
+  if (route.view === 'library' || current?.song.id === route.id) return;
   const song = songs.find((s) => s.id === route.id);
-  if (!song) { setHome(true); return; }
-  lastSongView = route.view;
-  if (current?.song !== song) {
-    selectSong(song); // loads it; the details open at once
-    if (route.view === 'play') setInfoOpen(false);
-  } else {
-    setHome(false);
-    setInfoOpen(route.view === 'song');
-  }
-  document.title = `${plainText(song.title)} - ${plainText(song.artist)} · YARG Remote`;
+  if (!song) return;
+  selectSong(song);
+  if (route.view === 'play') setInfoOpen(false);
 }
-
-function navigate(route, { replace = false } = {}) {
-  const hash = formatRoute(route);
-  if (location.hash !== hash && !(hash === '#/' && location.hash === '')) {
-    if (replace) history.replaceState({ nav: navDepth }, '', hash);
-    else history.pushState({ nav: ++navDepth }, '', hash);
-  }
-  applyRoute(route);
-}
-
-function goBack() { // Esc / the back buttons
-  if (history.state?.nav > 0) { history.back(); return; }
-  // no app history (opened on a deep link, or after a reload): go up one level
-  if (homeMode) { if (current) navigate({ view: lastSongView, id: current.song.id }, { replace: true }); return; }
-  if (infoOpen && loadInfo.state !== 'idle' && current) navigate({ view: 'play', id: current.song.id }, { replace: true });
-  else navigate({ view: 'library' }, { replace: true });
-}
-
-window.addEventListener('popstate', (e) => {
-  navDepth = e.state?.nav ?? 0;
-  applyRoute(parseRoute(location.hash));
-});
-
-// Start on the home screen: the full-page library (needs everything above to be defined).
-setHome(true);
-// Open a song link once the library is loaded (also called by afterLibraryLoaded).
-function openPendingRoute() {
-  if (!pendingRoute || pendingRoute.view === 'library' || !songs.length) return;
-  const route = pendingRoute;
-  pendingRoute = null;
-  if (songs.some((s) => s.id === route.id)) navigate(route, { replace: true });
-}
-openPendingRoute();
+window.addEventListener('hashchange', openFromHash);
