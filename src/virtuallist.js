@@ -17,8 +17,36 @@ export function layoutOffsets(items, rowH = ROW_H) {
   return offsets;
 }
 
+// Multi-column layout (the wide library on the home screen): song cards fill rows of `cols`, a group header takes a whole
+// row. Returns offsets (top of each item, then the total height), bottoms (bottom of each item) and col (column of each
+// item). With cols = 1 the offsets are the same as layoutOffsets().
+export function layoutGrid(items, cols, rowH = ROW_H) {
+  const n = items.length;
+  const offsets = new Float64Array(n + 1);
+  const bottoms = new Float64Array(n);
+  const col = new Uint16Array(n);
+  let y = 0;
+  let c = 0;
+  for (let i = 0; i < n; i++) {
+    if (items[i].type === 'head') {
+      if (c > 0) { y += rowH; c = 0; }
+      offsets[i] = y;
+      bottoms[i] = y + HEAD_H;
+      y += HEAD_H;
+    } else {
+      offsets[i] = y;
+      bottoms[i] = y + rowH;
+      col[i] = c;
+      if (++c >= cols) { c = 0; y += rowH; }
+    }
+  }
+  if (c > 0) y += rowH;
+  offsets[n] = y;
+  return { offsets, bottoms, col };
+}
+
 // Index range [first, last) of the items that intersect [scrollTop - overscan, scrollTop + height + overscan].
-export function visibleRange(offsets, scrollTop, height, overscan = OVERSCAN_PX) {
+export function visibleRange(offsets, scrollTop, height, overscan = OVERSCAN_PX, bottoms = null) {
   const n = offsets.length - 1;
   if (n <= 0) return [0, 0];
   const lo = Math.max(0, scrollTop - overscan);
@@ -28,7 +56,7 @@ export function visibleRange(offsets, scrollTop, height, overscan = OVERSCAN_PX)
   let b = n;
   while (a < b) {
     const m = (a + b) >> 1;
-    if (offsets[m + 1] <= lo) a = m + 1; else b = m;
+    if ((bottoms ? bottoms[m] : offsets[m + 1]) <= lo) a = m + 1; else b = m;
   }
   const first = a;
   // first item whose top is at or below hi
@@ -91,6 +119,10 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
   let rowH = ROW_HEIGHTS[mode];
   let items = [];
   let offsets = layoutOffsets(items, rowH);
+  let bottoms = null; // set when the list has several columns
+  let colOf = null;
+  let cols = 1;
+  let minColW = 0; // > 0: the number of columns follows the width (cards at least this wide)
   const rows = new Map(); // index -> { el, timer }
   let activeSong = null;
   let frame = 0;
@@ -135,6 +167,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     const item = items[index];
     const el = document.createElement('li');
     el.style.top = `${offsets[index]}px`;
+    if (colOf) el.style.setProperty('--col', String(colOf[index]));
     if (item.type === 'head') {
       el.className = 'divider';
       el.style.height = `${HEAD_H}px`;
@@ -283,7 +316,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
   function render() {
     frame = 0;
     const top = scroller.scrollTop;
-    const [first, last] = visibleRange(offsets, top, scroller.clientHeight);
+    const [first, last] = visibleRange(offsets, top, scroller.clientHeight, undefined, bottoms);
     for (const [i, entry] of rows) {
       if (i < first || i >= last) {
         clearTimeout(entry.timer);
@@ -376,10 +409,38 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     rail.addEventListener('pointercancel', end);
   }
 
+  // Recomputes the positions (items, card height or number of columns changed) and redraws the visible rows.
+  function relayout(keepTop = false) {
+    const top = keepTop ? itemAt(offsets, scroller.scrollTop) : 0;
+    ({ offsets, bottoms, col: colOf } = layoutGrid(items, cols, rowH));
+    scroller.style.setProperty('--cols', String(cols));
+    scroller.classList.toggle('multi', cols > 1);
+    for (const entry of rows.values()) { clearTimeout(entry.timer); entry.el.remove(); }
+    rows.clear();
+    spacer.style.height = `${offsets[items.length]}px`;
+    if (keepTop) scroller.scrollTop = offsets[Math.min(top, items.length)] ?? 0;
+    drawRail();
+    render();
+  }
+  // With a minimum card width, the columns follow the list's width.
+  function autoColumns() {
+    if (!minColW) return;
+    const railW = parseFloat(getComputedStyle(scroller.closest('.songs-wrap') ?? scroller).getPropertyValue('--rail-w')) || 0;
+    const next = Math.max(1, Math.floor((scroller.clientWidth - railW) / minColW));
+    if (next !== cols) { cols = next; relayout(true); }
+  }
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(autoColumns).observe(scroller);
+
   return {
+    setColumns(n, { minWidth = 0 } = {}) { // fixed number of columns, or (minWidth) as many as fit
+      minColW = minWidth;
+      cols = Math.max(1, n);
+      relayout(true);
+      autoColumns();
+    },
     setItems(next, { keepScroll = false, evenGroups = false } = {}) {
       items = next;
-      offsets = layoutOffsets(items, rowH);
+      ({ offsets, bottoms, col: colOf } = layoutGrid(items, cols, rowH));
       groups = items.flatMap((it, index) => (it.type === 'head' ? [{ index, label: it.label, anchor: anchor(it.label) }] : []));
       bounds = null;
       scroller.closest('.songs-wrap')?.classList.remove('even-rail');
@@ -390,6 +451,8 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       }
       for (const entry of rows.values()) { clearTimeout(entry.timer); entry.el.remove(); }
       rows.clear();
+      scroller.style.setProperty('--cols', String(cols));
+      scroller.classList.toggle('multi', cols > 1);
       spacer.style.height = `${offsets[items.length]}px`;
       if (!keepScroll) scroller.scrollTop = 0;
       drawRail();
@@ -406,16 +469,9 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     },
     setMode(next) { // card style: the list keeps the item at the top of the view
       if (next === mode || !ROW_HEIGHTS[next]) return;
-      const top = itemAt(offsets, scroller.scrollTop);
       mode = next;
       rowH = ROW_HEIGHTS[mode];
-      offsets = layoutOffsets(items, rowH);
-      for (const entry of rows.values()) { clearTimeout(entry.timer); entry.el.remove(); }
-      rows.clear();
-      spacer.style.height = `${offsets[items.length]}px`;
-      scroller.scrollTop = offsets[Math.min(top, items.length)] ?? 0;
-      drawRail();
-      render();
+      relayout(true);
     },
     scrollToSong(song) { // only when the row is not already fully visible
       const i = items.findIndex((it) => it.type === 'song' && it.song === song);

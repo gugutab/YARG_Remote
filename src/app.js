@@ -12,7 +12,7 @@ import { createThumbs, renderCoverThumb } from './thumbs.js';
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
-  'app', 'library', 'toggleLibrary', 'closeLibrary', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
+  'app', 'library', 'toggleLibrary', 'closeLibrary', 'libExpand', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
@@ -300,16 +300,35 @@ const list = createVirtualList({
 });
 
 function syncViewSeg() {
-  for (const b of els.viewSeg.querySelectorAll('[data-mode]')) b.setAttribute('aria-pressed', String(b.dataset.mode === (store.get('cardMode') || 'normal')));
+  for (const b of els.viewSeg.querySelectorAll('[data-mode]')) b.setAttribute('aria-pressed', String(b.dataset.mode === cardMode()));
 }
+// The home screen (before any song is open, or with the "wide view" button) is the library as a full page: a big search
+// and the results as large cards in as many columns as fit. It has its own card style (large) and never persists it.
+let homeMode = false;
+let homeCard = 'large';
+const cardMode = () => (homeMode ? homeCard : (CARD_MODES.includes(store.get('cardMode')) ? store.get('cardMode') : 'normal'));
 els.viewSeg.addEventListener('click', (e) => {
   const b = e.target.closest('[data-mode]');
   if (!b) return;
-  store.set('cardMode', b.dataset.mode);
+  if (homeMode) homeCard = b.dataset.mode;
+  else store.set('cardMode', b.dataset.mode);
   list.setMode(b.dataset.mode);
   syncViewSeg();
   if (current) list.scrollToSong(current.song);
 });
+function setHome(on) {
+  if (on === homeMode) return;
+  homeMode = on;
+  els.app.classList.toggle('home', on);
+  els.libExpand.setAttribute('aria-pressed', String(on));
+  closePopovers();
+  list.setMode(cardMode());
+  list.setColumns(on ? 3 : 1, { minWidth: on ? 420 : 0 }); // as many columns as fit, cards at least 420px wide
+  syncViewSeg();
+  syncHomeButton();
+}
+const syncHomeButton = () => { els.libExpand.hidden = !current && homeMode; }; // nothing to go back to before the first song
+els.libExpand.addEventListener('click', () => setHome(!homeMode));
 syncViewSeg();
 
 function renderList({ keepScroll = false } = {}) {
@@ -330,6 +349,7 @@ function setStatus(text) {
 
 // ---------- Song and chart selection ----------
 async function selectSong(song) {
+  if (!detached) setHome(false); // opening a song leaves the full-page library
   if (detached) {
     pendingSongId = song.id;
     setStatus('Choose the songs folder to open this song.');
@@ -398,6 +418,7 @@ async function selectSong(song) {
 
   current = { song, midi, coverUrl, options: instrumentOptions(midi), diffChoice: {}, statsCache: new Map(), expandedStats: new Set(), modeChoice: {} };
   renderMeta(song, midi); // adds the BPM chip
+  syncHomeButton();
   renderList({ keepScroll: true }); // highlight the loaded song
   fillInstrumentOptions();
   updateChart(); // the chart exists as soon as the MIDI is read; only playback waits for the audio
@@ -1320,6 +1341,7 @@ document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tag = e.target.tagName;
   if (e.code === 'Escape') {
+    if (homeMode && current && popovers.every(([, pop]) => pop.hidden)) { setHome(false); return; } // back from the wide library to the song
     if (popovers.every(([, pop]) => pop.hidden) && infoOpen && loadInfo.state !== 'idle') setInfoOpen(false);
     closePopovers();
     return;
@@ -1366,3 +1388,6 @@ function fmt(sec) {
   const s = Math.floor(sec || 0);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
+
+// Start on the home screen: the full-page library (needs everything above to be defined).
+setHome(true);

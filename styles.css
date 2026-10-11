@@ -880,3 +880,24 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 .active-filters::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
 .active-filters::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 @supports not selector(::-webkit-scrollbar) { .active-filters { scrollbar-width: thin; scrollbar-color: var(--line) transparent; } }
+
+/* Several columns (the wide library): each card takes 1/--cols of the width left of the rail; headers take all of it */
+#songs { --cols: 1; }
+#songs li.row { right: auto; left: calc((100% - var(--rail-w)) / var(--cols) * var(--col, 0)); width: calc((100% - var(--rail-w)) / var(--cols)); }
+#songs li.divider { right: auto; left: 0; width: calc(100% - var(--rail-w)); }
+#songs.multi li.row { border-right: 1px solid var(--line); }
+
+/* Round 65: the home screen: the library as a full page (see setHome in app.js) */
+.app.home .main, .app.home .scrim { display: none !important; }
+.app.home .library, .app.home.lib-closed .library {
+  position: static; flex: 1; width: auto; margin-left: 0; transform: none; box-shadow: none; border-right: 0; min-width: 0;
+  padding: 24px max(24px, calc((100vw - 1500px) / 2)); gap: 14px;
+}
+.app.home #closeLibrary { display: none !important; }
+.app.home .lib-head strong { font-size: 24px; }
+.app.home .search input { font-size: 18px; padding-top: 13px; padding-bottom: 13px; padding-left: 44px; border-radius: 12px; }
+.app.home .search > svg { left: 15px; top: 15px; width: 20px; height: 20px; }
+.app.home .search .filter-btn { top: 8px; right: 8px; }
+.app.home .filter-panel { max-width: 720px; }
+.app.home .songs-wrap { margin: 0; border-top: 0; }
+.app.home #songs li.divider { font-size: 12px; }

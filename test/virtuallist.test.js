@@ -207,3 +207,23 @@ test('pack codes for the rail', async () => {
   assert.equal(packCode('Guitar Hero World Tour DLC'), 'GHW+');
   assert.equal(packCode('No pack'), '?');
 });
+
+test('grid layout: cards fill rows of N columns, headers take a whole row', async () => {
+  const { layoutGrid, visibleRange, layoutOffsets, ROW_H, HEAD_H } = await import('../src/virtuallist.js');
+  const song = { type: 'song' };
+  const head = { type: 'head' };
+  const items = [head, song, song, song, song, head, song];
+  const g = layoutGrid(items, 3, 100);
+  assert.deepEqual([...g.offsets], [0, HEAD_H, HEAD_H, HEAD_H, HEAD_H + 100, HEAD_H + 200, HEAD_H + 200 + HEAD_H, HEAD_H + 200 + HEAD_H + 100]);
+  assert.deepEqual([...g.col], [0, 0, 1, 2, 0, 0, 0]);
+  assert.equal(g.bottoms[1], HEAD_H + 100);
+  // one column is the plain list layout
+  const one = layoutGrid(items, 1, ROW_H);
+  assert.deepEqual([...one.offsets], [...layoutOffsets(items, ROW_H)]);
+  // visible range works with bottoms: a row of cards sharing the same top
+  const many = Array.from({ length: 30 }, () => song);
+  const gg = layoutGrid(many, 3, 100); // 10 rows
+  const [a, b] = visibleRange(gg.offsets, 300, 200, 0, gg.bottoms);
+  assert.equal(a, 9); // the first card of the row at y=300
+  assert.equal(b, 15); // up to the row that starts at y=500 (exclusive)
+});
