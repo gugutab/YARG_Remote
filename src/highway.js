@@ -558,8 +558,8 @@ export class Highway {
 
     // harmonies first, so the lead is drawn on top
     for (const harmony of chart.harmonies || []) {
-      g.fillStyle = HARMONY_COLORS[harmony.part] || HARMONY_COLORS[1];
-      this.vocalNotes(harmony.notes, t, ahead, behind, xOf, yOfPitch, mid, 4, null, hitX);
+      const base = HARMONY_COLORS[harmony.part] || HARMONY_COLORS[1];
+      this.vocalNotes(harmony.notes, t, ahead, behind, xOf, yOfPitch, mid, 4, [tintWhite(base, 0.7), base], hitX); // the part past the hit line is lit, like the lead's
     }
     this.vocalNotes(chart.notes, t, ahead, behind, xOf, yOfPitch, mid, 6, ['#f5c518', '#5b8def'], hitX);
 
