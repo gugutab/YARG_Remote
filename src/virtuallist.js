@@ -120,7 +120,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       for (const i of describe(song).instruments) {
         const ic = document.createElement('span');
         ic.className = 'inst';
-        ic.title = `${i.label}: level ${i.level}`;
+        ic.title = i.level === null ? i.label : `${i.label}: level ${i.level}`;
         ic.innerHTML = `<svg><use href="#i-${i.icon}"/></svg>${i.badge ? `<sup>${i.badge}</sup>` : ''}`;
         icons.append(ic);
       }
@@ -139,8 +139,9 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       for (const i of d.instruments) {
         const chip = document.createElement('span');
         chip.className = 'inst';
-        chip.title = `${i.label}: level ${i.level}`;
-        chip.innerHTML = `<svg><use href="#i-${i.icon}"/></svg>${i.badge ? `<sup>${i.badge}</sup>` : ''}<span class="mini-pips">${Array.from({ length: 6 }, (_, k) => `<i${k < i.level ? ' class="on"' : ''}></i>`).join('')}</span>`;
+        chip.title = i.level === null ? i.label : `${i.label}: level ${i.level}`;
+        const pips = i.level === null ? '' : `<span class="mini-pips">${Array.from({ length: 6 }, (_, k) => `<i${k < i.level ? ' class="on"' : ''}></i>`).join('')}</span>`; // no pips when song.ini has no level
+        chip.innerHTML = `<svg><use href="#i-${i.icon}"/></svg>${i.badge ? `<sup>${i.badge}</sup>` : ''}${pips}`;
         insts.append(chip);
       }
       text2.append(insts);

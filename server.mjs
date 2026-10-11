@@ -6,10 +6,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseSongIni } from './src/ini.js';
+import { parseMidi } from './src/midi.js';
+import { instrumentOptions } from './src/chart.js';
 
 const APP_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP_FILES = new Set(['index.html', 'styles.css']);
 const APP_DIRS = ['src', 'vendor'];
+// Bump when the index gets new fields: older cache files are then rebuilt.
+const INDEX_VERSION = 2;
 const SONG_MARKERS = ['song.ini', 'notes.mid', 'notes.chart'];
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
@@ -18,8 +22,19 @@ const TYPES = {
   '.m4a': 'audio/mp4', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.mid': 'audio/midi',
 };
 
+// The instruments a notes.mid really has (tracks with notes), like the picker of the app: guitar, bass, rhythm, keys, drums,
+// vocals (harmony counts as vocals). song.ini often has no difficulty levels, or -1 for everything, while the chart is fine.
+export function partsOf(midiBytes) {
+  try {
+    const bases = instrumentOptions(parseMidi(midiBytes)).map((o) => (o.base === 'harmony' ? 'vocals' : o.base));
+    return [...new Set(bases)];
+  } catch {
+    return [];
+  }
+}
+
 // Walks songsDir; a song is any folder holding song.ini, notes.mid or notes.chart (same rule as src/library.js).
-// Output matches serializeSongs(): { id, folder, title, artist, album, ini, files: [{ name, path }] }.
+// Output matches serializeSongs(): { id, folder, title, artist, album, ini, parts, files: [{ name, path }] }.
 export async function scanLibrary(songsDir) {
   const songs = [];
   async function walk(dir, rel) {
@@ -39,10 +54,16 @@ export async function scanLibrary(songsDir) {
         } catch { /* unreadable ini: keep the folder name */ }
       }
       const folderName = rel.split('/').pop() || path.basename(dir);
+      let parts = [];
+      if (lower.has('notes.mid')) {
+        try {
+          parts = partsOf(await fs.promises.readFile(path.join(dir, lower.get('notes.mid'))));
+        } catch { /* unreadable chart: no parts */ }
+      }
       songs.push({
         id: rel, folder: rel,
         title: String(ini.name || folderName), artist: String(ini.artist || ''), album: String(ini.album || ''),
-        ini, files: files.map((name) => ({ name, path: rel ? `${rel}/${name}` : name })),
+        ini, parts, files: files.map((name) => ({ name, path: rel ? `${rel}/${name}` : name })),
       });
     }
     for (const e of entries) {
@@ -115,14 +136,14 @@ export function createServer({ songsDir, appRoot = APP_ROOT }) {
     if (!refresh) {
       try {
         const cached = JSON.parse(await fs.promises.readFile(cacheFile, 'utf8'));
-        if (cached.songsDir === songsDir) return (library = cached.songs);
+        if (cached.songsDir === songsDir && cached.version === INDEX_VERSION) return (library = cached.songs);
       } catch { /* no cache yet */ }
     }
     scanning ||= scanLibrary(songsDir).finally(() => { scanning = null; });
     library = await scanning;
     try {
       await fs.promises.mkdir(path.dirname(cacheFile), { recursive: true });
-      await fs.promises.writeFile(cacheFile, JSON.stringify({ songsDir, songs: library }));
+      await fs.promises.writeFile(cacheFile, JSON.stringify({ version: INDEX_VERSION, songsDir, songs: library }));
     } catch { /* cache is optional */ }
     return library;
   }

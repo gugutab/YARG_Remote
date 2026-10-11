@@ -67,3 +67,17 @@ test('query fields, instruments, levels and decades filter the list', async () =
   assert.equal(sum.year, 1972);
   assert.deepEqual(sum.instruments, [{ base: 'guitar', level: 5 }, { base: 'drums', level: 4 }]);
 });
+
+test('instruments come from the chart parts when the server index has them (song.ini may say -1 for everything)', async () => {
+  const { songSummary, hasInstrument, filterSongs } = await import('../src/songlist.js');
+  const gh = { title: 'All My Life', artist: 'Foo Fighters', album: 'x', parts: ['guitar', 'bass'], ini: { diff_guitar: -1, diff_bass: -1, diff_drums: -1, diff_vocals: -1 } };
+  assert.deepEqual(songSummary(gh).instruments, [{ base: 'guitar', level: null }, { base: 'bass', level: null }]);
+  assert.equal(hasInstrument(gh, 'guitar'), true);
+  assert.equal(hasInstrument(gh, 'drums'), false);
+  assert.deepEqual(filterSongs([gh], { instruments: ['drums'] }), []);
+  // parts win over the ini; with a level the pips still come from the ini
+  const rb = { title: 'x', artist: 'y', album: 'z', parts: ['guitar', 'drums'], ini: { diff_guitar: 3, diff_drums: 4, diff_vocals: 2 } };
+  assert.deepEqual(songSummary(rb).instruments, [{ base: 'guitar', level: 3 }, { base: 'drums', level: 4 }]);
+  // no parts (folder mode, unreadable chart): the ini decides, as before
+  assert.deepEqual(songSummary({ title: 'a', artist: 'b', album: 'c', ini: { diff_bass: 2 } }).instruments, [{ base: 'bass', level: 2 }]);
+});

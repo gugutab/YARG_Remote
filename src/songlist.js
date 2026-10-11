@@ -17,6 +17,7 @@ const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 // false only when the main key (first in DIFF_KEYS) says -1 and no other key says otherwise. Pro/real keys
 // alone (often -1 in old charts that lack the main key) do not exclude a song; unknown = kept.
 export function hasInstrument(song, instrument) {
+  if (song.parts?.length) return song.parts.includes(instrument); // the chart's real parts (server index), when known
   const keys = DIFF_KEYS[instrument] || [];
   const values = keys.map((k) => song.ini?.[k]).filter((v) => typeof v === 'number');
   if (values.some((v) => v >= 0)) return true;
@@ -45,7 +46,9 @@ export function songSummary(song) {
     year: year > 0 ? year : null,
     length: secs > 0 ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '',
     genre: typeof song.ini?.genre === 'string' ? song.ini.genre : '',
-    instruments: INSTRUMENTS.map((base) => ({ base, level: levelOf(song, base) })).filter((i) => i.level !== null),
+    // the instruments the chart has (server index) or, without that, the ones with a level in song.ini; level can be null
+    instruments: INSTRUMENTS.map((base) => ({ base, level: levelOf(song, base) }))
+      .filter((i) => (song.parts?.length ? song.parts.includes(i.base) : i.level !== null)),
   };
 }
 
