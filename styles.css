@@ -901,3 +901,11 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 .app.home .filter-panel { max-width: 720px; }
 .app.home .songs-wrap { margin: 0; border-top: 0; }
 .app.home #songs li.divider { font-size: 12px; }
+
+/* Round 66: with the top bar collapsed its (invisible) boxes must not catch clicks meant for the stage buttons; only the seek bar does */
+.app.bar-hidden .topbar, .app.bar-hidden .tb-main { pointer-events: none; }
+.app.bar-hidden .tb-main > .seekbox { pointer-events: auto; }
+
+/* Multi-column list: a line on the left of every card (the first column had none) and one more after the last column */
+#songs.multi li.row { border-left: 1px solid var(--line); border-right: 0; }
+#songs.multi li.row.last-col { border-right: 1px solid var(--line); }
