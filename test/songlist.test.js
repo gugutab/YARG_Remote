@@ -81,3 +81,24 @@ test('instruments come from the chart parts when the server index has them (song
   // no parts (folder mode, unreadable chart): the ini decides, as before
   assert.deepEqual(songSummary({ title: 'a', artist: 'b', album: 'c', ini: { diff_bass: 2 } }).instruments, [{ base: 'bass', level: 2 }]);
 });
+
+test('the pack is the top-level folder: shown, searchable, filterable and sortable', async () => {
+  const { packOf } = await import('../src/ini.js');
+  const { packsOf, groupLabel, anchorLabel, buildItems } = await import('../src/songlist.js');
+  const { metaRows } = await import('../src/songinfo.js');
+  const mk = (id, title) => ({ id, title, artist: 'A', album: 'B', ini: {} });
+  const songs = [mk('Rock Band 2 DLC/A - One', 'One'), mk('Guitar Hero III/B - Two', 'Two'), mk('CDLC/Band/Three', 'Three'), mk('Loose', 'Loose')];
+  assert.equal(packOf(songs[0]), 'Rock Band 2 DLC');
+  assert.equal(packOf(songs[2]), 'CDLC'); // deeper paths still use the first folder
+  assert.equal(packOf(songs[3]), ''); // a song in the root has no pack
+  assert.deepEqual(packsOf(songs), ['CDLC', 'Guitar Hero III', 'Rock Band 2 DLC']);
+  assert.deepEqual(filterSongs(songs, { pack: 'Guitar Hero III' }).map((s) => s.title), ['Two']);
+  assert.deepEqual(filterSongs(songs, { query: 'pack:"rock band"' }).map((s) => s.title), ['One']);
+  assert.deepEqual(filterSongs(songs, { query: 'guitar hero' }).map((s) => s.title), ['Two']); // free text also matches the pack
+  assert.deepEqual(sortSongs(songs, 'pack').map((s) => s.title), ['Three', 'Two', 'One', 'Loose']);
+  assert.equal(groupLabel(songs[3], 'pack'), 'No pack');
+  assert.equal(anchorLabel('Rock Band 2 DLC', 'pack'), 'RB');
+  assert.deepEqual(buildItems(sortSongs(songs, 'pack'), 'pack').filter((i) => i.type === 'head').map((i) => i.label), ['CDLC', 'Guitar Hero III', 'Rock Band 2 DLC', 'No pack']);
+  assert.equal(metaRows(songs[0])[0].label, 'Pack');
+  assert.equal(metaRows(songs[0])[0].value, 'Rock Band 2 DLC');
+});

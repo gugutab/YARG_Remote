@@ -6,14 +6,14 @@ import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, re
 import { songDelaySeconds, plainText } from './ini.js';
 import { metaRows, extraRows, chartStats, bpmLabel, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel } from './songinfo.js';
 import { saveLibrary, loadLibrary, loadThumb, saveThumb } from './store.js';
-import { filterSongs, sortSongs, genresOf, decadesOf, songSummary, buildItems, anchorLabel } from './songlist.js';
+import { filterSongs, sortSongs, genresOf, decadesOf, packsOf, songSummary, buildItems, anchorLabel } from './songlist.js';
 import { createVirtualList } from './virtuallist.js';
 import { createThumbs, renderCoverThumb } from './thumbs.js';
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
   'app', 'library', 'toggleLibrary', 'closeLibrary', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
-  'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
+  'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'sectionBtn', 'sectionPop', 'sectionText', 'partDiff', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
@@ -73,7 +73,7 @@ const filters = { instruments: new Set(), minLevel: 0 };
 const selectSyncs = []; // refresh the custom dropdowns after the code changes a <select> (see customSelect)
 const FILTER_ICONS = { guitar: 'guitar', bass: 'bass', rhythm: 'rhythm', keys: 'keys', drums: 'drum', vocals: 'mic' };
 const INSTRUMENT_NAMES = { guitar: 'Guitar', bass: 'Bass', rhythm: 'Rhythm', keys: 'Keys', drums: 'Drums', vocals: 'Vocals' };
-const filterCount = () => (filters.instruments.size ? 1 : 0) + (filters.minLevel ? 1 : 0) + (els.filterGenre.value ? 1 : 0) + (els.filterDecade.value ? 1 : 0);
+const filterCount = () => (filters.instruments.size ? 1 : 0) + (filters.minLevel ? 1 : 0) + (els.filterGenre.value ? 1 : 0) + (els.filterDecade.value ? 1 : 0) + (els.filterPack.value ? 1 : 0);
 function syncFilterUi() {
   for (const b of els.instChips.querySelectorAll('[data-inst]')) b.setAttribute('aria-pressed', String(filters.instruments.has(b.dataset.inst)));
   for (const b of els.levelSeg.querySelectorAll('[data-level]')) b.setAttribute('aria-pressed', String(Number(b.dataset.level) === filters.minLevel));
@@ -86,6 +86,7 @@ function syncFilterUi() {
   const add = (text, remove, icon) => chips.push({ text, remove, icon });
   for (const i of filters.instruments) add(INSTRUMENT_NAMES[i], () => filters.instruments.delete(i), FILTER_ICONS[i]);
   if (filters.minLevel) add(`Level ${filters.minLevel}+`, () => { filters.minLevel = 0; }, 'sort');
+  if (els.filterPack.value) add(els.filterPack.value, () => { els.filterPack.value = ''; }, 'package');
   if (els.filterGenre.value) add(els.filterGenre.value, () => { els.filterGenre.value = ''; }, 'list');
   if (els.filterDecade.value) add(`${els.filterDecade.value}s`, () => { els.filterDecade.value = ''; }, 'calendar');
   els.activeFilters.hidden = chips.length === 0;
@@ -101,7 +102,7 @@ function syncFilterUi() {
   }));
 }
 els.search.addEventListener('input', renderList);
-for (const el of [els.filterGenre, els.filterDecade]) el.addEventListener('input', () => { syncFilterUi(); renderList(); });
+for (const el of [els.filterGenre, els.filterDecade, els.filterPack]) el.addEventListener('input', () => { syncFilterUi(); renderList(); });
 els.instChips.addEventListener('click', (e) => {
   const b = e.target.closest('[data-inst]');
   if (!b) return;
@@ -121,6 +122,7 @@ els.filterClear.addEventListener('click', () => {
   filters.minLevel = 0;
   els.filterGenre.value = '';
   els.filterDecade.value = '';
+  els.filterPack.value = '';
   syncFilterUi();
   renderList();
 });
@@ -251,6 +253,8 @@ function afterLibraryLoaded() {
   els.filterGenre.closest('label').hidden = genres.length === 0;
   els.filterDecade.replaceChildren(new Option('Decade', ''), ...decadesOf(songs).map((d) => new Option(`${d}s`, String(d))));
   els.filterDecade.closest('label').hidden = els.filterDecade.options.length < 2;
+  els.filterPack.replaceChildren(new Option('Pack', ''), ...packsOf(songs).map((p) => new Option(p, p)));
+  els.filterPack.closest('label').hidden = els.filterPack.options.length < 2;
   syncFilterUi();
   renderList();
 }
@@ -306,7 +310,7 @@ syncViewSeg();
 
 function renderList({ keepScroll = false } = {}) {
   const shown = sortSongs(filterSongs(songs, {
-    query: els.search.value, instruments: [...filters.instruments], minLevel: filters.minLevel, genre: els.filterGenre.value, decade: Number(els.filterDecade.value) || 0,
+    query: els.search.value, instruments: [...filters.instruments], minLevel: filters.minLevel, genre: els.filterGenre.value, decade: Number(els.filterDecade.value) || 0, pack: els.filterPack.value,
   }), els.sortBy.value, sortDesc);
   els.sortDir.textContent = sortDesc ? 'Z→A' : 'A→Z';
   list.setActive(current?.song ?? null);
@@ -1172,7 +1176,7 @@ function customSelect(select) {
   selectSyncs.push(sync);
   sync();
 }
-for (const s of [els.sortBy, els.filterGenre, els.filterDecade]) customSelect(s);
+for (const s of [els.sortBy, els.filterGenre, els.filterDecade, els.filterPack]) customSelect(s);
 document.addEventListener('click', (e) => {
   closePopovers();
   // Drop focus from clicked buttons so Space and the other shortcuts keep working afterwards.

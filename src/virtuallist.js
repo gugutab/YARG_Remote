@@ -2,7 +2,7 @@
 // thumbnails scroll smoothly and stay light on memory. Items are fixed-height song rows and group headers.
 
 // Row heights per card style: compact (one text line), normal (thumb + 2 lines), large (big thumb + details).
-export const ROW_HEIGHTS = { compact: 32, normal: 56, large: 108 };
+export const ROW_HEIGHTS = { compact: 32, normal: 56, large: 128 };
 export const ROW_H = ROW_HEIGHTS.normal;
 export const HEAD_H = 26;
 // The rail is 4px wider than before: the letters and ticks sit 4px further in from the right edge (the handle does not move).
@@ -109,6 +109,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     el.innerHTML = '<span class="thumb"><img alt="" decoding="async" hidden></span><span class="song-text"><span class="song-title"></span><span class="song-artist"></span></span>';
     el.querySelector('.song-title').textContent = text(song.title);
     el.querySelector('.song-artist').textContent = text(song.artist);
+    if (mode === 'normal') el.title = describe(song).pack || ''; // the pack, as a tooltip
     if (mode === 'normal') { // the instruments the song has, as small icons to the right of the artist
       const sub = document.createElement('span');
       sub.className = 'song-sub';
@@ -134,6 +135,13 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       meta.className = 'song-meta';
       meta.textContent = facts.join(' · ');
       text2.append(meta);
+      if (d.pack) {
+        const pack = document.createElement('span');
+        pack.className = 'song-pack';
+        pack.innerHTML = '<svg><use href="#i-package"/></svg><span></span>';
+        pack.querySelector('span').textContent = d.pack;
+        text2.append(pack);
+      }
       const insts = document.createElement('span');
       insts.className = 'song-insts';
       for (const i of d.instruments) {

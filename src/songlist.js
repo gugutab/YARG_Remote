@@ -1,4 +1,4 @@
-import { plainText } from './ini.js';
+import { plainText, packOf } from './ini.js';
 
 // Search, filter and sort for the library list. Pure functions over the song objects from library.js.
 
@@ -42,6 +42,7 @@ export function songSummary(song) {
   const secs = Math.round(ms / 1000);
   const year = parseInt(song.ini?.year, 10) || 0;
   return {
+    pack: packOf(song),
     album: plainText(song.album).trim(),
     year: year > 0 ? year : null,
     length: secs > 0 ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '',
@@ -55,7 +56,7 @@ export function songSummary(song) {
 // Search text -> free terms plus field filters. Fields: title: artist: album: genre: charter: year: len: inst:/has: no:
 // (a leading "-" negates one). Values may be quoted ("iron maiden"). Examples: `artist:queen year:1975-1982`,
 // `inst:drums len:<4`, `genre:metal -artist:metallica`.
-const TEXT_FIELDS = { title: (s) => s.title, artist: (s) => s.artist, album: (s) => s.album, genre: (s) => s.ini?.genre, charter: (s) => s.ini?.charter };
+const TEXT_FIELDS = { pack: (s) => packOf(s), title: (s) => s.title, artist: (s) => s.artist, album: (s) => s.album, genre: (s) => s.ini?.genre, charter: (s) => s.ini?.charter };
 const QUERY_FIELDS = new Set([...Object.keys(TEXT_FIELDS), 'year', 'len', 'length', 'inst', 'has', 'no']);
 export function parseQuery(text = '') {
   const terms = [];
@@ -102,7 +103,7 @@ function matchesField(song, { field, value }) {
 }
 
 // filters: { query, instruments: [], minLevel, genre, decade, instrument (old single value) }
-export function filterSongs(songs, { query = '', instruments = [], instrument = '', minLevel = 0, genre = '', decade = 0 } = {}) {
+export function filterSongs(songs, { query = '', instruments = [], instrument = '', minLevel = 0, genre = '', decade = 0, pack = '' } = {}) {
   const { terms, fields } = parseQuery(query);
   const wanted = [...new Set([...instruments, ...(instrument ? [instrument] : [])])];
   const normTerms = terms.map(norm);
@@ -113,6 +114,7 @@ export function filterSongs(songs, { query = '', instruments = [], instrument = 
       if (!(wanted.length ? wanted.every(reaches) : INSTRUMENTS.some(reaches))) return false;
     }
     if (genre && s.ini?.genre !== genre) return false;
+    if (pack && packOf(s) !== pack) return false;
     if (decade) {
       const y = parseInt(s.ini?.year, 10) || 0;
       if (y < decade || y > decade + 9) return false;
@@ -124,9 +126,14 @@ export function filterSongs(songs, { query = '', instruments = [], instrument = 
       if (!pass) return false;
     }
     if (!normTerms.length) return true;
-    const hay = norm(plainText(`${s.title} ${s.artist} ${s.album}`));
+    const hay = norm(plainText(`${s.title} ${s.artist} ${s.album} ${packOf(s)}`)); // the pack is searchable too
     return normTerms.every((t) => hay.includes(t));
   });
+}
+
+// Packs present in the library, alphabetical.
+export function packsOf(songs) {
+  return [...new Set(songs.map(packOf).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base', numeric: true }));
 }
 
 // Decades present in the library (1970, 1980, ...), newest first.
@@ -168,6 +175,7 @@ const KEYS = {
   title: textKey('title'),
   artist: (s) => `${groupKey(s.artist, 'artist')}\u0000${norm(plainText(s.title))}`,
   album: (s) => `${groupKey(s.album, 'album')}\u0000${norm(plainText(s.title))}`,
+  pack: (s) => `${norm(packOf(s)) || '\uffff'}\u0000${norm(plainText(s.title))}`, // songs without a pack last
   year: (s) => parseInt(s.ini?.year, 10) || 0,
   length: (s) => Number(s.ini?.song_length) || 0,
 };
@@ -189,6 +197,7 @@ export function genresOf(songs) {
 
 // Divider label for a song under the current sort key (what the list headers show).
 export function groupLabel(song, by = 'title') {
+  if (by === 'pack') return packOf(song) || 'No pack';
   if (by === 'year') {
     const y = parseInt(song.ini?.year, 10);
     return y > 0 ? `${Math.floor(y / 10) * 10}s` : 'Unknown year';
@@ -241,6 +250,7 @@ export function buildItems(sorted, by = 'title') {
 
 // Short text for the scrollbar rail: the initial for text sorts, '70s' for decades, '3–4' for length buckets.
 export function anchorLabel(label, by = 'title') {
+  if (by === 'pack') return label === 'No pack' ? '?' : label.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase(); // "Rock Band 2 DLC" -> RB
   if (by === 'year') return /^\d{4}s$/.test(label) ? label.slice(2) : '?';
   if (by === 'length') return /^Unknown/.test(label) ? '?' : label.replace(/\s*min$/, '').replace(/\s+/g, '');
   const text = by === 'artist' || by === 'album' ? groupKey(label, by) : norm(plainText(label)).replace(/^[^a-z0-9]+/, ''); // same key as the sort

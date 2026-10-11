@@ -1,6 +1,6 @@
 // Descriptive data for the song info screen: metadata from song.ini and statistics from the built chart.
 // Pure functions, no DOM.
-import { plainText } from './ini.js';
+import { plainText, packOf } from './ini.js';
 
 // song.ini difficulty keys (value 0..6 = difficulty level, -1 = no part). Labels for the UI.
 export const DIFF_LABELS = [
@@ -23,9 +23,9 @@ const SHOWN_KEYS = new Set([
   ...DIFF_LABELS.map(([k]) => k),
 ]);
 
-// Header chips, in display order: Album, Track, Length, Charter first, then the rest.
+// Header chips, in display order: Pack, Album, Track, Length, Charter first, then the rest.
 // [ini key, label, icon id]; the track number is shown once, as "Track" (album track, else playlist track).
-const META_ORDER = ['album', 'track', 'length', 'charter', 'artist', 'genre', 'year', 'frets', 'playlist', 'sub_playlist', 'delay'];
+const META_ORDER = ['pack', 'album', 'track', 'length', 'charter', 'artist', 'genre', 'year', 'frets', 'playlist', 'sub_playlist', 'delay'];
 
 // [{ label, value, icon }] for the header chips; empty values are left out.
 export function metaRows(song) {
@@ -36,6 +36,7 @@ export function metaRows(song) {
   };
   const delay = Number(ini.delay);
   const items = {
+    pack: ['Pack', packOf(song), 'package'],
     album: ['Album', text(song.album), 'disc'],
     track: ['Track', text(ini.album_track) || text(ini.playlist_track), 'hash'],
     length: ['Length', formatDuration(ini.song_length), 'clock'],

@@ -829,3 +829,8 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
   .info-head img { width: 320px; height: 320px; }
 }
 .stem-btn .badge:empty { display: none; } /* no empty dot on stems without a number */
+
+/* Round 61: the pack (game / DLC) of a song */
+.song-pack { display: flex; align-items: center; gap: 4px; min-width: 0; color: var(--accent); font-size: 11.5px; font-weight: 600; }
+.song-pack svg { width: 12px; height: 12px; flex: none; }
+.song-pack span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

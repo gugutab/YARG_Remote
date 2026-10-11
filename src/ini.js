@@ -33,3 +33,10 @@ export function songDelaySeconds(ini) {
 export function plainText(value) {
   return String(value ?? '').replace(/<\/?[a-z][^>]*>/gi, '').trim();
 }
+
+// The pack a song belongs to ("Rock Band 2 DLC", "Guitar Hero III", ...): the top-level folder of its path in the library.
+// song.ini only has a short code for it (`icon = rb2dlc`) that is missing in some songs; the folder name is complete.
+export function packOf(song) {
+  const parts = String(song?.id ?? song?.folder ?? '').split('/').filter(Boolean);
+  return parts.length > 1 ? parts[0] : '';
+}
