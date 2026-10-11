@@ -1165,12 +1165,16 @@ function customSelect(select, { multi = false, placeholder = '' } = {}) {
     // several values: "Genre · 3"; one: its name; none: the placeholder
     text.textContent = multi ? (chosen.length === 0 ? placeholder : chosen.length === 1 ? chosen[0].textContent : `${placeholder} · ${chosen.length}`) : (chosen[0]?.textContent ?? '');
     const rows = [];
-    if (multi && chosen.length) { // a first row to drop the whole selection
-      const clear = document.createElement('div');
-      clear.className = 'prow clear-row';
-      clear.innerHTML = '<span class="prow-name">Clear selection</span>';
-      clear.addEventListener('click', () => { for (const o of select.options) o.selected = false; notify(); sync(); });
-      rows.push(clear);
+    if (multi) { // always there (the list never shifts): a check-all row, checked when all are, a dash when only some
+      const all = chosen.length === select.options.length;
+      const row = document.createElement('div');
+      row.className = 'prow all-row';
+      row.dataset.active = String(all);
+      row.dataset.partial = String(!all && chosen.length > 0);
+      row.setAttribute('role', 'option');
+      row.innerHTML = '<span class="check"><svg><use href="#i-check"/></svg></span><span class="prow-name">All</span>';
+      row.addEventListener('click', () => { for (const o of select.options) o.selected = !all; notify(); sync(); }); // all on, or all off when all were on
+      rows.push(row);
     }
     for (const o of select.options) {
       const row = document.createElement('div');
