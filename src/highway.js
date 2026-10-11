@@ -162,7 +162,7 @@ export class Highway {
     }
     let top = 0;
     if (vocal) { // vocals use the top of the other tracks
-      top = Math.round(this.vocalView === 'karaoke' ? Math.min(h * 0.3, 230) : Math.min(h * 0.34, 280));
+      top = Math.round(this.vocalView === 'karaoke' ? Math.min(h * 0.3, 230) : Math.min(h * 0.34, 280)) - 20; // 20 px shorter than the band of vocals alone
       this.drawPane(vocal, t, 0, 0, w, top, many);
       g.fillStyle = 'rgba(255,255,255,0.12)';
       g.fillRect(0, top - 1, w, 1);
