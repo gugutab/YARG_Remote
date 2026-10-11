@@ -312,7 +312,8 @@ function renderList({ keepScroll = false } = {}) {
   const shown = sortSongs(filterSongs(songs, {
     query: els.search.value, instruments: [...filters.instruments], minLevel: filters.minLevel, genre: els.filterGenre.value, decade: Number(els.filterDecade.value) || 0, pack: els.filterPack.value,
   }), els.sortBy.value, sortDesc);
-  els.sortDir.textContent = sortDesc ? 'Z→A' : 'A→Z';
+  els.sortDir.classList.toggle('desc', sortDesc); // the arrow points up when descending
+  els.sortDir.title = sortDesc ? 'Descending (click to reverse)' : 'Ascending (click to reverse)';
   list.setActive(current?.song ?? null);
   list.setItems(buildItems(shown, els.sortBy.value), { keepScroll, evenGroups: els.sortBy.value === 'pack' }); // pack sort: every pack gets a label on the rail
   els.count.textContent = songs.length ? `${shown.length} of ${songs.length} songs` : '';

@@ -857,3 +857,8 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 /* Round 63: the instrument icons are 15px in the normal and in the large card; the pack tag sits at the top of the normal card */
 .song-insts .inst svg { width: 15px; height: 15px; }
 .song-packtag { margin-top: -6px; } /* the text block is centred in the 56px card (11px from the top): the pack sits 4px from the top edge */
+
+/* Sort direction is an arrow, not A->Z: it also applies to year and length */
+.sort-dir { padding: 0 8px; }
+.sort-dir svg { transition: transform .15s; }
+.sort-dir.desc svg { transform: rotate(180deg); }

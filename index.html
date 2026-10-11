@@ -49,6 +49,7 @@
       <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
       <symbol id="i-shrink" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></symbol>
       <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
+      <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
       <symbol id="i-sort" viewBox="0 0 24 24"><path d="M7 5v14M7 19l-3-3M7 19l3-3M17 19V5M17 5l-3 3M17 5l3 3"/></symbol>
       <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
       <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/></symbol>
@@ -128,7 +129,7 @@
             <option value="length">Length</option>
           </select>
         </label>
-        <button id="sortDir" class="chip-btn" type="button" title="Reverse order" aria-label="Reverse order">A→Z</button>
+        <button id="sortDir" class="chip-btn sort-dir" type="button" title="Ascending (click to reverse)" aria-label="Reverse order"><svg><use href="#i-arrow-down"/></svg></button>
         <span class="view-seg seg compact" id="viewSeg" role="group" aria-label="Card style">
           <button type="button" data-mode="compact" title="Compact: one line" aria-label="Compact cards" aria-pressed="false"><svg><use href="#i-view-compact"/></svg></button>
           <button type="button" data-mode="normal" title="Normal" aria-label="Normal cards" aria-pressed="true"><svg><use href="#i-view-normal"/></svg></button>
