@@ -137,8 +137,23 @@ export class Highway {
     const vocal = this.panes.find((p) => p.chart.mode === 'vocals');
     const lanes = this.panes.filter((p) => p.chart.mode !== 'vocals');
     const many = this.panes.length > 1;
-    if (!lanes.length) { // vocals alone: the whole stage
-      this.drawPane(vocal, t, 0, 0, w, h, many);
+    if (!lanes.length) { // vocals alone
+      this.vocalAlone = true;
+      if (this.vocalView === 'karaoke') this.drawPane(vocal, t, 0, 0, w, h, many); // the lyrics fill the stage (renderKaraoke)
+      else { // the chart keeps the height it has next to other charts; the rest of the lyrics fill the space below
+        const vh = Math.round(Math.min(h * 0.34, 280));
+        this.drawPane(vocal, t, 0, 0, w, vh, many);
+        g.fillStyle = 'rgba(255,255,255,0.12)';
+        g.fillRect(0, vh - 1, w, 1);
+        g.save();
+        g.beginPath();
+        g.rect(0, vh, w, h - vh);
+        g.clip();
+        g.translate(0, vh);
+        this.renderLyricSheet(t, w, h - vh, vocal);
+        g.restore();
+      }
+      this.vocalAlone = false;
       return;
     }
     let top = 0;
@@ -208,59 +223,98 @@ export class Highway {
     }
   }
 
-  // Karaoke: only the lyrics. The line being sung fills from left to right, the next line waits underneath.
-  renderKaraoke(t, w, h, pane) {
+  // One karaoke line centred at cy: white, with the sung part filled teal (progressAt = the time, or null for a waiting line).
+  drawKaraokeLine(line, size, w, cy, alpha, progressAt) {
     const g = this.g;
+    const width = (s) => {
+      g.font = `700 ${s}px system-ui`;
+      const gw = g.measureText(' ').width;
+      let total = 0;
+      for (const syl of line.syl) total += g.measureText(syl.text).width + (syl.join ? 0 : gw);
+      return total - gw;
+    };
+    let sz = size;
+    while (width(sz) > w * 0.92 && sz > 12) sz -= 1;
+    const total = width(sz); // leaves the font set
+    const gw = g.measureText(' ').width;
+    let x = (w - total) / 2;
+    const prog = progressAt === null ? null : syllableProgress(line, progressAt);
+    g.textAlign = 'left';
+    g.textBaseline = 'middle';
+    g.lineJoin = 'round';
+    line.syl.forEach((syl, i) => {
+      const sw = g.measureText(syl.text).width;
+      g.lineWidth = Math.max(3, sz * 0.14);
+      g.strokeStyle = 'rgba(0,0,0,0.65)';
+      g.strokeText(syl.text, x, cy);
+      g.fillStyle = `rgba(255,255,255,${alpha})`;
+      g.fillText(syl.text, x, cy);
+      const p = prog ? prog[i] : 0;
+      if (p > 0) { // the sung part
+        g.save();
+        g.beginPath();
+        g.rect(x, cy - sz, sw * p, sz * 2);
+        g.clip();
+        g.fillStyle = '#13f0a6';
+        g.fillText(syl.text, x, cy);
+        g.restore();
+      }
+      x += sw + (syl.join ? 0 : gw);
+    });
+    g.textBaseline = 'alphabetic';
+  }
+
+  karaokeLines(pane) {
     pane.karaoke ??= buildKaraokeLines(pane.chart.lyrics || [], pane.chart.phrases);
-    if (!pane.karaoke.length) {
+    return pane.karaoke;
+  }
+
+  // The lyrics as a sheet: the line being sung (filled as it goes) and, under it, the lines to come, as many as fit.
+  renderLyricSheet(t, w, h, pane) {
+    const g = this.g;
+    const lines = this.karaokeLines(pane);
+    if (!lines.length) {
       g.font = '600 16px system-ui';
       g.textAlign = 'center';
       g.fillStyle = 'rgba(255,255,255,0.5)';
       g.fillText('No lyrics in this chart', w / 2, h / 2);
       return;
     }
-    const { current, next } = karaokeAt(pane.karaoke, t);
+    let idx = -1;
+    for (let i = 0; i < lines.length && lines[i].start <= t + 0.25; i++) idx = i;
+    const singing = idx >= 0 && t <= lines[idx].end + 2.5;
+    const first = singing ? idx : idx + 1;
+    const big = Math.max(18, Math.min(h * 0.16, 46, w * 0.06));
+    const small = Math.max(14, big * 0.72);
+    let y = big * 0.95;
+    for (let i = first; i < lines.length; i++) {
+      const cur = singing && i === idx;
+      const size = cur ? big : small;
+      if (y + size * 0.7 > h) break;
+      this.drawKaraokeLine(lines[i], size, w, y, cur ? 0.95 : Math.max(0.3, 0.7 - (i - first) * 0.08), cur ? t : null);
+      y += size * 1.55 + (cur ? big * 0.25 : 0);
+    }
+  }
+
+  // Karaoke: only the lyrics. Alone, they fill the stage as a sheet; next to other charts the line being sung and the next one.
+  renderKaraoke(t, w, h, pane) {
+    const g = this.g;
+    if (this.vocalAlone) {
+      this.renderLyricSheet(t, w, h, pane);
+      return;
+    }
+    const lines = this.karaokeLines(pane);
+    if (!lines.length) {
+      g.font = '600 16px system-ui';
+      g.textAlign = 'center';
+      g.fillStyle = 'rgba(255,255,255,0.5)';
+      g.fillText('No lyrics in this chart', w / 2, h / 2);
+      return;
+    }
+    const { current, next } = karaokeAt(lines, t);
     const big = Math.max(18, Math.min(h * 0.2, 54, w * 0.07));
-    const draw = (line, size, cy, alpha, progressAt) => {
-      const width = (s) => {
-        g.font = `700 ${s}px system-ui`;
-        const gw = g.measureText(' ').width;
-        let total = 0;
-        for (const syl of line.syl) total += g.measureText(syl.text).width + (syl.join ? 0 : gw);
-        return total - gw;
-      };
-      let sz = size;
-      while (width(sz) > w * 0.92 && sz > 12) sz -= 1;
-      const total = width(sz); // leaves the font set
-      const gw = g.measureText(' ').width;
-      let x = (w - total) / 2;
-      const prog = progressAt === null ? null : syllableProgress(line, progressAt);
-      g.textAlign = 'left';
-      g.textBaseline = 'middle';
-      g.lineJoin = 'round';
-      line.syl.forEach((syl, i) => {
-        const sw = g.measureText(syl.text).width;
-        g.lineWidth = Math.max(3, sz * 0.14);
-        g.strokeStyle = 'rgba(0,0,0,0.65)';
-        g.strokeText(syl.text, x, cy);
-        g.fillStyle = `rgba(255,255,255,${alpha})`;
-        g.fillText(syl.text, x, cy);
-        const p = prog ? prog[i] : 0;
-        if (p > 0) { // the sung part
-          g.save();
-          g.beginPath();
-          g.rect(x, cy - sz, sw * p, sz * 2);
-          g.clip();
-          g.fillStyle = '#13f0a6';
-          g.fillText(syl.text, x, cy);
-          g.restore();
-        }
-        x += sw + (syl.join ? 0 : gw);
-      });
-      g.textBaseline = 'alphabetic';
-    };
-    if (current) draw(current, big, h * 0.42, 0.95, t);
-    if (next) draw(next, big * 0.72, current ? h * 0.74 : h * 0.5, current ? 0.55 : 0.8, null);
+    if (current) this.drawKaraokeLine(current, big, w, h * 0.42, 0.95, t);
+    if (next) this.drawKaraokeLine(next, big * 0.72, w, current ? h * 0.74 : h * 0.5, current ? 0.55 : 0.8, null);
   }
 
   renderLanes(t, w, h) {
@@ -521,14 +575,32 @@ export class Highway {
         continue;
       }
       const prev = notes[i - 1];
-      if (n.slide && prev && !prev.talkie) { // continues the previous note: join the two bars
-        g.lineWidth = half;
+      const y = yOfPitch(n.pitch);
+      if (n.slide && prev && !prev.talkie) { // continues the previous note: a smooth ribbon from its end to this note's start
+        const xa = xOf(prev.end);
+        const ya = yOfPitch(prev.pitch);
+        const lead = Math.min(10, half * 1.5); // tucks under both bars so no seam shows
+        const x0 = xa - lead;
+        const x3 = x1 + lead;
+        const cx = (x0 + x3) / 2;
+        g.save();
+        g.globalAlpha *= 0.7;
         g.beginPath();
-        g.moveTo(xOf(prev.end), yOfPitch(prev.pitch));
-        g.lineTo(x1, yOfPitch(n.pitch));
-        g.stroke();
+        g.moveTo(x0, ya - half);
+        g.bezierCurveTo(cx, ya - half, cx, y - half, x3, y - half);
+        g.lineTo(x3, y + half);
+        g.bezierCurveTo(cx, y + half, cx, ya + half, x0, ya + half);
+        g.closePath();
+        g.fill();
+        g.restore();
       }
-      g.fillRect(x1, yOfPitch(n.pitch) - half, x2 - x1, half * 2);
+      const bw = x2 - x1;
+      if (active) { g.save(); g.shadowColor = g.fillStyle; g.shadowBlur = 14; }
+      g.beginPath();
+      if (g.roundRect) g.roundRect(x1, y - half, bw, half * 2, Math.min(half, bw / 2));
+      else g.rect(x1, y - half, bw, half * 2);
+      g.fill();
+      if (active) g.restore();
     }
   }
 
