@@ -654,7 +654,7 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .prow .seg.compact button { width: 34px; min-width: 0; padding: 3px 0; text-align: center; } /* mode and difficulty buttons share one size */
 
 /* The library's own close button replaces the hamburger while the library is open */
-.app:not(.lib-closed) #toggleLibrary, .app:not(.lib-closed) #infoMenu { display: none; }
+.app:not(.lib-closed) #toggleLibrary { display: none; }
 
 /* Library list: the native scrollbar is hidden; the rail on the right is the scrollbar (thumb), the group index (ticks
    and short labels) and a quick-navigation strip (press or drag). --rail-w also sets the right edge of the rows and
@@ -909,3 +909,12 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 /* Multi-column list: separator lines between and around the cards */
 #songs.multi li.row { border-right: 1px solid var(--line); } /* every card closes its own right side (also a lone card in the last row) */
 #songs.multi li.row.first-col { border-left: 1px solid var(--line); } /* the first column also has the left line */
+
+/* Round 67: navigation buttons: "Library" in the player bar and a labelled back button on the details screen */
+.tb-top { justify-content: flex-start; }
+.tb-top > :last-child { margin-left: auto; }
+.home-btn { flex: none; }
+.home-btn span { font-weight: 600; }
+button.chip-btn.info-back { position: absolute; top: 10px; left: 12px; z-index: 2; background: var(--panel); }
+.info-back span { font-weight: 600; }
+@media (max-width: 700px) { .home-btn span { display: none; } .home-btn { padding: 0 6px; } }

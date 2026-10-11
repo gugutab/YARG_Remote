@@ -5,6 +5,7 @@ import { Highway } from './highway.js';
 import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, readBytes, serializeSongs, restoreSongs, restoreRemoteSongs } from './library.js';
 import { songDelaySeconds, plainText } from './ini.js';
 import { metaRows, extraRows, chartStats, bpmLabel, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel } from './songinfo.js';
+import { parseRoute, formatRoute } from './route.js';
 import { saveLibrary, loadLibrary, loadThumb, saveThumb } from './store.js';
 import { filterSongs, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, anchorLabel } from './songlist.js';
 import { createVirtualList } from './virtuallist.js';
@@ -18,7 +19,7 @@ const els = Object.fromEntries([
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'sectionBtn', 'sectionPop', 'sectionText', 'partDiff', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
   'fullscreen', 'barHide', 'barShow', 'fretBtn', 'fretPop', 'viewChoice', 'noteChoice', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
-  'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay', 'infoMenu',
+  'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay', 'infoMenu', 'homeBtn',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
 ].map((id) => [id, $(id)]));
 
@@ -115,6 +116,7 @@ els.instChips.addEventListener('click', (e) => {
   filters.instruments[filters.instruments.has(b.dataset.inst) ? 'delete' : 'add'](b.dataset.inst);
   syncFilterUi();
   renderList();
+  openPendingRoute(); // a #/song/... link opened at startup
 });
 els.levelSeg.addEventListener('click', (e) => {
   const b = e.target.closest('[data-level]');
@@ -295,7 +297,7 @@ const describeSong = (song) => {
 const savedMode = store.get('cardMode');
 const list = createVirtualList({
   mode: CARD_MODES.includes(savedMode) ? savedMode : 'normal', describe: describeSong,
-  scroller: els.songs, label: els.groupLabel, rail: els.rail, thumbs, text: plainText, onSelect: (song) => selectSong(song),
+  scroller: els.songs, label: els.groupLabel, rail: els.rail, thumbs, text: plainText, onSelect: (song) => navigate({ view: 'song', id: song.id }),
   anchor: (label) => anchorLabel(label, els.sortBy.value),
 });
 
@@ -328,7 +330,7 @@ function setHome(on) {
   syncHomeButton();
 }
 const syncHomeButton = () => { els.libExpand.hidden = !current && homeMode; }; // nothing to go back to before the first song
-els.libExpand.addEventListener('click', () => setHome(!homeMode));
+els.libExpand.addEventListener('click', () => navigate(homeMode ? (current ? { view: lastSongView, id: current.song.id } : { view: 'library' }) : { view: 'library' }));
 syncViewSeg();
 
 function renderList({ keepScroll = false } = {}) {
@@ -777,8 +779,9 @@ function renderPartMenu() {
   }));
 }
 
-els.infoPopMore.addEventListener('click', () => { closePopovers(); setInfoOpen(true); });
-els.infoMenu.addEventListener('click', () => setLibraryOpen(!libraryOpen()));
+els.infoPopMore.addEventListener('click', () => { closePopovers(); if (current) navigate({ view: 'song', id: current.song.id }); else setInfoOpen(true); });
+els.infoMenu.addEventListener('click', () => navigate({ view: 'library' }));
+els.homeBtn.addEventListener('click', () => navigate({ view: 'library' }));
 els.infoPlay.addEventListener('click', () => togglePlay());
 
 function showPlayInfo(on) {
@@ -1266,7 +1269,7 @@ async function togglePlay() {
   if (!ready || !chart) return; // playback waits for the audio to finish loading
   if (player.playing) player.pause();
   else {
-    if (infoOpen) setInfoOpen(false); // starting from the info screen goes to the chart
+    if (infoOpen && current) navigate({ view: 'play', id: current.song.id }); // starting from the details goes to the chart
     await player.play();
   }
   syncPlayButton();
@@ -1353,14 +1356,14 @@ document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tag = e.target.tagName;
   if (e.code === 'Escape') {
-    if (homeMode && current && popovers.every(([, pop]) => pop.hidden)) { setHome(false); return; } // back from the wide library to the song
-    if (popovers.every(([, pop]) => pop.hidden) && infoOpen && loadInfo.state !== 'idle') setInfoOpen(false);
+    if (popovers.every(([, pop]) => pop.hidden)) { goBack(); return; } // Esc is Back (after closing an open popover)
     closePopovers();
     return;
   }
   if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(tag)) return;
   if (e.code === 'Space' && ready) { e.preventDefault(); togglePlay(); }
-  else if (e.code === 'KeyI' && (current || loadInfo.state !== 'idle')) setInfoOpen(!infoOpen);
+  else if (e.code === 'KeyI' && current && !homeMode) navigate({ view: infoOpen ? 'play' : 'song', id: current.song.id });
+  else if (e.code === 'KeyH') navigate({ view: 'library' });
   else if (e.code === 'KeyL') setLibraryOpen(!libraryOpen());
   else if (e.code === 'KeyB') setBarHidden(!els.app.classList.contains('bar-hidden'));
   else if (e.code === 'KeyF') toggleFullscreen();
@@ -1401,5 +1404,62 @@ function fmt(sec) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+// ---------- Navigation: Library -> Song details -> Player, addressed by the URL hash ----------
+// Every change of screen is a history entry, so the browser's Back/Forward and Esc walk through them and a reload (or a
+// shared link) opens the same screen. The low-level switches are setHome() and setInfoOpen(); this layer decides which.
+let lastSongView = 'song'; // the song screen to come back to from the library: details or player
+let navDepth = 0; // entries pushed by the app: Esc/Back stays inside the app while this is > 0
+let pendingRoute = parseRoute(location.hash); // a link opened at startup, applied when the library is there
+
+function applyRoute(route) {
+  document.title = 'YARG Remote - Viewer';
+  if (route.view === 'library') {
+    if (current && lastSongView === 'play') { player.pause(); syncPlayButton(); } // leaving the chart: stop the music
+    setHome(true);
+    return;
+  }
+  const song = songs.find((s) => s.id === route.id);
+  if (!song) { setHome(true); return; }
+  lastSongView = route.view;
+  if (current?.song !== song) {
+    selectSong(song); // loads it; the details open at once
+    if (route.view === 'play') setInfoOpen(false);
+  } else {
+    setHome(false);
+    setInfoOpen(route.view === 'song');
+  }
+  document.title = `${plainText(song.title)} - ${plainText(song.artist)} · YARG Remote`;
+}
+
+function navigate(route, { replace = false } = {}) {
+  const hash = formatRoute(route);
+  if (location.hash !== hash && !(hash === '#/' && location.hash === '')) {
+    if (replace) history.replaceState({ nav: navDepth }, '', hash);
+    else history.pushState({ nav: ++navDepth }, '', hash);
+  }
+  applyRoute(route);
+}
+
+function goBack() { // Esc / the back buttons
+  if (history.state?.nav > 0) { history.back(); return; }
+  // no app history (opened on a deep link, or after a reload): go up one level
+  if (homeMode) { if (current) navigate({ view: lastSongView, id: current.song.id }, { replace: true }); return; }
+  if (infoOpen && loadInfo.state !== 'idle' && current) navigate({ view: 'play', id: current.song.id }, { replace: true });
+  else navigate({ view: 'library' }, { replace: true });
+}
+
+window.addEventListener('popstate', (e) => {
+  navDepth = e.state?.nav ?? 0;
+  applyRoute(parseRoute(location.hash));
+});
+
 // Start on the home screen: the full-page library (needs everything above to be defined).
 setHome(true);
+// Open a song link once the library is loaded (also called by afterLibraryLoaded).
+function openPendingRoute() {
+  if (!pendingRoute || pendingRoute.view === 'library' || !songs.length) return;
+  const route = pendingRoute;
+  pendingRoute = null;
+  if (songs.some((s) => s.id === route.id)) navigate(route, { replace: true });
+}
+openPendingRoute();

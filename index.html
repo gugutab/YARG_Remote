@@ -49,6 +49,7 @@
       <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
       <symbol id="i-shrink" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></symbol>
       <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
+      <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol>
       <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
       <symbol id="i-sort" viewBox="0 0 24 24"><path d="M7 5v14M7 19l-3-3M7 19l3-3M17 19V5M17 5l-3 3M17 5l3 3"/></symbol>
       <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
@@ -159,6 +160,7 @@
 
         <div class="tb-main">
           <div class="tb-top">
+            <button id="homeBtn" class="chip-btn home-btn" type="button" title="Back to the library (H)" aria-label="Back to the library"><svg><use href="#i-grid"/></svg><span>Library</span></button>
             <div class="now" id="now" hidden>
               <div class="now-text">
                 <div id="title" class="now-title"></div>
@@ -257,7 +259,7 @@
         </div>
         <div id="loading" class="loading" hidden></div>
         <section id="info" class="info" hidden aria-label="Song info">
-          <button id="infoMenu" class="icon info-menu" type="button" title="Library (L)" aria-label="Open or close the library"><svg><use href="#i-menu"/></svg></button>
+          <button id="infoMenu" class="chip-btn info-back" type="button" title="Back to the library (Esc)" aria-label="Back to the library"><svg><use href="#i-arrow-left"/></svg><span>Library</span></button>
           <div class="info-scroll">
             <div class="info-grid">
               <header class="info-card info-head">
