@@ -408,7 +408,7 @@ const describeSong = (song) => {
   return { ...d, instruments: d.instruments.map((i) => ({ ...CARD_INSTRUMENTS[i.base], level: i.level })) };
 };
 // Legacy preferences (before the settings page) move into the settings once.
-for (const [legacy, id] of [['cardMode', 'library.cardStyle'], ['sortBy', 'library.sort']]) {
+for (const [legacy, id] of [['cardMode', 'library.cardStyle'], ['sortBy', 'library.sort'], ['view', 'highway.view'], ['noteStyle', 'highway.noteStyle']]) {
   const old = store.get(legacy);
   if (old && prefs.isDefault(id)) prefs.set(id, old);
 }
@@ -1390,18 +1390,18 @@ function syncPlayButton() {
 function setView(view) {
   highway.setView(view);
   for (const b of els.viewChoice.querySelectorAll('[data-view]')) b.setAttribute('aria-pressed', String(b.dataset.view === view));
-  store.set('view', view);
+  if (prefs.get('highway.view') !== view) prefs.set('highway.view', view); // the last choice is the default
 }
-setView(store.get('view') === '3d' ? '3d' : '2d');
+setView(prefs.get('highway.view'));
 els.viewChoice.addEventListener('click', (e) => { const b = e.target.closest('[data-view]'); if (b) setView(b.dataset.view); });
 
 // ---------- Note style: circles or rounded rectangles ----------
 function setNoteStyle(style) {
   highway.setNoteStyle(style);
   for (const b of els.noteChoice.querySelectorAll('[data-note]')) b.setAttribute('aria-pressed', String(b.dataset.note === style));
-  store.set('noteStyle', style);
+  if (prefs.get('highway.noteStyle') !== style) prefs.set('highway.noteStyle', style);
 }
-setNoteStyle(store.get('noteStyle') === 'rect' ? 'rect' : 'round');
+setNoteStyle(prefs.get('highway.noteStyle'));
 els.noteChoice.addEventListener('click', (e) => { const b = e.target.closest('[data-note]'); if (b) setNoteStyle(b.dataset.note); });
 
 // ---------- Hide / show the top bar (the chart takes its space) ----------
@@ -1426,7 +1426,8 @@ function setBarHidden(hidden) {
   closePopovers();
   alignStageButtons();
 }
-setBarHidden(store.get('barHidden') === '1');
+setBarHidden(prefs.get('highway.barHidden') === 'hidden' || (prefs.get('highway.barHidden') === 'last' && store.get('barHidden') === '1'));
+if (prefs.get('highway.neck') !== SETTING_DEFAULTS.neck) setSetting('neck', prefs.get('highway.neck')); // the starting neck speed
 els.barHide.addEventListener('click', () => setBarHidden(true));
 els.barShow.addEventListener('click', () => setBarHidden(false));
 
@@ -1544,6 +1545,8 @@ function applyDetails() {
   if (current) renderMeta(current.song, current.midi); // the chips
 }
 const EFFECTS = {
+  'highway.view': (v) => { if (highway.view !== v) setView(v); },
+  'highway.noteStyle': (v) => setNoteStyle(v),
   'panels.tabs': syncPanelUi, 'panels.nowPlaying': syncPanelUi,
   'details.chips': applyDetails, 'details.cover': applyDetails, 'details.quote': applyDetails, 'details.sections': applyDetails,
   'details.layout': applyDetails, 'details.stemNames': applyDetails, 'details.maxWidth': applyDetails, 'details.compact': applyDetails,

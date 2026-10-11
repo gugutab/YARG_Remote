@@ -84,6 +84,16 @@ export const SECTIONS = [
     ],
   },
   {
+    id: 'highway', title: 'Highway', icon: 'palette',
+    description: 'The note chart. The view and note shape also change when you use the chart buttons.',
+    items: [
+      { id: 'highway.view', type: 'choice', label: 'View', options: [{ value: '2d', label: '2D' }, { value: '3d', label: '3D' }], default: '2d' },
+      { id: 'highway.noteStyle', type: 'choice', label: 'Note shape', options: [{ value: 'round', label: 'Circles' }, { value: 'rect', label: 'Rounded' }], default: 'round' },
+      { id: 'highway.neck', type: 'range', label: 'Starting neck speed', help: 'Only the spacing of the notes, not the music speed.', min: 0.5, max: 3, step: 0.1, unit: '×', default: 1.2 },
+      { id: 'highway.barHidden', type: 'choice', label: 'Top bar at startup', options: [{ value: 'shown', label: 'Shown' }, { value: 'hidden', label: 'Hidden' }, { value: 'last', label: 'As I left it' }], default: 'last' },
+    ],
+  },
+  {
     id: 'general', title: 'General', icon: 'gear',
     description: 'What the app does when it starts and when a song opens.',
     items: [

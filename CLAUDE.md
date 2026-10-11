@@ -193,3 +193,11 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - Pack (game/DLC): `packOf(song)` in `ini.js` = the top-level folder of the song's path (40 values in the author's library: "Rock Band 2 DLC", "Guitar Hero III"...; the ini `icon` code is partial). Shown as the first header chip, as a line in the large card, a filter, a sort key with dividers, a `pack:` search field (and part of the free-text search). Songs in the library root have no pack.
 - Layout: two panels. The library (search, filters, sort, card list) is the left panel, always open on a desktop screen (collapsing it with L/the close button only lasts for the session; on a phone it is a drawer), and the song (details, then the player) is the right panel. A divider between them resizes the library (`#splitter`, width kept in `yargremote.libWidth`, double-click resets); a wide panel flows its cards into columns (`list.setColumns(1, { minWidth: 440 })`).
 - Deep links (`src/route.js`, the Deep links block at the end of `app.js`): the URL hash names the open song (`#/song/<id>` details, `#/song/<id>/play` chart); it is only replaced, never pushed, so Back leaves the app and the panels stay in place. A reload or a shared link opens the same song (`openFromHash`).
+
+## Settings page (customization)
+
+- `src/settings-schema.js` lists every setting by section (appearance, library and cards, song details, panels, highway, general, data). A setting is added to the schema only when it is wired; `app.js` applies each one through the `EFFECTS` map and an initial pass.
+- `prefs` (store in `src/settings.js`, only non-default values in `localStorage['yargremote.settings']`) is not the playback `settings` object (`speed/neck/chartDelay`).
+- Themes: `src/themes.js` (presets, derive, resolve/apply as CSS variables on `<html>`), theme studio in `src/settings-custom.js`.
+- Cards: `DEFAULT_CARDS`/`cardHeight`/`setCards` in `src/virtuallist.js`. Details screen: `applyDetails()` sets `data-*` attributes on `#info`.
+- Panels: library and song panel close/reopen (`setLibraryOpen`, `setSongPanelOpen`, keys L and D, edge tabs, mini player); never both closed on desktop; state in `yargremote.panelState`.
