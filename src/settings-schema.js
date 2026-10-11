@@ -88,6 +88,8 @@ export const SECTIONS = [
     items: [
       { id: 'highway.view', type: 'choice', label: 'View', options: [{ value: '2d', label: '2D' }, { value: '3d', label: '3D' }], default: '2d' },
       { id: 'highway.noteStyle', type: 'choice', label: 'Note shape', options: [{ value: 'round', label: 'Circles' }, { value: 'rect', label: 'Rounded' }], default: 'round' },
+      { id: 'highway.vocalView', type: 'choice', label: 'Vocal view', help: 'Notes shows the pitch bars with the lyrics; Karaoke shows only the lyrics. Key: K.', options: [{ value: 'track', label: 'Notes' }, { value: 'karaoke', label: 'Karaoke' }], default: 'track' },
+      { id: 'highway.paneMin', type: 'range', label: 'Narrowest fretboard', help: 'With several fretboards on screen, each one gets at least this width; the others wait outside (swipe, or [ and ]).', min: 200, max: 600, step: 20, unit: 'px', default: 280 },
       { id: 'highway.neck', type: 'range', label: 'Starting neck speed', help: 'Only the spacing of the notes, not the music speed.', min: 0.5, max: 3, step: 0.1, unit: '×', default: 1.2 },
       { id: 'highway.barHidden', type: 'choice', label: 'Top bar at startup', options: [{ value: 'shown', label: 'Shown' }, { value: 'hidden', label: 'Hidden' }, { value: 'last', label: 'As I left it' }], default: 'last' },
     ],

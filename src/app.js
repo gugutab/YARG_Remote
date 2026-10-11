@@ -23,7 +23,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'sectionBtn', 'sectionPop', 'sectionText', 'partDiff', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'fullscreen', 'barHide', 'barShow', 'fretBtn', 'fretPop', 'viewChoice', 'noteChoice', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'fullscreen', 'barHide', 'barShow', 'fretBtn', 'fretPop', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay', 'infoMenu',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
 ].map((id) => [id, $(id)]));
@@ -458,7 +458,7 @@ async function selectSong(song) {
   audioLoad = null;
   current = null;
   chart = null;
-  highway.setChart(null);
+  highway.setCharts([]);
   renderList({ keepScroll: true });
   if (narrow()) setLibraryOpen(false, false);
   else if (!songPanelOpen() && prefs.get('panels.openSongOnSelect')) setSongPanelOpen(true); // picking a song shows it
@@ -512,7 +512,7 @@ async function selectSong(song) {
     img.hidden = !coverUrl;
   }
 
-  current = { song, midi, coverUrl, options: instrumentOptions(midi), diffChoice: {}, statsCache: new Map(), expandedStats: new Set(), modeChoice: {} };
+  current = { song, midi, coverUrl, options: instrumentOptions(midi), diffChoice: {}, pins: new Set(), statsCache: new Map(), expandedStats: new Set(), modeChoice: {} };
   renderMeta(song, midi); // adds the BPM chip
   renderList({ keepScroll: true }); // highlight the loaded song
   syncUrl();
@@ -718,6 +718,7 @@ function instrumentGroups() {
       || (g.key === 'drums' ? g.options.find((o) => o.drumMode === 'pro') : null)
       || g.options[0];
     g.active = g.options.some((o) => o.id === activeId);
+    g.pinned = !g.active && current.pins.has(g.key); // shown next to the active one
   }
   return out;
 }
@@ -739,6 +740,31 @@ function layoutInstrumentCards() {
 }
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(layoutInstrumentCards).observe(els.instrumentCards);
 
+// Several fretboards at once: a card (or menu row) can be pinned to show next to the active instrument.
+function pinButton(group) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'icon small-icon pin-btn';
+  b.innerHTML = '<svg><use href="#i-layers"/></svg>';
+  b.title = group.pinned ? 'Stop showing it next to the others' : 'Show it together with the others';
+  b.setAttribute('aria-label', `${group.pinned ? 'Hide' : 'Show'} ${group.label} together with the others`);
+  b.setAttribute('aria-pressed', String(group.pinned));
+  b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    current.pins[group.pinned ? 'delete' : 'add'](group.key);
+    updateChart();
+  });
+  return b;
+}
+
+// A difficulty button: on the active card or a card that is not shown it picks the instrument; on a pinned card it only changes that fretboard.
+function pickDifficulty(group, ins, diffId) {
+  if (group.pinned) {
+    current.diffChoice[ins.id] = diffId;
+    updateChart();
+  } else selectInstrument(ins.id, diffId);
+}
+
 function renderPickers() {
   if (!current) return;
   const activeId = els.instrument.value;
@@ -753,6 +779,7 @@ function renderPickers() {
     const card = document.createElement('div');
     card.className = 'icard';
     card.dataset.active = String(group.active);
+    card.dataset.pinned = String(group.pinned);
 
     const head = document.createElement('button');
     head.type = 'button';
@@ -783,6 +810,7 @@ function renderPickers() {
       });
       top.append(info);
     }
+    if (!group.active) top.append(pinButton(group));
     const level = instrumentLevel(current.song, ins);
     if (level !== null) {
       const pips = document.createElement('span');
@@ -802,11 +830,12 @@ function renderPickers() {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = o.modeLabel ?? o.label;
-        btn.setAttribute('aria-pressed', String(group.active && o.id === activeId));
+        btn.setAttribute('aria-pressed', String((group.active || group.pinned) && o.id === group.chosen.id));
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           current.modeChoice[group.key] = o.id;
-          selectInstrument(o.id, diffFor(o).chosen?.id);
+          if (group.pinned) updateChart(); // a fretboard shown next to the active one keeps showing
+          else selectInstrument(o.id, diffFor(o).chosen?.id);
         });
         modes.append(btn);
       }
@@ -819,8 +848,8 @@ function renderPickers() {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = d.label;
-        btn.setAttribute('aria-pressed', String(group.active && d.id === els.difficulty.value));
-        btn.addEventListener('click', (e) => { e.stopPropagation(); selectInstrument(ins.id, d.id); });
+        btn.setAttribute('aria-pressed', String((group.active || group.pinned) && d.id === chosen?.id));
+        btn.addEventListener('click', (e) => { e.stopPropagation(); pickDifficulty(group, ins, d.id); });
         seg.append(btn);
       }
       card.append(seg);
@@ -861,6 +890,8 @@ function renderPartMenu() {
     row.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[o.base] || 'music'}"/></svg><span class="prow-name"></span>`;
     row.querySelector('.prow-name').textContent = group.label;
     row.addEventListener('click', () => { selectInstrument(o.id, chosen?.id); });
+    if (!group.active) row.append(pinButton(group));
+    row.dataset.pinned = String(group.pinned);
     if (o.mode !== 'vocals') {
       const seg = document.createElement('div');
       seg.className = 'seg compact';
@@ -870,8 +901,8 @@ function renderPartMenu() {
         btn.textContent = d.short; // E, M, H, X
         btn.title = d.label;
         btn.setAttribute('aria-label', `${group.label}, ${d.label}`);
-        btn.setAttribute('aria-pressed', String(group.active && d.id === els.difficulty.value));
-        btn.addEventListener('click', (e) => { e.stopPropagation(); selectInstrument(o.id, d.id); });
+        btn.setAttribute('aria-pressed', String((group.active || group.pinned) && d.id === chosen?.id));
+        btn.addEventListener('click', (e) => { e.stopPropagation(); pickDifficulty(group, o, d.id); });
         seg.append(btn);
       }
       row.append(seg);
@@ -946,9 +977,21 @@ function updateChart() {
   const ins = currentInstrument();
   const diff = DIFFICULTIES.find((d) => d.id === els.difficulty.value);
   chart = ins && diff ? buildChart(current.midi, ins, diff) : null;
-  highway.setChart(chart);
+  // Every chart on screen, in the order of the instruments: the active one plus the pinned ones.
+  const items = [];
+  for (const group of instrumentGroups()) {
+    if (group.active) current.pins.delete(group.key);
+    const shown = group.active ? chart : group.pinned ? (() => { const o = group.chosen; const d = diffFor(o).chosen; return d ? buildChart(current.midi, o, d) : null; })() : null;
+    if (!shown) continue;
+    const d = group.active ? diff : diffFor(group.chosen).chosen;
+    items.push({ chart: shown, label: shown.mode === 'vocals' ? group.label : `${group.label} · ${d.short}` });
+  }
+  highway.setCharts(items);
   fillSectionOptions();
-  els.fretBtn.hidden = !chart || chart.mode === 'vocals'; // vocals have no highway to turn 3D or note heads to reshape
+  const hasLanes = items.some((x) => x.chart.mode !== 'vocals');
+  const hasVocals = items.some((x) => x.chart.mode === 'vocals');
+  for (const g of els.fretPop.querySelectorAll('[data-needs]')) g.hidden = !(g.dataset.needs === 'lanes' ? hasLanes : hasVocals);
+  els.fretBtn.hidden = items.length === 0; // the chart options: view and notes for fretboards, notes or karaoke for vocals
   if (els.fretBtn.hidden) els.fretPop.hidden = true;
   renderPickers();
   renderLoadState();
@@ -1419,6 +1462,28 @@ function setView(view) {
 setView(prefs.get('highway.view'));
 els.viewChoice.addEventListener('click', (e) => { const b = e.target.closest('[data-view]'); if (b) setView(b.dataset.view); });
 
+// ---------- Vocal view: notes with lyrics, or karaoke (the lyrics alone) ----------
+function setVocalView(view) {
+  highway.setVocalView(view);
+  for (const b of els.vocalChoice.querySelectorAll('[data-vocal]')) b.setAttribute('aria-pressed', String(b.dataset.vocal === view));
+  if (prefs.get('highway.vocalView') !== view) prefs.set('highway.vocalView', view);
+}
+setVocalView(prefs.get('highway.vocalView'));
+els.vocalChoice.addEventListener('click', (e) => { const b = e.target.closest('[data-vocal]'); if (b) setVocalView(b.dataset.vocal); });
+
+// ---------- Several fretboards: swipe (or drag) sideways to bring the next one into view when they do not all fit ----------
+els.highway.style.touchAction = 'pan-y'; // vertical gestures stay with the page, horizontal ones are ours
+let swipe = null;
+els.highway.addEventListener('pointerdown', (e) => { swipe = { x: e.clientX, y: e.clientY }; });
+els.highway.addEventListener('pointerup', (e) => {
+  if (!swipe) return;
+  const dx = e.clientX - swipe.x;
+  const dy = e.clientY - swipe.y;
+  swipe = null;
+  if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) highway.shiftFocus(dx < 0 ? 1 : -1);
+});
+els.highway.addEventListener('pointercancel', () => { swipe = null; });
+
 // ---------- Note style: circles or rounded rectangles ----------
 function setNoteStyle(style) {
   highway.setNoteStyle(style);
@@ -1501,6 +1566,9 @@ document.addEventListener('keydown', (e) => {
   else if (e.code === 'KeyB') setBarHidden(!els.app.classList.contains('bar-hidden'));
   else if (e.code === 'KeyF') toggleFullscreen();
   else if (e.code === 'KeyV') setView(highway.view === '3d' ? '2d' : '3d');
+  else if (e.code === 'BracketRight') highway.shiftFocus(1);
+  else if (e.code === 'BracketLeft') highway.shiftFocus(-1);
+  else if (e.code === 'KeyK' && highway.panes.some((p) => p.chart.mode === 'vocals')) setVocalView(highway.vocalView === 'karaoke' ? 'track' : 'karaoke');
   else if (e.code === 'KeyN') setNoteStyle(highway.noteStyle === 'rect' ? 'round' : 'rect');
   else if (e.code === 'BracketLeft') stepSection(-1);
   else if (e.code === 'BracketRight') stepSection(1);
@@ -1569,6 +1637,8 @@ function applyDetails() {
   if (current) renderMeta(current.song, current.midi); // the chips
 }
 const EFFECTS = {
+  'highway.vocalView': (v) => { if (highway.vocalView !== v) setVocalView(v); },
+  'highway.paneMin': (v) => highway.setPaneMin(v),
   'highway.view': (v) => { if (highway.view !== v) setView(v); },
   'highway.noteStyle': (v) => setNoteStyle(v),
   'panels.tabs': syncPanelUi,

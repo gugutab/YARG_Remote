@@ -1079,3 +1079,12 @@ button.icon.close-song-info { position: absolute; top: 10px; right: 14px; z-inde
 .load-screen p { margin: 0; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 .ls-bar { width: min(420px, 80%); height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .ls-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s linear; }
+
+/* pinned fretboards */
+.pin-btn { flex: none; opacity: .6; }
+.pin-btn[aria-pressed="true"] { opacity: 1; color: var(--accent); }
+.icard[data-pinned="true"] { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.icard-top .pin-btn { margin-left: auto; }
+.icard-top .pin-btn + .pips { margin-left: 4px; }
+.prow .pin-btn { margin-left: auto; }
+.prow[data-pinned="true"] .prow-name { color: var(--accent); }

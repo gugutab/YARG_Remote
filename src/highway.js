@@ -38,6 +38,7 @@ import {
 } from './gfx.js';
 export { firstVisibleIndex } from './gfx.js';
 import { renderLanes3D } from './highway3d.js';
+import { buildKaraokeLines, karaokeAt, syllableProgress } from './karaoke.js';
 
 const RECT_WIDEN_2D = 1.18;
 
@@ -52,6 +53,11 @@ export class Highway {
     this.neck = 1.2; // neck speed (the app default): scales distance between notes only; timing is unchanged
     this.bg = '#0d1117'; // chart background and the colour its fades dissolve into (the theme's "stage" colour)
     this.bgRgb = '13, 17, 23';
+    this.panes = []; // every chart on screen: [{ chart, label, maxLength, vRange }]; vocals draw across the top, the rest side by side
+    this.paneMin = 280; // narrowest a fretboard may get before the others move out of view (swipe to bring them in)
+    this.focus = 0; // first fretboard in view when they do not all fit
+    this.perScreen = 1;
+    this.vocalView = 'track'; // 'track' (notes + lyrics) or 'karaoke' (the lyrics alone)
   }
 
   setBackground(hex) {
@@ -74,10 +80,38 @@ export class Highway {
   }
 
   setChart(chart) {
-    this.chart = chart;
-    this.vRange = null; // vocal view range is re-fitted for each chart
-    if (chart) markStarPowerNotes(chart);
-    this.maxLength = chart ? Math.max(0, ...chart.notes.map((n) => n.length || 0)) : 0;
+    this.setCharts(chart ? [{ chart }] : []);
+  }
+
+  // items: [{ chart, label }]. The first lane chart keeps the view when the others do not fit.
+  setCharts(items) {
+    this.panes = items.map(({ chart, label }) => {
+      markStarPowerNotes(chart);
+      return { chart, label: label ?? '', maxLength: Math.max(0, ...chart.notes.map((n) => n.length || 0)), vRange: null }; // the vocal range is re-fitted per chart
+    });
+    this.chart = this.panes[0]?.chart ?? null;
+    this.focus = 0;
+  }
+
+  setPaneMin(px) {
+    this.paneMin = Math.max(120, px);
+  }
+
+  setVocalView(view) {
+    this.vocalView = view === 'karaoke' ? 'karaoke' : 'track';
+  }
+
+  laneCount() {
+    return this.panes.filter((p) => p.chart.mode !== 'vocals').length;
+  }
+
+  // Swipe: brings the next (or previous) fretboard into view when they do not all fit. Returns whether it moved.
+  shiftFocus(delta) {
+    const total = this.laneCount();
+    const next = Math.max(0, Math.min(Math.max(0, total - this.perScreen), this.focus + delta));
+    const moved = next !== this.focus;
+    this.focus = next;
+    return moved;
   }
 
   resize() {
@@ -98,10 +132,134 @@ export class Highway {
     g.fillStyle = this.bg;
     g.fillRect(0, 0, w, h);
 
-    if (!this.chart) return; // the page shows its own welcome / loading overlay
-    if (this.chart.mode === 'vocals') this.renderVocals(t, w, h);
-    else if (this.view === '3d') renderLanes3D(this, t, w, h);
-    else this.renderLanes(t, w, h);
+    if (!this.panes.length) return; // the page shows its own welcome / loading overlay
+    const vocal = this.panes.find((p) => p.chart.mode === 'vocals');
+    const lanes = this.panes.filter((p) => p.chart.mode !== 'vocals');
+    const many = this.panes.length > 1;
+    if (!lanes.length) { // vocals alone: the whole stage
+      this.drawPane(vocal, t, 0, 0, w, h, many);
+      return;
+    }
+    let top = 0;
+    if (vocal) { // vocals use the top of the other tracks
+      top = Math.round(this.vocalView === 'karaoke' ? Math.min(h * 0.3, 230) : Math.min(h * 0.34, 280));
+      this.drawPane(vocal, t, 0, 0, w, top, many);
+      g.fillStyle = 'rgba(255,255,255,0.12)';
+      g.fillRect(0, top - 1, w, 1);
+    }
+    const per = Math.max(1, Math.min(lanes.length, Math.floor(w / this.paneMin)));
+    this.perScreen = per;
+    this.focus = Math.max(0, Math.min(this.focus, lanes.length - per));
+    const pw = w / per;
+    for (let i = 0; i < per; i++) {
+      const pane = lanes[this.focus + i];
+      this.drawPane(pane, t, i * pw, top, pw, h - top, many);
+      if (i > 0) { g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(Math.round(i * pw), top, 1, h - top); }
+    }
+    if (lanes.length > per) this.drawPaneDots(lanes.length, per, w, h);
+  }
+
+  // One chart in the rectangle (x, y, pw, ph): the drawing code sees a canvas of that size.
+  drawPane(pane, t, x, y, pw, ph, labelled) {
+    const g = this.g;
+    g.save();
+    g.beginPath();
+    g.rect(x, y, pw, ph);
+    g.clip();
+    g.translate(x, y);
+    this.chart = pane.chart;
+    this.maxLength = pane.maxLength;
+    this.vRange = pane.vRange;
+    if (pane.chart.mode === 'vocals') {
+      if (this.vocalView === 'karaoke') this.renderKaraoke(t, pw, ph, pane);
+      else this.renderVocals(t, pw, ph);
+    } else if (this.view === '3d') renderLanes3D(this, t, pw, ph);
+    else this.renderLanes(t, pw, ph);
+    pane.vRange = this.vRange;
+    if (labelled && pane.label) {
+      g.font = '600 12px system-ui';
+      g.textAlign = 'left';
+      g.textBaseline = 'middle';
+      const tw = g.measureText(pane.label).width;
+      g.fillStyle = 'rgba(0,0,0,0.45)';
+      g.beginPath();
+      if (g.roundRect) g.roundRect(8, 8, tw + 16, 22, 11);
+      else g.rect(8, 8, tw + 16, 22);
+      g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.9)';
+      g.fillText(pane.label, 16, 19);
+      g.textBaseline = 'alphabetic';
+    }
+    g.restore();
+  }
+
+  // Small dots at the bottom: how many fretboards there are and which ones are in view (swipe sideways to change).
+  drawPaneDots(total, per, w, h) {
+    const g = this.g;
+    const gap = 14;
+    const x0 = w / 2 - ((total - 1) * gap) / 2;
+    for (let i = 0; i < total; i++) {
+      const on = i >= this.focus && i < this.focus + per;
+      g.beginPath();
+      g.arc(x0 + i * gap, h - 10, on ? 4 : 3, 0, Math.PI * 2);
+      g.fillStyle = on ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.35)';
+      g.fill();
+    }
+  }
+
+  // Karaoke: only the lyrics. The line being sung fills from left to right, the next line waits underneath.
+  renderKaraoke(t, w, h, pane) {
+    const g = this.g;
+    pane.karaoke ??= buildKaraokeLines(pane.chart.lyrics || []);
+    if (!pane.karaoke.length) {
+      g.font = '600 16px system-ui';
+      g.textAlign = 'center';
+      g.fillStyle = 'rgba(255,255,255,0.5)';
+      g.fillText('No lyrics in this chart', w / 2, h / 2);
+      return;
+    }
+    const { current, next } = karaokeAt(pane.karaoke, t);
+    const big = Math.max(18, Math.min(h * 0.2, 54, w * 0.07));
+    const draw = (line, size, cy, alpha, progressAt) => {
+      const width = (s) => {
+        g.font = `700 ${s}px system-ui`;
+        const gw = g.measureText(' ').width;
+        let total = 0;
+        for (const syl of line.syl) total += g.measureText(syl.text).width + (syl.join ? 0 : gw);
+        return total - gw;
+      };
+      let sz = size;
+      while (width(sz) > w * 0.92 && sz > 12) sz -= 1;
+      const total = width(sz); // leaves the font set
+      const gw = g.measureText(' ').width;
+      let x = (w - total) / 2;
+      const prog = progressAt === null ? null : syllableProgress(line, progressAt);
+      g.textAlign = 'left';
+      g.textBaseline = 'middle';
+      g.lineJoin = 'round';
+      line.syl.forEach((syl, i) => {
+        const sw = g.measureText(syl.text).width;
+        g.lineWidth = Math.max(3, sz * 0.14);
+        g.strokeStyle = 'rgba(0,0,0,0.65)';
+        g.strokeText(syl.text, x, cy);
+        g.fillStyle = `rgba(255,255,255,${alpha})`;
+        g.fillText(syl.text, x, cy);
+        const p = prog ? prog[i] : 0;
+        if (p > 0) { // the sung part
+          g.save();
+          g.beginPath();
+          g.rect(x, cy - sz, sw * p, sz * 2);
+          g.clip();
+          g.fillStyle = '#13f0a6';
+          g.fillText(syl.text, x, cy);
+          g.restore();
+        }
+        x += sw + (syl.join ? 0 : gw);
+      });
+      g.textBaseline = 'alphabetic';
+    };
+    if (current) draw(current, big, h * 0.42, 0.95, t);
+    if (next) draw(next, big * 0.72, current ? h * 0.74 : h * 0.5, current ? 0.55 : 0.8, null);
   }
 
   renderLanes(t, w, h) {
