@@ -1494,17 +1494,40 @@ setVocalView(prefs.get('highway.vocalView'));
 els.vocalChoice.addEventListener('click', (e) => { const b = e.target.closest('[data-vocal]'); if (b) setVocalView(b.dataset.vocal); });
 
 // ---------- Several fretboards: swipe (or drag) sideways to bring the next one into view when they do not all fit ----------
-els.highway.style.touchAction = 'pan-y'; // vertical gestures stay with the page, horizontal ones are ours
+els.highway.style.touchAction = 'none'; // the stage does not scroll: the gestures are ours
+const canvasY = (e) => e.clientY - els.highway.getBoundingClientRect().top;
 let swipe = null;
-els.highway.addEventListener('pointerdown', (e) => { swipe = { x: e.clientX, y: e.clientY }; });
+els.highway.addEventListener('pointerdown', (e) => {
+  swipe = { x: e.clientX, y: e.clientY, lastY: e.clientY, sheet: highway.overSheet(canvasY(e)), moved: 0 };
+});
+els.highway.addEventListener('pointermove', (e) => {
+  if (!swipe?.sheet) return;
+  const dy = swipe.lastY - e.clientY; // dragging the lyrics up shows the next lines
+  swipe.lastY = e.clientY;
+  swipe.moved += Math.abs(dy);
+  if (swipe.moved > 6 && highway.sheetStep) highway.scrollSheet(dy / highway.sheetStep);
+});
 els.highway.addEventListener('pointerup', (e) => {
   if (!swipe) return;
-  const dx = e.clientX - swipe.x;
-  const dy = e.clientY - swipe.y;
+  const { x, y, sheet, moved } = swipe;
   swipe = null;
+  if (sheet) { // a tap on a lyric line seeks to it
+    if (moved <= 6 && ready) {
+      const time = highway.sheetLineAt(canvasY(e));
+      if (time !== null) { player.seek(Math.max(0, time + settings.chartDelay)); }
+    }
+    return;
+  }
+  const dx = e.clientX - x;
+  const dy = e.clientY - y;
   if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) highway.shiftFocus(dx < 0 ? 1 : -1);
 });
 els.highway.addEventListener('pointercancel', () => { swipe = null; });
+els.highway.addEventListener('wheel', (e) => { // the mouse wheel scrolls the lyrics when the pointer is over them
+  if (!highway.overSheet(canvasY(e)) || !highway.sheetStep) return;
+  e.preventDefault();
+  highway.scrollSheet(e.deltaY / highway.sheetStep);
+}, { passive: false });
 
 // ---------- Note style: circles or rounded rectangles ----------
 function setNoteStyle(style) {

@@ -58,6 +58,8 @@ export class Highway {
     this.paneMin = 280; // narrowest a fretboard may get before the others move out of view (swipe to bring them in)
     this.focus = 0; // first fretboard in view when they do not all fit
     this.perScreen = 1;
+    this.sheetRect = null; // where the lyric sheet is (canvas coordinates), when it is on screen
+    this.sheetManual = 0; // lines the user scrolled away from the singer
     this.vocalView = 'track'; // 'track' (notes + lyrics) or 'karaoke' (the lyrics alone)
   }
 
@@ -133,6 +135,8 @@ export class Highway {
     g.fillStyle = this.bg;
     g.fillRect(0, 0, w, h);
 
+    this.sheetRect = null;
+    this.sheetHits = [];
     if (!this.panes.length) return; // the page shows its own welcome / loading overlay
     const vocal = this.panes.find((p) => p.chart.mode === 'vocals');
     const lanes = this.panes.filter((p) => p.chart.mode !== 'vocals');
@@ -150,7 +154,7 @@ export class Highway {
         g.rect(0, vh, w, h - vh);
         g.clip();
         g.translate(0, vh);
-        this.renderLyricSheet(t, w, h - vh, vocal);
+        this.renderLyricSheet(t, w, h - vh, vocal, vh);
         g.restore();
       }
       this.vocalAlone = false;
@@ -269,10 +273,13 @@ export class Highway {
     return pane.karaoke;
   }
 
-  // The lyrics as a sheet: the line being sung (filled as it goes) and, under it, the lines to come, as many as fit.
-  renderLyricSheet(t, w, h, pane) {
+  // The lyrics as a sheet that scrolls: it follows the line being sung (the current line is filled as it goes and bigger);
+  // wheel / drag moves it by hand, and it glides back to the singer a few seconds after you stop. Clicking a line seeks to it.
+  renderLyricSheet(t, w, h, pane, yOff = 0) {
     const g = this.g;
     const lines = this.karaokeLines(pane);
+    this.sheetRect = { y: yOff, h };
+    this.sheetHits = [];
     if (!lines.length) {
       g.font = '600 16px system-ui';
       g.textAlign = 'center';
@@ -284,23 +291,53 @@ export class Highway {
     for (let i = 0; i < lines.length && lines[i].start <= t + 0.25; i++) idx = i;
     const singing = idx >= 0 && t <= lines[idx].end + 2.5;
     const first = singing ? idx : idx + 1;
+    const now = performance.now();
+    if (this.sheetManual && now - this.sheetTouched > 3500) this.sheetManual = 0; // back to following the singer
+    const target = Math.max(0, Math.min(lines.length - 1, first + this.sheetManual));
+    const dt = Math.min(0.25, (now - (this.sheetAt || now)) / 1000);
+    this.sheetAt = now;
+    if (this.sheetPos == null || !Number.isFinite(this.sheetPos) || Math.abs(target - this.sheetPos) > 40) this.sheetPos = target;
+    else this.sheetPos += (target - this.sheetPos) * (1 - Math.exp(-dt / 0.12));
     const big = Math.max(18, Math.min(h * 0.16, 46, w * 0.06));
     const small = Math.max(14, big * 0.72);
-    let y = big * 0.95;
-    for (let i = first; i < lines.length; i++) {
+    const step = Math.max(small * 1.55, big * 1.15);
+    this.sheetStep = step;
+    const top = big * 0.95;
+    const from = Math.max(0, Math.floor(this.sheetPos) - 1);
+    for (let i = from; i < lines.length; i++) {
+      const y = top + (i - this.sheetPos) * step;
+      if (y - step / 2 > h) break;
+      if (y - small * 0.6 < 0) continue; // a row cut by the top edge would look broken
       const cur = singing && i === idx;
-      const size = cur ? big : small;
-      if (y + size * 0.7 > h) break;
-      this.drawKaraokeLine(lines[i], size, w, y, cur ? 0.95 : Math.max(0.3, 0.7 - (i - first) * 0.08), cur ? t : null);
-      y += size * 1.55 + (cur ? big * 0.25 : 0);
+      const past = i < first ? 0.3 : Math.max(0.3, 0.7 - Math.max(0, i - first) * 0.06);
+      this.drawKaraokeLine(lines[i], cur ? big : small, w, y, cur ? 0.95 : past, cur ? t : null);
+      this.sheetHits.push({ y: y + yOff, half: step / 2, time: lines[i].start });
     }
+  }
+
+  // Wheel / drag over the sheet (`lines` = how many lines to move).
+  scrollSheet(lines) {
+    if (!this.sheetRect) return;
+    this.sheetManual = (this.sheetManual || 0) + lines;
+    this.sheetTouched = performance.now();
+  }
+
+  // Is the canvas point (x, y) over the lyric sheet?
+  overSheet(y) {
+    return !!this.sheetRect && y >= this.sheetRect.y && y < this.sheetRect.y + this.sheetRect.h;
+  }
+
+  // The start time (chart seconds) of the lyric line drawn at canvas height y, or null.
+  sheetLineAt(y) {
+    const hit = (this.sheetHits || []).find((r) => Math.abs(y - r.y) <= r.half);
+    return hit ? hit.time : null;
   }
 
   // Karaoke: only the lyrics. Alone, they fill the stage as a sheet; next to other charts the line being sung and the next one.
   renderKaraoke(t, w, h, pane) {
     const g = this.g;
     if (this.vocalAlone) {
-      this.renderLyricSheet(t, w, h, pane);
+      this.renderLyricSheet(t, w, h, pane, 0);
       return;
     }
     const lines = this.karaokeLines(pane);
@@ -507,6 +544,7 @@ export class Highway {
     const percussionY = h * 0.92;
     const xOf = (time) => hitX + (time - t) * pxPerSec;
     const ahead = BASE_LOOKAHEAD_SEC + ENTRY_MARGIN_SEC;
+    const behind = hitX / pxPerSec + 0.5; // how long after the hit line a note is still on the stage (it scrolls off the left edge)
 
     g.fillStyle = 'rgba(255,255,255,0.7)';
     g.fillRect(hitX - 2, 0, 3, h);
@@ -514,14 +552,13 @@ export class Highway {
     // harmonies first, so the lead is drawn on top
     for (const harmony of chart.harmonies || []) {
       g.fillStyle = HARMONY_COLORS[harmony.part] || HARMONY_COLORS[1];
-      g.strokeStyle = g.fillStyle;
-      this.vocalNotes(harmony.notes, t, ahead, xOf, yOfPitch, mid, 4, null);
+      this.vocalNotes(harmony.notes, t, ahead, behind, xOf, yOfPitch, mid, 4, null, hitX);
     }
-    this.vocalNotes(chart.notes, t, ahead, xOf, yOfPitch, mid, 6, ['#f5c518', '#5b8def']);
+    this.vocalNotes(chart.notes, t, ahead, behind, xOf, yOfPitch, mid, 6, ['#f5c518', '#5b8def'], hitX);
 
     // percussion: a diamond per hit, white when played, grey when not
     for (const p of chart.percussion || []) {
-      if (p.time < t - 0.2 || p.time > t + ahead) continue;
+      if (p.time < t - behind || p.time > t + ahead) continue;
       const x = xOf(p.time);
       g.beginPath();
       g.moveTo(x, percussionY - 7);
@@ -541,7 +578,7 @@ export class Highway {
     const lyrics = chart.lyrics;
     for (let i = 0; i < lyrics.length; i++) {
       const l = lyrics[i];
-      if (l.time < t - 0.6 || l.time > t + ahead) continue;
+      if (l.time < t - behind - 0.8 || l.time > t + ahead) continue;
       const sungUntil = l.end > l.time ? l.end : lyrics[i + 1]?.time ?? Infinity; // the paired note's end, else the next syllable
       g.fillStyle = l.time > t ? '#ffffff' : t < sungUntil ? '#13f0a6' : '#595959';
       g.fillText(l.text, xOf(l.time), lyricY);
@@ -549,58 +586,63 @@ export class Highway {
     g.textBaseline = 'alphabetic';
   }
 
-  // Notes of a vocal part: pitched bars, a line joining a pitch slide to the note before it, and talkies (unpitched
-  // notes, '#', '^', '*') as a dashed outline in the middle of the pitch area. colors = [active, idle], or null to keep the fill.
-  vocalNotes(notes, t, ahead, xOf, yOfPitch, mid, half, colors) {
+  // Notes of a vocal part: rounded pitched bars, a ribbon joining a pitch slide to the note before it (same colour as the
+  // notes), and talkies (unpitched notes, '#', '^', '*') as a dashed box in the middle of the pitch area.
+  // colors = [passed, idle]: the part of a note that is past the hit line is painted `passed`. null keeps the current fill.
+  vocalNotes(notes, t, ahead, behind, xOf, yOfPitch, mid, half, colors, hitX) {
     const g = this.g;
     const keep = g.fillStyle;
     for (let i = 0; i < notes.length; i++) {
       const n = notes[i];
-      if (n.end < t - 0.2 || n.time > t + ahead) continue;
+      if (n.end < t - behind || n.time > t + ahead) continue; // a note stays until it has left the stage on the left
       const x1 = xOf(n.time);
       const x2 = Math.max(x1 + 6, xOf(n.end));
-      const active = n.time <= t && n.end >= t;
-      if (colors) g.fillStyle = colors[active ? 0 : 1];
-      else g.fillStyle = keep;
-      g.strokeStyle = g.fillStyle;
-      if (n.talkie) {
-        g.save();
-        g.globalAlpha *= 0.35;
-        g.fillRect(x1, mid - half * 2, x2 - x1, half * 4);
-        g.restore();
-        g.setLineDash([4, 3]);
-        g.lineWidth = 2;
-        g.strokeRect(x1, mid - half * 2, x2 - x1, half * 4);
-        g.setLineDash([]);
-        continue;
-      }
+      const bw = x2 - x1;
       const prev = notes[i - 1];
       const y = yOfPitch(n.pitch);
-      if (n.slide && prev && !prev.talkie) { // continues the previous note: a smooth ribbon from its end to this note's start
-        const xa = xOf(prev.end);
-        const ya = yOfPitch(prev.pitch);
-        const lead = Math.min(10, half * 1.5); // tucks under both bars so no seam shows
-        const x0 = xa - lead;
-        const x3 = x1 + lead;
-        const cx = (x0 + x3) / 2;
-        g.save();
-        g.globalAlpha *= 0.7;
+      const shape = (color) => {
+        g.fillStyle = color;
+        g.strokeStyle = color;
+        if (n.talkie) {
+          g.save();
+          g.globalAlpha *= 0.35;
+          g.fillRect(x1, mid - half * 2, bw, half * 4);
+          g.restore();
+          g.setLineDash([4, 3]);
+          g.lineWidth = 2;
+          g.strokeRect(x1, mid - half * 2, bw, half * 4);
+          g.setLineDash([]);
+          return;
+        }
+        if (n.slide && prev && !prev.talkie) { // continues the previous note: a smooth ribbon from its end to this note's start
+          const xa = xOf(prev.end);
+          const ya = yOfPitch(prev.pitch);
+          const lead = Math.min(10, half * 1.5); // tucks under both bars so no seam shows
+          const xs = xa - lead;
+          const xe = x1 + lead;
+          const cx = (xs + xe) / 2;
+          g.beginPath();
+          g.moveTo(xs, ya - half);
+          g.bezierCurveTo(cx, ya - half, cx, y - half, xe, y - half);
+          g.lineTo(xe, y + half);
+          g.bezierCurveTo(cx, y + half, cx, ya + half, xs, ya + half);
+          g.closePath();
+          g.fill();
+        }
         g.beginPath();
-        g.moveTo(x0, ya - half);
-        g.bezierCurveTo(cx, ya - half, cx, y - half, x3, y - half);
-        g.lineTo(x3, y + half);
-        g.bezierCurveTo(cx, y + half, cx, ya + half, x0, ya + half);
-        g.closePath();
+        if (g.roundRect) g.roundRect(x1, y - half, bw, half * 2, Math.min(half, bw / 2));
+        else g.rect(x1, y - half, bw, half * 2);
         g.fill();
+      };
+      shape(colors ? colors[1] : keep);
+      if (colors && x1 < hitX) { // only the part that has crossed the hit line changes colour
+        g.save();
+        g.beginPath();
+        g.rect(-1e4, -1e4, hitX + 1e4, 2e4);
+        g.clip();
+        shape(colors[0]);
         g.restore();
       }
-      const bw = x2 - x1;
-      if (active) { g.save(); g.shadowColor = g.fillStyle; g.shadowBlur = 14; }
-      g.beginPath();
-      if (g.roundRect) g.roundRect(x1, y - half, bw, half * 2, Math.min(half, bw / 2));
-      else g.rect(x1, y - half, bw, half * 2);
-      g.fill();
-      if (active) g.restore();
     }
   }
 
