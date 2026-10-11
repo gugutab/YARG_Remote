@@ -653,14 +653,32 @@ export class Highway {
     }
   }
 
+  // Lowest and highest pitched note of the whole chart (and its harmonies), cached per chart.
+  vocalFullRange() {
+    const chart = this.chart;
+    if (!chart.fullRange) {
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (const list of [chart.notes, ...(chart.harmonies || []).map((h) => h.notes)]) {
+        for (const n of list) {
+          if (n.talkie) continue;
+          lo = Math.min(lo, n.pitch);
+          hi = Math.max(hi, n.pitch);
+        }
+      }
+      chart.fullRange = lo === Infinity ? [48, 72] : [lo, hi];
+    }
+    return chart.fullRange;
+  }
+
   // Pitch range shown by the vocal view. Charts with range shifts (note 0, [range_shift], '%' lyrics; YARG.Core
-  // GetRangeShifts) use the range of the shift in force at `t`; the others use the notes coming up, as YARG's
-  // VocalTrack does. Either way: at least 20 semitones tall, padded by 10% on each side, and eased so range
+  // GetRangeShifts) use the range of the shift in force at `t`; the others keep one range for the whole song.
+  // Either way: at least 20 semitones tall, padded by 10% on each side, and eased slowly so the rare range
   // changes slide instead of jumping (over the length of the shift when the chart gives one).
   vocalRange(t, windowSec) {
     let lo = Infinity;
     let hi = -Infinity;
-    let slide = 0.15; // easing time constant, seconds
+    let slide = 0.6; // easing time constant, seconds (calm: the view should move rarely)
     const shifts = this.chart.rangeShifts || [];
     if (shifts.length > 1) {
       let active = shifts[0];
@@ -668,15 +686,7 @@ export class Highway {
       [lo, hi] = [active.min, active.max];
       slide = Math.max(slide, active.length / 3);
     } else {
-      const scan = (notes) => {
-        for (let i = firstIndexAtOrAfter(notes, t - 1); i < notes.length && notes[i].time <= t + windowSec; i++) {
-          if (notes[i].talkie) continue;
-          lo = Math.min(lo, notes[i].pitch);
-          hi = Math.max(hi, notes[i].pitch);
-        }
-      };
-      scan(this.chart.notes);
-      for (const h of this.chart.harmonies || []) scan(h.notes);
+      [lo, hi] = this.vocalFullRange(); // no range shifts: the range of the whole song, so the view stays still
     }
     if (lo === Infinity) [lo, hi] = this.vRange || [48, 72]; // nothing ahead: keep the last range
     lo -= 0.75; // half a note width of padding, like NOTE_WIDTH_MULTIPLIER / 2
