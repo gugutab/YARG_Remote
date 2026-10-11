@@ -13,7 +13,7 @@ function fakeDir(tree) {
     async getFileHandle(name) {
       const child = tree[name];
       if (typeof child !== 'string') throw new Error(`no file ${name}`);
-      return { getFile: async () => ({ name, text: async () => child }) };
+      return { getFile: async () => ({ name, text: async () => child, arrayBuffer: async () => new TextEncoder().encode(child).buffer }) };
     },
   };
 }
