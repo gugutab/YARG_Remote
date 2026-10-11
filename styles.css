@@ -692,7 +692,7 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .filter-panel .seg button { min-width: 30px; padding: 4px 8px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 0 10px 0 8px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; }
-.chip svg { width: 14px; height: 14px; color: var(--muted); }
+.chip svg { width: 16px; height: 16px; color: var(--muted); }
 .chip:hover { border-color: var(--muted); }
 .chip[aria-pressed="true"], .chip.on { background: color-mix(in srgb, var(--accent) 22%, transparent); border-color: var(--accent); }
 .chip[aria-pressed="true"] svg, .chip.on svg { color: var(--accent); }
@@ -745,7 +745,7 @@ button.icon.stage-btn.style-btn { top: 54px; }
 @supports not selector(::-webkit-scrollbar) { .popover { scrollbar-width: thin; scrollbar-color: var(--line) transparent; } }
 
 .active-filters .chip { padding-left: 7px; }
-.active-filters .chip svg.kind { width: 14px; height: 14px; color: var(--accent); }
+.active-filters .chip svg.kind { width: 16px; height: 16px; color: var(--accent); }
 .active-filters .chip svg.x { width: 12px; height: 12px; color: var(--muted); }
 
 /* Round 52: the top bar can be hidden; the stage then takes the whole height and a small tab brings the bar back */
