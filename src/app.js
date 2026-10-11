@@ -4,6 +4,7 @@ import { MultiTrackPlayer } from './player.js';
 import { Highway } from './highway.js';
 import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, readBytes, serializeSongs, restoreSongs, restoreRemoteSongs } from './library.js';
 import { songDelaySeconds, plainText } from './ini.js';
+import { previewWindow } from './preview.js';
 import { metaRows, extraRows, chartStats, bpmLabel, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel } from './songinfo.js';
 import { parseRoute, formatRoute } from './route.js';
 import { createSettings } from './settings.js';
@@ -18,7 +19,7 @@ import { createThumbs, renderCoverThumb } from './thumbs.js';
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
-  'app', 'library', 'toggleLibrary', 'closeLibrary', 'splitter', 'libTab', 'songTab', 'closeSong', 'closeSongInfo', 'npPlay', 'npSeek', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
+  'app', 'library', 'toggleLibrary', 'closeLibrary', 'splitter', 'libTab', 'songTab', 'closeSong', 'closeSongInfo', 'npPlay', 'npPreview', 'npSeek', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
@@ -123,11 +124,25 @@ els.songTab.addEventListener('click', () => setSongPanelOpen(true));
 els.closeSong.addEventListener('click', () => setSongPanelOpen(false));
 els.closeSongInfo.addEventListener('click', () => setSongPanelOpen(false));
 els.npPlay.addEventListener('click', async () => { // the Listen card: play here, without leaving the details
+  previewStop = null;
   if (!player.playing && !(await ensureAudio())) return; // loads the audio the first time
   if (player.playing) player.pause(); else await player.play();
   syncPlayButton();
 });
-els.npSeek.addEventListener('input', () => player.seek(Number(els.npSeek.value)));
+els.npSeek.addEventListener('input', () => { previewStop = null; player.seek(Number(els.npSeek.value)); });
+
+// Preview button of the Listen card: plays the window song.ini defines (preview_start_time .. preview_end_time).
+// The times are positions in the audio file; the chart clock is the file position minus the audio delay.
+let previewStop = null; // chart-clock second where the preview ends, or null when none is running
+els.npPreview.addEventListener('click', async () => {
+  const win = current && previewWindow(current.song.ini);
+  if (!win || !(await ensureAudio())) return;
+  const delay = songDelaySeconds(current.song.ini);
+  player.seek(Math.max(0, win.start - delay));
+  previewStop = Math.min(win.end - delay, player.duration);
+  if (!player.playing) await player.play();
+  syncPlayButton();
+});
 
 // The divider between the two panels: drag to resize the library panel (remembered); double-click restores the default.
 const MIN_LIB_W = 300;
@@ -512,13 +527,15 @@ async function selectSong(song) {
     img.hidden = !coverUrl;
   }
 
-  current = { song, midi, coverUrl, options: instrumentOptions(midi), diffChoice: {}, pins: new Set(), statsCache: new Map(), expandedStats: new Set(), modeChoice: {} };
+  current = { song, midi, coverUrl, options: instrumentOptions(midi, song.ini), diffChoice: {}, pins: new Set(), statsCache: new Map(), expandedStats: new Set(), modeChoice: {} };
   renderMeta(song, midi); // adds the BPM chip
   renderList({ keepScroll: true }); // highlight the loaded song
   syncUrl();
   fillInstrumentOptions();
   updateChart(); // the chart exists as soon as the MIDI is read; only playback waits for the audio
-  const stems = audioStemsOf(song);
+  const stems = audioStemsOf(song, { censor: prefs.get('audio.censor') }); // read per load: a change applies to the next song load
+  els.npPreview.hidden = !previewWindow(song.ini);
+  previewStop = null;
   buildMixer(stems);
 
   current.stems = stems;
@@ -689,7 +706,7 @@ function selectInstrument(insId, diffId) {
 function cardStats(ins, diff) {
   const key = `${ins.id}:${diff.id}`;
   if (!current.statsCache.has(key)) {
-    const built = ins.id === els.instrument.value && diff.id === els.difficulty.value && chart ? chart : buildChart(current.midi, ins, diff);
+    const built = ins.id === els.instrument.value && diff.id === els.difficulty.value && chart ? chart : buildChart(current.midi, ins, diff, current.song.ini);
     current.statsCache.set(key, chartStats(built));
   }
   return current.statsCache.get(key);
@@ -724,7 +741,7 @@ function instrumentGroups() {
 }
 
 const diffFor = (ins) => {
-  const diffs = availableDifficulties(current.midi, ins);
+  const diffs = availableDifficulties(current.midi, ins, current.song.ini);
   const chosen = diffs.find((d) => d.id === current.diffChoice[ins.id]) || diffs[diffs.length - 1];
   return { diffs, chosen };
 };
@@ -960,7 +977,7 @@ function fillInstrumentOptions() {
 
 function fillDifficultyOptions() {
   const ins = currentInstrument();
-  const diffs = ins ? availableDifficulties(current.midi, ins) : [];
+  const diffs = ins ? availableDifficulties(current.midi, ins, current.song.ini) : [];
   const previous = els.difficulty.value;
   els.difficulty.replaceChildren(...diffs.map((d) => new Option(d.label, d.id)));
   // Keep the previous choice when still available, otherwise prefer the highest difficulty (Expert).
@@ -976,12 +993,12 @@ function updateChart() {
   if (!current) return;
   const ins = currentInstrument();
   const diff = DIFFICULTIES.find((d) => d.id === els.difficulty.value);
-  chart = ins && diff ? buildChart(current.midi, ins, diff) : null;
+  chart = ins && diff ? buildChart(current.midi, ins, diff, current.song.ini) : null;
   // Every chart on screen, in the order of the instruments: the active one plus the pinned ones.
   const items = [];
   for (const group of instrumentGroups()) {
     if (group.active) current.pins.delete(group.key);
-    const shown = group.active ? chart : group.pinned ? (() => { const o = group.chosen; const d = diffFor(o).chosen; return d ? buildChart(current.midi, o, d) : null; })() : null;
+    const shown = group.active ? chart : group.pinned ? (() => { const o = group.chosen; const d = diffFor(o).chosen; return d ? buildChart(current.midi, o, d, current.song.ini) : null; })() : null;
     if (!shown) continue;
     const d = group.active ? diff : diffFor(group.chosen).chosen;
     items.push({ chart: shown, label: shown.mode === 'vocals' ? group.label : `${group.label} · ${d.short}` });
@@ -1432,10 +1449,11 @@ els.seek.addEventListener('input', () => {
   seeking = true;
   els.timeNow.textContent = fmt(Number(els.seek.value));
 });
-els.seek.addEventListener('change', () => { player.seek(Number(els.seek.value)); seeking = false; });
+els.seek.addEventListener('change', () => { previewStop = null; player.seek(Number(els.seek.value)); seeking = false; });
 
 async function togglePlay() {
   if (!chart) return;
+  previewStop = null;
   if (player.playing) player.pause();
   else {
     if (infoOpen) setInfoOpen(false); // starting from the details goes to the chart
@@ -1580,6 +1598,10 @@ document.addEventListener('keydown', (e) => {
 function frame() {
   if (current && chart) {
     const t = player.currentTime();
+    if (previewStop != null && (!player.playing || t >= previewStop)) {
+      if (player.playing) { player.pause(); syncPlayButton(); }
+      previewStop = null;
+    }
     if (player.playing && t >= player.duration) {
       player.pause();
       syncPlayButton();

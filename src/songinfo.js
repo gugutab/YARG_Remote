@@ -1,6 +1,6 @@
 // Descriptive data for the song info screen: metadata from song.ini and statistics from the built chart.
 // Pure functions, no DOM.
-import { plainText, packOf } from './ini.js';
+import { plainText, packOf, iniBool } from './ini.js';
 
 // song.ini difficulty keys (value 0..6 = difficulty level, -1 = no part). Labels for the UI.
 export const DIFF_LABELS = [
@@ -72,13 +72,72 @@ export function difficultyLevels(song) {
     .map(([key, label]) => ({ label, level: Math.min(6, ini[key]) }));
 }
 
-// Every other song.ini property, as raw key/value rows.
+// The song.ini keys YARG reads (YARG.Core IO/Ini/SongIniHandler.cs) that the extra list shows with a readable
+// label, in display order: [key, label, kind]. Kinds: 'time' = milliseconds, 'bool' = Yes/No. Keys not listed here are
+// still shown (raw name, alphabetical) after these.
+const EXTRA_KEYS = [
+  // release and tags
+  ['sub_genre', 'Subgenre'], ['tags', 'Tags'], ['date_released', 'Released'], ['version', 'Chart version'],
+  ['rating', 'Rating'], ['count', 'Song count'], ['covered_by', 'Covered by'], ['location', 'Location'],
+  ['lyrics', 'Has lyrics', 'bool'], ['modchart', 'Modchart', 'bool'], ['tutorial', 'Tutorial', 'bool'], ['clean_vocals', 'Clean vocals', 'bool'],
+  // charters (the plain `charter` is a header chip)
+  ['charter_audio', 'Charter: audio'], ['charter_guitar', 'Charter: guitar'], ['charter_guitar_6f', 'Charter: guitar (6 fret)'],
+  ['charter_bass', 'Charter: bass'], ['charter_bass_6f', 'Charter: bass (6 fret)'], ['charter_rhythm', 'Charter: rhythm'],
+  ['charter_rhythm_6f', 'Charter: rhythm (6 fret)'], ['charter_keys', 'Charter: keys'], ['charter_drums', 'Charter: drums'],
+  ['charter_elite_drums', 'Charter: elite drums'], ['charter_vocals', 'Charter: vocals'], ['charter_venue', 'Charter: venue'],
+  ['charter_pro_guitar', 'Charter: pro guitar'], ['charter_pro_bass', 'Charter: pro bass'], ['charter_pro_keys', 'Charter: pro keys'],
+  ['charter_lower_diff', 'Charter: lower difficulties'],
+  // credits
+  ['credit_written_by', 'Credit: written by'], ['credit_composed_by', 'Credit: composed by'], ['credit_arranged_by', 'Credit: arranged by'],
+  ['credit_performed_by', 'Credit: performed by'], ['credit_produced_by', 'Credit: produced by'], ['credit_engineered_by', 'Credit: engineered by'],
+  ['credit_mixed_by', 'Credit: mixed by'], ['credit_mastered_by', 'Credit: mastered by'], ['credit_published_by', 'Credit: published by'],
+  ['credit_courtesy_of', 'Credit: courtesy of'], ['credit_album_art_designed_by', 'Credit: album art'], ['credit_background', 'Credit: background'],
+  ['credit_license', 'Credit: license'], ['credit_other', 'Credit: other'],
+  // vocals
+  ['vocal_gender', 'Vocal gender'], ['vocal_character_hint', 'Vocal character'], ['vocal_scroll_speed', 'Vocal scroll speed'],
+  // media and timing
+  ['cover', 'Cover image'], ['background', 'Background'], ['video', 'Video'], ['video_start_time', 'Video start', 'time'],
+  ['video_end_time', 'Video end', 'time'], ['video_loop', 'Video loops', 'bool'], ['preview_end_time', 'Preview end', 'time'],
+  ['venue_hint', 'Venue hint'], ['tuning_offset_cents', 'Tuning offset (cents)'],
+  // chart reading rules (applied by the chart builder)
+  ['hopo_frequency', 'HOPO frequency (ticks)'], ['hopofreq', 'HOPO frequency (legacy)'], ['eighthnote_hopo', 'Eighth-note HOPO', 'bool'],
+  ['sustain_cutoff_threshold', 'Sustain cutoff (ticks)'], ['five_lane_drums', 'Five-lane drums', 'bool'], ['pro_drums', 'Pro drums', 'bool'],
+  ['multiplier_note', 'Star power note'], ['star_power_note', 'Star power note'], ['end_events', 'End events', 'bool'],
+  // links
+  ['link_youtube', 'Link: YouTube'], ['link_spotify', 'Link: Spotify'], ['link_bandcamp', 'Link: Bandcamp'], ['link_bluesky', 'Link: Bluesky'],
+  ['link_facebook', 'Link: Facebook'], ['link_instagram', 'Link: Instagram'], ['link_twitter', 'Link: Twitter'], ['link_other', 'Link: other'],
+  // gameplay setup
+  ['guitar_type', 'Guitar type'], ['bass_type', 'Bass type'], ['keys_type', 'Keys type'], ['kit_type', 'Drum kit type'], ['dance_type', 'Dance type'],
+  ['real_guitar_tuning', 'Pro guitar tuning'], ['real_bass_tuning', 'Pro bass tuning'],
+];
+const EXTRA_INDEX = new Map(EXTRA_KEYS.map((k, i) => [k[0], i]));
+
+// "1:23" / "1:23.5" for a time in milliseconds; '' when it is not a number.
+function formatMs(ms) {
+  const n = Number(ms);
+  if (!Number.isFinite(n)) return '';
+  const total = Math.abs(n) / 1000;
+  const m = Math.floor(total / 60);
+  const sec = total - m * 60;
+  const whole = Number.isInteger(sec) ? String(sec).padStart(2, '0') : sec.toFixed(1).padStart(4, '0');
+  return `${n < 0 ? '-' : ''}${m}:${whole}`;
+}
+
+// Every other song.ini property as label/value rows: the keys YARG knows come first with readable labels (see
+// EXTRA_KEYS), then the rest by raw name.
 export function extraRows(song) {
   return Object.entries(song.ini || {})
     .filter(([key]) => !SHOWN_KEYS.has(key))
-    .map(([key, value]) => ({ label: key, value: plainText(value) }))
+    .map(([key, raw]) => {
+      const known = EXTRA_KEYS[EXTRA_INDEX.get(key)];
+      let value = plainText(raw);
+      if (known?.[2] === 'time') value = formatMs(raw) || value;
+      else if (known?.[2] === 'bool') value = iniBool(raw) ? 'Yes' : 'No';
+      return { label: known ? known[1] : key, value, order: known ? EXTRA_INDEX.get(key) : Infinity };
+    })
     .filter((r) => r.value !== '')
-    .sort((a, b) => a.label.localeCompare(b.label, 'en'));
+    .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label, 'en'))
+    .map(({ label, value }) => ({ label, value }));
 }
 
 // [min, max] BPM of the tempo map, or null without tempo events.

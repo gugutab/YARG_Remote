@@ -100,6 +100,7 @@ export const SECTIONS = [
     items: [
       { id: 'general.restoreLast', type: 'toggle', label: 'Reopen the last song', help: 'At startup, open the song you were on.', default: false, keywords: 'startup resume session' },
       { id: 'general.autoplay', type: 'toggle', label: 'Load and play as soon as I pick a song', help: 'Skips the Play button: the loading screen appears right away.', default: false, keywords: 'autoplay start' },
+      { id: 'audio.censor', type: 'toggle', label: 'Use clean (censored) audio when available', help: 'Songs with both explicit and clean stems (song_clean, vocals_explicit, ...) play one version, never both. Off plays the explicit one. Applies the next time a song is opened.', default: false, keywords: 'explicit clean censored profanity stems' },
     ],
   },
   {

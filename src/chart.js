@@ -3,6 +3,9 @@
 //   Easy 60-64, Medium 72-76, Hard 84-88, Expert 96-100 (offset 0..4 = lane 0..4)
 //   103 = solo, 116 = star power, 12/13 = measure/beat lines in the BEAT track.
 // Reference: YARG.Core MidIOHelper.cs and MidiInstrumentPreparser.cs.
+// Several rules can be changed by song.ini keys (see chartSettings); every builder takes the parsed ini as an optional
+// last argument and behaves as before when a key is absent.
+import { iniBool } from './ini.js';
 
 export const INSTRUMENTS = [
   { id: 'guitar', label: 'Guitar', tracks: ['PART GUITAR'], mode: 'lanes' },
@@ -89,7 +92,41 @@ function harmonyTracks(midi) {
     .filter((h) => h.match)
     .map((h) => ({ part: Number(h.match[1]), track: h.track }));
 }
-// YARG.Core MidReader.cs: notes shorter than resolution / 3 ticks have no sustain (SustainCutoffThreshold).
+// Chart-building settings from the song.ini keys YARG reads when it scans a .mid song
+// (YARG.Core Song/Entries/Ini/SongEntry.IniBase.cs, ScanChart; MidReader.cs applies them). `division` is the MIDI resolution.
+//   hopoThreshold  max ticks between two notes for a natural HOPO, before the +1 of leniency MidReader adds:
+//                  hopo_frequency (> 0), else eighthnote_hopo (res/2 when true, res/3 when false), else hopofreq
+//                  (0..5 -> 4 * res / [24, 16, 12, 8, 6, 4]), else res / 3.
+//   sustainCutoff  notes shorter than this many ticks have no sustain: sustain_cutoff_threshold (0 becomes 1,
+//                  MidReader), else res / 3.
+//   fiveLaneDrums  five_lane_drums: true forces 5-lane drums, false forbids them, undefined = guess from the notes.
+//   starPowerNote  multiplier_note / star_power_note: only 103 is honoured (the legacy note, which then also stops
+//                  being a solo); anything else is 116.
+//   endEvents      end_events (Clone Hero: false ignores the [end] event). YARG.Core declares the key but never reads it.
+const HOPOFREQ_DENOMINATORS = [24, 16, 12, 8, 6, 4];
+export function chartSettings(ini = {}, division = 480) {
+  const num = (v) => (v === undefined || v === '' ? NaN : Number(v));
+  let hopoThreshold;
+  const freq = num(ini.hopo_frequency);
+  const eighth = iniBool(ini.eighthnote_hopo);
+  const hopofreq = num(ini.hopofreq);
+  if (Number.isFinite(freq) && freq > 0) hopoThreshold = Math.floor(freq);
+  else if (eighth !== undefined) hopoThreshold = Math.floor(division / (eighth ? 2 : 3));
+  else if (Number.isInteger(hopofreq) && hopofreq >= 0 && hopofreq < HOPOFREQ_DENOMINATORS.length) hopoThreshold = Math.floor(4 * division / HOPOFREQ_DENOMINATORS[hopofreq]);
+  else hopoThreshold = Math.floor(division / 3);
+
+  const cutoff = num(ini.sustain_cutoff_threshold);
+  const sustainCutoff = Number.isFinite(cutoff) && cutoff >= 0 ? Math.max(1, Math.floor(cutoff)) : Math.floor(division / 3);
+
+  const note = num(ini.multiplier_note ?? ini.star_power_note);
+  return {
+    hopoThreshold,
+    sustainCutoff,
+    fiveLaneDrums: iniBool(ini.five_lane_drums),
+    starPowerNote: note === SOLO_NOTE ? SOLO_NOTE : STAR_POWER_NOTE,
+    endEvents: iniBool(ini.end_events) !== false,
+  };
+}
 
 export function findTrack(midi, instrument) {
   return midi.tracks.find((t) => instrument.tracks.includes(t.name.toUpperCase())) || null;
@@ -97,9 +134,9 @@ export function findTrack(midi, instrument) {
 
 // The drum modes a track can be played in. A chart with cymbal flags can be played as Pro or
 // as 4-lane (flags ignored, every yellow/blue/green is a tom), the same choice YARG offers.
-export function drumModes(track) {
+export function drumModes(track, ini = {}) {
   const four = { mode: 'four', label: 'Drums (4 lanes)', short: '4 lanes' };
-  switch (drumKind(track)) {
+  switch (drumKind(track, ini)) {
     case 'five': return [{ mode: 'five', label: 'Drums (5 lanes)', short: '5 lanes' }];
     case 'pro': return [
       four,
@@ -111,16 +148,16 @@ export function drumModes(track) {
 }
 
 // Playable instrument options for a song, in INSTRUMENTS order. Drums expand into one option per mode.
-export function instrumentOptions(midi) {
+export function instrumentOptions(midi, ini = {}) {
   const options = [];
   for (const ins of INSTRUMENTS) {
     const track = findTrack(midi, ins);
-    if (!track || !availableDifficulties(midi, ins).length) continue;
+    if (!track || !availableDifficulties(midi, ins, ini).length) continue;
     if (ins.mode !== 'drums') {
       options.push({ ...ins, base: ins.id });
       continue;
     }
-    for (const m of drumModes(track)) {
+    for (const m of drumModes(track, ini)) {
       options.push({ ...ins, id: `drums-${m.mode}`, label: m.label, modeLabel: m.short, base: 'drums', drumMode: m.mode });
     }
   }
@@ -128,35 +165,41 @@ export function instrumentOptions(midi) {
 }
 
 // Difficulties that actually have notes for this instrument.
-export function availableDifficulties(midi, instrument) {
+export function availableDifficulties(midi, instrument, ini = {}) {
   const track = findTrack(midi, instrument);
   if (!track) return [];
   if (instrument.mode === 'vocals') {
     return track.notes.some((n) => inRange(n.pitch, VOCAL_RANGE)) ? [DIFFICULTIES[3]] : [];
   }
-  const span = drumSpan(track, instrument);
+  const span = drumSpan(track, instrument, ini);
   return DIFFICULTIES.filter((d) =>
     track.notes.some((n) => n.pitch >= d.base && n.pitch < d.base + span));
 }
 
 // Number of pitch offsets a difficulty uses: 5 for guitar, 6 for 5-lane drums (offset 5 = green).
-function drumSpan(track, instrument) {
+function drumSpan(track, instrument, ini) {
   if (instrument.mode !== 'drums') return LANES;
-  return drumKind(track) === 'five' ? 6 : LANES;
+  return drumKind(track, ini) === 'five' ? 6 : LANES;
 }
 
 // Same rule as YARG.Core: 101 => five lane; any 110-112 pro flag => pro; otherwise four lane.
-export function drumKind(track) {
-  if (track.notes.some((n) => n.pitch === FIVE_LANE_GREEN_NOTE)) return 'five';
+// song.ini five_lane_drums overrides the guess (SongEntry.IniBase.cs ScanChart + Midi_Drums_Preparser): true forces
+// 5 lanes, false ignores note 101. pro_drums needs no handling: a .mid without it is Pro, and the preparser marks
+// the part Pro whenever 110-112 exist, even with pro_drums = false, so the cymbal flags alone decide Pro here.
+export function drumKind(track, ini = {}) {
+  const five = iniBool(ini.five_lane_drums);
+  if (five === true) return 'five';
+  if (five === undefined && track.notes.some((n) => n.pitch === FIVE_LANE_GREEN_NOTE)) return 'five';
   if (track.notes.some((n) => DRUM_CYMBAL_FLAGS.includes(n.pitch))) return 'pro';
   return 'four';
 }
 
-export function buildChart(midi, instrument, difficulty) {
+export function buildChart(midi, instrument, difficulty, ini = {}) {
   const track = findTrack(midi, instrument);
   if (!track) return null;
   const toSec = midi.toSeconds;
-  const sustainCutoff = Math.floor(midi.division / 3);
+  const settings = chartSettings(ini, midi.division);
+  const sustainCutoff = settings.sustainCutoff; // YARG.Core MidReader.cs: shorter notes have no sustain (SustainCutoffThreshold)
   const timed = (n) => {
     const time = toSec(n.tick);
     const end = toSec(n.endTick);
@@ -190,11 +233,11 @@ export function buildChart(midi, instrument, difficulty) {
     const harmonies = instrument.harmony
       ? harmonyTracks(midi).filter((h) => h.part > 1).map((h) => ({ part: h.part, notes: vocalNotes(h.track) }))
       : [];
-    return { mode: 'vocals', notes, harmonies, percussion, lyrics, ...commonParts(midi, track, toSec) };
+    return { mode: 'vocals', notes, harmonies, percussion, lyrics, ...commonParts(midi, track, toSec, settings) };
   }
 
   if (instrument.mode === 'drums') {
-    return buildDrumChart(midi, track, instrument.drumMode ?? drumKind(track), difficulty, timed, toSec);
+    return buildDrumChart(midi, track, instrument.drumMode ?? drumKind(track, ini), difficulty, timed, toSec, settings);
   }
 
   // Tap: note 104 marks a window [start, end) in which every note of the guitar is a tap (MidReader.cs).
@@ -203,7 +246,7 @@ export function buildChart(midi, instrument, difficulty) {
   const hopoWindows = windowsOf(track.notes.filter((n) => n.pitch === difficulty.base + 5));
   const strumWindows = windowsOf(track.notes.filter((n) => n.pitch === difficulty.base + 6));
   const fretNotes = track.notes.filter((n) => n.pitch - difficulty.base >= 0 && n.pitch - difficulty.base < LANES);
-  const natural = naturalHopo(fretNotes, midi.division);
+  const natural = naturalHopo(fretNotes, midi.division, settings.hopoThreshold);
   // Open notes: SysEx phrase 1 marks a window in which the notes are open (YARG.Core
   // ProcessSysExEventPairAsOpenNoteModifier). Open notes are drawn as a bar across the lanes.
   const openWindowsHere = phraseWindows(track, PHRASE_OPEN)[DIFFICULTIES.indexOf(difficulty)];
@@ -218,7 +261,7 @@ export function buildChart(midi, instrument, difficulty) {
       : inWindows(hopoWindows, n.tick) ? true : natural.get(n));
     notes.push({ ...timed(n), lane, cymbal: false, tap, hopo: Boolean(hopo), open });
   }
-  return { mode: 'lanes', lanes: LANES, laneColors: GUITAR_LANE_COLORS, notes, ...commonParts(midi, track, toSec) };
+  return { mode: 'lanes', lanes: LANES, laneColors: GUITAR_LANE_COLORS, notes, ...commonParts(midi, track, toSec, settings) };
 }
 
 const extendedLane = (pad, cymbal) => EXTENDED_DRUM_LANES.findIndex((l) => l.pad === pad && l.cymbal === cymbal);
@@ -235,10 +278,10 @@ function inWindows(windows, tick) {
 }
 
 // Natural HOPO per note, as YARG.Core MoonNote.IsNaturalHopo: not a chord, has a previous note
-// (a different fret, or any chord before it), and comes within resolution / 3 + 1 ticks of it.
-// fretNotes must be sorted by tick.
-export function naturalHopo(fretNotes, division) {
-  const threshold = Math.floor(division / 3) + 1;
+// (a different fret, or any chord before it), and comes within hopoThreshold + 1 ticks of it (MidReader.cs adds 1 for
+// leniency). hopoThreshold defaults to resolution / 3; song.ini can change it (chartSettings). fretNotes must be sorted by tick.
+export function naturalHopo(fretNotes, division, hopoThreshold = Math.floor(division / 3)) {
+  const threshold = hopoThreshold + 1;
   const groups = [];
   for (const n of fretNotes) {
     const last = groups[groups.length - 1];
@@ -267,7 +310,7 @@ function rollSpans(track, toSec) {
     .map((n) => ({ start: toSec(n.tick), end: toSec(n.endTick), type: ROLL_TYPES[n.pitch] }));
 }
 
-function buildDrumChart(midi, track, kind, difficulty, timed, toSec) {
+function buildDrumChart(midi, track, kind, difficulty, timed, toSec, settings) {
   const extended = kind === 'extended';
   const lanes = extended ? EXTENDED_DRUM_LANES.length : kind === 'five' ? 5 : 4;
   const laneColors = extended ? EXTENDED_DRUM_LANES.map((l) => l.color) : kind === 'five' ? DRUM_LANE_COLORS_5 : DRUM_LANE_COLORS_4;
@@ -299,7 +342,7 @@ function buildDrumChart(midi, track, kind, difficulty, timed, toSec) {
     });
   }
   const notes = [...kicks.values(), ...pads].sort((a, b) => a.time - b.time);
-  return { mode: 'lanes', lanes, laneColors, laneKinds: extended ? EXTENDED_DRUM_LANES.map((l) => (l.cymbal ? 'cymbal' : 'tom')) : null, drumKind: kind, notes, rolls: rollSpans(track, toSec), ...commonParts(midi, track, toSec) };
+  return { mode: 'lanes', lanes, laneColors, laneKinds: extended ? EXTENDED_DRUM_LANES.map((l) => (l.cymbal ? 'cymbal' : 'tom')) : null, drumKind: kind, notes, rolls: rollSpans(track, toSec), ...commonParts(midi, track, toSec, settings) };
 }
 
 // Tick ranges during which each cymbal flag (110/111/112) is on.
@@ -327,7 +370,7 @@ export function displayLyric(text) {
   return text.replace(LYRIC_MARKERS, '').replace(/=/g, '-').replace(/§/g, '‿').trim();
 }
 
-function commonParts(midi, track, toSec) {
+function commonParts(midi, track, toSec, settings = chartSettings({}, midi.division)) {
   const spans = (pitch) => spansOf(track.notes.filter((n) => n.pitch === pitch), toSec);
   const beatTrack = midi.tracks.find((t) => t.name.toUpperCase() === 'BEAT');
   const beats = beatTrack
@@ -342,14 +385,43 @@ function commonParts(midi, track, toSec) {
       .filter((s) => s.name !== null)
       .sort((a, b) => a.time - b.time)
     : [];
-  const duration = Math.max(0, ...track.notes.map((n) => toSec(n.endTick)));
+  // With the legacy star power note (103) YARG drops solos: the note cannot be both (MidReader.ProcessLists.cs, GetPhraseProcessDict).
+  const legacyStarPower = settings.starPowerNote === SOLO_NOTE;
+  const events = eventsTrack ? eventsTrack.texts.filter((t) => parseSectionName(t.text) === null) : []; // sections are not "global events" in YARG
+  const { musicStart, musicEnd, end } = globalMarkers(events, toSec);
+  const lastNote = Math.max(0, ...track.notes.map((n) => toSec(n.endTick)));
   return {
-    solos: spans(SOLO_NOTE),
-    starPower: spans(STAR_POWER_NOTE),
+    solos: legacyStarPower ? [] : spans(SOLO_NOTE),
+    starPower: spans(settings.starPowerNote),
     beats,
     sections,
-    duration,
+    // [music_start] / [music_end] in seconds, or null (see globalMarkers). Data only, nothing is drawn from them.
+    musicStart,
+    musicEnd,
+    // The [end] event closes the chart when present (and end_events does not turn it off); else the last note's end.
+    duration: end !== null && settings.endEvents ? end : lastNote,
   };
+}
+
+// Event text as YARG normalises it (TextEvents.NormalizeTextEvent): the part between the first '[' and ']' if there
+// is one, else the whole text, trimmed.
+export function normalizeEventText(raw) {
+  const open = raw.indexOf('[');
+  const close = raw.indexOf(']');
+  return (open >= 0 && close >= 0 && open <= close ? raw.slice(open + 1, close) : raw).trim();
+}
+
+// The markers YARG looks for in the global (EVENTS) events, in seconds (SongChart.cs):
+//   GetMusicEvents: "music_start" within the first 20 events and "music_end" within the last 20; if either is missing
+//     both are null (a charting error). GetEndEvent: "end" within the last 10 events.
+// `events` are { tick, text } in file order. Texts are matched exactly as TextEvents.MUSIC_START / MUSIC_END / END_MARKER.
+function globalMarkers(events, toSec) {
+  const norm = events.map((e) => ({ tick: e.tick, text: normalizeEventText(e.text) }));
+  const secOf = (e) => (e ? toSec(e.tick) : null);
+  const start = norm.slice(0, 20).find((e) => e.text === 'music_start');
+  const musicEnd = start ? norm.slice(-20).reverse().find((e) => e.text === 'music_end') : undefined;
+  const end = norm.slice(-10).reverse().find((e) => e.text === 'end');
+  return { musicStart: musicEnd ? secOf(start) : null, musicEnd: secOf(musicEnd), end: secOf(end) };
 }
 
 // Section names come from text events in the EVENTS track, as YARG.Core reads them (TextEvents.cs):

@@ -26,7 +26,7 @@ test('metaRows lists known fields, cleans tags and formats the length', () => {
 
 test('difficultyLevels keeps parts with level >= 0; extraRows keeps the rest', () => {
   assert.deepEqual(difficultyLevels(song), [{ label: 'Guitar', level: 4 }, { label: 'Drums', level: 0 }]);
-  assert.deepEqual(extraRows(song).map((r) => r.label), ['hopo_frequency', 'pro_drums']);
+  assert.deepEqual(extraRows(song).map((r) => r.label), ['HOPO frequency (ticks)', 'Pro drums']);
 });
 
 test('bpm label, chart counts and per-instrument level', () => {

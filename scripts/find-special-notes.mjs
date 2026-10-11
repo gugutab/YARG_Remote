@@ -9,8 +9,9 @@
 //   vocal percussion (played / not played), vocal harmonies, solo and star power spans.
 // --max N caps how many occurrences are listed per category per song (default 5); counts are always full.
 // --json prints one JSON object per occurrence group instead of text.
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
+import { join, relative, dirname } from 'node:path';
+import { parseSongIni } from '../src/ini.js';
 import { parseMidi } from '../src/midi.js';
 import { buildChart, instrumentOptions, availableDifficulties, sectionIndexAt, DIFFICULTIES } from '../src/chart.js';
 
@@ -48,6 +49,8 @@ function formatTime(sec) {
 
 function scanSong(path) {
   const midi = parseMidi(readFileSync(path));
+  const iniPath = join(dirname(path), 'song.ini'); // song.ini keys (HOPO threshold, drum mode, ...) change the chart
+  const ini = existsSync(iniPath) ? parseSongIni(readFileSync(iniPath)) : {};
   const rows = [];
   let sections = [];
 
@@ -55,9 +58,9 @@ function scanSong(path) {
     rows.push({ category, instrument, difficulty, time, ...extra });
   };
 
-  for (const option of instrumentOptions(midi)) {
-    for (const difficulty of availableDifficulties(midi, option)) {
-      const chart = buildChart(midi, option, difficulty);
+  for (const option of instrumentOptions(midi, ini)) {
+    for (const difficulty of availableDifficulties(midi, option, ini)) {
+      const chart = buildChart(midi, option, difficulty, ini);
       if (!chart) continue;
       if (sections.length === 0) sections = chart.sections;
       const who = { instrument: option.label, difficulty: difficulty.label };

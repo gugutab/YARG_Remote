@@ -50,7 +50,7 @@ export async function scanLibrary(songsDir) {
       let ini = {};
       if (lower.has('song.ini')) {
         try {
-          ini = parseSongIni(await fs.promises.readFile(path.join(dir, lower.get('song.ini')), 'utf8'));
+          ini = parseSongIni(await fs.promises.readFile(path.join(dir, lower.get('song.ini'))));
         } catch { /* unreadable ini: keep the folder name */ }
       }
       const folderName = rel.split('/').pop() || path.basename(dir);

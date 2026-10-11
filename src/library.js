@@ -40,7 +40,7 @@ export async function scanSongs(entries) {
   for (const [dir, files] of byDir) {
     if (!SONG_MARKERS.some((m) => files.has(m))) continue;
     const folderName = dir.split('/').pop() || dir;
-    const ini = files.has('song.ini') ? parseSongIni(await readText(files.get('song.ini'))) : {};
+    const ini = files.has('song.ini') ? parseSongIni(new Uint8Array(await readBytes(files.get('song.ini')))) : {};
     songs.push({
       id: dir,
       folder: dir,
@@ -125,11 +125,48 @@ export function findCover(song) {
   return images.find((f) => !/^(background|bg|album_alt|banner|highway)/.test(base(f))) || null;
 }
 
-export function audioStemsOf(song) {
-  return [...song.files.values()]
-    .filter((f) => AUDIO_EXT.includes(f.name.split('.').pop().toLowerCase()))
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((f) => ({ id: f.name, label: f.name.replace(/\.[^.]+$/, ''), getFile: f.getFile }));
+// Stem names YARG loads from a song folder (IniAudio.SupportedStems in SongEntry.IniBase.cs and the name table in
+// AudioHelpers.cs, which also knows the _clean / _explicit variants). YARG loads ONLY these names; any other audio file
+// in the folder is ignored (the stem lookup falls back to SongStem.Song only for unknown names it is asked about, it
+// never scans the folder). We do the same, except that a folder with no recognised stem at all still plays (see below).
+const STEM_NAMES = new Set(['song', 'guitar', 'bass', 'rhythm', 'keys', 'vocals', 'vocals_1', 'vocals_2', 'drums', 'drums_1', 'drums_2', 'drums_3', 'drums_4', 'crowd']);
+const VARIANT = /_(clean|explicit)$/;
+// YARG tries formats in this order for one stem name (IniAudio.SupportedFormats); ours follow, then the extras we also decode.
+const EXT_ORDER = ['opus', 'ogg', 'mp3', 'wav', 'aiff', 'flac', 'm4a'];
+// preview.* and preview_clean.* are the separate preview stem (PREVIEW_FILES), never part of the mix.
+const isPreviewName = (n) => /^preview(_clean)?$/.test(n);
+
+const extOf = (name) => name.split('.').pop().toLowerCase();
+const baseName = (name) => name.replace(/\.[^.]+$/, '').toLowerCase();
+
+// Picks one version of each stem. `entries` need a `name`; "vocals", "vocals_clean" and "vocals_explicit" are versions
+// of the same stem and only one may play (the mix would double it). Explicit wins by default (the uncensored original);
+// pass { censor: true } for clean first. A version that does not exist is skipped (plain "song" alone is always used).
+// The same name in several formats (song.ogg + song.mp3) also counts once, in YARG's format order.
+export function chooseStemVariants(entries, { censor = false } = {}) {
+  const rank = censor ? { clean: 0, '': 1, explicit: 2 } : { explicit: 0, '': 1, clean: 2 };
+  const best = new Map(); // stem base name -> { entry, rank, ext }
+  for (const entry of entries) {
+    const name = baseName(entry.name);
+    const variant = VARIANT.exec(name)?.[1] ?? '';
+    const base = name.replace(VARIANT, '');
+    const r = rank[variant];
+    const e = EXT_ORDER.indexOf(extOf(entry.name));
+    const cur = best.get(base);
+    if (!cur || r < cur.rank || (r === cur.rank && e < cur.ext)) best.set(base, { entry, rank: r, ext: e, base });
+  }
+  return [...best.values()];
+}
+
+// The audio files of a song as mixer stems: { id: file name, label: canonical stem name, getFile }.
+// Only YARG's stem names are used. If the folder has none of them (odd packs: "audio.ogg", "track1.mp3"), every audio
+// file except the preview plays, so the song is still audible. `options.censor` prefers the _clean versions.
+export function audioStemsOf(song, options = {}) {
+  const audio = [...song.files.values()].filter((f) => AUDIO_EXT.includes(extOf(f.name)) && !isPreviewName(baseName(f.name)));
+  const known = audio.filter((f) => STEM_NAMES.has(baseName(f.name).replace(VARIANT, '')));
+  return chooseStemVariants(known.length ? known : audio, options)
+    .map(({ entry, base }) => ({ id: entry.name, label: base, getFile: entry.getFile }))
+    .sort((a, b) => a.id.localeCompare(b.id));
 }
 
 export async function readText(entry) {
