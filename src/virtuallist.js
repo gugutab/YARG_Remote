@@ -6,6 +6,8 @@ import { evenPerRow } from './songlist.js';
 // Row heights per card style: compact (one text line), normal (thumb + 2 lines), large (big thumb + details).
 export const ROW_HEIGHTS = { compact: 32, normal: 56, large: 128 };
 export const ROW_H = ROW_HEIGHTS.normal;
+// Narrowest a card of each style may get before the list drops a column (the grid appears as soon as two cards fit).
+export const CARD_MIN_WIDTHS = { compact: 300, normal: 360, large: 400 };
 export const HEAD_H = 26;
 // The rail is 4px wider than before: the letters and ticks sit 4px further in from the right edge (the handle does not move).
 const RAIL_PAD = 4;
@@ -129,7 +131,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
   let bottoms = null; // set when the list has several columns
   let colOf = null;
   let cols = 1;
-  let minColW = 0; // > 0: the number of columns follows the width (cards at least this wide)
+  let minColW = 0; // > 0: the number of columns follows the width (cards at least this wide); 'auto': by card style
   const rows = new Map(); // index -> { el, timer }
   let activeSong = null;
   let frame = 0;
@@ -447,7 +449,8 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
   function autoColumns() {
     if (!minColW) return;
     const railW = parseFloat(getComputedStyle(scroller.closest('.songs-wrap') ?? scroller).getPropertyValue('--rail-w')) || 0;
-    const next = Math.max(1, Math.floor((scroller.clientWidth - railW) / minColW));
+    const min = minColW === 'auto' ? CARD_MIN_WIDTHS[mode] : minColW;
+    const next = Math.max(1, Math.floor((scroller.clientWidth - railW) / min));
     if (next !== cols) { cols = next; relayout(true); }
   }
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(autoColumns).observe(scroller);
@@ -493,6 +496,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       mode = next;
       rowH = ROW_HEIGHTS[mode];
       relayout(true);
+      autoColumns(); // the card style changes how many columns fit
     },
     scrollToSong(song) { // only when the row is not already fully visible
       const i = items.findIndex((it) => it.type === 'song' && it.song === song);

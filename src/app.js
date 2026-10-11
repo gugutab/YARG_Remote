@@ -66,12 +66,18 @@ els.welcomeOpen.addEventListener('click', () => setLibraryOpen(true));
 
 // The divider between the two panels: drag to resize the library panel (remembered); double-click restores the default.
 const MIN_LIB_W = 300;
+const MIN_SONG_W = 420; // the song panel keeps at least this: one column of details at its minimum size
+const maxLibWidth = () => Math.max(MIN_LIB_W, window.innerWidth - MIN_SONG_W);
 function setLibWidth(px) {
   if (px == null) document.documentElement.style.removeProperty('--lib-w');
   else document.documentElement.style.setProperty('--lib-w', `${Math.round(px)}px`);
 }
 const savedLibW = Number(store.get('libWidth'));
-if (savedLibW >= MIN_LIB_W && !narrow()) setLibWidth(savedLibW);
+if (savedLibW >= MIN_LIB_W && !narrow()) setLibWidth(Math.min(savedLibW, maxLibWidth()));
+window.addEventListener('resize', () => { // a smaller window must not squeeze the song panel below its minimum
+  const w = els.library.getBoundingClientRect().width;
+  if (!narrow() && w > maxLibWidth()) setLibWidth(maxLibWidth());
+});
 els.splitter.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   els.splitter.setPointerCapture(e.pointerId);
@@ -80,7 +86,7 @@ els.splitter.addEventListener('pointerdown', (e) => {
 });
 els.splitter.addEventListener('pointermove', (e) => {
   if (!els.splitter.classList.contains('dragging')) return;
-  setLibWidth(Math.min(Math.max(e.clientX, MIN_LIB_W), Math.min(window.innerWidth * 0.7, 900))); // at most 70% of the window
+  setLibWidth(Math.min(Math.max(e.clientX, MIN_LIB_W), maxLibWidth())); // as wide as it gets while the song panel keeps its minimum
 });
 const endDrag = () => {
   if (!els.splitter.classList.contains('dragging')) return;
@@ -144,7 +150,6 @@ els.instChips.addEventListener('click', (e) => {
   filters.instruments[filters.instruments.has(b.dataset.inst) ? 'delete' : 'add'](b.dataset.inst);
   syncFilterUi();
   renderList();
-  openFromHash(); // a #/song/... link opened at startup
 });
 els.levelSeg.addEventListener('click', (e) => {
   const b = e.target.closest('[data-level]');
@@ -291,6 +296,7 @@ function afterLibraryLoaded() {
   els.filterPack.closest('label').hidden = els.filterPack.options.length < 1;
   syncFilterUi();
   renderList();
+  openFromHash(); // a #/song/... link opened at startup (does nothing once a song is open)
 }
 
 // On the first load, offer to reopen the folder from the last visit (no picker, one click).
@@ -341,8 +347,8 @@ els.viewSeg.addEventListener('click', (e) => {
   syncViewSeg();
   if (current) list.scrollToSong(current.song);
 });
-// A wide panel flows the cards into columns (cards at least 440px wide); the usual panel stays one column.
-list.setColumns(1, { minWidth: 440 });
+// A wide panel flows the cards into columns as soon as two fit (the minimum card width depends on the card style).
+list.setColumns(1, { minWidth: 'auto' });
 syncViewSeg();
 
 function renderList({ keepScroll = false } = {}) {

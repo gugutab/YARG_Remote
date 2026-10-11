@@ -907,3 +907,16 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 @media (max-width: 700px) { .splitter { display: none; } }
 .app:not(.lib-closed) #welcomeOpen { display: none; } /* the list is already on screen */
 body.resizing { cursor: col-resize; user-select: none; }
+
+/* Round 69: the song panel can be as narrow as 420px next to a wide library: the top bar adapts to the panel's width
+   (a container query), not to the window's */
+.main { container-type: inline-size; container-name: song; }
+@container song (max-width: 640px) {
+  .tb-cover { display: none; }
+  .transport .time { display: none; }
+  #fullscreen { display: none; }
+  .tb-top { gap: 6px; }
+  .section-wrap .chip-btn { max-width: 100px; }
+  .chip-btn #partText { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar { column-gap: 6px; padding-left: 4px; }
+}
