@@ -839,3 +839,6 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 .song-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .song-top .song-title { flex: 1 1 auto; min-width: 0; }
 .song-packtag { flex: 0 1 auto; max-width: 42%; padding-right: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; font-weight: 600; color: var(--accent); }
+
+/* Pack sort: the rail is wider so every pack has a readable code */
+.songs-wrap.even-rail { --rail-w: 42px; }

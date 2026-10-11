@@ -57,6 +57,30 @@ export function itemAt(offsets, y) {
 export function railPos(offset, range, railH, thumbH) {
   return thumbH / 2 + (range > 0 ? Math.min(1, Math.max(0, offset / range)) : 0) * (railH - thumbH);
 }
+// Even rails (used when sorting by pack): every group gets the same share of the rail, whatever its length, so all of
+// them have room for a label. `bounds` = the scroll offset of each group's header, then the maximum scroll offset
+// (clamped to it and non-decreasing). The thumb moves piecewise: inside a group it follows the scroll linearly.
+export function evenFrac(offset, bounds) {
+  const n = bounds.length - 1;
+  if (n <= 0) return 0;
+  const off = Math.min(Math.max(offset, bounds[0]), bounds[n]);
+  let a = 0;
+  let b = n;
+  while (b - a > 1) { // last group whose start is <= offset
+    const m = (a + b) >> 1;
+    if (bounds[m] <= off) a = m; else b = m;
+  }
+  const span = bounds[a + 1] - bounds[a];
+  return (a + (span > 0 ? (off - bounds[a]) / span : 0)) / n;
+}
+export function evenOffset(frac, bounds) {
+  const n = bounds.length - 1;
+  if (n <= 0) return 0;
+  const f = Math.min(Math.max(frac, 0), 1) * n;
+  const a = Math.min(n - 1, Math.floor(f));
+  return bounds[a] + (bounds[a + 1] - bounds[a]) * (f - a);
+}
+
 export function railScroll(y, range, railH, thumbH) {
   const f = railH - thumbH > 0 ? (y - thumbH / 2) / (railH - thumbH) : 0;
   return Math.min(1, Math.max(0, f)) * range;
@@ -71,6 +95,9 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
   let activeSong = null;
   let frame = 0;
   let groups = []; // { index, label, anchor } of the headers, for the rail
+  let bounds = null; // even rail (see evenFrac), or null for the linear one
+  const fracOf = (offset) => (bounds ? evenFrac(offset, bounds) : (range() > 0 ? offset / range() : 0));
+  const offsetOf = (frac) => (bounds ? evenOffset(frac, bounds) : frac * range());
   const canvas = rail?.querySelector('canvas');
   const railThumb = rail?.querySelector('.rail-thumb');
   const bubble = rail?.querySelector('.rail-bubble');
@@ -203,17 +230,17 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     const th = thumbH();
     const tick = css('--line', '#2a3140');
     const muted = css('--muted', '#8b95a7');
-    g.font = '600 9px system-ui, sans-serif';
-    g.textAlign = 'center';
+    g.font = `600 ${bounds ? 8 : 9}px system-ui, sans-serif`;
+    g.textAlign = bounds ? 'left' : 'center'; // even rail: wider, labels start at the left edge
     g.textBaseline = 'middle';
     let lastText = null;
     let lastY = -99;
     for (const gr of groups) {
-      const y = railPos(offsets[gr.index], range(), H, th);
+      const y = railPos(fracOf(offsets[gr.index]), 1, H, th);
       const isAnchor = gr.anchor !== lastText;
       if (isAnchor && y - lastY >= 11) {
         g.fillStyle = muted;
-        g.fillText(gr.anchor, 8 + RAIL_PAD / 2, y);
+        g.fillText(gr.anchor, bounds ? 3 : 8 + RAIL_PAD / 2, y);
         lastY = y;
       }
       if (isAnchor) lastText = gr.anchor;
@@ -226,7 +253,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
   function updateThumb() {
     if (!rail || rail.classList.contains('off')) return;
     const th = thumbH();
-    const y = railPos(scroller.scrollTop, range(), rail.clientHeight, th) - th / 2;
+    const y = railPos(fracOf(scroller.scrollTop), 1, rail.clientHeight, th) - th / 2;
     railThumb.style.transform = `translateY(${y}px)`;
   }
 
@@ -274,9 +301,9 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     const box = rail.getBoundingClientRect();
     const y = clientY - box.top;
     const th = thumbH();
-    let target = railScroll(y, range(), box.height, th);
+    let target = offsetOf(railScroll(y, 1, box.height, th));
     for (const gr of groups) {
-      if (Math.abs(railPos(offsets[gr.index], range(), box.height, th) - y) <= 4) { target = Math.min(offsets[gr.index], range()); break; }
+      if (Math.abs(railPos(fracOf(offsets[gr.index]), 1, box.height, th) - y) <= 4) { target = Math.min(offsets[gr.index], range()); break; }
     }
     return { target, y, height: box.height };
   }
@@ -324,10 +351,17 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
   }
 
   return {
-    setItems(next, { keepScroll = false } = {}) {
+    setItems(next, { keepScroll = false, evenGroups = false } = {}) {
       items = next;
       offsets = layoutOffsets(items, rowH);
       groups = items.flatMap((it, index) => (it.type === 'head' ? [{ index, label: it.label, anchor: anchor(it.label) }] : []));
+      bounds = null;
+      scroller.closest('.songs-wrap')?.classList.remove('even-rail');
+      if (evenGroups && groups.length > 1) { // clamp the header offsets to the scroll range so the rail stays monotonic
+        const max = Math.max(0, offsets[items.length] - scroller.clientHeight);
+        bounds = [...groups.map((g) => Math.min(offsets[g.index], max)), max];
+        scroller.closest('.songs-wrap')?.classList.add('even-rail'); // wider rail: room for the 4-character pack codes
+      }
       for (const entry of rows.values()) { clearTimeout(entry.timer); entry.el.remove(); }
       rows.clear();
       spacer.style.height = `${offsets[items.length]}px`;

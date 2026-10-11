@@ -131,6 +131,18 @@ export function filterSongs(songs, { query = '', instruments = [], instrument = 
   });
 }
 
+// Short rail code of a pack: the initials of its words, roman numerals as digits, "+" for DLC.
+// "Rock Band 2 DLC" -> RB2+, "Guitar Hero III" -> GH3, "The Beatles Rock Band" -> BRB.
+export function packCode(label) {
+  if (label === 'No pack') return '?';
+  const ROMAN = { i: '1', ii: '2', iii: '3', iv: '4', v: '5' };
+  const words = norm(label).split(/[^a-z0-9]+/).filter((w) => w && w !== 'the' && w !== 'of');
+  const dlc = words.includes('dlc');
+  const parts = words.filter((w) => w !== 'dlc').map((w) => ROMAN[w] ?? (/^\d+$/.test(w) ? w : w[0].toUpperCase()));
+  const code = parts.join('').slice(0, dlc ? 3 : 4);
+  return (code || '?') + (dlc ? '+' : '');
+}
+
 // Packs present in the library, alphabetical.
 export function packsOf(songs) {
   return [...new Set(songs.map(packOf).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base', numeric: true }));
@@ -250,7 +262,7 @@ export function buildItems(sorted, by = 'title') {
 
 // Short text for the scrollbar rail: the initial for text sorts, '70s' for decades, '3–4' for length buckets.
 export function anchorLabel(label, by = 'title') {
-  if (by === 'pack') return label === 'No pack' ? '?' : label.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase(); // "Rock Band 2 DLC" -> RB
+  if (by === 'pack') return packCode(label);
   if (by === 'year') return /^\d{4}s$/.test(label) ? label.slice(2) : '?';
   if (by === 'length') return /^Unknown/.test(label) ? '?' : label.replace(/\s*min$/, '').replace(/\s+/g, '');
   const text = by === 'artist' || by === 'album' ? groupKey(label, by) : norm(plainText(label)).replace(/^[^a-z0-9]+/, ''); // same key as the sort

@@ -314,7 +314,7 @@ function renderList({ keepScroll = false } = {}) {
   }), els.sortBy.value, sortDesc);
   els.sortDir.textContent = sortDesc ? 'Z→A' : 'A→Z';
   list.setActive(current?.song ?? null);
-  list.setItems(buildItems(shown, els.sortBy.value), { keepScroll });
+  list.setItems(buildItems(shown, els.sortBy.value), { keepScroll, evenGroups: els.sortBy.value === 'pack' }); // pack sort: every pack gets a label on the rail
   els.count.textContent = songs.length ? `${shown.length} of ${songs.length} songs` : '';
   els.empty.hidden = songs.length > 0;
 }

@@ -183,3 +183,27 @@ test('thumbs: a request joining a job dropped for a gone row is retried for the 
   assert.equal(await p2, 'blob:x');
   assert.equal(renders, 1);
 });
+
+test('even rail: every group gets the same share, in both directions', async () => {
+  const { evenFrac, evenOffset } = await import('../src/virtuallist.js');
+  const bounds = [0, 1000, 1100, 5000]; // three groups of very different length; the last number is the max scroll
+  assert.equal(evenFrac(0, bounds), 0);
+  assert.ok(Math.abs(evenFrac(1000, bounds) - 1 / 3) < 1e-9);
+  assert.ok(Math.abs(evenFrac(1100, bounds) - 2 / 3) < 1e-9);
+  assert.equal(evenFrac(5000, bounds), 1);
+  assert.ok(Math.abs(evenFrac(1050, bounds) - 0.5) < 1e-9); // halfway through the short group
+  for (const off of [0, 400, 1000, 1050, 1100, 3000, 5000]) assert.ok(Math.abs(evenOffset(evenFrac(off, bounds), bounds) - off) < 1e-6);
+  // groups clamped to the same offset (the last ones are shorter than the viewport) do not break it
+  const tail = [0, 500, 900, 900, 900];
+  assert.ok(Number.isFinite(evenFrac(900, tail)) && Number.isFinite(evenOffset(0.9, tail)));
+});
+
+test('pack codes for the rail', async () => {
+  const { packCode } = await import('../src/songlist.js');
+  assert.equal(packCode('Rock Band 2 DLC'), 'RB2+');
+  assert.equal(packCode('Rock Band 2'), 'RB2');
+  assert.equal(packCode('Guitar Hero III'), 'GH3');
+  assert.equal(packCode('The Beatles Rock Band'), 'BRB');
+  assert.equal(packCode('Guitar Hero World Tour DLC'), 'GHW+');
+  assert.equal(packCode('No pack'), '?');
+});

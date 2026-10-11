@@ -97,7 +97,7 @@ test('the pack is the top-level folder: shown, searchable, filterable and sortab
   assert.deepEqual(filterSongs(songs, { query: 'guitar hero' }).map((s) => s.title), ['Two']); // free text also matches the pack
   assert.deepEqual(sortSongs(songs, 'pack').map((s) => s.title), ['Three', 'Two', 'One', 'Loose']);
   assert.equal(groupLabel(songs[3], 'pack'), 'No pack');
-  assert.equal(anchorLabel('Rock Band 2 DLC', 'pack'), 'RB');
+  assert.equal(anchorLabel('Rock Band 2 DLC', 'pack'), 'RB2+');
   assert.deepEqual(buildItems(sortSongs(songs, 'pack'), 'pack').filter((i) => i.type === 'head').map((i) => i.label), ['CDLC', 'Guitar Hero III', 'Rock Band 2 DLC', 'No pack']);
   assert.equal(metaRows(songs[0])[0].label, 'Pack');
   assert.equal(metaRows(songs[0])[0].value, 'Rock Band 2 DLC');
