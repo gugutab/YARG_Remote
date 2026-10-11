@@ -104,6 +104,28 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
   const range = () => Math.max(0, offsets[items.length] - scroller.clientHeight);
   const thumbH = () => Math.min(rail.clientHeight, Math.max(28, (scroller.clientHeight / Math.max(1, offsets[items.length])) * rail.clientHeight));
 
+  // Hover tip of the instrument icons in normal cards: the instrument name and its difficulty level (mini pips).
+  const tip = document.createElement('div');
+  tip.className = 'inst-tip';
+  tip.hidden = true;
+  document.body.append(tip);
+  const hideTip = () => { tip.hidden = true; };
+  scroller.addEventListener('mouseover', (e) => {
+    const ic = e.target.closest?.('.song-icons .inst');
+    if (!ic) return;
+    const level = ic.dataset.level === '' ? null : Number(ic.dataset.level);
+    const pips = level === null ? '<em>no level</em>' : `<span class="mini-pips">${Array.from({ length: 6 }, (_, k) => `<i${k < level ? ' class="on"' : ''}></i>`).join('')}</span>`;
+    tip.innerHTML = `<b></b>${pips}`;
+    tip.querySelector('b').textContent = ic.dataset.label;
+    tip.hidden = false;
+    const r = ic.getBoundingClientRect();
+    const w = tip.offsetWidth;
+    tip.style.left = `${Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8)}px`;
+    tip.style.top = `${r.top - tip.offsetHeight - 6 < 8 ? r.bottom + 6 : r.top - tip.offsetHeight - 6}px`; // above, or below near the top edge
+  });
+  scroller.addEventListener('mouseout', (e) => { if (e.target.closest?.('.song-icons .inst')) hideTip(); });
+  scroller.addEventListener('scroll', hideTip, { passive: true });
+
   const spacer = document.createElement('li');
   spacer.className = 'spacer';
   spacer.setAttribute('aria-hidden', 'true');
@@ -161,7 +183,8 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       for (const i of describe(song).instruments) {
         const ic = document.createElement('span');
         ic.className = 'inst';
-        ic.title = i.level === null ? i.label : `${i.label}: level ${i.level}`;
+        ic.dataset.label = i.label; // shown by the hover tip: the name and the difficulty level
+        ic.dataset.level = i.level === null ? '' : String(i.level);
         ic.innerHTML = `<svg><use href="#i-${i.icon}"/></svg>${i.badge ? `<sup>${i.badge}</sup>` : ''}`;
         icons.append(ic);
       }
