@@ -546,6 +546,13 @@ export class Highway {
     const ahead = BASE_LOOKAHEAD_SEC + ENTRY_MARGIN_SEC;
     const behind = hitX / pxPerSec + 0.5; // how long after the hit line a note is still on the stage (it scrolls off the left edge)
 
+    // beat and measure lines, vertical (the same marks the lane charts have), behind everything else
+    for (const b of chart.beats || []) {
+      if (b.time < t - behind || b.time > t + ahead) continue;
+      g.fillStyle = b.measure ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)';
+      g.fillRect(Math.round(xOf(b.time)), 0, b.measure ? 2 : 1, h);
+    }
+
     g.fillStyle = 'rgba(255,255,255,0.7)';
     g.fillRect(hitX - 2, 0, 3, h);
 
