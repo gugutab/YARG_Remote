@@ -1,3 +1,5 @@
+import { evenPerRow } from './songlist.js';
+
 // A windowed list for the library: only the rows near the viewport exist in the DOM, so ~750 songs with album
 // thumbnails scroll smoothly and stay light on memory. Items are fixed-height song rows and group headers.
 
@@ -113,6 +115,11 @@ export function railScroll(y, range, railH, thumbH) {
   const f = railH - thumbH > 0 ? (y - thumbH / 2) / (railH - thumbH) : 0;
   return Math.min(1, Math.max(0, f)) * range;
 }
+
+// How many instrument chips (icon + level bars) fit on a line of the large card's text column.
+const CHIP_W = 50;
+const CHIP_GAP = 10;
+const CARD_TEXT_INSET = 6 + 92 + 12 + 6; // left margin, cover, gap, safety
 
 export function createVirtualList({ scroller, label, rail, thumbs, onSelect, text, describe = () => ({ instruments: [] }), anchor = (l) => l[0], mode: initialMode = 'normal' }) {
   let mode = initialMode;
@@ -241,6 +248,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       }
       const insts = document.createElement('span');
       insts.className = 'song-insts';
+      insts.style.setProperty('--per', String(evenPerRow(d.instruments.length, chipsPerLine()))); // 4 chips with room for 3: 2 + 2
       for (const i of d.instruments) {
         const chip = document.createElement('span');
         chip.className = 'inst';
@@ -423,6 +431,18 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     drawRail();
     render();
   }
+  // Instrument chips of the large card per line, from the card's width (the line breaks are then even: see evenPerRow).
+  const railWidth = () => parseFloat(getComputedStyle(scroller.closest('.songs-wrap') ?? scroller).getPropertyValue('--rail-w')) || 0;
+  function chipsPerLine() {
+    const cardW = (scroller.clientWidth - railWidth()) / cols;
+    return Math.max(1, Math.floor((cardW - CARD_TEXT_INSET + CHIP_GAP) / (CHIP_W + CHIP_GAP)));
+  }
+  let lastWidth = 0;
+  new ResizeObserver(() => { // a width change can change the line breaks of the large cards: rebuild the visible rows
+    const w = scroller.clientWidth;
+    if (mode === 'large' && Math.abs(w - lastWidth) > 4 && lastWidth) { for (const entry of rows.values()) { clearTimeout(entry.timer); entry.el.remove(); } rows.clear(); schedule(); }
+    lastWidth = w;
+  }).observe(scroller);
   // With a minimum card width, the columns follow the list's width.
   function autoColumns() {
     if (!minColW) return;

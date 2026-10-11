@@ -640,8 +640,8 @@ button.icon.stage-btn.style-btn { top: 54px; }
   .info-cols > .card-adjust, .info-cols > .card-volume, .info-cols > .card-extra { grid-column: 1; grid-row: auto; }
 }
 /* Instrument cards pack into columns, each as tall as its content: no gaps between cards of different heights */
-.icards { display: block; column-width: 260px; column-gap: 10px; }
-.icards > .icard { break-inside: avoid; margin-bottom: 10px; }
+.icards { display: grid; grid-template-columns: repeat(var(--icols, 1), minmax(0, 1fr)); gap: 10px; align-items: start; } /* --icols: see layoutInstrumentCards() */
+.icards > .icard { margin: 0; }
 
 /* "Other song.ini properties": as many columns as fit (each at least 190 px) */
 .kv.kv-pairs { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 18px; }
@@ -719,7 +719,7 @@ button.icon.stage-btn.style-btn { top: 54px; }
 #songs li.row.large .song-title { font-size: 15px; }
 #songs li.row.large .song-artist { font-size: 13px; }
 .song-meta { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.song-insts { display: flex; flex-wrap: wrap; gap: 3px 10px; margin-top: 4px; }
+.song-insts { display: grid; grid-template-columns: repeat(var(--per, 6), max-content); gap: 3px 10px; margin-top: 4px; } /* --per: instruments per line, set by virtuallist.js */
 .inst { display: inline-flex; align-items: center; gap: 3px; color: var(--muted); }
 .inst svg { width: 14px; height: 14px; }
 

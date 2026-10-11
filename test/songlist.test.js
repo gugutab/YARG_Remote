@@ -114,3 +114,16 @@ test('genre, pack and decade filters take several values: any of them matches, f
   assert.deepEqual(ids({ genre: 'Pop' }), ['d']); // a single value still works
   assert.deepEqual(ids({ genre: [] }), ['a', 'b', 'c', 'd']);
 });
+
+test('evenPerRow spreads items evenly over the rows that would be needed', async () => {
+  const { evenPerRow } = await import('../src/songlist.js');
+  assert.equal(evenPerRow(4, 3), 2); // 2 + 2, not 3 + 1
+  assert.equal(evenPerRow(5, 3), 3); // 3 + 2
+  assert.equal(evenPerRow(6, 3), 3);
+  assert.equal(evenPerRow(7, 3), 3); // 3 + 3 + 1 stays: ceil(7/3) = 3 rows -> 3 per row... 
+  assert.equal(evenPerRow(2, 5), 2);
+  assert.equal(evenPerRow(0, 3), 1);
+  assert.equal(evenPerRow(5, 1), 1);
+  assert.equal(evenPerRow(8, 3), 3); // 3 rows of 3,3,2
+  assert.equal(evenPerRow(10, 4), 4); // 3 rows: 4,4,2 -> the widest row is the cap
+});

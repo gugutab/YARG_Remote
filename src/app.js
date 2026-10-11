@@ -6,7 +6,7 @@ import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, re
 import { songDelaySeconds, plainText } from './ini.js';
 import { metaRows, extraRows, chartStats, bpmLabel, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel } from './songinfo.js';
 import { saveLibrary, loadLibrary, loadThumb, saveThumb } from './store.js';
-import { filterSongs, sortSongs, genresOf, decadesOf, packsOf, songSummary, buildItems, anchorLabel } from './songlist.js';
+import { filterSongs, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, anchorLabel } from './songlist.js';
 import { createVirtualList } from './virtuallist.js';
 import { createThumbs, renderCoverThumb } from './thumbs.js';
 
@@ -599,6 +599,17 @@ const diffFor = (ins) => {
   return { diffs, chosen };
 };
 
+// The instrument cards are laid out in even rows: with room for 3 columns, 4 cards are 2 + 2, not 3 + 1.
+const ICARD_MIN_W = 260;
+const ICARD_GAP = 10;
+function layoutInstrumentCards() {
+  const box = els.instrumentCards;
+  const n = box.children.length;
+  const fit = Math.max(1, Math.floor((box.clientWidth + ICARD_GAP) / (ICARD_MIN_W + ICARD_GAP)));
+  box.style.setProperty('--icols', String(evenPerRow(n, fit)));
+}
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(layoutInstrumentCards).observe(els.instrumentCards);
+
 function renderPickers() {
   if (!current) return;
   const activeId = els.instrument.value;
@@ -694,6 +705,7 @@ function renderPickers() {
     }
     return card;
   }));
+  layoutInstrumentCards();
   renderPartMenu();
 }
 

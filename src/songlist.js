@@ -272,3 +272,11 @@ export function anchorLabel(label, by = 'title') {
   const text = by === 'artist' || by === 'album' ? groupKey(label, by) : norm(plainText(label)).replace(/^[^a-z0-9]+/, ''); // same key as the sort
   return /^[a-z]/.test(text) ? text[0].toUpperCase() : '#';
 }
+
+// Items per row when `n` items are laid out in rows that would fit `fit` of them: the rows are made as even as possible
+// (4 items with room for 3 -> 2 + 2, not 3 + 1).
+export function evenPerRow(n, fit) {
+  if (n <= 0) return 1;
+  const rows = Math.ceil(n / Math.max(1, fit));
+  return Math.ceil(n / rows);
+}
