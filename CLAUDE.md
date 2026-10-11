@@ -26,7 +26,7 @@ Portuguese, so chat replies stay in Portuguese.
 
 Supported: guitar, bass, rhythm, keys (5 lanes); drums in 4 lanes, Pro (with cymbal markers),
 5 lanes; solo vocals (`PART VOCALS`) and Harmony (its own instrument: HARM1 leads, HARM2/3 behind; lyrics and percussion fall back to `PART VOCALS`), no difficulty for vocals; lyrics, percussion; open (PhaseShift SysEx); tap; forced HOPO and strum;
-accent and ghost; double kick; rolls (tremolo, trill, kick roll); solos and star power (background bands); sections
+accent and ghost; double kick; rolls (tremolo, trill, kick roll); solos and star power (background bands; the notes inside star power are coloured too); enhanced opens; drum fills and BRE (background band); beat grid generated from tempo + time signatures when there is no BEAT track; sections
 (EVENTS); audio and chart delay; speed and neck; persistence of the folder and the list (IndexedDB).
 
 UI labels (English): instruments Guitar, Bass, Rhythm, Keys, Drums, Vocals, Harmony; difficulties Easy, Medium, Hard, Expert; drum modes "Drums (4 lanes)", "Drums (5 lanes)", "Drums (Pro)", "Drums (Pro 7 lanes)"; panels Library, Settings, Stem volume, Other song.ini properties.
@@ -34,10 +34,10 @@ UI labels (English): instruments Guitar, Bass, Rhythm, Keys, Drums, Vocals, Harm
 **Not supported** (pending items, in order of likely value):
 - `.chart` files (only `notes.mid`);
 - Pro guitar and bass (`PART REAL_GUITAR`, `REAL_BASS`) and Pro keys (`PART REAL_KEYS_*`);
-- "enhanced opens" (text `[ENHANCED_OPENS]`) and open by 5-lane note pattern;
-- fill notes (120–124) and BRE/coda markers: not drawn;
+- open by 5-lane note pattern (only the SysEx and `[ENHANCED_OPENS]` forms are read);
+- fill / BRE only as a faint band; no BRE-specific graphics or scoring, and no coda `Coda` phrase;
 - Elite Drums (`PART ELITE_DRUMS`) and VENUE/lights;
-- star power and solo only as a background band, not highlighting the notes inside the span;
+- solo only as a background band (star power also recolours its notes, see `markStarPowerNotes` in `highway.js`);
 - lyrics: phrases, syllables with `§`/`=` handled only in a basic way; `#`, `+`, `^`, `*`, `%`, `/`, `$` are hidden
   as in YARG (see §4).
 
@@ -142,6 +142,9 @@ Reference clone used: `/home/user/yarc-official/yarg.core` (may not exist in the
 | Lyric symbols | Hidden: `+ # ^ * % / $`. `=` = hyphen. `§` = joined syllables (`‿`). `-` stays. | `LyricSymbols.cs` |
 | Vocals | Notes 36–84 (0 and 1 are range shifts; 96 played and 97 not played are percussion). Harmonies: `HARM1`–`HARM3` or `PART HARM1`–`HARM3`. | `MidIOHelper.cs` |
 | Delay | `delay` (ms) if ≠ 0, otherwise `delay_seconds`. File position = chart time + delay. | `SongMetadata.cs`, `SongRunner.cs` |
+| Enhanced opens | Text `[ENHANCED_OPENS]` / `ENHANCED_OPENS` in a 5-fret track: from that tick on, the note one below each difficulty's green (59/71/83/95) is an open note (`n.open`, lane 0). | `SwitchToGuitarEnhancedOpensProcessMap`, `BuildGuitarNoteProcessDict` (`FretToMidiKey[Open] = -1`) in `MidReader.ProcessLists.cs` |
+| Fills / BRE | Drums: notes 120–124 are activation phrases (`chart.fills`, kind `fill`); with a `coda`/`midcoda` event those starting inside a coda become `bre`. Guitar-like parts: note 120 is a BRE, valid only entirely inside a coda. Coda ranges: `midcoda`…`midcoda_end` pairs and a last `coda` to the end. | `DRUM_FILL_NOTE_*`, `ReplaceDrumFillDuringCoda`, `GetCodaRanges` (`MidReader.ProcessLists.cs`); `ValidateGuitarPhrase` (`MoonSongLoader.Guitar.cs`) |
+| Time signature / beat grid | Meta 0x58 (numerator, denominator = 2^n) → `midi.timeSignatures`. BEAT track notes 12/13 win; with none, lines every `resolution*4/denominator` ticks, restarting at each signature change, a measure line every `numerator` lines (x/1: only the first), default 4/4. | `SyncTrack.GenerateBeatlines` (`FinishLoading`) in `Chart/Sync/SyncTrack.cs`; `ReadSongBeats` in `MidReader.cs` |
 | Tempo | Tempo map summed across all tracks (meta 0x51), integrated `tick → seconds`. | `SyncTrack.cs` |
 
 ## 6. The user's sample songs

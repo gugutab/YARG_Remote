@@ -13,6 +13,7 @@ import {
   ACCENT_OUTLINE_DARKEN,
   GHOST_ALPHA,
   ROLL_COLORS,
+  FILL_COLORS,
   FADE_SEC,
   BASE_LOOKAHEAD_SEC,
   ENTRY_MARGIN_SEC,
@@ -276,6 +277,10 @@ export class Highway {
     // star power / solo bands
     this.fillSpans(chart.starPower, t, ahead, yOf, x0, laneW * chart.lanes, h, 'rgba(60,160,255,0.12)');
     this.fillSpans(chart.solos, t, ahead, yOf, x0, laneW * chart.lanes, h, 'rgba(255,190,60,0.10)');
+    // drum fills / big rock endings (YARG activation phrases and BRE), a faint band under the notes
+    for (const [kind, color] of Object.entries(FILL_COLORS)) {
+      this.fillSpans((chart.fills || []).filter((f) => f.kind === kind), t, ahead, yOf, x0, laneW * chart.lanes, h, color);
+    }
     // drum rolls: one band per roll type (kick roll, tremolo lane, trill lane)
     for (const [type, color] of Object.entries(ROLL_COLORS)) {
       this.fillSpans((chart.rolls || []).filter((r) => r.type === type), t, ahead, yOf, x0, laneW * chart.lanes, h, color);

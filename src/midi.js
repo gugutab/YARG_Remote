@@ -26,12 +26,14 @@ export function parseMidi(input) {
   }
 
   const tempos = collectTempos(tracks);
-  return { format, division, tracks, tempos, toSeconds: createTickToSeconds(tempos, division) };
+  const timeSignatures = tracks.flatMap((t) => t.timeSignatures || []).sort((a, b) => a.tick - b.tick);
+  return { format, division, tracks, tempos, timeSignatures, toSeconds: createTickToSeconds(tempos, division) };
 }
 
 function parseTrack(bytes, start, end) {
   const track = { name: '', notes: [], texts: [], lyrics: [], sysex: [] };
   const tempos = [];
+  const timeSignatures = [];
   const open = new Map(); // channel/pitch -> note-ons waiting for their note-off
   let pos = start;
   let tick = 0;
@@ -52,6 +54,7 @@ function parseTrack(bytes, start, end) {
       else if (type === 0x01) track.texts.push({ tick, text: readText(data) });
       else if (type === 0x05) track.lyrics.push({ tick, text: readText(data) }); // lyric events, used by vocal tracks
       else if (type === 0x51 && len === 3) tempos.push({ tick, usPerQuarter: (data[0] << 16) | (data[1] << 8) | data[2] });
+      else if (type === 0x58 && len >= 2 && data[0] > 0) timeSignatures.push({ tick, num: data[0], den: 2 ** data[1] }); // denominator is a power of two
       else if (type === 0x2f) break;
       continue;
     }
@@ -85,6 +88,7 @@ function parseTrack(bytes, start, end) {
 
   track.notes.sort((a, b) => a.tick - b.tick);
   track.tempos = tempos;
+  track.timeSignatures = timeSignatures;
   return track;
 }
 

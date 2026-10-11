@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   GUITAR_LANE_COLORS, KICK_COLOR, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha, noteScale, noteColor,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FADE_SEC, firstVisibleIndex, tintWhite, darken, withAlpha, noteScale, noteColor,
 } from './gfx.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the flat view shows 2.5)
@@ -84,6 +84,7 @@ export function renderLanes3D(hw, t, w, h) {
   }
   span(chart.starPower, 'rgba(60,160,255,0.16)');
   span(chart.solos, 'rgba(255,190,60,0.13)');
+  for (const [kind, color] of Object.entries(FILL_COLORS)) span((chart.fills || []).filter((f) => f.kind === kind), color);
   for (const [type, color] of Object.entries(ROLL_COLORS)) span((chart.rolls || []).filter((r) => r.type === type), color);
 
   // lane dividers and rails

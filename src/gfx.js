@@ -15,6 +15,11 @@ export const ROLL_COLORS = {
   tremolo: 'rgba(63,191,63,0.14)',
   trill: 'rgba(245,197,24,0.14)',
 };
+// Drum fill (activation phrase) and big rock ending bands, one colour per chart.fills kind; kept faint under the notes.
+export const FILL_COLORS = {
+  fill: 'rgba(178,92,255,0.13)',
+  bre: 'rgba(255,80,80,0.15)',
+};
 export const FADE_SEC = 0.25; // how long a note takes to fade out after the hit line
 export const BASE_LOOKAHEAD_SEC = 2.5; // time from the top edge to the hit line at neck speed 1
 export const ENTRY_MARGIN_SEC = 0.3; // extra window above the top edge, so notes are already moving when they enter

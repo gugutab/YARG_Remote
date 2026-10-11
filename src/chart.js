@@ -56,6 +56,11 @@ const STAR_POWER_NOTE = 116;
 const MEASURE_NOTE = 12;
 const BEAT_NOTE = 13;
 const TAP_NOTE = 104;
+// Fills (YARG.Core MidIOHelper.cs): drums use 120-124 as activation phrases (DRUM_FILL_NOTE_0..4); guitar-like parts use
+// 120 as a Big Rock Ending (BIG_ROCK_ENDING_NOTE_1), which only counts inside a coda.
+const FILL_NOTES = [120, 121, 122, 123, 124];
+const BRE_NOTE = 120;
+const ENHANCED_OPENS_TEXT = 'ENHANCED_OPENS'; // MidIOHelper.ENHANCED_OPENS_TEXT
 const VELOCITY_ACCENT = 127; // drum pads: accent (bigger) and ghost (dim), as YARG.Core MidIOHelper.cs
 const VELOCITY_GHOST = 1;
 const VOCAL_RANGE = [36, 84];
@@ -233,7 +238,7 @@ export function buildChart(midi, instrument, difficulty, ini = {}) {
     const harmonies = instrument.harmony
       ? harmonyTracks(midi).filter((h) => h.part > 1).map((h) => ({ part: h.part, notes: vocalNotes(h.track) }))
       : [];
-    return { mode: 'vocals', notes, harmonies, percussion, lyrics, ...commonParts(midi, track, toSec, settings) };
+    return { mode: 'vocals', notes, harmonies, percussion, lyrics, ...commonParts(midi, track, toSec, settings, 'vocals') };
   }
 
   if (instrument.mode === 'drums') {
@@ -245,16 +250,22 @@ export function buildChart(midi, instrument, difficulty, ini = {}) {
   // Forced HOPO (offset +5) and forced strum (offset +6) windows for this difficulty.
   const hopoWindows = windowsOf(track.notes.filter((n) => n.pitch === difficulty.base + 5));
   const strumWindows = windowsOf(track.notes.filter((n) => n.pitch === difficulty.base + 6));
-  const fretNotes = track.notes.filter((n) => n.pitch - difficulty.base >= 0 && n.pitch - difficulty.base < LANES);
+  // Enhanced opens: from the [ENHANCED_OPENS] text on, the note one below the difficulty's green (59/71/83/95) is an
+  // open note (YARG.Core MidReader.ProcessLists.cs SwitchToGuitarEnhancedOpensProcessMap + BuildGuitarNoteProcessDict:
+  // FretToMidiKey[Open] = -1). It is drawn in lane 0 with the open flag, like SysEx opens.
+  const enhancedFrom = enhancedOpensTick(track);
+  const isEnhancedOpen = (n) => n.pitch === difficulty.base - 1 && n.tick >= enhancedFrom;
+  const fretNotes = track.notes.filter((n) => isEnhancedOpen(n) || (n.pitch - difficulty.base >= 0 && n.pitch - difficulty.base < LANES));
   const natural = naturalHopo(fretNotes, midi.division, settings.hopoThreshold);
   // Open notes: SysEx phrase 1 marks a window in which the notes are open (YARG.Core
   // ProcessSysExEventPairAsOpenNoteModifier). Open notes are drawn as a bar across the lanes.
   const openWindowsHere = phraseWindows(track, PHRASE_OPEN)[DIFFICULTIES.indexOf(difficulty)];
   const notes = [];
   for (const n of track.notes) {
-    const lane = n.pitch - difficulty.base;
+    const enhancedOpen = isEnhancedOpen(n);
+    const lane = enhancedOpen ? 0 : n.pitch - difficulty.base;
     if (lane < 0 || lane >= LANES) continue;
-    const open = inWindows(openWindowsHere, n.tick);
+    const open = enhancedOpen || inWindows(openWindowsHere, n.tick);
     const tap = inWindows(tapWindows, n.tick);
     // A forced strum wins over a forced HOPO; without either, the note is a HOPO only if it is natural.
     const hopo = !tap && (inWindows(strumWindows, n.tick) ? false
@@ -262,6 +273,13 @@ export function buildChart(midi, instrument, difficulty, ini = {}) {
     notes.push({ ...timed(n), lane, cymbal: false, tap, hopo: Boolean(hopo), open });
   }
   return { mode: 'lanes', lanes: LANES, laneColors: GUITAR_LANE_COLORS, notes, ...commonParts(midi, track, toSec, settings) };
+}
+
+// Tick of the first [ENHANCED_OPENS] / ENHANCED_OPENS text event in the track, or Infinity. YARG switches its process
+// map when the event is reached, so only later notes are affected.
+function enhancedOpensTick(track) {
+  const e = track.texts.find((t) => normalizeEventText(t.text) === ENHANCED_OPENS_TEXT);
+  return e ? e.tick : Infinity;
 }
 
 const extendedLane = (pad, cymbal) => EXTENDED_DRUM_LANES.findIndex((l) => l.pad === pad && l.cymbal === cymbal);
@@ -342,7 +360,7 @@ function buildDrumChart(midi, track, kind, difficulty, timed, toSec, settings) {
     });
   }
   const notes = [...kicks.values(), ...pads].sort((a, b) => a.time - b.time);
-  return { mode: 'lanes', lanes, laneColors, laneKinds: extended ? EXTENDED_DRUM_LANES.map((l) => (l.cymbal ? 'cymbal' : 'tom')) : null, drumKind: kind, notes, rolls: rollSpans(track, toSec), ...commonParts(midi, track, toSec, settings) };
+  return { mode: 'lanes', lanes, laneColors, laneKinds: extended ? EXTENDED_DRUM_LANES.map((l) => (l.cymbal ? 'cymbal' : 'tom')) : null, drumKind: kind, notes, rolls: rollSpans(track, toSec), ...commonParts(midi, track, toSec, settings, 'drums') };
 }
 
 // Tick ranges during which each cymbal flag (110/111/112) is on.
@@ -370,14 +388,16 @@ export function displayLyric(text) {
   return text.replace(LYRIC_MARKERS, '').replace(/=/g, '-').replace(/§/g, '‿').trim();
 }
 
-function commonParts(midi, track, toSec, settings = chartSettings({}, midi.division)) {
+function commonParts(midi, track, toSec, settings = chartSettings({}, midi.division), mode = 'guitar') {
   const spans = (pitch) => spansOf(track.notes.filter((n) => n.pitch === pitch), toSec);
   const beatTrack = midi.tracks.find((t) => t.name.toUpperCase() === 'BEAT');
-  const beats = beatTrack
+  let beats = beatTrack
     ? beatTrack.notes
       .filter((n) => n.pitch === MEASURE_NOTE || n.pitch === BEAT_NOTE)
       .map((n) => ({ time: toSec(n.tick), measure: n.pitch === MEASURE_NOTE }))
     : [];
+  // No BEAT track notes: build the grid from the tempo map and time signatures, as YARG does (SyncTrack.FinishLoading).
+  if (beats.length === 0) beats = generateBeats(midi, toSec);
   const eventsTrack = midi.tracks.find((t) => t.name.toUpperCase() === 'EVENTS');
   const sections = eventsTrack
     ? eventsTrack.texts
@@ -393,6 +413,7 @@ function commonParts(midi, track, toSec, settings = chartSettings({}, midi.divis
   return {
     solos: legacyStarPower ? [] : spans(SOLO_NOTE),
     starPower: spans(settings.starPowerNote),
+    fills: mode === 'vocals' ? [] : fillSpans(track, eventsTrack, mode, toSec),
     beats,
     sections,
     // [music_start] / [music_end] in seconds, or null (see globalMarkers). Data only, nothing is drawn from them.
@@ -401,6 +422,88 @@ function commonParts(midi, track, toSec, settings = chartSettings({}, midi.divis
     // The [end] event closes the chart when present (and end_events does not turn it off); else the last note's end.
     duration: end !== null && settings.endEvents ? end : lastNote,
   };
+}
+
+// Coda ranges in ticks from the EVENTS texts, as YARG.Core MidReader.GetCodaRanges: [midcoda] ... [midcoda_end] pairs
+// and a final [coda] that runs to the end; unbalanced markers drop the ranges. `end` is Infinity while open.
+export function codaRanges(eventsTrack) {
+  const ranges = [];
+  let midcodas = 0;
+  for (const ev of eventsTrack ? eventsTrack.texts : []) {
+    const text = normalizeEventText(ev.text);
+    if (text === 'midcoda') {
+      if (ranges.length > 0 && ranges[ranges.length - 1].end === Infinity) return [];
+      midcodas++;
+      ranges.push({ start: ev.tick, end: Infinity });
+    } else if (text === 'midcoda_end') {
+      if (midcodas !== ranges.length) return [];
+      ranges[ranges.length - 1].end = ev.tick;
+    } else if (text === 'coda') {
+      if (ranges.length > 0 && ranges[ranges.length - 1].end === Infinity) ranges.length = 0;
+      ranges.push({ start: ev.tick, end: Infinity });
+      break; // YARG accepts no more codas after this one
+    }
+  }
+  return ranges;
+}
+
+// Fill / Big Rock Ending spans in seconds: [{ start, end, kind: 'fill' | 'bre' }].
+//   Drums: notes 120-124 are activation phrases (kind 'fill'). When the song has a coda, the ones that start inside a
+//   coda become 'bre' (MidReader.ProcessLists.cs ReplaceDrumFillDuringCoda; YARG skips this when the chart already has
+//   a BRE phrase, which cannot happen here because drums read 120 as a fill only).
+//   Guitar, bass, rhythm, keys: note 120 is a BRE, kept only when it lies entirely inside a coda
+//   (MoonSongLoader.Guitar.cs ValidateGuitarPhrase). Overlapping notes (120-124 are normally charted together) merge.
+export function fillSpans(track, eventsTrack, mode, toSec) {
+  const coda = codaRanges(eventsTrack);
+  const phrases = [];
+  if (mode === 'drums') {
+    for (const n of track.notes) {
+      if (!FILL_NOTES.includes(n.pitch)) continue;
+      const bre = coda.some((r) => n.tick >= r.start && n.tick <= r.end);
+      phrases.push({ start: n.tick, end: n.endTick, kind: bre ? 'bre' : 'fill' });
+    }
+  } else {
+    for (const n of track.notes) {
+      if (n.pitch === BRE_NOTE && coda.some((r) => n.tick >= r.start && n.endTick <= r.end)) {
+        phrases.push({ start: n.tick, end: n.endTick, kind: 'bre' });
+      }
+    }
+  }
+  const merged = [];
+  for (const p of phrases.sort((a, b) => a.start - b.start)) {
+    const last = merged[merged.length - 1];
+    if (last && last.kind === p.kind && p.start <= last.end) last.end = Math.max(last.end, p.end);
+    else merged.push({ ...p });
+  }
+  return merged.map((p) => ({ start: toSec(p.start), end: toSec(p.end), kind: p.kind }));
+}
+
+// Beat and measure lines from the tempo map and time signatures, as YARG.Core SyncTrack.GenerateBeatlines (default
+// delegates): a line every `resolution * 4 / denominator` ticks, restarting at each time signature change; the first of
+// every `numerator` lines is a measure line (with x/1 only the very first). The grid runs to the last note or text event
+// of the file. Without a time signature the file is 4/4.
+export function generateBeats(midi, toSec) {
+  let lastTick = 0;
+  for (const t of midi.tracks) {
+    for (const n of t.notes) lastTick = Math.max(lastTick, n.endTick);
+    for (const e of t.texts) lastTick = Math.max(lastTick, e.tick);
+  }
+  const sigs = [];
+  for (const s of midi.timeSignatures || []) {
+    if (sigs.length && sigs[sigs.length - 1].tick === s.tick) sigs[sigs.length - 1] = s; // a later event at the same tick wins
+    else sigs.push(s);
+  }
+  if (sigs.length === 0 || sigs[0].tick > 0) sigs.unshift({ tick: 0, num: 4, den: 4 });
+  const beats = [];
+  sigs.forEach((sig, i) => {
+    const end = i + 1 < sigs.length ? sigs[i + 1].tick - 1 : lastTick + 1;
+    const step = Math.floor((midi.division * 4) / sig.den);
+    if (step < 1) return;
+    for (let tick = sig.tick, count = 0; tick <= end; tick += step, count++) {
+      beats.push({ time: toSec(tick), measure: sig.num === 1 ? count === 0 : count % sig.num === 0 });
+    }
+  });
+  return beats;
 }
 
 // Event text as YARG normalises it (TextEvents.NormalizeTextEvent): the part between the first '[' and ']' if there
