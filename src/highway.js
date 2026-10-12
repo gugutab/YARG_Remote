@@ -493,15 +493,6 @@ export class Highway {
     let focusRow = Math.min(rows.length - 1, rowOf(Math.min(first, lines.length - 1)));
     const before = rows[focusRow - 1]; // a running countdown right before the next line takes the focus
     if (!singing && before?.type === 'cd' && t >= before.gap.start && t < before.gap.end) focusRow -= 1;
-    const now = performance.now();
-    const dt = Math.min(0.25, (now - (state.at || now)) / 1000);
-    state.at = now;
-    if (state.lastT != null && Math.abs(t - state.lastT) > 1.5) state.following = true; // the music jumped (a seek): follow it again
-    state.lastT = t;
-    if (state.following === false) state.hold = Math.max(0, Math.min(rows.length - 1, state.hold ?? focusRow)); // the sheet stays where you put it
-    const target = state.following === false ? state.hold : focusRow;
-    if (state.pos == null || !Number.isFinite(state.pos) || Math.abs(target - state.pos) > 40) state.pos = target;
-    else state.pos += (target - state.pos) * (1 - Math.exp(-dt / 0.12));
     // Sizes: the font stays the same (it does not follow the height) while the previous, current and next lines fit; it only
     // shrinks when they cannot.
     const peekPx = h * this.sheetPeek; // how much of the lines before the focus shows at the top: a share of the sheet's height
@@ -515,6 +506,32 @@ export class Highway {
     }
     sheet.step = step;
     const top = peekPx - small * 0.5 + step; // where the row in focus sits (the row before it ends `peekPx` from the top)
+    const now = performance.now();
+    const dt = Math.min(0.25, (now - (state.at || now)) / 1000);
+    state.at = now;
+    if (state.lastT != null && Math.abs(t - state.lastT) > 1.5) state.following = true; // the music jumped (a seek): follow it again
+    state.lastT = t;
+    const margin = Math.min(40, h * 0.12);
+    const clampHold = (v) => Math.max(0, Math.min(rows.length - 1, v));
+    const rowVisible = (row, hold) => { // is that row on screen (clear of the faded edges) when the sheet is held at `hold`?
+      const y = top + (row - hold) * step;
+      return y >= margin * 0.8 && y <= h - margin * 0.8;
+    };
+    if (state.following === false) {
+      state.hold = clampHold(state.hold ?? focusRow); // the sheet stays where you put it...
+      let visible = rowVisible(focusRow, state.hold);
+      if (state.lastFocus !== focusRow && state.lastVisible && !visible) { // ...until the music pushes the current line out of view:
+        const below = top + (focusRow - state.hold) * step > h / 2; // then it scrolls just enough to bring it back
+        state.hold = clampHold(below ? focusRow - (h - margin - step - top) / step : focusRow - (top + step * 0.2 - top) / step);
+        visible = rowVisible(focusRow, state.hold);
+      }
+      state.lastVisible = visible;
+      state.curVisible = visible;
+    } else { state.lastVisible = true; state.curVisible = true; }
+    state.lastFocus = focusRow;
+    const target = state.following === false ? state.hold : focusRow;
+    if (state.pos == null || !Number.isFinite(state.pos) || Math.abs(target - state.pos) > 40) state.pos = target;
+    else state.pos += (target - state.pos) * (1 - Math.exp(-dt / 0.12));
     const badgeR = Math.max(14, Math.min(step * 0.38, 30));
     let hovered = null; // the row under the resting pointer, if any
     let seenFrom = Infinity;
@@ -614,9 +631,9 @@ export class Highway {
       }
     }
     const rail = this.drawSheetRail(t, w, h, ctx, rows, lines, seenFrom, seenTo);
-    // The Autoscroll button (back to following the singer): next to the song marker on the rail, bottom centre without a rail.
+    // The Autoscroll button (back to following the singer), shown only while the line being sung is off screen: next to the song marker on the rail, bottom centre without a rail.
     // It slides in from the right and fades while the sheet is held, and goes back the same way.
-    const wantBtn = state.following === false ? 1 : 0;
+    const wantBtn = state.following === false && !state.curVisible ? 1 : 0; // only when the line being sung is out of view
     const nowB = performance.now();
     const dtB = Math.min(0.1, (nowB - (state.btnAt || nowB)) / 1000);
     state.btnAt = nowB;
