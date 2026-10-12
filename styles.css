@@ -1182,3 +1182,12 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .song-hide:hover { opacity: 1; }
 .edge-tab.song-show svg { transform: rotate(90deg); } /* points left: where it comes back */
 .edge-tab.song-show { height: 56px; }
+
+/* ---------- the top bar hides and shows like the library: it slides (0.2 s) and a small chevron tab brings it back ---------- */
+.topbar { transition: height .2s ease, padding .2s ease; }
+.app.bar-hidden .topbar { overflow: hidden; }
+.app.bar-hidden .topbar > *, .app.bar-hidden .tb-main > * { transition: visibility 0s .2s; } /* its content stays visible while it slides away */
+.app.bar-hidden .tb-main > .seekbox, .app.bar-hidden .topbar > .tb-main { transition: none; }
+.app.bar-hidden button.icon.stage-btn.bar-show.edge-top, button.icon.stage-btn.bar-show.edge-top { position: absolute; left: 50%; right: auto; top: 12px; transform: translateX(-50%); width: 56px; height: 26px; min-width: 0; padding: 0; border-radius: 10px; z-index: 40; background: var(--panel); border: 1px solid var(--line); color: var(--muted); backdrop-filter: none; }
+.app.bar-hidden button.icon.stage-btn.bar-show.edge-top:hover { color: var(--accent); background: var(--panel-2); }
+button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transform: none; } /* points down: where the bar comes back from */
