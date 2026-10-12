@@ -262,12 +262,12 @@ export class Highway {
   }
 
   // An offscreen canvas for one fretboard (its size in device pixels), reused between panes and frames.
-  layerFor(pw, ph, dpr) {
+  layerFor(pw, ph, dpr, name = 'layer') {
     const lw = Math.max(1, Math.round(pw * dpr));
     const lh = Math.max(1, Math.round(ph * dpr));
-    this.layer ??= document.createElement('canvas');
-    if (this.layer.width !== lw || this.layer.height !== lh) { this.layer.width = lw; this.layer.height = lh; }
-    return this.layer;
+    this[name] ??= document.createElement('canvas');
+    if (this[name].width !== lw || this[name].height !== lh) { this[name].width = lw; this[name].height = lh; }
+    return this[name];
   }
 
   // Colour stops for an edge fade: while a fretboard is drawn on its own layer the fade erases (alpha), otherwise it paints the stage colour.
@@ -628,6 +628,17 @@ export class Highway {
     let hovered = null; // the row under the resting pointer, if any
     let seenFrom = Infinity;
     let seenTo = -Infinity; // the time range of the lines on screen, for the rail
+    // With a visualizer behind, the rows go on their own layer and the edge fades erase them (below), so only the words fade out.
+    let rowLayer = null;
+    if (this.visualizer) {
+      const dpr = this.canvas.width / (this.canvas.clientWidth || 1);
+      rowLayer = this.layerFor(w, h, dpr, 'rowLayer');
+      const lg = rowLayer.getContext('2d');
+      lg.setTransform(1, 0, 0, 1, 0, 0);
+      lg.clearRect(0, 0, rowLayer.width, rowLayer.height);
+      lg.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.g = lg;
+    }
     const from = Math.max(0, Math.floor(state.pos) - 1 - Math.ceil(peekPx / step));
     for (let r = from; r < rows.length; r++) {
       const y = top + (r - state.pos) * step;
@@ -660,16 +671,24 @@ export class Highway {
       const u = Math.pow(pos, 0.7); // spreads the fade over the whole band: the text is covered at the very edge and fully back where the band ends
       ramp.push([pos, 1 - u * u * u * (u * (u * 6 - 15) + 10)]);
     }
-    const fadeIn = g.createLinearGradient(0, 0, 0, fade);
-    const fadeOut = g.createLinearGradient(0, h, 0, h - fade);
+    const eg = rowLayer ? this.g : g; // the layer (to erase) or the stage (to paint over)
+    const fadeIn = eg.createLinearGradient(0, 0, 0, fade);
+    const fadeOut = eg.createLinearGradient(0, h, 0, h - fade);
     for (const [pos, alpha] of ramp) {
-      fadeIn.addColorStop(pos, `rgba(${this.bgRgb},${alpha})`);
-      fadeOut.addColorStop(pos, `rgba(${this.bgRgb},${alpha})`);
+      const c = rowLayer ? `rgba(0,0,0,${alpha})` : `rgba(${this.bgRgb},${alpha})`;
+      fadeIn.addColorStop(pos, c);
+      fadeOut.addColorStop(pos, c);
     }
-    g.fillStyle = fadeIn;
-    g.fillRect(0, 0, w, fade);
-    g.fillStyle = fadeOut;
-    g.fillRect(0, h - fade, w, fade);
+    if (rowLayer) eg.globalCompositeOperation = 'destination-out';
+    eg.fillStyle = fadeIn;
+    eg.fillRect(0, 0, w, fade);
+    eg.fillStyle = fadeOut;
+    eg.fillRect(0, h - fade, w, fade);
+    if (rowLayer) {
+      eg.globalCompositeOperation = 'source-over';
+      this.g = g;
+      g.drawImage(rowLayer, 0, 0, rowLayer.width, rowLayer.height, 0, 0, w, h);
+    }
     // The jump button: it slides and fades in when the pointer has rested on a row, and out when it leaves.
     const jump = (this.jump ??= { k: 0, target: 0, spec: null, at: 0 });
     const sheetKey = `${x0},${y0}`;
