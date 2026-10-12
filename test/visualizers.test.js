@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   extractPalette, fallbackPalette, beatInfo, beatIndexAt, densityHistogram, densityAt, travelAt, spanAmount,
-  buildEvents, spectrumAt, hitLevel, vocalLevel, pulseAfter, hash01, buildSongData, VISUALIZERS, clothAt, radialLayout, beamAngle, sectionValue,
+  buildEvents, waveField, spectrumAt, hitLevel, vocalLevel, pulseAfter, hash01, buildSongData, VISUALIZERS, clothAt, radialLayout, beamAngle, sectionValue,
 } from '../src/visualizers.js';
 
 const px = (list) => Uint8ClampedArray.from(list.flatMap(([r, g, b, a = 255]) => [r, g, b, a]));
@@ -173,4 +173,17 @@ test('the registry has the new effects with a swatch and a hint', () => {
     const v = VISUALIZERS.find((x) => x.id === id);
     assert.ok(v && v.create && v.swatch && v.hint && v.label);
   }
+});
+
+test('waveField is bounded, smooth and a pure function of the beat position and the time', () => {
+  for (const axis of [0, 1]) {
+    for (let u = 0; u <= 1; u += 0.05) {
+      const a = waveField(u, axis, 12.5, 40);
+      assert.ok(Math.abs(a.d) <= 1 && Math.abs(a.slope) <= 1);
+      const b = waveField(u + 0.001, axis, 12.5, 40);
+      assert.ok(Math.abs(a.d - b.d) < 0.02, 'continuous in u');
+      assert.deepEqual(waveField(u, axis, 12.5, 40), a); // same inputs: the same answer (frozen when paused)
+    }
+  }
+  assert.notEqual(waveField(0.3, 0, 1, 10).d, waveField(0.3, 0, 2, 10).d); // it moves with the music
 });

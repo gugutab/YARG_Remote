@@ -428,10 +428,27 @@ function glowSprite(c) {
 // The cover as a flag in a soft breeze: drawn in vertical strips that rise and fall on two travelling waves (clothAt), with the
 // slope of the wave shading the strips lighter or darker, so it reads as fabric while the picture stays recognisable.
 const CLOTH_STRIPS = 48;
+// Organic displacement of the cover: a sum of three travelling waves with unrelated frequencies and slow time terms, so it never
+// repeats in an obvious loop. axis 0 gives the vertical shift of a column at u, axis 1 the horizontal shift of a row at u.
+// d is -1..1, slope -1..1. A pure function of the beat position and the song time, so it freezes when the music is paused.
+export function waveField(u, axis, pos, t, out = {}) {
+  const k = axis === 0 ? [5.3, 11.7, 2.3, 0.55, 0.9, 0.021, 0.034, 0.017] : [4.1, 9.3, 1.7, 0.7, 0.6, 0.027, 0.019, 0.023];
+  const p1 = u * k[0] + pos * k[3] + t * k[5];
+  const p2 = u * k[1] - pos * k[4] + t * k[6] + 1.3 + axis;
+  const p3 = u * k[2] + t * k[7] + 2.1 - axis;
+  const norm = 0.5 + 0.3 + 0.4;
+  out.d = (0.5 * Math.sin(p1) + 0.3 * Math.sin(p2) + 0.4 * Math.sin(p3)) / norm;
+  out.slope = (0.5 * Math.cos(p1) * k[0] + 0.3 * Math.cos(p2) * k[1] + 0.4 * Math.cos(p3) * k[2]) / (0.5 * k[0] + 0.3 * k[1] + 0.4 * k[2]);
+  return out;
+}
+
+const COVER_COLS = 48;
+const COVER_K = 1.1; // each pass magnifies a little, so the shifted picture never shows a gap at its edges
 const coverViz = (ctx) => {
   const fallback = memo();
-  const c = { dy: new Float32Array(CLOTH_STRIPS + 1), slope: new Float32Array(CLOTH_STRIPS + 1), sy: new Float32Array(CLOTH_STRIPS + 1), rx: new Float32Array(CLOTH_STRIPS + 1) };
-  const edge = {};
+  let passA = null;
+  let passB = null;
+  const f = {};
   return {
     draw(g, s) {
       const { w, h } = s;
@@ -447,39 +464,43 @@ const coverViz = (ctx) => {
         g.fillRect(0, 0, w, h);
         return;
       }
-      const size = Math.max(w, h) * 1.08;
-      const zoom = 1.02 + 0.03 * Math.sin(s.t * 0.06);
-      const amp = (h * 0.02 * (0.85 + 0.3 * s.density)) / zoom; // 1.7-2.3% of the height
-      const rip = size * 0.003;
-      for (let i = 0; i <= CLOTH_STRIPS; i++) {
-        clothAt(i / CLOTH_STRIPS, s.beat.pos, s.t, edge);
-        c.dy[i] = edge.dy; c.slope[i] = edge.slope; c.sy[i] = edge.sy; c.rx[i] = edge.rx;
+      const N = Math.min(512, cv.width);
+      passA ??= makeCanvas(N, N);
+      passB ??= makeCanvas(N, N);
+      if (passA.width !== N) { passA.width = passA.height = passB.width = passB.height = N; }
+      const gaA = passA.getContext('2d');
+      const gaB = passB.getContext('2d');
+      const maxShift = ((COVER_K - 1) / 2) * N * 0.9;
+      const amp = maxShift * (0.75 + 0.25 * s.density);
+      const cell = N / COVER_COLS;
+      // pass 1: the columns move up and down; pass 2: the rows move left and right (the whole picture is deformed, not a single band)
+      gaA.clearRect(0, 0, N, N);
+      for (let i = 0; i < COVER_COLS; i++) {
+        waveField((i + 0.5) / COVER_COLS, 0, s.beat.pos, s.t, f);
+        gaA.drawImage(cv, i * (cv.width / COVER_COLS), 0, cv.width / COVER_COLS + 0.5, cv.height, i * cell, f.d * amp - ((COVER_K - 1) / 2) * N, cell + 1, COVER_K * N);
       }
+      gaB.clearRect(0, 0, N, N);
+      const rowH = N / COVER_COLS;
+      for (let j = 0; j < COVER_COLS; j++) {
+        waveField((j + 0.5) / COVER_COLS, 1, s.beat.pos, s.t, f);
+        gaB.drawImage(passA, 0, j * rowH, N, rowH + 0.5, f.d * amp - ((COVER_K - 1) / 2) * N, j * rowH, COVER_K * N, rowH + 1);
+      }
+      const size = Math.max(w, h) * 1.1;
+      const zoom = 1.04 + 0.03 * Math.sin(s.t * 0.041) + 0.015 * Math.sin(s.t * 0.07 + 1);
+      const panX = w * (0.03 * Math.sin(s.t * 0.031 + 0.4) + 0.02 * Math.sin(s.t * 0.053 + 2));
+      const panY = h * (0.03 * Math.sin(s.t * 0.037 + 1.1) + 0.02 * Math.sin(s.t * 0.061 + 0.3));
       g.save();
       g.imageSmoothingEnabled = true;
       g.imageSmoothingQuality = 'high';
-      g.translate(w / 2 + Math.sin(s.t * 0.05 + s.clock * 0.07) * w * 0.05, h / 2 + Math.cos(s.t * 0.043 + s.clock * 0.05) * h * 0.05);
+      g.translate(w / 2 + panX, h / 2 + panY);
       g.scale(zoom, zoom);
-      const x0 = -size / 2;
-      const y0 = -size / 2;
-      const overlap = 1 / zoom; // one screen pixel, so no seam shows between two strips
-      const srcW = cv.width / CLOTH_STRIPS;
-      const xs = (i) => x0 + (i / CLOTH_STRIPS) * size + c.rx[i] * rip;
-      for (let i = 0; i < CLOTH_STRIPS; i++) {
-        const xa = xs(i);
-        const dw = xs(i + 1) - xa + overlap;
-        const sy = (c.sy[i] + c.sy[i + 1]) / 2;
-        const hh = size * sy;
-        const dy = (c.dy[i] + c.dy[i + 1]) / 2;
-        const sx = i * srcW;
-        const sw = Math.min(srcW + (overlap * srcW) / Math.max(1, dw - overlap), cv.width - sx);
-        g.drawImage(cv, sx, 0, sw, cv.height, xa, y0 + dy * amp - (hh - size) / 2, dw, hh);
-      }
-      for (let i = 0; i < CLOTH_STRIPS; i++) { // light on the slopes that face up, shade on the others
-        const sl = (c.slope[i] + c.slope[i + 1]) / 2;
-        const xa = xs(i);
-        g.fillStyle = sl > 0 ? `rgba(255,255,255,${(sl * 0.16).toFixed(3)})` : `rgba(0,0,0,${(-sl * 0.2).toFixed(3)})`;
-        g.fillRect(xa, y0 - amp, xs(i + 1) - xa + overlap, size + amp * 2);
+      g.drawImage(passB, -size / 2, -size / 2, size, size);
+      // fabric light and shade from the slope of the vertical wave, across the whole height
+      const strips = 36;
+      for (let i = 0; i < strips; i++) {
+        waveField((i + 0.5) / strips, 0, s.beat.pos, s.t, f);
+        g.fillStyle = f.slope > 0 ? `rgba(255,255,255,${(f.slope * 0.1).toFixed(3)})` : `rgba(0,0,0,${(-f.slope * 0.13).toFixed(3)})`;
+        g.fillRect(-size / 2 + (i / strips) * size, -size / 2, size / strips + 1, size);
       }
       g.restore();
     },

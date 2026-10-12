@@ -265,3 +265,4 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - 3D fretboard overlays (star power, solos, fills, rolls) are no longer cut at the hit line: the band runs down to the end of the board (`ROAD_NEAR`).
 - Neck speed also works on the vocal chart, and the vocal speed is fixed in pixels: `VOCAL_PX_PER_SEC` (340 px/s, a 1000 px window shows 2.5 s) times `neck / global neck`; a wider window shows more music ahead, a narrower one less.
 - The instrument tags show only the icon and the arrow; the name (with the difficulty) is the tooltip and the aria-label.
+- Album art visualizer: the movement is a pure function of the beat position and the song time (no wall clock), so it freezes when paused. The picture is deformed everywhere (`waveField`: columns shift vertically, then rows shift horizontally, two passes on 512 px offscreen canvases) with three unrelated waves per axis, plus an organic slow pan and zoom from sums of sines.
