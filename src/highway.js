@@ -1266,6 +1266,10 @@ export class Highway {
         prevRight = x + g.measureText(l.text).width;
         if (l.time < t - behind - 0.8) continue;
         const sungUntil = l.end > l.time ? l.end : list[i + 1]?.time ?? Infinity; // the paired note's end, else the next syllable
+        g.lineWidth = Math.max(3, size * 0.16); // a dark outline under the letters, so they read over any background
+        g.strokeStyle = 'rgba(0,0,0,0.85)';
+        g.lineJoin = 'round';
+        g.strokeText(l.text, x, y);
         g.fillStyle = l.time > t ? future : t < sungUntil ? present : past;
         g.fillText(l.text, x, y);
       }
