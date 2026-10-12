@@ -252,9 +252,9 @@ export class Highway {
   }
 
   // The track of the vocals (the chart and the lyrics): a semi-transparent base in the stage colour, so the words and notes read well
-  // over a visualizer. It is the same colour as the stage, so without a visualizer nothing changes.
+  // over a visualizer or any stage colour.
   trackBase(x, y, w, h, alpha = 0.72) {
-    if (!this.visualizer) return;
+    if (alpha <= 0) return;
     const g = this.g;
     g.fillStyle = `rgba(0,0,0,${alpha})`;
     g.fillRect(x, y, w, h);
