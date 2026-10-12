@@ -893,10 +893,11 @@ export class Highway {
     const secondSize = Math.max(15, Math.min(26, h * 0.08));
     const secondY = secondSize * 0.85 + 6;
     const top = second ? secondY + secondSize * 0.75 : h * 0.08; // pitch area: below the second lyric line, if any, to 76% of the canvas
-    const bottom = h * 0.76;
+    const fontSize = Math.max(18, Math.min(30, h * 0.095)); // lyric size, grows with the band
+    const lyricY = h - fontSize * 0.5 - 10; // the lyrics sit 10 px above the bottom edge
+    const bottom = lyricY - fontSize * 0.5 - 16; // and 16 px of air between them and the notes
     const yOfPitch = (p) => bottom - ((p - lo) / (hi - lo)) * (bottom - top);
     const mid = (top + bottom) / 2; // talkies (unpitched notes) sit in the middle of the pitch area
-    const lyricY = bottom + h * 0.055; // lyrics sit right under the note area
     const percussionY = this.vocalCenterY(chart, h); // percussion hits sit in the vertical middle of the chart
     const xOf = (time) => hitX + (time - t) * pxPerSec;
     const ahead = BASE_LOOKAHEAD_SEC + ENTRY_MARGIN_SEC;
@@ -976,7 +977,6 @@ export class Highway {
     }
 
     // lyrics under the notes, each at its start time
-    const fontSize = Math.max(18, Math.min(30, h * 0.095)); // grows with the band
     g.textAlign = 'left';
     g.textBaseline = 'middle';
     // One row of syllables. Colours as in YARG's static lyrics (VocalStaticLyricPhraseElement): past grey, present teal,
