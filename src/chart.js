@@ -385,7 +385,7 @@ function commonParts(midi, track, toSec, settings = chartSettings({}, midi.divis
   const eventsTrack = midi.tracks.find((t) => t.name.toUpperCase() === 'EVENTS');
   const sections = eventsTrack
     ? eventsTrack.texts
-      .map((t) => ({ time: toSec(t.tick), name: parseSectionName(t.text) }))
+      .map((t) => { const raw = parseSectionName(t.text); return { time: toSec(t.tick), name: raw === null ? null : prettySectionName(raw), raw }; }) // `raw` is the name as written in the file
       .filter((s) => s.name !== null)
       .sort((a, b) => a.time - b.time)
     : [];
@@ -525,6 +525,27 @@ export function parseSectionName(raw) {
   else return null;
   const name = rest.replace(/^_+/, '').trim();
   return name || null;
+}
+
+// Section names written the Rock Band way are internal keys (chorus_1, gtr_solo_a, big_rock_ending, _endofsong); the ones
+// charters typed by hand ("Verse 1", "Guitar Solo") are already readable and are left as they are. YARG.Core shows the name
+// as it is (TextEvents.TryParseSectionEvent only drops the prefix); this is only for display.
+const SECTION_WORDS = { gtr: 'Guitar', gtrs: 'Guitars', bs: 'Bass', drm: 'Drums', drms: 'Drums', kbd: 'Keys', kbds: 'Keys', kb: 'Keys', keys: 'Keys', vox: 'Vocals', voc: 'Vocals', vocs: 'Vocals', inst: 'Instrumental', mel: 'Melody', bre: 'Big Rock Ending', endofsong: 'End of Song', endofsong1: 'End of Song' };
+const SECTION_SMALL = new Set(['of', 'the', 'and', 'to', 'in', 'on', 'at', 'for']);
+export function prettySectionName(name) {
+  const raw = String(name).trim();
+  if (!raw || /[A-Z]/.test(raw)) return raw; // already typed with capitals: left as written
+  const clean = raw.replace(/^_+/, '').replace(/^practice_/, '');
+  if (!clean) return raw;
+  const words = clean.split(/[_\s]+/).filter(Boolean).map((w) => {
+    if (SECTION_WORDS[w]) return SECTION_WORDS[w];
+    const pre = /^(pre|post)(chorus|verse|bridge|solo|riff|intro)$/.exec(w); // prechorus -> Pre-Chorus
+    if (pre) return `${pre[1][0].toUpperCase()}${pre[1].slice(1)}-${pre[2][0].toUpperCase()}${pre[2].slice(1)}`;
+    if (/^\d+[a-z]?$/.test(w)) return w.toUpperCase(); // 1, 2a -> 2A
+    if (/^[a-z]$/.test(w)) return w.toUpperCase(); // a, b -> A, B
+    return w.replace(/(^|-)([a-z])/g, (m, a, b) => a + b.toUpperCase()); // pre-chorus -> Pre-Chorus
+  });
+  return words.map((w, i) => (i > 0 && SECTION_SMALL.has(w.toLowerCase()) ? w.toLowerCase() : w)).join(' ');
 }
 
 // Index of the section playing at chart time t: the last section that has started, or the first one
