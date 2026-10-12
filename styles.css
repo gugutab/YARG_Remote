@@ -1107,8 +1107,8 @@ button.icon.close-song-info { position: absolute; top: 10px; right: 14px; z-inde
 
 /* ---------- instrument tags over the charts, and their menu ---------- */
 .pane-tags { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
-.pane-tag { position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px 0 8px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, .14); background: rgba(13, 17, 23, .62); color: #e6edf3; font: 600 12px/1 var(--font, system-ui); cursor: pointer; pointer-events: auto; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); white-space: nowrap; }
-.pane-tag:hover, .pane-tag[aria-expanded="true"] { background: rgba(13, 17, 23, .9); border-color: var(--accent); }
+.pane-tag { position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px 0 8px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, .14); background: rgba(13, 17, 23, .3); color: #e6edf3; font: 600 12px/1 var(--font, system-ui); cursor: pointer; pointer-events: auto; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); white-space: nowrap; }
+.pane-tag:hover, .pane-tag[aria-expanded="true"] { background: rgba(13, 17, 23, .55); border-color: var(--accent); }
 .pane-tag svg { width: 16px; height: 16px; flex: none; fill: currentColor; }
 .pane-tag .chev { width: 6px; height: 6px; margin: -3px 0 0 2px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor; transform: rotate(45deg); opacity: .75; flex: none; }
 .pane-tag[aria-expanded="true"] .chev { transform: rotate(-135deg); margin-top: 3px; }
