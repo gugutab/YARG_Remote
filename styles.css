@@ -76,7 +76,8 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
   min-height: 0;
 }
 .app.lib-closed .library { margin-left: calc(var(--lib-w) * -1); }
-.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.main { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--stage, #0d1117); }
+.bg-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 0; }
 .scrim { display: none; }
 .only-narrow { display: none !important; }
 
@@ -143,7 +144,7 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 .mix-row input { min-width: 0; accent-color: var(--accent); }
 
 /* ---------- Stage ---------- */
-.stage { position: relative; flex: 1; min-height: 0; background: var(--stage, #0d1117); }
+.stage { position: relative; flex: 1; min-height: 0; background: transparent; }
 #highway { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .loading {
   position: absolute;
@@ -1257,3 +1258,6 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 /* The instrument tag shows only the icon and the arrow (the name is its tooltip and accessible label) */
 .pane-tag span { display: none; }
 .pane-tag { gap: 5px; padding: 0 8px; }
+
+/* The top bar is a glass window over the background of the fretboards (the visualizer shows through) */
+.topbar { background: color-mix(in srgb, var(--panel) 62%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(10px); border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }

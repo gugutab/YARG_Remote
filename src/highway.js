@@ -89,6 +89,7 @@ export class Highway {
   setBackground(hex) {
     const n = parseInt(hex.slice(1), 16);
     this.bg = hex;
+    if (this.bgCanvas?.parentElement) this.bgCanvas.parentElement.style.background = hex;
     this.bgRgb = `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
   }
 
@@ -171,7 +172,28 @@ export class Highway {
 
   render(t) {
     const { w, h } = this.resize();
+    this.drawBackground(t);
     this.draw(t, w, h);
+  }
+
+  // The page's background canvas (behind the top bar and the fretboards, the full width and height of the main area): it holds the
+  // visualizer, and the stage colour is the CSS background of its parent. The fretboard canvas itself is transparent.
+  setBackgroundCanvas(canvas) {
+    this.bgCanvas = canvas;
+    if (canvas?.parentElement) canvas.parentElement.style.background = this.bg;
+  }
+
+  drawBackground(t) {
+    const c = this.bgCanvas;
+    if (!c) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = c.clientWidth;
+    const h = c.clientHeight;
+    if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+    const vg = c.getContext('2d');
+    vg.setTransform(dpr, 0, 0, dpr, 0, 0);
+    vg.clearRect(0, 0, w, h);
+    if (this.visualizer && this.panes.length) this.visualizer(vg, w, h, t, this.bgRgb);
   }
 
   // Motion blur: the chart drawn at several moments of the time that passes during one frame and averaged, so notes that rush
@@ -186,7 +208,13 @@ export class Highway {
     const side = this.blurCanvas.getContext('2d');
     const dpr = cw / w;
     try {
-      if (this.visualizer && this.panes.length) { // the background is drawn once and reused by every sample
+      if (this.bgCanvas) { // the page background is drawn once; the samples only hold the fretboards (transparent)
+        this.drawBackground(times[times.length - 1]);
+        main.save();
+        main.setTransform(1, 0, 0, 1, 0, 0);
+        main.clearRect(0, 0, cw, ch);
+        main.restore();
+      } else if (this.visualizer && this.panes.length) { // the background is drawn once and reused by every sample
         this.vizCanvas ??= document.createElement('canvas');
         if (this.vizCanvas.width !== cw || this.vizCanvas.height !== ch) { this.vizCanvas.width = cw; this.vizCanvas.height = ch; }
         const vg = this.vizCanvas.getContext('2d');
@@ -214,9 +242,9 @@ export class Highway {
 
   draw(t, w, h) {
     const g = this.g;
-    g.fillStyle = this.bg;
-    g.fillRect(0, 0, w, h);
-    if (this.visualizer && this.panes.length) {
+    if (this.bgCanvas) g.clearRect(0, 0, w, h); // (transparent: the background canvas and the stage colour show through)
+    else { g.fillStyle = this.bg; g.fillRect(0, 0, w, h); }
+    if (!this.bgCanvas && this.visualizer && this.panes.length) {
       if (this.vizFrame) g.drawImage(this.vizFrame, 0, 0, w, h); // motion blur: drawn once for all the samples (renderBlur)
       else this.visualizer(g, w, h, t, this.bgRgb);
     }

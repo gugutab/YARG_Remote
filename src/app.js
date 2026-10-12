@@ -38,6 +38,7 @@ const els = Object.fromEntries([
 for (const img of [els.cover, els.infoCover, els.infoPopCover]) img.addEventListener('error', () => { img.hidden = true; });
 const player = new MultiTrackPlayer();
 const highway = new Highway(els.highway);
+highway.setBackgroundCanvas(document.getElementById('bgCanvas'));
 const perf = new PerfMeter();
 const perfOverlay = createPerfOverlay({
   stage: document.getElementById('stage'), meter: perf, onCycle: () => cyclePerfOverlay(),
