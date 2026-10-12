@@ -537,8 +537,9 @@ export class Highway {
     const hitX = w * 0.15;
     const pxPerSec = (w * 0.85) / BASE_LOOKAHEAD_SEC;
     const [lo, hi] = this.vocalRange(t, BASE_LOOKAHEAD_SEC + 1.5);
-    const top = h * 0.08; // pitch area: top 8% to 76% of the canvas
-    const bottom = h * 0.76;
+    const second = (chart.lyrics2 || []).length > 0; // harmony charts: the other voices' own words get a second line
+    const top = h * 0.08; // pitch area: top 8% to 76% of the canvas (66% when there is a second lyric line)
+    const bottom = h * (second ? 0.66 : 0.76);
     const yOfPitch = (p) => bottom - ((p - lo) / (hi - lo)) * (bottom - top);
     const mid = (top + bottom) / 2; // talkies (unpitched notes) sit in the middle of the pitch area
     const lyricY = bottom + h * 0.055; // lyrics sit right under the note area
@@ -600,23 +601,27 @@ export class Highway {
 
     // lyrics under the notes, each at its start time
     const fontSize = Math.max(18, Math.min(30, h * 0.095)); // grows with the band
-    g.font = `600 ${fontSize}px system-ui`;
     g.textAlign = 'left';
     g.textBaseline = 'middle';
-    // colours as in YARG's static lyrics (VocalStaticLyricPhraseElement): past grey, present teal, future white
-    const lyrics = chart.lyrics;
-    let prevRight = -Infinity;
-    for (let i = 0; i < lyrics.length; i++) {
-      const l = lyrics[i];
-      if (l.time < t - behind - 3) continue; // (a few syllables before the window still push the next ones along)
-      if (l.time > t + ahead) break;
-      const x = Math.max(xOf(l.time), prevRight + 5); // a syllable never overlaps the one before it
-      prevRight = x + g.measureText(l.text).width;
-      if (l.time < t - behind - 0.8) continue;
-      const sungUntil = l.end > l.time ? l.end : lyrics[i + 1]?.time ?? Infinity; // the paired note's end, else the next syllable
-      g.fillStyle = l.time > t ? '#ffffff' : t < sungUntil ? '#13f0a6' : '#595959';
-      g.fillText(l.text, x, lyricY);
-    }
+    // One row of syllables. Colours as in YARG's static lyrics (VocalStaticLyricPhraseElement): past grey, present teal,
+    // future white. A syllable never overlaps the one before it.
+    const lyricRow = (list, y, size, [future, present, past]) => {
+      g.font = `600 ${size}px system-ui`;
+      let prevRight = -Infinity;
+      for (let i = 0; i < list.length; i++) {
+        const l = list[i];
+        if (l.time < t - behind - 3) continue; // (a few syllables before the window still push the next ones along)
+        if (l.time > t + ahead) break;
+        const x = Math.max(xOf(l.time), prevRight + 5);
+        prevRight = x + g.measureText(l.text).width;
+        if (l.time < t - behind - 0.8) continue;
+        const sungUntil = l.end > l.time ? l.end : list[i + 1]?.time ?? Infinity; // the paired note's end, else the next syllable
+        g.fillStyle = l.time > t ? future : t < sungUntil ? present : past;
+        g.fillText(l.text, x, y);
+      }
+    };
+    lyricRow(second && chart.lyrics1?.length ? chart.lyrics1 : chart.lyrics, lyricY, fontSize, ['#ffffff', '#13f0a6', '#595959']); // with a second line, the first one is the lead's own words
+    if (second) lyricRow(chart.lyrics2, lyricY + fontSize * 1.05, fontSize * 0.85, ['#9fe3d0', '#2fd9c4', '#4b6b66']);
     g.textBaseline = 'alphabetic';
   }
 

@@ -272,7 +272,8 @@ function rangeShifts(track, events, notes, toSec) {
 
 // midi: parsed file; track: the lead track (PART VOCALS, or HARM1 for harmonies); harmonyParts: [{ part, track }] when
 // building the harmony instrument; timed(note) -> { time, end, length }.
-// Returns { notes, harmonies, percussion, lyrics, phrases, rangeShifts }.
+// Returns { notes, harmonies, percussion, lyrics, lyrics1, lyrics2, phrases, rangeShifts }: `lyrics` are the merged static lyrics (karaoke),
+// `lyrics1` the lead voice's own words and `lyrics2` the other voices' own words (harmony charts; null / [] otherwise).
 //   notes/harmonies[].notes: { time, end, length, pitch, slide, talkie } (slide: continues the previous note; talkie: unpitched)
 //   lyrics: { time, end, text, join } with `end` from the paired note; phrases: { start, end, from, to } (lyrics[from..to)),
 //   the display lines of YARG's static lyrics; rangeShifts: { time, length, min, max }.
@@ -332,6 +333,25 @@ export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
     for (const l of raw) lyrics.push({ time: l.time, end: l.end, text: l.text, join: l.join });
   }
 
+  // The other voices' own words (HARM2/HARM3), for a second lyric line: the visible lyrics of those parts that the lead
+  // does not sing at the same moment with the same text.
+  const lyrics2 = [];
+  let lyrics1 = null; // the lead voice's own words (the merged `lyrics` hold every voice's, as YARG's static lyrics do)
+  if (harmony) {
+    const lead = walked1.flatMap((p) => p.lyrics);
+    lyrics1 = lead.filter((l) => !l.hidden && l.text).map((l) => ({ time: l.time, end: l.end, text: l.text, join: l.join }));
+    const sameAs = (list, l) => list.some((o) => o.text === l.text && Math.abs(o.time - l.time) < 0.2);
+    for (const e of walkedExtra) {
+      for (const p of e.walked) {
+        for (const l of p.lyrics) {
+          if (l.hidden || !l.text || sameAs(lead, l) || sameAs(lyrics2, l)) continue;
+          lyrics2.push({ time: l.time, end: l.end, text: l.text, join: l.join, part: e.part });
+        }
+      }
+    }
+    lyrics2.sort((x, y) => x.time - y.time);
+  }
+
   const shape = (wrapped) => wrapped.filter((n) => !n.perc).map((n) => ({ ...timed(n), pitch: n.pitch, slide: n.slide, talkie: n.talkie }));
   const pitched = [notes1, ...walkedExtra.map((e) => e.notes)].flat().filter((n) => !n.perc && !n.talkie);
   const anyPhrases = walked1.length > 0 || walkedExtra.some((e) => e.walked.length > 0);
@@ -340,6 +360,8 @@ export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
     harmonies: walkedExtra.map((e) => ({ part: e.part, notes: shape(e.notes) })),
     percussion,
     lyrics,
+    lyrics1,
+    lyrics2,
     phrases,
     rangeShifts: anyPhrases ? rangeShifts(track, events, pitched, toSec) : [DUMMY_RANGE],
   };
