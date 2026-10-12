@@ -42,6 +42,7 @@ import { renderLanes3D } from './highway3d.js';
 import { buildKaraokeLines, karaokeAt, syllableProgress } from './karaoke.js';
 
 const RECT_WIDEN_2D = 1.18;
+const VOCAL_LEAD = '#5b8def'; // lead vocal notes
 
 export class Highway {
   constructor(canvas) {
@@ -540,7 +541,7 @@ export class Highway {
     const bottom = h * 0.76;
     const yOfPitch = (p) => bottom - ((p - lo) / (hi - lo)) * (bottom - top);
     const mid = (top + bottom) / 2; // talkies (unpitched notes) sit in the middle of the pitch area
-    const lyricY = bottom + h * 0.04; // lyrics sit right under the note area
+    const lyricY = bottom + h * 0.055; // lyrics sit right under the note area
     const percussionY = h * 0.92;
     const xOf = (time) => hitX + (time - t) * pxPerSec;
     const ahead = BASE_LOOKAHEAD_SEC + ENTRY_MARGIN_SEC;
@@ -561,34 +562,60 @@ export class Highway {
       const base = HARMONY_COLORS[harmony.part] || HARMONY_COLORS[1];
       this.vocalNotes(harmony.notes, t, ahead, behind, xOf, yOfPitch, mid, 4, [tintWhite(base, 0.7), base], hitX); // the part past the hit line is lit, like the lead's
     }
-    this.vocalNotes(chart.notes, t, ahead, behind, xOf, yOfPitch, mid, 6, ['#f5c518', '#5b8def'], hitX);
+    this.vocalNotes(chart.notes, t, ahead, behind, xOf, yOfPitch, mid, 6, [tintWhite(VOCAL_LEAD, 0.6), VOCAL_LEAD], hitX); // lit: a lighter shade of the note's own colour
 
-    // percussion: a diamond per hit, white when played, grey when not
+    // percussion: a drum-head marker per hit on its own row. Played hits are solid, the ones that are not played are hollow;
+    // a hit flashes when it crosses the line and then dims as it scrolls off.
     for (const p of chart.percussion || []) {
       if (p.time < t - behind || p.time > t + ahead) continue;
       const x = xOf(p.time);
+      const past = t - p.time;
+      const r = Math.max(7, Math.min(11, h * 0.04));
+      g.save();
+      g.globalAlpha = past > 0.25 ? 0.4 : 1;
+      if (past > 0 && past < 0.25) { // the flash: a ring that grows and fades
+        g.beginPath();
+        g.arc(x, percussionY, r * (1 + (past / 0.25) * 1.1), 0, Math.PI * 2);
+        g.lineWidth = 2;
+        g.strokeStyle = `rgba(230,237,243,${1 - past / 0.25})`;
+        g.stroke();
+      }
       g.beginPath();
-      g.moveTo(x, percussionY - 7);
-      g.lineTo(x + 6, percussionY);
-      g.lineTo(x, percussionY + 7);
-      g.lineTo(x - 6, percussionY);
-      g.closePath();
-      g.fillStyle = p.played ? '#e6edf3' : '#6e7681';
-      g.fill();
+      g.arc(x, percussionY, r, 0, Math.PI * 2);
+      if (p.played) {
+        g.fillStyle = '#e6edf3';
+        g.fill();
+        g.beginPath();
+        g.arc(x, percussionY, r * 0.5, 0, Math.PI * 2);
+        g.lineWidth = 2;
+        g.strokeStyle = 'rgba(13,17,23,0.55)';
+        g.stroke();
+      } else {
+        g.lineWidth = 2;
+        g.strokeStyle = '#6e7681';
+        g.stroke();
+      }
+      g.restore();
     }
 
     // lyrics under the notes, each at its start time
-    g.font = '18px system-ui';
+    const fontSize = Math.max(18, Math.min(30, h * 0.095)); // grows with the band
+    g.font = `600 ${fontSize}px system-ui`;
     g.textAlign = 'left';
     g.textBaseline = 'middle';
     // colours as in YARG's static lyrics (VocalStaticLyricPhraseElement): past grey, present teal, future white
     const lyrics = chart.lyrics;
+    let prevRight = -Infinity;
     for (let i = 0; i < lyrics.length; i++) {
       const l = lyrics[i];
-      if (l.time < t - behind - 0.8 || l.time > t + ahead) continue;
+      if (l.time < t - behind - 3) continue; // (a few syllables before the window still push the next ones along)
+      if (l.time > t + ahead) break;
+      const x = Math.max(xOf(l.time), prevRight + 5); // a syllable never overlaps the one before it
+      prevRight = x + g.measureText(l.text).width;
+      if (l.time < t - behind - 0.8) continue;
       const sungUntil = l.end > l.time ? l.end : lyrics[i + 1]?.time ?? Infinity; // the paired note's end, else the next syllable
       g.fillStyle = l.time > t ? '#ffffff' : t < sungUntil ? '#13f0a6' : '#595959';
-      g.fillText(l.text, xOf(l.time), lyricY);
+      g.fillText(l.text, x, lyricY);
     }
     g.textBaseline = 'alphabetic';
   }

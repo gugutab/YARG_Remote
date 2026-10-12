@@ -254,6 +254,10 @@
         <button id="barShow" class="icon stage-btn bar-show" type="button" title="Show the top bar (B)" aria-label="Show the top bar" hidden><svg><use href="#i-chevron"/></svg></button>
         <button id="fretBtn" class="icon stage-btn fret-btn" type="button" title="Fretboard settings" aria-label="Fretboard settings" aria-expanded="false" hidden><svg><use href="#i-sliders"/></svg></button>
         <div class="popover fret-pop" id="fretPop" hidden>
+          <div class="fp-group" id="fpSpecialsGroup" hidden>
+            <span class="fp-label">Special notes</span>
+            <div id="fpSpecials" class="specials compact"></div>
+          </div>
           <div class="fp-group" data-needs="vocals">
             <span class="fp-label">Vocals</span>
             <div class="seg fret-seg" id="vocalChoice" role="group" aria-label="Vocal view">
@@ -306,6 +310,11 @@
                   <input id="npSeek" type="range" min="0" max="1" step="0.01" value="0" aria-label="Position" disabled>
                   <span id="npTime" class="listen-time">0:00 / 0:00</span>
                 </div>
+              </div>
+
+              <div class="info-card info-wide card-specials" id="specialCard" hidden>
+                <h3>Special notes</h3>
+                <div id="specialList" class="specials"></div>
               </div>
 
               <div class="info-card info-wide">

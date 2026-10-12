@@ -1091,3 +1091,14 @@ button.icon.close-song-info { position: absolute; top: 10px; right: 14px; z-inde
 
 .listen-preview { flex: none; padding: 6px 12px; font-size: 12px; }
 .listen-preview[hidden] { display: none; }
+
+/* special notes: a list of kinds with counts and previous / next buttons */
+#info[data-hide~="specials"] .card-specials { display: none; }
+.specials { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 14px; }
+.specials.compact { grid-template-columns: 1fr; gap: 2px; }
+.spc-row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 3px 0; }
+.spc-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; box-shadow: 0 0 0 1px rgba(255, 255, 255, .25); }
+.spc-name { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spc-count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; }
+.spc-row .icon svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; width: 14px; height: 14px; }
+.fret-pop .spc-name { font-size: 12.5px; }
