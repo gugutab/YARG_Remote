@@ -532,9 +532,9 @@ export class Highway {
     }
     this.drawSheetRail(t, w, h, ctx, rows, lines, seenFrom, seenTo);
     if (state.following === false) { // back to following the singer
-      const label = 'Back to autoscroll';
+      const label = 'Autoscroll';
       g.font = '600 13px system-ui';
-      const bw = g.measureText(label).width + 36;
+      const bw = g.measureText(label).width + 28;
       const bh = 30;
       const bx = (w - bw) / 2;
       const by = h - bh - 14;
@@ -547,10 +547,9 @@ export class Highway {
       g.strokeStyle = 'rgba(108,182,255,0.7)';
       g.stroke();
       g.fillStyle = '#cfe6ff';
-      g.textAlign = 'left';
+      g.textAlign = 'center';
       g.textBaseline = 'middle';
-      g.fillText('\u2193', bx + 12, by + bh / 2 + 1);
-      g.fillText(label, bx + 26, by + bh / 2 + 1);
+      g.fillText(label, bx + bw / 2, by + bh / 2 + 1);
       g.textBaseline = 'alphabetic';
       sheet.button = { x: x0 + bx, y: y0 + by, w: bw, h: bh };
     }
@@ -614,7 +613,7 @@ export class Highway {
     st.hold = Math.max(0, Math.min((st.rows?.length ?? 1) - 1, st.hold + lines));
   }
 
-  // The sheet whose "Back to autoscroll" button is under the canvas point (x, y), or null.
+  // The sheet whose "Autoscroll" button is under the canvas point (x, y), or null.
   sheetButtonAt(x, y) {
     return this.sheets.find((sh) => sh.button && x >= sh.button.x && x <= sh.button.x + sh.button.w && y >= sh.button.y && y <= sh.button.y + sh.button.h) ?? null;
   }
