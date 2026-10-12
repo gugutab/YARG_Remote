@@ -57,6 +57,7 @@ export function createPerfOverlay({ stage, meter, probes, onCycle }) {
       `frame  avg ${f1(s.avg)}  p95 ${f1(s.p95)}  max ${f1(s.max)} ms`,
       `draw   avg ${f1(s.drawAvg)}  max ${f1(s.drawMax)} ms`,
       `dropped ${s.dropped} / ${s.samples} frames   long tasks ${longTasks}`,
+      `music clock jitter  max ${s.clockMax.toFixed(1)} ms  rms ${s.clockRms.toFixed(1)} ms`,
       `canvas ${p.canvas}  dpr ${p.dpr}`,
       `panes ${p.panes}${p.notes != null ? `  notes ${p.notes}` : ''}`,
     ];

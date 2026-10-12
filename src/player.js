@@ -245,7 +245,23 @@ class WorkletPlayer {
   // The chart clock: the source position being heard right now. That is the position at audio time
   // `ctx.currentTime - outputLatency`, read from the worklet's recent reports (see clock.js).
   currentTime() {
-    if (!this.playing) return this.offset;
+    if (!this.playing) { this.smooth = null; return this.offset; }
+    const raw = this.rawTime();
+    if (this.scrub) { this.smooth = null; return raw; } // (during a scrub the clock is already the target)
+    // The audio clock only moves in steps (the worklet reports every ~12 ms, ctx.currentTime moves in audio blocks), which made the
+    // notes advance unevenly even at a high frame rate. So the time runs on the real clock between frames and is pulled gently
+    // towards the audio position (time constant 0.15 s); a bigger gap (a seek, a speed change) snaps.
+    const now = performance.now();
+    const sm = this.smooth;
+    if (!sm || Math.abs(raw - sm.t) > 0.1 || now < sm.at) { this.smooth = { t: raw, at: now }; return raw; }
+    const dt = (now - sm.at) / 1000;
+    let t = sm.t + dt * this.rate;
+    t += (raw - t) * (1 - Math.exp(-dt / 0.15));
+    this.smooth = { t, at: now };
+    return Math.min(this.duration, Math.max(0, t));
+  }
+
+  rawTime() {
     const heardAt = this.ctx.currentTime - this.outputLatency;
     if (this.scrub) { // the chart goes to the target at once (its own animation travels there); the sound catches up when the scrub ends
       if (heardAt < this.scrub.end) return this.scrub.to;
@@ -269,6 +285,7 @@ class WorkletPlayer {
   startAt(seconds) {
     const frame = Math.round(seconds * this.ctx.sampleRate);
     this.epoch++;
+    this.smooth = null;
     this.history = [{ time: this.ctx.currentTime, pos: seconds }]; // until the worklet reports for real
     this.node.port.postMessage({ type: 'seek', frame, epoch: this.epoch });
     this.node.port.postMessage({ type: 'play' });
@@ -291,6 +308,7 @@ class WorkletPlayer {
     const from = this.currentTime();
     const dur = Math.round((ms / 1000) * this.ctx.sampleRate);
     this.epoch++;
+    this.smooth = null;
     this.scrub = { to, end: this.ctx.currentTime + ms / 1000 };
     this.history = [{ time: this.scrub.end, pos: to }]; // until the worklet reports for real after the scrub
     this.offset = to;

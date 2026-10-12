@@ -11,6 +11,13 @@ export class PerfMeter {
     this.frames = []; // { at, dt, draw } inside the window
     this.ring = new Float32Array(history); // last frame times, oldest overwritten
     this.count = 0; // frames recorded in total
+    this.clockDevs = new Float32Array(history); // |song time step - real time step| per frame (ms): how steadily the music clock advances
+    this.clockCount = 0;
+  }
+
+  // How far the music clock's step between two frames was from the real time that passed (ms, signed).
+  clock(devMs) {
+    this.clockDevs[this.clockCount++ % this.size] = Math.abs(devMs);
   }
 
   // `at`: frame timestamp (ms); `draw`: ms spent in the highway render for this frame.
@@ -38,7 +45,12 @@ export class PerfMeter {
 
   stats() {
     const f = this.frames;
-    if (!f.length) return { fps: 0, avg: 0, p95: 0, max: 0, dropped: 0, drawAvg: 0, drawMax: 0, samples: 0 };
+    const nc = Math.min(this.clockCount, this.size);
+    let clockMax = 0;
+    let clockSq = 0;
+    for (let i = 0; i < nc; i++) { clockMax = Math.max(clockMax, this.clockDevs[i]); clockSq += this.clockDevs[i] ** 2; }
+    const clockRms = nc ? Math.sqrt(clockSq / nc) : 0;
+    if (!f.length) return { fps: 0, avg: 0, p95: 0, max: 0, dropped: 0, drawAvg: 0, drawMax: 0, samples: 0, clockMax, clockRms };
     const dts = f.map((x) => x.dt);
     const sorted = [...dts].sort((a, b) => a - b);
     const sum = dts.reduce((a, b) => a + b, 0);
@@ -54,8 +66,10 @@ export class PerfMeter {
       drawAvg: draws.reduce((a, b) => a + b, 0) / draws.length,
       drawMax: Math.max(...draws),
       samples: f.length,
+      clockMax,
+      clockRms,
     };
   }
 
-  reset() { this.last = null; this.frames = []; this.count = 0; }
+  reset() { this.last = null; this.frames = []; this.count = 0; this.clockCount = 0; }
 }
