@@ -769,7 +769,7 @@ export class Highway {
       if (p.time < t - behind || p.time > t + ahead) continue;
       const x = xOf(p.time);
       const past = t - p.time;
-      const r = Math.max(7, Math.min(11, h * 0.04));
+      const r = Math.max(14, Math.min(22, h * 0.08)); // percussion marker radius
       g.save();
       g.globalAlpha = past > 0.25 ? 0.4 : 1;
       if (past > 0 && past < 0.25) { // the flash: a ring that grows and fades
