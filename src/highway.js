@@ -614,13 +614,27 @@ export class Highway {
       }
     }
     const rail = this.drawSheetRail(t, w, h, ctx, rows, lines, seenFrom, seenTo);
-    if (state.following === false) { // back to following the singer: next to the song marker on the rail (bottom centre without a rail)
+    // The Autoscroll button (back to following the singer): next to the song marker on the rail, bottom centre without a rail.
+    // It slides in from the right and fades while the sheet is held, and goes back the same way.
+    const wantBtn = state.following === false ? 1 : 0;
+    const nowB = performance.now();
+    const dtB = Math.min(0.1, (nowB - (state.btnAt || nowB)) / 1000);
+    state.btnAt = nowB;
+    state.btnK = (state.btnK ?? 0) + (wantBtn - (state.btnK ?? 0)) * (1 - Math.exp(-dtB / 0.07));
+    if (!wantBtn && state.btnK < 0.02) state.btnK = 0;
+    if (state.btnK > 0) {
+      const k = state.btnK;
       const label = 'Autoscroll';
       g.font = '600 13px system-ui';
       const bw = g.measureText(label).width + 28;
       const bh = 30;
       const bx = rail ? rail.rx - 10 - bw : (w - bw) / 2;
       const by = rail ? Math.max(rail.y0, Math.min(rail.y1 - bh, rail.my - bh / 2)) : h - bh - 14;
+      g.save();
+      g.globalAlpha = k;
+      g.translate(bx + bw / 2 + (1 - k) * 10, by + bh / 2); // comes in from the right, growing
+      g.scale(0.82 + 0.18 * k, 0.82 + 0.18 * k);
+      g.translate(-(bx + bw / 2), -(by + bh / 2));
       g.fillStyle = 'rgba(30,40,55,0.92)';
       g.beginPath();
       if (g.roundRect) g.roundRect(bx, by, bw, bh, 15);
@@ -634,7 +648,8 @@ export class Highway {
       g.textBaseline = 'middle';
       g.fillText(label, bx + bw / 2, by + bh / 2 + 1);
       g.textBaseline = 'alphabetic';
-      sheet.button = { x: x0 + bx, y: y0 + by, w: bw, h: bh };
+      g.restore();
+      if (wantBtn && k > 0.5) sheet.button = { x: x0 + bx, y: y0 + by, w: bw, h: bh };
     }
   }
 
