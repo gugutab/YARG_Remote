@@ -73,7 +73,10 @@ export function renderLanes3D(hw, t, w, h) {
     }
   };
 
-  // road
+  // road: a neutral dark base first, as opaque as the setting says
+  g.fillStyle = `rgba(0,0,0,${hw.trackOpacity})`;
+  quad(ROAD_NEAR, ROAD_END, -half, half);
+  g.fill();
   g.fillStyle = 'rgba(255,255,255,0.045)';
   quad(ROAD_NEAR, ROAD_END, -half, half);
   g.fill();

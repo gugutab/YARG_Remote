@@ -537,6 +537,7 @@ function setStatus(text) {
 }
 
 // ---------- Song and chart selection ----------
+let pendingInstruments = null; // the instruments of a link, applied once the chart is read
 let loadAudioWithSong = false; // a #/song/<id>/play link: the audio loads with the song, like a Play press would
 async function selectSong(song) {
   const wantAudio = loadAudioWithSong;
@@ -618,6 +619,7 @@ async function selectSong(song) {
   renderList({ keepScroll: true }); // highlight the loaded song
   syncUrl();
   fillInstrumentOptions();
+  if (pendingInstruments) { applyInstruments(pendingInstruments); pendingInstruments = null; }
   updateChart(); // the chart exists as soon as the MIDI is read; only playback waits for the audio
   const stems = audioStemsOf(song, { censor: prefs.get('audio.censor') }); // read per load: a change applies to the next song load
   els.npPreview.hidden = !previewWindow(song.ini);
@@ -1066,6 +1068,7 @@ function updateChart() {
   else if (!els.paneMenu.hidden) buildPaneMenu(); // keep an open menu up to date
   for (const [key, el] of chooserEls) fillChooser(el, key); // the cards follow the instruments that are not on screen
   renderLoadState();
+  syncUrl(); // the link carries the instruments on screen
 }
 
 els.instrument.addEventListener('change', () => { fillDifficultyOptions(); updateChart(); });
@@ -2376,6 +2379,7 @@ const EFFECTS = {
   'highway.visualizer': (v) => { vizDriver.select(v); highway.setVisualizer(vizDriver.fn); syncVizPop(); },
   'highway.visualizerVisibility': (v) => { vizDriver.visibility = v / 100; syncVizPop(); },
   'highway.visualizerBlur': (v) => { vizDriver.blur = v; syncVizPop(); },
+  'highway.trackOpacity': (v) => { highway.trackOpacity = v / 100; },
   'highway.stageColorOn': () => { applyStage(); syncVizPop(); },
   'highway.stageColor': () => { applyStage(); syncVizPop(); },
   'ui.animations': (v) => { document.documentElement.dataset.motion = v ? 'on' : 'off'; },
@@ -2401,19 +2405,56 @@ document.addEventListener('keydown', (e) => {
 // ---------- Deep links: the URL hash names the open song ----------
 // The hash is only replaced (no history entries): a reload or a shared link opens the same song, and the two panels
 // stay in place. #/song/<id> opens the details, #/song/<id>/play the chart.
+// The instruments on screen for the link: the active one first, then the pinned ones, each with its difficulty.
+function instrumentsOnScreen() {
+  if (!current?.options?.length) return [];
+  const out = [];
+  for (const g of instrumentGroups()) {
+    if (!(g.active && !current.hiddenActive) && !g.pinned) continue;
+    const d = g.active ? els.difficulty.value : diffFor(g.chosen).chosen?.id;
+    out.push({ id: g.chosen.id, diff: d || undefined, active: g.active });
+  }
+  out.sort((x, y) => Number(!!y.active) - Number(!!x.active)); // the active one leads
+  return out.map(({ id, diff }) => ({ id, diff }));
+}
+// Puts the instruments of a link on screen: the first is the active one, the others are pinned. Unknown ones are ignored.
+function applyInstruments(list) {
+  const known = (list || []).filter((x) => current.options.some((o) => o.id === x.id));
+  if (!known.length) return false;
+  const [first, ...rest] = known;
+  els.instrument.value = first.id;
+  fillDifficultyOptions();
+  if (first.diff && [...els.difficulty.options].some((o) => o.value === first.diff)) els.difficulty.value = first.diff;
+  current.pins.clear();
+  current.hiddenActive = false;
+  const groups = instrumentGroups();
+  for (const x of rest) {
+    const g = groups.find((gr) => gr.options.some((o) => o.id === x.id));
+    if (!g || g.active) continue;
+    current.modeChoice[g.key] = x.id;
+    if (x.diff) current.diffChoice[x.id] = x.diff;
+    current.pins.add(g.key);
+  }
+  return true;
+}
 function syncUrl() {
   if (!current) return;
   store.set('lastSong', current.song.id); // for "Reopen the last song"
-  const hash = formatRoute({ view: infoOpen ? 'song' : 'play', id: current.song.id });
+  const hash = formatRoute({ view: infoOpen ? 'song' : 'play', id: current.song.id, instruments: instrumentsOnScreen() });
   if (location.hash !== hash) history.replaceState(null, '', hash);
   document.title = `${plainText(current.song.title)} - ${plainText(current.song.artist)} · YARG Remote`;
 }
 function openFromHash() {
   const route = parseRoute(location.hash);
-  if (route.view === 'library' || current?.song.id === route.id) return;
+  if (route.view === 'library') return;
+  if (current?.song.id === route.id) { // the same song: a link with other instruments rearranges the screen
+    if (route.instruments && applyInstruments(route.instruments)) updateChart();
+    return;
+  }
   const song = songs.find((s) => s.id === route.id);
   if (!song) return;
   loadAudioWithSong = route.view === 'play';
+  pendingInstruments = route.instruments || null;
   selectSong(song);
   if (route.view === 'play') setInfoOpen(false);
 }

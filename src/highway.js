@@ -73,6 +73,7 @@ export class Highway {
     this.onResize = null; // called when a drag ends, so the page can keep the sizes
     this.layout = { w: 0, sum: 1, keys: [] };
     this.vocalView = 'track'; // 'track' (notes + lyrics) or 'karaoke' (the lyrics alone)
+    this.trackOpacity = 0.5; // how opaque the board of a fretboard is (setting highway.trackOpacity)
     this.visualizer = null; // (g, w, h, t, bgRgb) => draws the shared background behind every pane, or null (src/visualizers.js)
   }
 
@@ -959,6 +960,9 @@ export class Highway {
       g.fillRect(x0, y, laneW * chart.lanes, b.measure ? 2 : 1);
     }
 
+    // the board: a neutral dark base (not the stage colour), as opaque as the setting says
+    g.fillStyle = `rgba(0,0,0,${this.trackOpacity})`;
+    g.fillRect(x0, 0, laneW * chart.lanes, h);
     // lane guides
     g.fillStyle = 'rgba(255,255,255,0.04)';
     for (let i = 0; i < chart.lanes; i++) {

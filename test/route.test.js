@@ -20,3 +20,12 @@ test('route format and parsing', () => {
   assert.deepEqual(parseRoute('#/song/%E0%A4%A'), { view: 'library' }); // a broken escape does not throw
   assert.deepEqual(parseRoute('#/song/x/'), { view: 'song', id: 'x' });
 });
+
+test('links carry the instruments on screen', () => {
+  const hash = formatRoute({ view: 'play', id: 'a/b', instruments: [{ id: 'guitar', diff: 'expert' }, { id: 'drums-pro', diff: 'hard' }, { id: 'vocals' }] });
+  assert.equal(hash, '#/song/a%2Fb/play?i=guitar:expert,drums-pro:hard,vocals');
+  assert.deepEqual(parseRoute(hash), { view: 'play', id: 'a/b', instruments: [{ id: 'guitar', diff: 'expert' }, { id: 'drums-pro', diff: 'hard' }, { id: 'vocals' }] });
+  assert.deepEqual(parseRoute('#/song/x?i=bass'), { view: 'song', id: 'x', instruments: [{ id: 'bass' }] });
+  assert.deepEqual(parseRoute('#/song/x/play?i='), { view: 'play', id: 'x' });
+  assert.equal(formatRoute({ view: 'play', id: 'x', instruments: [] }), '#/song/x/play');
+});
