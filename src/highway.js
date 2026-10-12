@@ -544,6 +544,17 @@ export class Highway {
       sheet.hits.push({ y: y + y0, half: step / 2, time: lines[i].start });
       hovered = this.hoverRow(sheet, x0, y0, y, step, lines[i].start, shown.x + shown.total) ?? hovered;
     }
+    const fade = Math.min(36, h * 0.14); // the lines dissolve into the background at the top and bottom edges
+    const fadeIn = g.createLinearGradient(0, 0, 0, fade);
+    fadeIn.addColorStop(0, `rgba(${this.bgRgb},1)`);
+    fadeIn.addColorStop(1, `rgba(${this.bgRgb},0)`);
+    g.fillStyle = fadeIn;
+    g.fillRect(0, 0, w, fade);
+    const fadeOut = g.createLinearGradient(0, h - fade, 0, h);
+    fadeOut.addColorStop(0, `rgba(${this.bgRgb},0)`);
+    fadeOut.addColorStop(1, `rgba(${this.bgRgb},1)`);
+    g.fillStyle = fadeOut;
+    g.fillRect(0, h - fade, w, fade);
     // The jump button: it slides and fades in when the pointer has rested on a row, and out when it leaves.
     const jump = (this.jump ??= { k: 0, target: 0, spec: null, at: 0 });
     const sheetKey = `${x0},${y0}`;
