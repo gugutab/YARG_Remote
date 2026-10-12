@@ -1125,8 +1125,9 @@ export class Highway {
     const bottom = lyricY - fontSize * 0.5 - 16; // and 16 px of air between them and the notes
     // The track: the note area is nearly see-through (the visualizer shows), the rows of lyrics keep their readable base.
     this.trackBase(0, 0, w, h, 0.15);
-    this.trackBase(0, bottom, w, h - bottom, 0.68); // (together with the first layer: about 0.72)
-    if (second) this.trackBase(0, 0, w, top, 0.68);
+    const lyricTop = lyricY - fontSize * 0.8; // snug: just above the letters
+    this.trackBase(0, lyricTop, w, h - lyricTop, 0.68); // (together with the first layer: about 0.72)
+    if (second) this.trackBase(0, 0, w, secondY + secondSize * 0.45, 0.68);
     const yOfPitch = (p) => bottom - ((p - lo) / (hi - lo)) * (bottom - top);
     const mid = (top + bottom) / 2; // talkies (unpitched notes) sit in the middle of the pitch area
     const percussionY = this.vocalCenterY(chart, h); // percussion hits sit in the vertical middle of the chart
