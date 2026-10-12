@@ -162,7 +162,7 @@ export class Highway {
         g.clip();
         g.translate(0, vh);
         if ((vocal.chart.lyrics2 || []).length > 0) this.renderSheetsSplit(t, w, h - vh, vocal, 0, vh); // harmony: one sheet per voice
-        else this.renderLyricSheet(t, w, h - vh, this.karaokeLines(vocal, 'main'), this.sheetState(vocal, 'main'), 0, vh, this.countdownState(vocal, t, true));
+        else this.renderLyricSheet(t, w, h - vh, this.karaokeLines(vocal, 'main'), this.sheetState(vocal, 'main'), 0, vh, this.lyricGaps(vocal));
         g.restore();
       }
       this.vocalAlone = false;
@@ -282,6 +282,12 @@ export class Highway {
 
   // The wait countdown: while the chart has nothing to play for 9 s or more, the seconds until its next note, in a ring that
   // empties (YARG's WaitCountdown). Drawn over the pane's centre.
+  // The rests of the lyric views (karaoke): percussion hits are no singing.
+  lyricGaps(pane) {
+    pane.countdownsLyrics ??= waitCountdowns(pane.chart, { percussion: false });
+    return this.countdowns ? pane.countdownsLyrics : [];
+  }
+
   // The countdown running for a pane at `t`: { remaining, total } or null.
   countdownState(pane, t, lyrics = false) {
     if (!this.countdowns) return null;
@@ -296,10 +302,10 @@ export class Highway {
     const g = this.g;
     const fadeIn = Math.min(1, (c.total - c.remaining) / 0.5); // eases in at the start of the gap, out as the notes return
     const fadeOut = Math.min(1, c.remaining / 0.6);
-    const secs = Math.ceil(c.remaining);
-    const urgent = c.remaining <= 3.05;
+    const secs = c.dim ? Math.round(c.total) : Math.ceil(c.remaining); // a dim badge (past / future) shows the length of the rest
+    const urgent = !c.dim && c.remaining <= 3.05;
     g.save();
-    g.globalAlpha *= Math.min(fadeIn, fadeOut);
+    g.globalAlpha *= c.dim ?? Math.min(fadeIn, fadeOut);
     g.beginPath();
     g.arc(cx, cy, r, 0, Math.PI * 2);
     g.fillStyle = 'rgba(8,11,16,0.72)';
@@ -417,10 +423,28 @@ export class Highway {
     return (pane.ss[key] ??= { pos: null, manual: 0, touched: 0, at: 0 });
   }
 
+  // The rows of a lyric sheet: the lines, with a countdown row before each line that follows a long rest (every rest, the
+  // ones already gone and the ones to come, not only the running one). `gaps` are the wait countdowns without percussion.
+  sheetRows(lines, gaps) {
+    const rows = [];
+    let gi = 0;
+    for (let i = 0; i < lines.length; i++) {
+      let best = null;
+      while (gi < gaps.length && gaps[gi].end <= lines[i].start + 0.3) { // the rests that end where this line starts
+        const gap = gaps[gi++];
+        if (!best || gap.end - gap.start > best.end - best.start) best = gap;
+      }
+      if (best) rows.push({ type: 'cd', gap: best, before: i });
+      rows.push({ type: 'line', i });
+    }
+    return rows;
+  }
+
   // A lyric sheet that scrolls, drawn at the current origin of the canvas (which sits at x0, y0 of the whole canvas): it
   // follows the line being sung (that line is filled as it goes, and bigger); wheel / drag moves it by hand and it glides
-  // back to the singer a few seconds after you stop. Clicking a line seeks to it.
-  renderLyricSheet(t, w, h, lines, state, x0 = 0, y0 = 0, cd = null) {
+  // back to the singer a few seconds after you stop. Clicking a line seeks to it. Rests of 9 s or more get a countdown row
+  // between the lines: ring and seconds counting down while it runs, the length of the rest before and after.
+  renderLyricSheet(t, w, h, lines, state, x0 = 0, y0 = 0, gaps = []) {
     const g = this.g;
     const sheet = { x: x0, y: y0, w, h, step: 0, hits: [], state };
     this.sheets.push(sheet);
@@ -431,13 +455,24 @@ export class Highway {
       g.fillText('No lyrics here', w / 2, h / 2);
       return;
     }
+    if (state.rowsFor !== lines || state.rowsGaps !== gaps) { // rebuilt when the lyrics change
+      state.rows = this.sheetRows(lines, gaps);
+      state.rowOfLine = new Map(state.rows.map((row, r) => [row.type === 'line' ? row.i : -1 - r, r]));
+      state.rowsFor = lines;
+      state.rowsGaps = gaps;
+    }
+    const rows = state.rows;
+    const rowOf = (i) => state.rowOfLine.get(i) ?? 0;
     let idx = -1;
     for (let i = 0; i < lines.length && lines[i].start <= t + 0.25; i++) idx = i;
     const singing = idx >= 0 && t <= lines[idx].end + 2.5;
     const first = singing ? idx : idx + 1;
+    let focusRow = Math.min(rows.length - 1, rowOf(Math.min(first, lines.length - 1)));
+    const before = rows[focusRow - 1]; // a running countdown right before the next line takes the focus
+    if (!singing && before?.type === 'cd' && t >= before.gap.start && t < before.gap.end) focusRow -= 1;
     const now = performance.now();
     if (state.manual && now - state.touched > 3500) state.manual = 0; // back to following the singer
-    const target = Math.max(0, Math.min(lines.length - 1, first + state.manual));
+    const target = Math.max(0, Math.min(rows.length - 1, focusRow + state.manual));
     const dt = Math.min(0.25, (now - (state.at || now)) / 1000);
     state.at = now;
     if (state.pos == null || !Number.isFinite(state.pos) || Math.abs(target - state.pos) > 40) state.pos = target;
@@ -447,25 +482,23 @@ export class Highway {
     const step = Math.max(small * 1.55, big * 1.15);
     sheet.step = step;
     const top = big * 0.95;
-    // The wait countdown has a row of its own just before the next line to be sung: the lines from there on make room for it.
-    state.cdShift = (state.cdShift ?? 0) + ((cd ? 1 : 0) - (state.cdShift ?? 0)) * (1 - Math.exp(-dt / 0.18));
-    if (cd) state.lastCd = cd;
-    const shift = state.cdShift > 0.01 ? state.cdShift * step : 0;
-    if (shift > 0 && state.lastCd) {
-      const r = Math.max(14, Math.min(step * 0.38, 30));
-      const cy = top + (idx + 1 - state.pos) * step; // where the next line was: the countdown takes its place, the line moves down
-      if (cy - r > 0 && cy - r < h) {
-        g.save();
-        g.globalAlpha = Math.min(1, state.cdShift);
-        this.drawCountdownBadge(w / 2, cy, r, state.lastCd);
-        g.restore();
-      }
-    }
+    const badgeR = Math.max(14, Math.min(step * 0.38, 30));
     const from = Math.max(0, Math.floor(state.pos) - 1);
-    for (let i = from; i < lines.length; i++) {
-      const y = top + (i - state.pos) * step + (i >= idx + 1 ? shift : 0);
+    for (let r = from; r < rows.length; r++) {
+      const y = top + (r - state.pos) * step;
       if (y - step / 2 > h) break;
       if (y - small * 0.6 < 0) continue; // a row cut by the top edge would look broken
+      const row = rows[r];
+      if (row.type === 'cd') {
+        const { start, end } = row.gap;
+        const total = end - start;
+        if (t >= start && t < end) {
+          if (end - t >= 0.25) this.drawCountdownBadge(w / 2, y, badgeR, { remaining: end - t, total });
+        } else this.drawCountdownBadge(w / 2, y, badgeR, { remaining: total, total, dim: t >= end ? 0.28 : 0.55 }); // past / to come
+        sheet.hits.push({ y: y + y0, half: step / 2, time: start });
+        continue;
+      }
+      const i = row.i;
       const cur = singing && i === idx;
       const past = i < first ? 0.3 : Math.max(0.3, 0.7 - Math.max(0, i - first) * 0.06);
       this.drawKaraokeLine(lines[i], cur ? big : small, w, y, cur ? 0.95 : past, cur ? t : null);
@@ -513,7 +546,7 @@ export class Highway {
       g.rect(bx, by, bw, bh);
       g.clip();
       g.translate(bx, by);
-      this.renderLyricSheet(t, bw, bh, this.karaokeLines(pane, key), this.sheetState(pane, key), x0 + bx, y0 + by, this.countdownState(pane, t, true));
+      this.renderLyricSheet(t, bw, bh, this.karaokeLines(pane, key), this.sheetState(pane, key), x0 + bx, y0 + by, this.lyricGaps(pane));
       caption(name, 12, 14);
       g.restore();
     });
@@ -529,7 +562,7 @@ export class Highway {
     const split = (pane.chart.lyrics2 || []).length > 0;
     if (this.vocalAlone) {
       if (!split) {
-        this.renderLyricSheet(t, w, h, this.karaokeLines(pane, 'main'), this.sheetState(pane, 'main'), 0, 0, this.countdownState(pane, t, true));
+        this.renderLyricSheet(t, w, h, this.karaokeLines(pane, 'main'), this.sheetState(pane, 'main'), 0, 0, this.lyricGaps(pane));
         return;
       }
       this.renderSheetsSplit(t, w, h, pane, 0, 0);
