@@ -1693,8 +1693,29 @@ function fillChooser(el, key) {
   el.replaceChildren(head, cards);
 }
 
+// The mixer rows of an instrument inside its menu. They are the same rows as in Stem volume (the slider, the mute button, the
+// reset), registered as extra views of the same stem states, so both places always agree; the old ones are dropped on rebuild.
+let menuMixViews = [];
+function dropMenuMixViews() {
+  for (const { owner, added } of menuMixViews) owner.views = owner.views.filter((v) => !added.includes(v));
+  menuMixViews = [];
+}
+function menuVolume(group) {
+  const members = stemStates.filter((st) => stemGroup(st.stem.label) === group.key);
+  if (!members.length) return null;
+  const grouped = groupList.find((g) => g.members[0] && stemGroup(g.members[0].stem.label) === group.key);
+  const owners = [...members, ...(grouped ? [grouped] : [])];
+  const before = owners.map((o) => o.views.length);
+  const wrap = document.createElement('div');
+  wrap.className = 'mixer pm-mixer';
+  wrap.append(grouped ? groupBlock(grouped) : mixerRow(members[0]));
+  menuMixViews = owners.map((owner, i) => ({ owner, added: owner.views.slice(before[i]) }));
+  return wrap;
+}
+
 function buildPaneMenu() {
   const host = els.paneMenuDyn;
+  dropMenuMixViews();
   host.replaceChildren();
   if (!current) return;
   const groups = instrumentGroups();
@@ -1738,6 +1759,8 @@ function buildPaneMenu() {
       else selectInstrument(m.option.id, diffFor(m.option).chosen?.id);
     }));
   }
+  const volume = menuVolume(group); // the volume of this instrument's track (or tracks), like the Stem volume card
+  if (volume) part('Volume', volume);
   const free = hiddenGroups().length - current.choosers.length; // instruments with no slot yet
   const row = els.paneMenuActions; // at the end of the menu: swap, add and remove
   row.replaceChildren();

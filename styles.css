@@ -1155,3 +1155,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 #paneMenuActions .chip-btn { flex: 1 1 calc(50% - 3px); }
 #paneMenuActions .pm-remove { flex-basis: 100%; color: #ff8a8a; border-color: rgba(255, 107, 107, .55); background: rgba(255, 107, 107, .1); }
 #paneMenuActions .pm-remove:hover:not(:disabled) { background: rgba(255, 107, 107, .22); border-color: #ff6b6b; color: #ffb4b4; }
+
+.pm-mixer .mix-row { font-size: 12px; gap: 6px; }
+.pm-mixer .mix-name { display: none; }
+.pm-mixer .mix-kids { margin-top: 4px; }
