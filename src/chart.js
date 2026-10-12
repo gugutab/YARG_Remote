@@ -385,7 +385,7 @@ function commonParts(midi, track, toSec, settings = chartSettings({}, midi.divis
   const eventsTrack = midi.tracks.find((t) => t.name.toUpperCase() === 'EVENTS');
   const sections = eventsTrack
     ? eventsTrack.texts
-      .map((t) => ({ time: toSec(t.tick), name: parseSectionName(t.text) })) // the name as written, minus the prefix (TextEvents.TryParseSectionEvent)
+      .map((t) => { const name = parseSectionName(t.text); return { time: toSec(t.tick), name: name === null ? null : displaySectionName(name) }; })
       .filter((s) => s.name !== null)
       .sort((a, b) => a.time - b.time)
     : [];
@@ -526,6 +526,12 @@ export function parseSectionName(raw) {
   else return null;
   const name = rest.replace(/^_+/, '').trim();
   return name || null;
+}
+
+// The name as YARG reads it (parseSectionName), made a little easier to read: underscores become spaces and every word starts
+// with a capital (chorus_1 -> Chorus 1, gtr_solo_a -> Gtr Solo A). Nothing else is changed: no abbreviations are expanded.
+export function displaySectionName(name) {
+  return name.replace(/_+/g, ' ').replace(/\s+/g, ' ').trim().replace(/(^|\s)([a-z])/g, (m, space, ch) => space + ch.toUpperCase());
 }
 
 // A song with no sections gets ten automatic ones, "0% - 10%" ... "90% - 100%" of the song, so the section chip, the list and the

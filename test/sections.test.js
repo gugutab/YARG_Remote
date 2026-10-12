@@ -29,7 +29,13 @@ test('no sections gives -1', () => {
   assert.equal(sectionIndexAt([], 3), -1);
 });
 
-test('section names are shown as written, minus the prefix (no prettifying, like YARG)', async () => {
+test('displaySectionName: underscores become spaces and words are capitalised, nothing else changes', async () => {
+  const { displaySectionName: show } = await import('../src/chart.js');
+  const cases = { chorus_1: 'Chorus 1', verse_6: 'Verse 6', gtr_solo_a: 'Gtr Solo A', _endofsong: 'Endofsong', 'Verse 1A': 'Verse 1A', 'verse  1': 'Verse 1', 'pre-chorus': 'Pre-chorus', 'Breakdown 1,2,3': 'Breakdown 1,2,3', "don't stop": "Don't Stop" };
+  for (const [raw, expected] of Object.entries(cases)) assert.equal(show(raw), expected, raw);
+});
+
+test('chart section names: prefix removed, underscores as spaces, capitalised', async () => {
   const { buildChart, INSTRUMENTS, DIFFICULTIES } = await import('../src/chart.js');
   const { parseMidi } = await import('../src/midi.js');
   const { buildMidi, tempo120, trackName, text, on, off } = await import('./smf.js');
@@ -38,7 +44,7 @@ test('section names are shown as written, minus the prefix (no prettifying, like
     [{ dt: 0, bytes: trackName('EVENTS') }, { dt: 0, bytes: text('[section chorus_1]') }, { dt: 480, bytes: text('[prc_gtr_solo_a]') }],
   ]));
   const chart = buildChart(midi, INSTRUMENTS.find((i) => i.id === 'guitar'), DIFFICULTIES[3]);
-  assert.deepEqual(chart.sections.map((s) => s.name), ['chorus_1', 'gtr_solo_a']);
+  assert.deepEqual(chart.sections.map((s) => s.name), ['Chorus 1', 'Gtr Solo A']);
 });
 
 test('a song with no sections gets ten automatic ones, 0% - 10% ... 90% - 100% (YARG PostProcessSections)', async () => {
