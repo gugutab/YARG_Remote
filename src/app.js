@@ -1545,6 +1545,8 @@ try { highway.setSizes(JSON.parse(localStorage.getItem('yargremote.paneSizes')))
 highway.onResize = () => { try { localStorage.setItem('yargremote.paneSizes', JSON.stringify(highway.getSizes())); } catch { /* optional */ } };
 els.highway.addEventListener('pointerdown', (e) => {
   const [px, py] = canvasPoint(e);
+  const back = highway.sheetButtonAt(px, py);
+  if (back) { highway.resumeSheet(back); return; } // "Back to autoscroll"
   const divider = highway.dividerAt(px, py, slopFor(e));
   if (divider) { // resizing: drag a divider between two fretboards, or the one under the vocal band
     swipe = { divider, lastX: e.clientX, lastY: e.clientY, resizing: true };
@@ -1591,7 +1593,7 @@ els.highway.addEventListener('pointerup', (e) => {
   if (sheet) { // a tap on a lyric line seeks to it
     if (moved <= 6 && ready) {
       const time = highway.sheetLineAt(sheet, canvasPoint(e)[1]);
-      if (time !== null) player.seek(Math.max(0, time + settings.chartDelay));
+      if (time !== null) { player.seek(Math.max(0, time + settings.chartDelay)); highway.resumeSheet(sheet); }
     }
     return;
   }

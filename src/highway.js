@@ -162,7 +162,7 @@ export class Highway {
         g.clip();
         g.translate(0, vh);
         if ((vocal.chart.lyrics2 || []).length > 0) this.renderSheetsSplit(t, w, h - vh, vocal, 0, vh); // harmony: one sheet per voice
-        else this.renderLyricSheet(t, w, h - vh, this.karaokeLines(vocal, 'main'), this.sheetState(vocal, 'main'), 0, vh, this.lyricGaps(vocal));
+        else this.renderLyricSheet(t, w, h - vh, this.karaokeLines(vocal, 'main'), this.sheetState(vocal, 'main'), 0, vh, this.lyricCtx(vocal));
         g.restore();
       }
       this.vocalAlone = false;
@@ -288,6 +288,25 @@ export class Highway {
     return this.countdowns ? pane.countdownsLyrics : [];
   }
 
+  // What the sheet's side rail shows: the rests (also when the countdowns are off), the percussion sections and the length.
+  lyricCtx(pane) {
+    pane.railCtx ??= (() => {
+      const hits = (pane.chart.percussion || []).map((x) => x.time).sort((a, b) => a - b);
+      const perc = [];
+      let startI = 0;
+      for (let k = 1; k <= hits.length; k++) {
+        if (k === hits.length || hits[k] - hits[k - 1] > 3) { // a section: hits at most 3 s apart, at least 4 of them
+          if (k - startI >= 4) perc.push({ start: hits[startI], end: hits[k - 1] });
+          startI = k;
+        }
+      }
+      const lines = this.karaokeLines(pane, 'main');
+      const duration = Math.max(pane.chart.duration || 0, lines.length ? lines[lines.length - 1].end : 0, hits.length ? hits[hits.length - 1] : 0, 1);
+      return { pauses: waitCountdowns(pane.chart, { percussion: false }), perc, duration };
+    })();
+    return { gaps: this.lyricGaps(pane), ...pane.railCtx };
+  }
+
   // The countdown running for a pane at `t`: { remaining, total } or null.
   countdownState(pane, t, lyrics = false) {
     if (!this.countdowns) return null;
@@ -315,10 +334,10 @@ export class Highway {
     g.stroke();
     g.beginPath(); // what is left of the gap
     g.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (c.remaining / c.total));
-    g.strokeStyle = urgent ? '#13f0a6' : '#6cb6ff';
+    g.strokeStyle = c.dim ? '#7d8590' : urgent ? '#13f0a6' : '#6cb6ff'; // past and future countdowns are all grey
     g.lineCap = 'round';
     g.stroke();
-    g.fillStyle = urgent ? '#13f0a6' : '#ffffff';
+    g.fillStyle = c.dim ? '#8b949e' : urgent ? '#13f0a6' : '#ffffff';
     g.font = `700 ${Math.round(r * 1.05)}px system-ui`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
@@ -444,7 +463,8 @@ export class Highway {
   // follows the line being sung (that line is filled as it goes, and bigger); wheel / drag moves it by hand and it glides
   // back to the singer a few seconds after you stop. Clicking a line seeks to it. Rests of 9 s or more get a countdown row
   // between the lines: ring and seconds counting down while it runs, the length of the rest before and after.
-  renderLyricSheet(t, w, h, lines, state, x0 = 0, y0 = 0, gaps = []) {
+  renderLyricSheet(t, w, h, lines, state, x0 = 0, y0 = 0, ctx = { gaps: [], pauses: [], perc: [], duration: 1 }) {
+    const gaps = ctx.gaps;
     const g = this.g;
     const sheet = { x: x0, y: y0, w, h, step: 0, hits: [], state };
     this.sheets.push(sheet);
@@ -471,10 +491,12 @@ export class Highway {
     const before = rows[focusRow - 1]; // a running countdown right before the next line takes the focus
     if (!singing && before?.type === 'cd' && t >= before.gap.start && t < before.gap.end) focusRow -= 1;
     const now = performance.now();
-    if (state.manual && now - state.touched > 3500) state.manual = 0; // back to following the singer
-    const target = Math.max(0, Math.min(rows.length - 1, focusRow + state.manual));
     const dt = Math.min(0.25, (now - (state.at || now)) / 1000);
     state.at = now;
+    if (state.lastT != null && Math.abs(t - state.lastT) > 1.5) state.following = true; // the music jumped (a seek): follow it again
+    state.lastT = t;
+    if (state.following === false) state.hold = Math.max(0, Math.min(rows.length - 1, state.hold ?? focusRow)); // the sheet stays where you put it
+    const target = state.following === false ? state.hold : focusRow;
     if (state.pos == null || !Number.isFinite(state.pos) || Math.abs(target - state.pos) > 40) state.pos = target;
     else state.pos += (target - state.pos) * (1 - Math.exp(-dt / 0.12));
     const big = Math.max(18, Math.min(h * 0.16, 46, w * 0.06));
@@ -483,6 +505,8 @@ export class Highway {
     sheet.step = step;
     const top = big * 0.95;
     const badgeR = Math.max(14, Math.min(step * 0.38, 30));
+    let seenFrom = Infinity;
+    let seenTo = -Infinity; // the time range of the lines on screen, for the rail
     const from = Math.max(0, Math.floor(state.pos) - 1);
     for (let r = from; r < rows.length; r++) {
       const y = top + (r - state.pos) * step;
@@ -499,11 +523,83 @@ export class Highway {
         continue;
       }
       const i = row.i;
+      seenFrom = Math.min(seenFrom, lines[i].start);
+      seenTo = Math.max(seenTo, lines[i].end);
       const cur = singing && i === idx;
       const past = i < first ? 0.3 : Math.max(0.3, 0.7 - Math.max(0, i - first) * 0.06);
       this.drawKaraokeLine(lines[i], cur ? big : small, w, y, cur ? 0.95 : past, cur ? t : null);
       sheet.hits.push({ y: y + y0, half: step / 2, time: lines[i].start });
     }
+    this.drawSheetRail(t, w, h, ctx, rows, lines, seenFrom, seenTo);
+    if (state.following === false) { // back to following the singer
+      const label = 'Back to autoscroll';
+      g.font = '600 13px system-ui';
+      const bw = g.measureText(label).width + 36;
+      const bh = 30;
+      const bx = (w - bw) / 2;
+      const by = h - bh - 14;
+      g.fillStyle = 'rgba(30,40,55,0.92)';
+      g.beginPath();
+      if (g.roundRect) g.roundRect(bx, by, bw, bh, 15);
+      else g.rect(bx, by, bw, bh);
+      g.fill();
+      g.lineWidth = 1;
+      g.strokeStyle = 'rgba(108,182,255,0.7)';
+      g.stroke();
+      g.fillStyle = '#cfe6ff';
+      g.textAlign = 'left';
+      g.textBaseline = 'middle';
+      g.fillText('\u2193', bx + 12, by + bh / 2 + 1);
+      g.fillText(label, bx + 26, by + bh / 2 + 1);
+      g.textBaseline = 'alphabetic';
+      sheet.button = { x: x0 + bx, y: y0 + by, w: bw, h: bh };
+    }
+  }
+
+  // The rail at the right edge of a sheet: the whole song top to bottom, like a seek bar you cannot touch. Shows how far the
+  // song is (fill and a marker with the percentage), the rests (grey bands), the percussion sections (light bands), where
+  // the singing enters again (green ticks) and the part of the song the sheet shows now (the bracket).
+  drawSheetRail(t, w, h, ctx, rows, lines, seenFrom, seenTo) {
+    const g = this.g;
+    const dur = ctx.duration;
+    if (!(dur > 0) || h < 80) return;
+    const rx = w - 18;
+    const rw = 6;
+    const y0 = 12;
+    const y1 = h - 12;
+    const yOf = (time) => y0 + (Math.max(0, Math.min(dur, time)) / dur) * (y1 - y0);
+    g.save();
+    g.fillStyle = 'rgba(255,255,255,0.08)';
+    g.fillRect(rx, y0, rw, y1 - y0);
+    g.fillStyle = 'rgba(108,182,255,0.28)'; // how much of the song has played
+    g.fillRect(rx, y0, rw, Math.max(0, yOf(t) - y0));
+    for (const gap of ctx.pauses) { // rests
+      g.fillStyle = 'rgba(139,148,158,0.55)';
+      g.fillRect(rx, yOf(gap.start), rw, Math.max(2, yOf(gap.end) - yOf(gap.start)));
+    }
+    for (const sec of ctx.perc) { // percussion sections
+      g.fillStyle = 'rgba(230,237,243,0.8)';
+      g.fillRect(rx + 1, yOf(sec.start), rw - 2, Math.max(2, yOf(sec.end) - yOf(sec.start)));
+    }
+    g.fillStyle = '#13f0a6';
+    for (const row of rows) { // entries: the singing starts after a rest
+      if (row.type === 'cd') g.fillRect(rx - 7, Math.round(yOf(row.gap.end)), 6, 2);
+    }
+    if (seenTo > seenFrom) { // what the sheet shows now
+      g.strokeStyle = 'rgba(255,255,255,0.55)';
+      g.lineWidth = 1;
+      g.strokeRect(rx - 2.5, yOf(seenFrom), rw + 5, Math.max(6, yOf(seenTo) - yOf(seenFrom)));
+    }
+    const my = yOf(t); // where the song is
+    g.fillStyle = '#ffffff';
+    g.fillRect(rx - 3, my - 1, rw + 6, 2);
+    g.font = '600 10px system-ui';
+    g.textAlign = 'right';
+    g.textBaseline = 'middle';
+    g.fillStyle = 'rgba(255,255,255,0.7)';
+    g.fillText(`${Math.round(Math.max(0, Math.min(1, t / dur)) * 100)}%`, rx - 10, Math.min(y1 - 6, Math.max(y0 + 6, my)));
+    g.textBaseline = 'alphabetic';
+    g.restore();
   }
 
   // The sheet under the canvas point (x, y), or null.
@@ -513,8 +609,18 @@ export class Highway {
 
   // Wheel / drag over a sheet (`lines` = how many lines to move).
   scrollSheet(sheet, lines) {
-    sheet.state.manual = (sheet.state.manual || 0) + lines;
-    sheet.state.touched = performance.now();
+    const st = sheet.state;
+    if (st.following !== false) { st.following = false; st.hold = st.pos ?? 0; } // scrolling by hand stops the autoscroll
+    st.hold = Math.max(0, Math.min((st.rows?.length ?? 1) - 1, st.hold + lines));
+  }
+
+  // The sheet whose "Back to autoscroll" button is under the canvas point (x, y), or null.
+  sheetButtonAt(x, y) {
+    return this.sheets.find((sh) => sh.button && x >= sh.button.x && x <= sh.button.x + sh.button.w && y >= sh.button.y && y <= sh.button.y + sh.button.h) ?? null;
+  }
+
+  resumeSheet(sheet) {
+    sheet.state.following = true;
   }
 
   // The start time (chart seconds) of the lyric line drawn at canvas height y in a sheet, or null.
@@ -546,7 +652,7 @@ export class Highway {
       g.rect(bx, by, bw, bh);
       g.clip();
       g.translate(bx, by);
-      this.renderLyricSheet(t, bw, bh, this.karaokeLines(pane, key), this.sheetState(pane, key), x0 + bx, y0 + by, this.lyricGaps(pane));
+      this.renderLyricSheet(t, bw, bh, this.karaokeLines(pane, key), this.sheetState(pane, key), x0 + bx, y0 + by, this.lyricCtx(pane));
       caption(name, 12, 14);
       g.restore();
     });
@@ -562,7 +668,7 @@ export class Highway {
     const split = (pane.chart.lyrics2 || []).length > 0;
     if (this.vocalAlone) {
       if (!split) {
-        this.renderLyricSheet(t, w, h, this.karaokeLines(pane, 'main'), this.sheetState(pane, 'main'), 0, 0, this.lyricGaps(pane));
+        this.renderLyricSheet(t, w, h, this.karaokeLines(pane, 'main'), this.sheetState(pane, 'main'), 0, 0, this.lyricCtx(pane));
         return;
       }
       this.renderSheetsSplit(t, w, h, pane, 0, 0);
@@ -821,21 +927,48 @@ export class Highway {
       const x = xOf(p.time);
       const past = t - p.time;
       const r = Math.max(14, Math.min(22, h * 0.08)); // percussion marker radius
+      const k = past > 0 ? Math.min(1, past / 0.5) : 0; // 0..1 over the half second after the hit
       g.save();
-      g.globalAlpha = past > 0.25 ? 0.4 : 1;
-      if (past > 0 && past < 0.25) { // the flash: a ring that grows and fades
+      g.globalAlpha = past > 0.5 ? 0.4 : 1;
+      if (past > 0 && past < 0.5) {
+        const fade = 1 - k;
+        const glow = g.createRadialGradient(x, percussionY, r * 0.4, x, percussionY, r * (2.2 + k));
+        glow.addColorStop(0, `rgba(108,182,255,${0.55 * fade})`);
+        glow.addColorStop(1, 'rgba(108,182,255,0)');
+        g.fillStyle = glow;
         g.beginPath();
-        g.arc(x, percussionY, r * (1 + (past / 0.25) * 1.1), 0, Math.PI * 2);
-        g.lineWidth = 2;
-        g.strokeStyle = `rgba(230,237,243,${1 - past / 0.25})`;
-        g.stroke();
+        g.arc(x, percussionY, r * (2.2 + k), 0, Math.PI * 2);
+        g.fill();
+        for (const [delay, grow, width] of [[0, 1.9, 3.5], [0.18, 1.4, 2]]) { // two rings going out, one after the other
+          const q = Math.max(0, Math.min(1, (k - delay) / (1 - delay)));
+          if (q <= 0) continue;
+          g.beginPath();
+          g.arc(x, percussionY, r * (1 + q * grow), 0, Math.PI * 2);
+          g.lineWidth = width * (1 - q) + 0.5;
+          g.strokeStyle = `rgba(191,233,255,${0.9 * (1 - q)})`;
+          g.stroke();
+        }
+        g.lineCap = 'round';
+        for (let n = 0; n < 8; n++) { // short spokes flying out
+          const a = (n * Math.PI) / 4 + Math.PI / 8;
+          const from = r * (1.15 + k * 1.1);
+          const to = from + r * 0.55 * fade;
+          g.beginPath();
+          g.moveTo(x + Math.cos(a) * from, percussionY + Math.sin(a) * from);
+          g.lineTo(x + Math.cos(a) * to, percussionY + Math.sin(a) * to);
+          g.lineWidth = 3 * fade + 0.5;
+          g.strokeStyle = `rgba(191,233,255,${0.9 * fade})`;
+          g.stroke();
+        }
       }
+      const pop = past > 0 && past < 0.2 ? 1 + 0.5 * Math.sin((Math.PI * past) / 0.2) : 1; // the ball swells and settles
+      const lit = past > 0 && past < 0.35 ? 1 - past / 0.35 : 0; // and flashes from blue-white back to white
       g.beginPath();
-      g.arc(x, percussionY, r, 0, Math.PI * 2);
-      g.fillStyle = '#e6edf3';
+      g.arc(x, percussionY, r * pop, 0, Math.PI * 2);
+      g.fillStyle = lit > 0 ? `rgb(${Math.round(230 - 122 * lit)},${Math.round(237 - 55 * lit)},255)` : '#e6edf3';
       g.fill();
       g.beginPath();
-      g.arc(x, percussionY, r * 0.5, 0, Math.PI * 2);
+      g.arc(x, percussionY, r * 0.5 * pop, 0, Math.PI * 2);
       g.lineWidth = 2;
       g.strokeStyle = 'rgba(13,17,23,0.55)';
       g.stroke();
