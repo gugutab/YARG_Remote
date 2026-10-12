@@ -472,12 +472,16 @@ export class Highway {
     g.restore();
   }
 
-  // The vertical middle of the vocal chart: of the whole band, or of what is below the second lyric line (harmony charts).
+  // The vertical middle of the pitch area of the vocal chart (the same area `renderVocals` lays the notes out in): below the harmony
+  // lyric line, if any, and above the lyrics at the bottom.
   vocalCenterY(chart, h) {
-    if (!(chart.lyrics2 || []).length) return h / 2;
+    const second = (chart.lyrics2 || []).length > 0;
     const secondSize = Math.max(15, Math.min(26, h * 0.08));
-    const top = secondSize * 0.85 + 6 + secondSize * 0.75;
-    return (top + h) / 2;
+    const top = second ? secondSize * 0.75 + secondSize * 0.75 : 8;
+    const fontSize = Math.max(18, Math.min(30, h * 0.095));
+    const lyricY = h - fontSize * 0.75;
+    const bottom = lyricY - fontSize * 0.5 - 16;
+    return (top + bottom) / 2;
   }
 
   // The wait countdown of a chart pane (YARG's WaitCountdown), over the centre; in the vocal notes view it sits to the left of
