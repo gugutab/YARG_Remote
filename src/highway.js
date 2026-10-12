@@ -256,7 +256,7 @@ export class Highway {
   trackBase(x, y, w, h, alpha = 0.72) {
     if (!this.visualizer) return;
     const g = this.g;
-    g.fillStyle = `rgba(${this.bgRgb},${alpha})`;
+    g.fillStyle = `rgba(0,0,0,${alpha})`;
     g.fillRect(x, y, w, h);
     g.fillStyle = `rgba(255,255,255,${(0.03 * alpha / 0.72).toFixed(3)})`;
     g.fillRect(x, y, w, h);
@@ -273,7 +273,7 @@ export class Highway {
 
   // Colour stops for an edge fade: while a fretboard is drawn on its own layer the fade erases (alpha), otherwise it paints the stage colour.
   fadeStyle(a) {
-    return this.layered ? `rgba(0,0,0,${a})` : `rgba(${this.bgRgb},${a})`;
+    return `rgba(0,0,0,${a})`;
   }
 
   // The height of the vocal band: the default, or what the user dragged it to (kept within sensible limits).
@@ -351,7 +351,7 @@ export class Highway {
     if (pane.chart.mode === 'vocals') {
       if (this.vocalView === 'karaoke') this.renderKaraoke(t, pw, ph, pane);
       else this.renderVocals(t, pw, ph);
-    } else if (this.visualizer) { // a visualizer is behind: the fades must make the board transparent, not paint the stage colour over it
+    } else { // the fade at the edges erases the board (it never paints a colour over what is behind: the stage colour or a visualizer)
       const main = g;
       const dpr = this.canvas.width / (this.canvas.clientWidth || 1);
       const layer = this.layerFor(pw, ph, dpr);
@@ -369,8 +369,7 @@ export class Highway {
         this.layered = false;
       }
       main.drawImage(layer, 0, 0, layer.width, layer.height, 0, 0, pw, ph);
-    } else if (this.view === '3d') renderLanes3D(this, t, pw, ph);
-    else this.renderLanes(t, pw, ph);
+    }
     pane.vRange = this.vRange;
     if (!(pane.chart.mode === 'vocals' && this.vocalView === 'karaoke')) this.drawCountdown(pane, t, pw, ph);
     g.restore();
@@ -631,7 +630,7 @@ export class Highway {
     let seenTo = -Infinity; // the time range of the lines on screen, for the rail
     // With a visualizer behind, the rows go on their own layer and the edge fades erase them (below), so only the words fade out.
     let rowLayer = null;
-    if (this.visualizer) {
+    {
       const dpr = this.canvas.width / (this.canvas.clientWidth || 1);
       rowLayer = this.layerFor(w, h, dpr, 'rowLayer');
       const lg = rowLayer.getContext('2d');
@@ -676,7 +675,7 @@ export class Highway {
     const fadeIn = eg.createLinearGradient(0, 0, 0, fade);
     const fadeOut = eg.createLinearGradient(0, h, 0, h - fade);
     for (const [pos, alpha] of ramp) {
-      const c = rowLayer ? `rgba(0,0,0,${alpha})` : `rgba(${this.bgRgb},${alpha})`;
+      const c = `rgba(0,0,0,${alpha})`;
       fadeIn.addColorStop(pos, c);
       fadeOut.addColorStop(pos, c);
     }
@@ -823,7 +822,7 @@ export class Highway {
       g.strokeRect(rx - 2.5, yOf(seenFrom), rw + 5, Math.max(6, yOf(seenTo) - yOf(seenFrom)));
     }
     const my = yOf(t); // where the song is
-    g.fillStyle = `rgba(${this.bgRgb},0.62)`; // an overlay on the part that has played: what is behind is dimmed, what is ahead is bright
+    g.fillStyle = 'rgba(0,0,0,0.62)'; // an overlay on the part that has played: what is behind is dimmed, what is ahead is bright
     g.fillRect(rx - 2, y0 - 1, rw + 4, Math.max(0, my - y0 + 1));
     g.fillStyle = '#ffffff';
     g.fillRect(rx - 3, my - 1, rw + 6, 2);

@@ -2084,7 +2084,7 @@ els.barShow.addEventListener('click', () => setBarHidden(false));
 
 // ---------- Background visualizer ----------
 // One animated background behind every fretboard (src/visualizers.js, Highway.setVisualizer). The picker is a popover from the
-// tools row; the choice, its visibility and its blur live in prefs (highway.visualizer, highway.visualizerVisibility, highway.visualizerBlur).
+// tools row; the choice and its blur live in prefs (highway.visualizer, highway.visualizerBlur).
 let vizSrc = null;
 const vizDriver = createVisualizerDriver({
   getSource() { // rebuilt only when the charts on screen change (setCharts makes a new panes array)
@@ -2112,7 +2112,6 @@ function vizSlider(icon, label, min, max, step, pref) {
   input.addEventListener('input', () => prefs.set(pref, Number(input.value)));
   return { row, input, output: row.querySelector('output') };
 }
-const vizVis = vizSlider('i-eye', 'Visibility', 10, 95, 5, 'highway.visualizerVisibility');
 const vizBlur = vizSlider('i-blur', 'Blur', 0, 40, 1, 'highway.visualizerBlur');
 const vizColor = document.createElement('div'); // the stage colour: shown with "None" too, and behind visualizers that let it through
 vizColor.className = 'viz-level viz-color';
@@ -2137,7 +2136,7 @@ vizList.replaceChildren(...VISUALIZERS.map((v) => {
 }));
 const vizFoot = document.createElement('div');
 vizFoot.className = 'viz-foot';
-vizFoot.append(vizVis.row, vizBlur.row, vizColor);
+vizFoot.append(vizBlur.row, vizColor);
 vizPop.replaceChildren(vizList, vizFoot);
 function syncVizPop() {
   const id = prefs.get('highway.visualizer');
@@ -2145,13 +2144,11 @@ function syncVizPop() {
     row.dataset.active = String(row.dataset.id === id);
     row.setAttribute('aria-selected', String(row.dataset.id === id));
   }
-  vizVis.row.hidden = vizBlur.row.hidden = id === 'none';
-  vizVis.input.value = prefs.get('highway.visualizerVisibility');
+  vizBlur.row.hidden = id === 'none';
   vizBlur.input.value = prefs.get('highway.visualizerBlur');
   const custom = prefs.get('highway.stageColorOn');
   vizColorInput.value = custom ? prefs.get('highway.stageColor') : themeStage;
   vizColor.querySelector('button').hidden = !custom;
-  vizVis.output.textContent = `${vizVis.input.value}%`;
   vizBlur.output.textContent = `${vizBlur.input.value}px`;
 }
 popovers.push([vizBtn, vizPop]);
@@ -2377,7 +2374,6 @@ const EFFECTS = {
   'ui.radius': (v) => document.documentElement.style.setProperty('--radius', `${v}px`),
   'ui.font': (v) => document.documentElement.style.setProperty('--font', fontCss(v)),
   'highway.visualizer': (v) => { vizDriver.select(v); highway.setVisualizer(vizDriver.fn); syncVizPop(); },
-  'highway.visualizerVisibility': (v) => { vizDriver.visibility = v / 100; syncVizPop(); },
   'highway.visualizerBlur': (v) => { vizDriver.blur = v; syncVizPop(); },
   'highway.trackOpacity': (v) => { highway.trackOpacity = v / 100; },
   'highway.stageColorOn': () => { applyStage(); syncVizPop(); },

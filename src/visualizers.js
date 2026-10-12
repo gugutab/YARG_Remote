@@ -1135,7 +1135,7 @@ export async function loadCover(url) {
 }
 
 // What Highway.setVisualizer gets. getSource() -> { key, song, charts, coverUrl }: `key` changes when the charts do.
-// Draws the chosen visualizer (blurred when `blur` > 0), then an overlay of the stage colour (1 - visibility) so the notes stay readable.
+// Draws the chosen visualizer (blurred when `blur` > 0). Nothing is laid over it: the stage colour (`s.stage`, 'r, g, b') is only offered to the effects that want it.
 export function createDriver({ getSource }) {
   const state = { t: 0, w: 0, h: 0, dpr: 1, beat: {}, density: 0, travel: 0, sp: 0, solo: 0, vocal: 0, perc: 0, hit: 0, section: 0, clock: 0 };
   let id = 'none';
@@ -1173,7 +1173,6 @@ export function createDriver({ getSource }) {
     g.drawImage(lowB, 0, 0, s.w, s.h);
   };
   const driver = {
-    visibility: 0.65, // 0..1: how much of the visualizer shows through (the stage colour covers the rest)
     blur: 0, // px of blur on the visualizer (not on the notes); 0 costs nothing
     get id() { return id; },
     select(next) {
@@ -1210,6 +1209,7 @@ export function createDriver({ getSource }) {
       }
       const s = state;
       s.t = t; s.w = w; s.h = h;
+      s.stage = bgRgb; // the stage colour, 'r, g, b': for effects that want to use it
       s.dpr = g.getTransform().a || 1;
       s.clock = performance.now() / 1000;
       beatInfo(data.beats, t, s.beat);
@@ -1231,8 +1231,6 @@ export function createDriver({ getSource }) {
         console.error('Visualizer failed:', err);
       }
       g.restore();
-      g.fillStyle = `rgba(${bgRgb},${(1 - driver.visibility).toFixed(3)})`;
-      g.fillRect(0, 0, w, h);
       const ms = performance.now() - t0;
       stats[id] = stats[id] === undefined ? ms : stats[id] * 0.9 + ms * 0.1;
     },
