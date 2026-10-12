@@ -243,3 +243,4 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - Lyric sheet fades with a visualizer: the rows are drawn on their own layer (`rowLayer`) and the top/bottom fades erase only the words; the rail and the jump button are drawn after, on the stage. Without a visualizer the stage-colour fade is unchanged.
 - Seek bar thumb and the time counter follow the eased time of the seek animation (`shownTime + chartDelay` in `frame()`), so they rush along with the fretboards; the audio clock and the loop use the real time.
 - The seek thumb is hidden until hover, but `.seekbox.animating` (set from `vis.anim` in `frame()`) keeps it visible while a seek animation runs.
+- A `#/song/<id>/play` link (startup, reload, hashchange) loads the audio together with the song (`loadAudioWithSong` → `ensureAudio()`), ready to press Play; browsers block sound before a click, so it does not start by itself. `#/song/<id>` (details) still loads no audio.

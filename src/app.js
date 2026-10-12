@@ -537,7 +537,10 @@ function setStatus(text) {
 }
 
 // ---------- Song and chart selection ----------
+let loadAudioWithSong = false; // a #/song/<id>/play link: the audio loads with the song, like a Play press would
 async function selectSong(song) {
+  const wantAudio = loadAudioWithSong;
+  loadAudioWithSong = false;
   if (detached) {
     pendingSongId = song.id;
     setStatus('Choose the songs folder to open this song.');
@@ -624,6 +627,7 @@ async function selectSong(song) {
   current.stems = stems;
   setLoadState('idle', 'The audio loads when you press Play.', 0); // nothing is decoded until then
   if (chart && prefs.get('general.autoplay')) togglePlay(); // "Start playing as soon as I pick a song"
+  else if (chart && wantAudio) ensureAudio(); // (playing needs a click: browsers block sound before one)
 }
 
 // The audio (the heavy part) loads on demand: Play, the Listen card or Space. A loading screen covers the song panel meanwhile.
@@ -2395,6 +2399,7 @@ function openFromHash() {
   if (route.view === 'library' || current?.song.id === route.id) return;
   const song = songs.find((s) => s.id === route.id);
   if (!song) return;
+  loadAudioWithSong = route.view === 'play';
   selectSong(song);
   if (route.view === 'play') setInfoOpen(false);
 }
