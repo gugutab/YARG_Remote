@@ -1744,14 +1744,14 @@ function buildPaneMenu() {
   for (const [label, enabled, onClick, cls] of [
     ['Swap instrument', hiddenGroups().length > 0, () => swapPane(group), 'chip-btn'],
     ['Add instrument', free > 0, addPane, 'chip-btn'],
-    ['Remove instrument', canClose, () => { closePane(group); els.paneMenu.hidden = true; }, 'chip-btn pm-remove'],
+    ['Remove instrument', true, () => { if (canClose) { closePane(group); els.paneMenu.hidden = true; } else swapPane(group); }, 'chip-btn pm-remove'], // the only one on screen: it goes, and the cards to choose another take its place
   ]) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = cls;
     b.textContent = label;
     b.disabled = !enabled;
-    if (label.startsWith('Remove') && !enabled) b.title = 'It is the only instrument on screen';
+    if (label.startsWith('Remove') && !canClose) b.title = 'It is the only instrument on screen: choose another one';
     b.addEventListener('click', onClick);
     row.append(b);
   }
