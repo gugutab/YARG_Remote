@@ -1248,3 +1248,8 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 /* the thumb stays visible while a seek animation runs */
 .seekbox.animating input::-webkit-slider-thumb { opacity: 1; margin-top: -3px; }
 .seekbox.animating input::-moz-range-thumb { opacity: 1; }
+
+/* Neck speed and chart delay of one window, in its instrument menu */
+.pane-menu .pm-range { display: grid; grid-template-columns: 1fr 52px 22px; align-items: center; gap: 6px; }
+.pane-menu .pm-range output { text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.pane-menu .pm-range .reset:disabled { opacity: .3; }

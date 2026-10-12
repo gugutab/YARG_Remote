@@ -554,6 +554,7 @@ async function selectSong(song) {
   syncPlayButton();
   ready = false;
   setLoop(null); // a loop belongs to one song
+  highway.paneOpts = {}; // so do the options of each window
   audioLoad = null;
   current = null;
   chart = null;
@@ -1679,11 +1680,17 @@ function syncPlayButton() {
 // ---------- 2D / 3D view ----------
 function setView(view) {
   highway.setView(view);
+  highway.clearPaneOpt(null, 'view'); // a global choice (the V key, the settings) applies to every window again
   for (const b of els.viewChoice.querySelectorAll('[data-view]')) b.setAttribute('aria-pressed', String(b.dataset.view === view));
   if (prefs.get('highway.view') !== view) prefs.set('highway.view', view); // the last choice is the default
 }
 setView(prefs.get('highway.view'));
-els.viewChoice.addEventListener('click', (e) => { const b = e.target.closest('[data-view]'); if (b) setView(b.dataset.view); });
+// In the instrument menu, the view and the note shape belong to that window only.
+els.viewChoice.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-view]');
+  if (!b) return;
+  if (menuKey) { highway.setPaneOpt(menuKey, 'view', b.dataset.view); syncMenuView(); } else setView(b.dataset.view);
+});
 
 // ---------- Vocal view: notes with lyrics, or karaoke (the lyrics alone) ----------
 function setVocalView(view) {
@@ -1932,6 +1939,8 @@ function buildPaneMenu() {
     return box;
   };
   const canClose = group.pinned || groups.some((g) => g.pinned);
+  syncMenuView();
+  for (const g of els.paneMenu.querySelectorAll('[data-needs]')) g.hidden = g.dataset.needs === 'lanes' ? ins.mode === 'vocals' : ins.mode !== 'vocals'; // this window's own options
   const head = document.createElement('div');
   head.className = 'pm-head';
   head.innerHTML = `<svg class="pm-icon"><use href="#i-${INSTRUMENT_ICON[ins.base] || 'music'}"/></svg><b></b>`;
@@ -1947,6 +1956,29 @@ function buildPaneMenu() {
   }
   const volume = menuVolume(group); // the volume of this instrument's track (or tracks), like the Stem volume card
   if (volume) part('Volume', volume);
+  // A slider with a reset button, for an option that belongs to this window only (see Highway.setPaneOpt).
+  const optRange = (name, min, max, step, def, fmtValue) => {
+    const box = document.createElement('div');
+    box.className = 'pm-range';
+    box.innerHTML = '<input type="range"><output></output><button class="icon small-icon reset" type="button" title="Reset" aria-label="Reset"><svg><use href="#i-reset"/></svg></button>';
+    const input = box.querySelector('input');
+    const out = box.querySelector('output');
+    const reset = box.querySelector('button');
+    Object.assign(input, { min, max, step });
+    const paint = () => {
+      const v = highway.paneOpt(group.key, name);
+      input.value = v;
+      out.textContent = fmtValue(v);
+      reset.disabled = Math.abs(v - def()) < 1e-9;
+      paintRange(input, def());
+    };
+    input.addEventListener('input', () => { highway.setPaneOpt(group.key, name, Number(input.value)); paint(); });
+    reset.addEventListener('click', () => { highway.clearPaneOpt(group.key, name); paint(); });
+    paint();
+    return box;
+  };
+  if (ins.mode !== 'vocals') part('Neck speed', optRange('neck', 0.5, 3, 0.1, () => highway.neck, (v) => `${v.toFixed(1)}×`));
+  part('Chart delay', optRange('delay', -1, 1, 0.05, () => 0, (v) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)} s`));
   const free = hiddenGroups().length - current.choosers.length; // instruments with no slot yet
   const row = els.paneMenuActions; // at the end of the menu: swap, add and remove
   row.replaceChildren();
@@ -2049,11 +2081,24 @@ els.highway.addEventListener('wheel', (e) => { // the mouse wheel scrolls the ly
 // ---------- Note style: circles or rounded rectangles ----------
 function setNoteStyle(style) {
   highway.setNoteStyle(style);
+  highway.clearPaneOpt(null, 'noteStyle');
   for (const b of els.noteChoice.querySelectorAll('[data-note]')) b.setAttribute('aria-pressed', String(b.dataset.note === style));
   if (prefs.get('highway.noteStyle') !== style) prefs.set('highway.noteStyle', style);
 }
 setNoteStyle(prefs.get('highway.noteStyle'));
-els.noteChoice.addEventListener('click', (e) => { const b = e.target.closest('[data-note]'); if (b) setNoteStyle(b.dataset.note); });
+els.noteChoice.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-note]');
+  if (!b) return;
+  if (menuKey) { highway.setPaneOpt(menuKey, 'noteStyle', b.dataset.note); syncMenuView(); } else setNoteStyle(b.dataset.note);
+});
+// The pressed state of the view and shape buttons for the window the menu is open on.
+function syncMenuView() {
+  if (!menuKey) return;
+  const view = highway.paneOpt(menuKey, 'view');
+  const style = highway.paneOpt(menuKey, 'noteStyle');
+  for (const b of els.viewChoice.querySelectorAll('[data-view]')) b.setAttribute('aria-pressed', String(b.dataset.view === view));
+  for (const b of els.noteChoice.querySelectorAll('[data-note]')) b.setAttribute('aria-pressed', String(b.dataset.note === style));
+}
 
 // ---------- Hide / show the top bar (the chart takes its space) ----------
 // The stage buttons line up with the right edge of the top bar's content (which stops growing on wide screens).

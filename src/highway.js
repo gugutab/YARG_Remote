@@ -53,6 +53,7 @@ export class Highway {
     this.maxLength = 0; // longest sustain in the current chart, in seconds
     this.view = '2d';
     this.noteStyle = 'round'; // 'round' or 'rect' (rounded rectangles)
+    this.paneOpts = {}; // per window overrides, see setPaneOpt
     this.neck = 1.2; // neck speed (the app default): scales distance between notes only; timing is unchanged
     this.bg = '#0d1117'; // chart background and the colour its fades dissolve into (the theme's "stage" colour)
     this.bgRgb = '13, 17, 23';
@@ -99,6 +100,22 @@ export class Highway {
 
   setNeckSpeed(value) {
     this.neck = value;
+  }
+
+  // Options of one window (a fretboard or the vocal chart) that override the global ones: view, noteStyle, neck, delay (seconds the
+  // notes arrive later). `paneOpt` answers with the override or the global value; clearPaneOpt(null, name) clears it for every window.
+  setPaneOpt(key, name, value) {
+    (this.paneOpts[key] ??= {})[name] = value;
+  }
+
+  clearPaneOpt(key, name) {
+    for (const k of key === null ? Object.keys(this.paneOpts) : [key]) if (this.paneOpts[k]) delete this.paneOpts[k][name];
+  }
+
+  paneOpt(key, name) {
+    const v = this.paneOpts[key]?.[name];
+    if (v !== undefined) return v;
+    return name === 'delay' ? 0 : name === 'view' ? this.view : name === 'noteStyle' ? this.noteStyle : this.neck;
   }
 
   setChart(chart) {
@@ -344,34 +361,45 @@ export class Highway {
     g.rect(x, y, pw, ph);
     g.clip();
     g.translate(x, y);
-    this.chart = pane.chart;
-    this.curPane = pane;
-    this.maxLength = pane.maxLength;
-    this.vRange = pane.vRange;
-    if (pane.chart.mode === 'vocals') {
-      if (this.vocalView === 'karaoke') this.renderKaraoke(t, pw, ph, pane);
-      else this.renderVocals(t, pw, ph);
-    } else { // the fade at the edges erases the board (it never paints a colour over what is behind: the stage colour or a visualizer)
-      const main = g;
-      const dpr = this.canvas.width / (this.canvas.clientWidth || 1);
-      const layer = this.layerFor(pw, ph, dpr);
-      const lg = layer.getContext('2d');
-      lg.setTransform(1, 0, 0, 1, 0, 0);
-      lg.clearRect(0, 0, layer.width, layer.height);
-      lg.setTransform(dpr, 0, 0, dpr, 0, 0);
-      this.g = lg;
-      this.layered = true;
-      try {
-        if (this.view === '3d') renderLanes3D(this, t, pw, ph);
-        else this.renderLanes(t, pw, ph);
-      } finally {
-        this.g = main;
-        this.layered = false;
+    const saved = { view: this.view, noteStyle: this.noteStyle, neck: this.neck };
+    this.view = this.paneOpt(pane.key, 'view');
+    this.noteStyle = this.paneOpt(pane.key, 'noteStyle');
+    this.neck = this.paneOpt(pane.key, 'neck');
+    t -= this.paneOpt(pane.key, 'delay'); // this window's own chart delay
+    try {
+      this.chart = pane.chart;
+      this.curPane = pane;
+      this.maxLength = pane.maxLength;
+      this.vRange = pane.vRange;
+      if (pane.chart.mode === 'vocals') {
+        if (this.vocalView === 'karaoke') this.renderKaraoke(t, pw, ph, pane);
+        else this.renderVocals(t, pw, ph);
+      } else { // the fade at the edges erases the board (it never paints a colour over what is behind: the stage colour or a visualizer)
+        const main = g;
+        const dpr = this.canvas.width / (this.canvas.clientWidth || 1);
+        const layer = this.layerFor(pw, ph, dpr);
+        const lg = layer.getContext('2d');
+        lg.setTransform(1, 0, 0, 1, 0, 0);
+        lg.clearRect(0, 0, layer.width, layer.height);
+        lg.setTransform(dpr, 0, 0, dpr, 0, 0);
+        this.g = lg;
+        this.layered = true;
+        try {
+          if (this.view === '3d') renderLanes3D(this, t, pw, ph);
+          else this.renderLanes(t, pw, ph);
+        } finally {
+          this.g = main;
+          this.layered = false;
+        }
+        main.drawImage(layer, 0, 0, layer.width, layer.height, 0, 0, pw, ph);
       }
-      main.drawImage(layer, 0, 0, layer.width, layer.height, 0, 0, pw, ph);
+      pane.vRange = this.vRange;
+      if (!(pane.chart.mode === 'vocals' && this.vocalView === 'karaoke')) this.drawCountdown(pane, t, pw, ph);
+    } finally {
+      this.view = saved.view;
+      this.noteStyle = saved.noteStyle;
+      this.neck = saved.neck;
     }
-    pane.vRange = this.vRange;
-    if (!(pane.chart.mode === 'vocals' && this.vocalView === 'karaoke')) this.drawCountdown(pane, t, pw, ph);
     g.restore();
   }
 
