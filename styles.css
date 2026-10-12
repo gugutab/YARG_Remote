@@ -1159,3 +1159,10 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .pm-mixer .mix-row { font-size: 12px; gap: 6px; }
 .pm-mixer .mix-name { display: none; }
 .pm-mixer .mix-kids { margin-top: 4px; }
+
+/* hover on the horizontal selectors (difficulty, type, view, note shape, card style...) */
+.seg button { cursor: pointer; transition: background-color .12s, color .12s, filter .12s; }
+.seg button:hover:not(:disabled):not([aria-pressed="true"]) { background: color-mix(in srgb, var(--accent) 18%, var(--panel-2)); color: var(--text); }
+.seg button[aria-pressed="true"]:hover:not(:disabled) { filter: brightness(1.14); }
+.seg button:active:not(:disabled) { filter: brightness(.92); }
+.seg button:disabled { cursor: default; }
