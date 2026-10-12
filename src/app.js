@@ -2301,8 +2301,9 @@ function visualChartTime(ct) {
 }
 
 let lastClock = null; // the previous frame's music time and timestamp, for the clock jitter meter
-function frame() {
+function frame(frameTs) {
   const frameStart = performance.now();
+  if (frameTs) player.frameNow = frameTs; // the clock of this animation frame (vsync aligned)
   let drawMs = 0;
   if (current && chart) {
     let t = player.currentTime();
@@ -2325,8 +2326,8 @@ function frame() {
       player.pause();
       syncPlayButton();
     }
-    if (player.playing && lastClock && !instantJump && Math.abs(t - lastClock.t) < SEEK_JUMP_SEC) perf.clock(((t - lastClock.t) - ((frameStart - lastClock.at) / 1000) * player.rate) * 1000); // steadiness of the music clock
-    lastClock = { t, at: frameStart };
+    if (player.playing && lastClock && !instantJump && Math.abs(t - lastClock.t) < SEEK_JUMP_SEC) perf.clock(((t - lastClock.t) - (((frameTs || frameStart) - lastClock.at) / 1000) * player.rate) * 1000); // steadiness of the music clock
+    lastClock = { t, at: frameTs || frameStart };
     const chartTime = t - settings.chartDelay;
     const shownTime = visualChartTime(chartTime);
     if (vis.anim && Math.abs(vis.step) > MOTION_BLUR_MIN_STEP && prefs.get('highway.motionBlur')) { // a fast jump: blur the motion

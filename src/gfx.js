@@ -42,21 +42,37 @@ export function firstIndexAtOrAfter(notes, time) {
   return lo;
 }
 
+// Colour strings are cached per colour and quantised amount: they were rebuilt for every note on every frame, and that garbage was
+// one of the things behind micro-stutters. The steps are fine enough to be invisible.
+const colorCache = [new Map(), new Map(), new Map()];
+function cachedColor(kind, hex, amount, steps, build) {
+  let row = colorCache[kind].get(hex);
+  if (!row) { row = []; colorCache[kind].set(hex, row); }
+  const q = Math.round(Math.min(1, Math.max(0, amount)) * steps);
+  return row[q] ?? (row[q] = build(hex, q / steps));
+}
+
 export function tintWhite(hex, amount) {
-  const n = parseInt(hex.slice(1), 16);
-  const mix = (c) => Math.round(c + (255 - c) * amount);
-  return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
+  return cachedColor(0, hex, amount, 64, (h, a) => {
+    const n = parseInt(h.slice(1), 16);
+    const mix = (c) => Math.round(c + (255 - c) * a);
+    return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
+  });
 }
 
 export function darken(hex, factor) {
-  const n = parseInt(hex.slice(1), 16);
-  const mix = (c) => Math.round(c * factor);
-  return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
+  return cachedColor(1, hex, factor, 100, (h, a) => {
+    const n = parseInt(h.slice(1), 16);
+    const mix = (c) => Math.round(c * a);
+    return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
+  });
 }
 
 export function withAlpha(hex, alpha) {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+  return cachedColor(2, hex, alpha, 100, (h, a) => {
+    const n = parseInt(h.slice(1), 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  });
 }
 
 // A long note keeps its head on the hit line while it lasts; the exit animation starts when the tail ends.
@@ -153,65 +169,81 @@ export const NOTE_TRI_H = 0.72; // flatter than the round note (it was 1.0)
 export const NOTE_TRI_ROUND = 0.5;
 export const NOTE_RECT_ROUND = 0.8; // corner radius as a fraction of the half-height (1 = a pill); it was 0.55
 
-// A polygon with rounded corners, as sampled points: each corner is replaced by an arc of radius r (clamped so it fits).
-function roundedPolygon(verts, r) {
-  const out = [];
-  const n = verts.length;
-  for (let i = 0; i < n; i++) {
-    const V = verts[i];
-    const A = verts[(i + n - 1) % n];
-    const B = verts[(i + 1) % n];
-    const ua = [A[0] - V[0], A[1] - V[1]];
-    const ub = [B[0] - V[0], B[1] - V[1]];
-    const la = Math.hypot(...ua);
-    const lb = Math.hypot(...ub);
-    ua[0] /= la; ua[1] /= la; ub[0] /= lb; ub[1] /= lb;
-    const cos = Math.max(-1, Math.min(1, ua[0] * ub[0] + ua[1] * ub[1]));
+// The sampled outline of a note head goes into one reused buffer (x, y pairs): drawing hundreds of notes a frame used to allocate
+// thousands of small arrays, and the garbage collector's pauses showed up as micro-stutters.
+const PT = new Float64Array(256);
+
+// A triangle with rounded corners, sampled into PT (9 points per corner, 27 in all); returns the number of points.
+function roundedTriangle(x0, y0, x1, y1, x2, y2, r) {
+  let n = 0;
+  for (let i = 0; i < 3; i++) {
+    const vx = i === 0 ? x0 : i === 1 ? x1 : x2;
+    const vy = i === 0 ? y0 : i === 1 ? y1 : y2;
+    const ax = i === 0 ? x2 : i === 1 ? x0 : x1; // previous vertex
+    const ay = i === 0 ? y2 : i === 1 ? y0 : y1;
+    const bx = i === 0 ? x1 : i === 1 ? x2 : x0; // next vertex
+    const by = i === 0 ? y1 : i === 1 ? y2 : y0;
+    let uax = ax - vx;
+    let uay = ay - vy;
+    let ubx = bx - vx;
+    let uby = by - vy;
+    const la = Math.hypot(uax, uay);
+    const lb = Math.hypot(ubx, uby);
+    uax /= la; uay /= la; ubx /= lb; uby /= lb;
+    const cos = Math.max(-1, Math.min(1, uax * ubx + uay * uby));
     const theta = Math.acos(cos); // angle at the corner
     const t = Math.min(r / Math.tan(theta / 2), la * 0.48, lb * 0.48); // distance from the corner to the tangent points
     const rr = t * Math.tan(theta / 2); // the radius that distance allows
-    const bis = [ua[0] + ub[0], ua[1] + ub[1]];
-    const bl = Math.hypot(...bis) || 1;
+    const bisx = uax + ubx;
+    const bisy = uay + uby;
+    const bl = Math.hypot(bisx, bisy) || 1;
     const dc = rr / Math.sin(theta / 2);
-    const C = [V[0] + (bis[0] / bl) * dc, V[1] + (bis[1] / bl) * dc];
-    const a0 = Math.atan2(V[1] + ua[1] * t - C[1], V[0] + ua[0] * t - C[0]);
-    let a1 = Math.atan2(V[1] + ub[1] * t - C[1], V[0] + ub[0] * t - C[0]);
+    const cx = vx + (bisx / bl) * dc;
+    const cy = vy + (bisy / bl) * dc;
+    const a0 = Math.atan2(vy + uay * t - cy, vx + uax * t - cx);
+    const a1 = Math.atan2(vy + uby * t - cy, vx + ubx * t - cx);
     let d = a1 - a0;
     while (d > Math.PI) d -= Math.PI * 2;
     while (d < -Math.PI) d += Math.PI * 2;
     for (let k = 0; k <= 8; k++) {
       const a = a0 + (d * k) / 8;
-      out.push([C[0] + rr * Math.cos(a), C[1] + rr * Math.sin(a)]);
+      PT[n++] = cx + rr * Math.cos(a);
+      PT[n++] = cy + rr * Math.sin(a);
     }
   }
-  return out;
+  return n / 2;
 }
 
+// Fills PT with the outline of a note head and returns how many points it holds.
 function outline(x, y, rx, ry, style) {
   if (style === 'tri') { // a rounded triangle pointing up (cymbal notes)
     const w = rx * NOTE_TRI_W;
     const h = ry * NOTE_TRI_H;
-    return roundedPolygon([[x, y - h], [x + w, y + h], [x - w, y + h]], Math.min(w, h) * NOTE_TRI_ROUND);
+    return roundedTriangle(x, y - h, x + w, y + h, x - w, y + h, Math.min(w, h) * NOTE_TRI_ROUND);
   }
-  const pts = [];
+  let n = 0;
   if (style !== 'rect') {
     for (let i = 0; i < 40; i++) {
       const a = (i / 40) * Math.PI * 2;
-      pts.push([x + rx * Math.cos(a), y + ry * Math.sin(a)]);
+      PT[n++] = x + rx * Math.cos(a);
+      PT[n++] = y + ry * Math.sin(a);
     }
-    return pts;
+    return 40;
   }
   const w = rx * NOTE_RECT_W;
   const h = ry * NOTE_RECT_H;
   const r = Math.min(w, h) * NOTE_RECT_ROUND;
-  const corners = [[x + w - r, y - h + r, -90], [x + w - r, y + h - r, 0], [x - w + r, y + h - r, 90], [x - w + r, y - h + r, 180]];
-  for (const [cx, cy, start] of corners) {
+  for (let c = 0; c < 4; c++) { // the four corners, each an arc of 7 points
+    const cx = c === 0 || c === 1 ? x + w - r : x - w + r;
+    const cy = c === 0 || c === 3 ? y - h + r : y + h - r;
+    const start = c * 90 - 90;
     for (let k = 0; k <= 6; k++) {
       const a = ((start + (k / 6) * 90) * Math.PI) / 180;
-      pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+      PT[n++] = cx + r * Math.cos(a);
+      PT[n++] = cy + r * Math.sin(a);
     }
   }
-  return pts;
+  return 28;
 }
 
 export function noteShape(g, x, y, rx, ry, style, dist = 0) {
@@ -220,15 +252,16 @@ export function noteShape(g, x, y, rx, ry, style, dist = 0) {
       g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
       return;
     }
-    const pts = outline(x, y, rx, ry, style);
-    g.moveTo(pts[0][0], pts[0][1]);
-    for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
+    const n = outline(x, y, rx, ry, style);
+    g.moveTo(PT[0], PT[1]);
+    for (let i = 1; i < n; i++) g.lineTo(PT[2 * i], PT[2 * i + 1]);
     g.closePath();
     return;
   }
-  const pts = outline(x, y, rx, ry, style);
-  for (let i = 0; i < pts.length; i++) {
-    const [px, py] = pts[i];
+  const n = outline(x, y, rx, ry, style);
+  for (let i = 0; i < n; i++) {
+    const px = PT[2 * i];
+    const py = PT[2 * i + 1];
     const true_ = (dist + (py - y)) / dist; // exact perspective factor at this row
     const f = 1 + TAPER_GAIN * (true_ - 1);
     const X = x + (px - x) * f;

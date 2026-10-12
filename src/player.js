@@ -251,7 +251,7 @@ class WorkletPlayer {
     // The audio clock only moves in steps (the worklet reports every ~12 ms, ctx.currentTime moves in audio blocks), which made the
     // notes advance unevenly even at a high frame rate. So the time runs on the real clock between frames and is pulled gently
     // towards the audio position (time constant 0.15 s); a bigger gap (a seek, a speed change) snaps.
-    const now = performance.now();
+    const now = this.frameNow ?? performance.now(); // the animation frame's own timestamp when the page gives it: it is steadier than a clock read in the callback
     const sm = this.smooth;
     if (!sm || Math.abs(raw - sm.t) > 0.1 || now < sm.at) { this.smooth = { t: raw, at: now }; return raw; }
     const dt = (now - sm.at) / 1000;
@@ -361,6 +361,7 @@ export class MultiTrackPlayer {
     }
   }
 
+  set frameNow(ms) { this.impl.frameNow = ms; }
   get duration() { return this.impl.duration; }
   get playing() { return this.impl.playing; }
   get stems() { return this.impl.stems; }

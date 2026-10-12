@@ -19,6 +19,8 @@ const ROAD_END = 1.8; // the road runs well past the last visible note, so it ha
 const BAR_DEPTH = 0.0087; // one third of the earlier 0.026 // pedal/open bar thickness along the road, in depth units (it lies flat on the fretboard)
 const GLOW_DEPTH = 0.009; // half-height of the hit glow (it was 0.026 and looked too tall)
 const easeOut = (x) => 1 - (1 - x) ** 3;
+const TAIL_RIGHT = new Float64Array(2 * 21); // scratch for taperedStrip
+const FLASH = new Float64Array(16); // scratch of renderLanes3D: the light of each pad
 
 export function renderLanes3D(hw, t, w, h) {
   const g = hw.g;
@@ -52,16 +54,17 @@ export function renderLanes3D(hw, t, w, h) {
   const tailFactor = (d, dRef) => TAIL_MIN_WIDTH + (1 - TAIL_MIN_WIDTH) * (scaleAt(d) / scaleAt(dRef)) ** TAIL_TAPER_POWER;
   const taperedStrip = (d0, d1, mid, wl, dRef) => {
     const N = 20;
-    const right = [];
+    const right = TAIL_RIGHT; // (reused: x, y pairs)
     g.beginPath();
     for (let i = 0; i <= N; i++) {
       const d = d0 + ((d1 - d0) * i) / N;
       const hw = wl * tailFactor(d, dRef);
       if (i === 0) g.moveTo(xAt(mid - hw, d), yAt(d));
       else g.lineTo(xAt(mid - hw, d), yAt(d));
-      right.push([xAt(mid + hw, d), yAt(d)]);
+      right[2 * i] = xAt(mid + hw, d);
+      right[2 * i + 1] = yAt(d);
     }
-    for (let i = N; i >= 0; i--) g.lineTo(right[i][0], right[i][1]);
+    for (let i = N; i >= 0; i--) g.lineTo(right[2 * i], right[2 * i + 1]);
     g.closePath();
   };
   const span = (spans, color) => {
@@ -117,14 +120,17 @@ export function renderLanes3D(hw, t, w, h) {
 
   // notes that can still be seen
   const from = firstVisibleIndex(chart.notes, t, hw.maxLength);
-  const visible = [];
-  for (let i = from; i < chart.notes.length && chart.notes[i].time <= t + windowSec; i++) visible.push(chart.notes[i]);
+  const notes = chart.notes;
+  let end = from; // the notes that can be seen are notes[from .. end)
+  while (end < notes.length && notes[end].time <= t + windowSec) end++;
   const colors = chart.laneColors || GUITAR_LANE_COLORS;
 
   // hit zone: a bar across the road and one pad per lane, lit while a note is being hit
-  const flash = new Array(lanes).fill(0);
+  const flash = FLASH;
+  flash.fill(0, 0, lanes);
   let barFlash = 0; // a pedal or open hit lights the whole zone
-  for (const n of visible) {
+  for (let vi = from; vi < end; vi++) {
+    const n = notes[vi];
     const past = t - n.time;
     if (past < 0) continue;
     if (n.lane >= 0 && !n.open) flash[n.lane] = Math.max(flash[n.lane], heldAmount(n, t) * (0.75 + 0.15 * Math.sin(t * 22)));
@@ -150,8 +156,8 @@ export function renderLanes3D(hw, t, w, h) {
   // Pedal and open bars lie flat on the road (a quad with real depth, not a screen-space strip) and sit behind
   // the heads; far ones first. Hit animation (FADE_SEC): white flash, a glow that spreads over the road and the
   // rails, and a bar that thins out as it fades.
-  for (let i = visible.length - 1; i >= 0; i--) {
-    const n = visible[i];
+  for (let i = end - 1; i >= from; i--) {
+    const n = notes[i];
     if (n.lane >= 0 && !n.open) continue;
     const past = t - exitTime(n);
     if (past > FADE_SEC) continue;
@@ -196,7 +202,8 @@ export function renderLanes3D(hw, t, w, h) {
   g.globalAlpha = 1;
 
   // sustains
-  for (const n of visible) {
+  for (let vi = from; vi < end; vi++) {
+    const n = notes[vi];
     if (!n.length || n.lane < 0) continue;
     const dTop = depth(n.time + n.length);
     const dBot = depth(Math.max(n.time, t));
@@ -249,8 +256,8 @@ export function renderLanes3D(hw, t, w, h) {
   }
 
   // heads, far to near so closer ones cover farther ones
-  for (let i = visible.length - 1; i >= 0; i--) {
-    const n = visible[i];
+  for (let i = end - 1; i >= from; i--) {
+    const n = notes[i];
     if (n.lane < 0 || n.open) continue;
     const past = t - exitTime(n); // long notes: the exit starts when the tail ends
     if (past > FADE_SEC) continue;
