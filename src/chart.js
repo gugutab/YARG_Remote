@@ -385,10 +385,11 @@ function commonParts(midi, track, toSec, settings = chartSettings({}, midi.divis
   const eventsTrack = midi.tracks.find((t) => t.name.toUpperCase() === 'EVENTS');
   const sections = eventsTrack
     ? eventsTrack.texts
-      .map((t) => { const raw = parseSectionName(t.text); return { time: toSec(t.tick), name: raw === null ? null : prettySectionName(raw), raw }; }) // `raw` is the name as written in the file
+      .map((t) => ({ time: toSec(t.tick), name: parseSectionName(t.text) })) // the name as written, minus the prefix (TextEvents.TryParseSectionEvent)
       .filter((s) => s.name !== null)
       .sort((a, b) => a.time - b.time)
     : [];
+  if (sections.length === 0) sections.push(...autoSections(midi, toSec));
   // With the legacy star power note (103) YARG drops solos: the note cannot be both (MidReader.ProcessLists.cs, GetPhraseProcessDict).
   const legacyStarPower = settings.starPowerNote === SOLO_NOTE;
   const events = eventsTrack ? eventsTrack.texts.filter((t) => parseSectionName(t.text) === null) : []; // sections are not "global events" in YARG
@@ -527,25 +528,25 @@ export function parseSectionName(raw) {
   return name || null;
 }
 
-// Section names written the Rock Band way are internal keys (chorus_1, gtr_solo_a, big_rock_ending, _endofsong); the ones
-// charters typed by hand ("Verse 1", "Guitar Solo") are already readable and are left as they are. YARG.Core shows the name
-// as it is (TextEvents.TryParseSectionEvent only drops the prefix); this is only for display.
-const SECTION_WORDS = { gtr: 'Guitar', gtrs: 'Guitars', bs: 'Bass', drm: 'Drums', drms: 'Drums', kbd: 'Keys', kbds: 'Keys', kb: 'Keys', keys: 'Keys', vox: 'Vocals', voc: 'Vocals', vocs: 'Vocals', inst: 'Instrumental', mel: 'Melody', bre: 'Big Rock Ending', endofsong: 'End of Song', endofsong1: 'End of Song' };
-const SECTION_SMALL = new Set(['of', 'the', 'and', 'to', 'in', 'on', 'at', 'for']);
-export function prettySectionName(name) {
-  const raw = String(name).trim();
-  if (!raw || /[A-Z]/.test(raw)) return raw; // already typed with capitals: left as written
-  const clean = raw.replace(/^_+/, '').replace(/^practice_/, '');
-  if (!clean) return raw;
-  const words = clean.split(/[_\s]+/).filter(Boolean).map((w) => {
-    if (SECTION_WORDS[w]) return SECTION_WORDS[w];
-    const pre = /^(pre|post)(chorus|verse|bridge|solo|riff|intro)$/.exec(w); // prechorus -> Pre-Chorus
-    if (pre) return `${pre[1][0].toUpperCase()}${pre[1].slice(1)}-${pre[2][0].toUpperCase()}${pre[2].slice(1)}`;
-    if (/^\d+[a-z]?$/.test(w)) return w.toUpperCase(); // 1, 2a -> 2A
-    if (/^[a-z]$/.test(w)) return w.toUpperCase(); // a, b -> A, B
-    return w.replace(/(^|-)([a-z])/g, (m, a, b) => a + b.toUpperCase()); // pre-chorus -> Pre-Chorus
-  });
-  return words.map((w, i) => (i > 0 && SECTION_SMALL.has(w.toLowerCase()) ? w.toLowerCase() : w)).join(' ');
+// A song with no sections gets ten automatic ones, "0% - 10%" ... "90% - 100%" of the song, so the section chip, the list and the
+// jumps still work (YARG.Core Chart/SongChart.AutoGeneration.cs PostProcessSections). The song's last tick is the last note or
+// lyric of any instrument (SongChart.GetLastTick); the EVENTS, BEAT, VENUE and animation tracks are not counted.
+export function autoSections(midi, toSec) {
+  let lastTick = 0;
+  for (const track of midi.tracks) {
+    const name = String(track.name || '').toUpperCase();
+    if (name === 'EVENTS' || name === 'BEAT' || name === 'VENUE' || name.endsWith(' ANIM')) continue;
+    for (const n of track.notes || []) lastTick = Math.max(lastTick, n.endTick ?? n.tick);
+    for (const l of track.lyrics || []) lastTick = Math.max(lastTick, l.tick);
+  }
+  if (lastTick <= 0) return [];
+  const out = [];
+  let startTick = 0;
+  for (let i = 0; i < 10; i++) {
+    out.push({ time: toSec(startTick), name: `${i * 10}% - ${i + 1}0%` }); // (the name is `{i * 10}% - {i + 1}0%` in YARG)
+    startTick = Math.floor(lastTick * ((i + 1) / 10));
+  }
+  return out;
 }
 
 // Index of the section playing at chart time t: the last section that has started, or the first one
