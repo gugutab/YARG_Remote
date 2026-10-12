@@ -81,13 +81,13 @@ function savePanelState() {
   if (narrow()) return;
   try { localStorage.setItem('yargremote.panelState', JSON.stringify({ library: libraryOpen(), song: songPanelOpen() })); } catch { /* optional */ }
 }
-function setSongPanelOpen(open) {
+function setSongPanelOpen(open, persist = true) {
   if (narrow()) return; // a phone shows one thing at a time
   if (!open && !libraryOpen()) setLibraryOpen(true); // never both closed
   if (!open) els.app.style.setProperty('--main-w', `${Math.round(document.querySelector('.main').getBoundingClientRect().width)}px`); // it slides out by its own width
   els.app.classList.toggle('song-closed', !open);
   syncPanelUi();
-  savePanelState();
+  if (persist) savePanelState();
 }
 function setLibraryOpen(open, persist = true) {
   if (!open && !narrow() && !songPanelOpen()) setSongPanelOpen(true); // never both closed
@@ -121,6 +121,57 @@ els.closeLibrary.addEventListener('click', () => setLibraryOpen(false, false));
 els.scrim.addEventListener('click', () => setLibraryOpen(false, false));
 els.welcomeOpen.addEventListener('click', () => setLibraryOpen(true));
 els.libTab.addEventListener('click', () => setLibraryOpen(true));
+
+// ---------- Peeking: resting the pointer on a handle opens its menu for a while ----------
+// Hovering the handle of a hidden menu (the library's tab, the song panel's tab, the top bar's tab) for a moment opens it
+// temporarily: nothing is saved, and it closes again when the pointer has been out of it for a couple of seconds or has stopped
+// moving for a few. It stays while something in it is being edited or a popover is open.
+const PEEK = { hoverMs: 1000, outsideMs: 2000, idleMs: 3000 };
+function setupPeek(handle, panel, { isOpen, open, close }) {
+  let peeking = false;
+  let hoverTimer = 0;
+  let outsideTimer = 0;
+  let idleTimer = 0;
+  const busy = () => { // do not take the menu away from someone who is using it
+    const el = document.activeElement;
+    return !!document.querySelector('.popover:not([hidden])') || (panel.contains(el) && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName));
+  };
+  const end = () => {
+    clearTimeout(outsideTimer);
+    clearTimeout(idleTimer);
+    if (!peeking) return;
+    if (busy()) { arm(); return; } // try again later
+    peeking = false;
+    if (isOpen()) close();
+  };
+  const arm = () => { // the idle timer restarts with every move over the menu
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(end, PEEK.idleMs);
+  };
+  handle.addEventListener('pointerenter', (e) => {
+    if (e.pointerType === 'touch' || narrow() || isOpen()) return;
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(() => {
+      if (isOpen()) return;
+      peeking = true;
+      open();
+      arm();
+    }, PEEK.hoverMs);
+  });
+  handle.addEventListener('pointerleave', () => clearTimeout(hoverTimer));
+  handle.addEventListener('click', () => { clearTimeout(hoverTimer); peeking = false; }); // a click opens it for good
+  panel.addEventListener('pointerenter', () => clearTimeout(outsideTimer));
+  panel.addEventListener('pointermove', () => { if (peeking) arm(); });
+  panel.addEventListener('pointerleave', () => {
+    if (!peeking) return;
+    clearTimeout(outsideTimer);
+    outsideTimer = setTimeout(end, PEEK.outsideMs);
+  });
+  panel.addEventListener('pointerdown', () => { if (peeking) arm(); });
+}
+setupPeek(els.libTab, els.library, { isOpen: libraryOpen, open: () => setLibraryOpen(true, false), close: () => setLibraryOpen(false, false) });
+setupPeek(els.songTab, document.querySelector('.main'), { isOpen: songPanelOpen, open: () => setSongPanelOpen(true, false), close: () => setSongPanelOpen(false, false) });
+setupPeek(els.barShow, document.querySelector('.topbar'), { isOpen: () => !els.app.classList.contains('bar-hidden'), open: () => setBarHidden(false, false), close: () => setBarHidden(true, false) });
 els.songTab.addEventListener('click', () => setSongPanelOpen(true));
 els.closeSong.addEventListener('click', () => setSongPanelOpen(false));
 els.closeSongInfo.addEventListener('click', () => setSongPanelOpen(false));
@@ -1821,10 +1872,10 @@ if (typeof ResizeObserver !== 'undefined') {
 }
 window.addEventListener('resize', alignStageButtons);
 els.app.addEventListener('transitionend', alignStageButtons); // the library slides in and out
-function setBarHidden(hidden) {
+function setBarHidden(hidden, persist = true) {
   els.app.classList.toggle('bar-hidden', hidden);
   els.barShow.hidden = !hidden;
-  store.set('barHidden', hidden ? '1' : '0');
+  if (persist) store.set('barHidden', hidden ? '1' : '0');
   closePopovers();
   alignStageButtons();
 }
