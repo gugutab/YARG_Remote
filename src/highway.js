@@ -66,6 +66,7 @@ export class Highway {
     this.vocalH = null; // height of the vocal band in px, once the user dragged its divider (null: the default)
     this.dividers = []; // the draggable dividers drawn this frame
     this.hover = null; // the divider under the pointer
+    this.sheetPeek = 0.12; // share of a lyric sheet's height that shows the lines before the one in focus
     this.delay = 0; // the chart delay, so times shown on the lyrics match the seek bar
     this.pointer = null; // the pointer over the canvas, for the "play from here" button on the lyrics: { x, y, t0, key, shown }
     this.onResize = null; // called when a drag ends, so the page can keep the sizes
@@ -501,16 +502,24 @@ export class Highway {
     const target = state.following === false ? state.hold : focusRow;
     if (state.pos == null || !Number.isFinite(state.pos) || Math.abs(target - state.pos) > 40) state.pos = target;
     else state.pos += (target - state.pos) * (1 - Math.exp(-dt / 0.12));
-    const big = Math.max(18, Math.min(h * 0.16, 46, w * 0.06));
-    const small = Math.max(14, big * 0.72);
-    const step = Math.max(small * 1.55, big * 1.15);
+    // Sizes: the font stays the same (it does not follow the height) while the previous, current and next lines fit; it only
+    // shrinks when they cannot.
+    const peekPx = h * this.sheetPeek; // how much of the lines before the focus shows at the top: a share of the sheet's height
+    let big = Math.max(18, Math.min(46, w * 0.06));
+    let small = Math.max(14, big * 0.72);
+    let step = Math.max(small * 1.55, big * 1.15);
+    while (big > 16 && peekPx - small * 0.5 + step * 2 + small * 0.6 > h) {
+      big -= 2;
+      small = Math.max(12, big * 0.72);
+      step = Math.max(small * 1.55, big * 1.15);
+    }
     sheet.step = step;
-    const top = small * 0.1 + step; // where the row in focus sits: the row before it is half above the top edge
+    const top = peekPx - small * 0.5 + step; // where the row in focus sits (the row before it ends `peekPx` from the top)
     const badgeR = Math.max(14, Math.min(step * 0.38, 30));
     let hovered = null; // the row under the resting pointer, if any
     let seenFrom = Infinity;
     let seenTo = -Infinity; // the time range of the lines on screen, for the rail
-    const from = Math.max(0, Math.floor(state.pos) - 2);
+    const from = Math.max(0, Math.floor(state.pos) - 1 - Math.ceil(peekPx / step));
     for (let r = from; r < rows.length; r++) {
       const y = top + (r - state.pos) * step;
       if (y - step / 2 > h) break;

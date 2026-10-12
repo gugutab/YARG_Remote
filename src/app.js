@@ -1768,6 +1768,7 @@ function applyDetails() {
   if (current) renderMeta(current.song, current.midi); // the chips
 }
 const EFFECTS = {
+  'highway.lyricsAbove': (v) => { highway.sheetPeek = v / 100; },
   'highway.countdown': (v) => { highway.countdowns = v; },
   'highway.vocalView': (v) => { if (highway.vocalView !== v) setVocalView(v); },
   'highway.paneMin': (v) => highway.setPaneMin(v),
