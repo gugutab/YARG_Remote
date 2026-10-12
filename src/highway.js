@@ -62,6 +62,12 @@ export class Highway {
     this.perScreen = 1;
     this.sheets = []; // the lyric sheets on screen this frame: { x, y, w, h, step, hits, state } (canvas coordinates)
     this.countdowns = true; // show the wait countdowns
+    this.weights = {}; // relative width of each fretboard, by pane key (dragging the dividers between them changes it)
+    this.vocalH = null; // height of the vocal band in px, once the user dragged its divider (null: the default)
+    this.dividers = []; // the draggable dividers drawn this frame
+    this.hover = null; // the divider under the pointer
+    this.onResize = null; // called when a drag ends, so the page can keep the sizes
+    this.layout = { w: 0, sum: 1, keys: [] };
     this.vocalView = 'track'; // 'track' (notes + lyrics) or 'karaoke' (the lyrics alone)
   }
 
@@ -90,9 +96,9 @@ export class Highway {
 
   // items: [{ chart, label }]. The first lane chart keeps the view when the others do not fit.
   setCharts(items) {
-    this.panes = items.map(({ chart, label }) => {
+    this.panes = items.map(({ chart, label, key }) => {
       markStarPowerNotes(chart);
-      return { chart, label: label ?? '', maxLength: Math.max(0, ...chart.notes.map((n) => n.length || 0)), vRange: null }; // the vocal range is re-fitted per chart
+      return { chart, label: label ?? '', key: key ?? label ?? '', maxLength: Math.max(0, ...chart.notes.map((n) => n.length || 0)), vRange: null }; // the vocal range is re-fitted per chart
     });
     this.chart = this.panes[0]?.chart ?? null;
     this.focus = 0;
@@ -138,6 +144,7 @@ export class Highway {
     g.fillRect(0, 0, w, h);
 
     this.sheets = [];
+    this.dividers = [];
     if (!this.panes.length) return; // the page shows its own welcome / loading overlay
     const vocal = this.panes.find((p) => p.chart.mode === 'vocals');
     const lanes = this.panes.filter((p) => p.chart.mode !== 'vocals');
@@ -146,10 +153,9 @@ export class Highway {
       this.vocalAlone = true;
       if (this.vocalView === 'karaoke') this.drawPane(vocal, t, 0, 0, w, h, many); // the lyrics fill the stage (renderKaraoke)
       else { // the chart keeps the height it has next to other charts; the rest of the lyrics fill the space below
-        const vh = Math.round(Math.min(h * 0.34, 280));
+        const vh = this.bandHeight(h, Math.min(h * 0.34, 280));
         this.drawPane(vocal, t, 0, 0, w, vh, many);
-        g.fillStyle = 'rgba(255,255,255,0.12)';
-        g.fillRect(0, vh - 1, w, 1);
+        this.drawDivider({ type: 'row', y: vh - 1, w });
         g.save();
         g.beginPath();
         g.rect(0, vh, w, h - vh);
@@ -164,21 +170,79 @@ export class Highway {
     }
     let top = 0;
     if (vocal) { // vocals use the top of the other tracks
-      top = Math.round(this.vocalView === 'karaoke' ? Math.min(h * 0.3, 230) : Math.min(h * 0.34, 280)) - 20; // 20 px shorter than the band of vocals alone
+      top = this.bandHeight(h, (this.vocalView === 'karaoke' ? Math.min(h * 0.3, 230) : Math.min(h * 0.34, 280)) - 20); // 20 px shorter than the band of vocals alone
       this.drawPane(vocal, t, 0, 0, w, top, many);
-      g.fillStyle = 'rgba(255,255,255,0.12)';
-      g.fillRect(0, top - 1, w, 1);
+      this.drawDivider({ type: 'row', y: top - 1, w });
     }
     const per = Math.max(1, Math.min(lanes.length, Math.floor(w / this.paneMin)));
     this.perScreen = per;
     this.focus = Math.max(0, Math.min(this.focus, lanes.length - per));
-    const pw = w / per;
-    for (let i = 0; i < per; i++) {
-      const pane = lanes[this.focus + i];
-      this.drawPane(pane, t, i * pw, top, pw, h - top, many);
-      if (i > 0) { g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(Math.round(i * pw), top, 1, h - top); }
-    }
+    const shown = lanes.slice(this.focus, this.focus + per);
+    const weightOf = (pane) => this.weights[pane.key] ?? 1;
+    const sum = shown.reduce((acc, pane) => acc + weightOf(pane), 0);
+    this.layout = { w, sum, keys: shown.map((pane) => pane.key) };
+    let x = 0;
+    shown.forEach((pane, i) => {
+      const pw = (w * weightOf(pane)) / sum;
+      this.drawPane(pane, t, x, top, pw, h - top, many);
+      if (i > 0) this.drawDivider({ type: 'col', x: Math.round(x), y: top, h: h - top, a: shown[i - 1].key, b: pane.key });
+      x += pw;
+    });
     if (lanes.length > per) this.drawPaneDots(lanes.length, per, w, h);
+  }
+
+  // The height of the vocal band: the default, or what the user dragged it to (kept within sensible limits).
+  bandHeight(h, fallback) {
+    const base = this.vocalH ?? fallback;
+    return Math.round(Math.max(90, Math.min(h - 160, base)));
+  }
+
+  // A divider between two panes: a thin line, brighter while the pointer is over it or it is being dragged.
+  drawDivider(d) {
+    const g = this.g;
+    const hot = this.hover && this.hover.type === d.type && this.hover.a === d.a && this.hover.b === d.b;
+    this.dividers.push(d);
+    g.fillStyle = hot ? 'rgba(108,182,255,0.9)' : 'rgba(255,255,255,0.12)';
+    if (d.type === 'row') g.fillRect(0, d.y, d.w, hot ? 3 : 1);
+    else g.fillRect(d.x - (hot ? 1 : 0), d.y, hot ? 3 : 1, d.h);
+  }
+
+  // The divider under the canvas point (x, y), within `slop` px, or null.
+  dividerAt(x, y, slop = 6) {
+    return this.dividers.find((d) => (d.type === 'row' ? Math.abs(y - d.y) <= slop : Math.abs(x - d.x) <= slop && y >= d.y && y <= d.y + d.h)) ?? null;
+  }
+
+  // Drag a divider by (dx, dy) px: a column divider moves width between its two fretboards, a row divider changes the band height.
+  dragDivider(d, dx, dy) {
+    if (d.type === 'row') {
+      const h = this.canvas.clientHeight;
+      this.vocalH = Math.round(Math.max(90, Math.min(h - 160, (this.vocalH ?? d.y + 1) + dy)));
+      return;
+    }
+    const { w, sum } = this.layout;
+    const perWeight = w / sum; // px per unit of weight
+    const wa = (this.weights[d.a] ?? 1) * perWeight;
+    const wb = (this.weights[d.b] ?? 1) * perWeight;
+    const min = Math.min(140, (wa + wb) / 2);
+    const na = Math.max(min, Math.min(wa + wb - min, wa + dx));
+    this.weights[d.a] = na / perWeight;
+    this.weights[d.b] = (wa + wb - na) / perWeight;
+  }
+
+  // Back to the default sizes (double click on a divider: just that one; no argument: all).
+  resetSizes(d) {
+    if (!d) { this.weights = {}; this.vocalH = null; return; }
+    if (d.type === 'row') this.vocalH = null;
+    else { delete this.weights[d.a]; delete this.weights[d.b]; }
+  }
+
+  getSizes() {
+    return { weights: this.weights, vocalH: this.vocalH };
+  }
+
+  setSizes(sizes) {
+    this.weights = sizes?.weights && typeof sizes.weights === 'object' ? { ...sizes.weights } : {};
+    this.vocalH = Number.isFinite(sizes?.vocalH) ? sizes.vocalH : null;
   }
 
   // One chart in the rectangle (x, y, pw, ph): the drawing code sees a canvas of that size.

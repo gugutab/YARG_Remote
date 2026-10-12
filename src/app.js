@@ -1043,7 +1043,7 @@ function updateChart() {
     const shown = group.active ? chart : group.pinned ? (() => { const o = group.chosen; const d = diffFor(o).chosen; return d ? buildChart(current.midi, o, d, current.song.ini) : null; })() : null;
     if (!shown) continue;
     const d = group.active ? diff : diffFor(group.chosen).chosen;
-    items.push({ chart: shown, label: shown.mode === 'vocals' ? group.label : `${group.label} · ${d.short}` });
+    items.push({ chart: shown, key: group.key, label: shown.mode === 'vocals' ? group.label : `${group.label} · ${d.short}` });
   }
   highway.setCharts(items);
   renderSpecials();
@@ -1539,18 +1539,53 @@ const canvasPoint = (e) => {
   return [e.clientX - r.left, e.clientY - r.top];
 };
 let swipe = null;
+const slopFor = (e) => (e.pointerType === 'touch' ? 14 : 6);
+// The sizes of the fretboards (dragged dividers) are kept in the browser.
+try { highway.setSizes(JSON.parse(localStorage.getItem('yargremote.paneSizes'))); } catch { /* defaults */ }
+highway.onResize = () => { try { localStorage.setItem('yargremote.paneSizes', JSON.stringify(highway.getSizes())); } catch { /* optional */ } };
 els.highway.addEventListener('pointerdown', (e) => {
-  swipe = { x: e.clientX, y: e.clientY, lastY: e.clientY, sheet: highway.sheetAt(...canvasPoint(e)), moved: 0 };
+  const [px, py] = canvasPoint(e);
+  const divider = highway.dividerAt(px, py, slopFor(e));
+  if (divider) { // resizing: drag a divider between two fretboards, or the one under the vocal band
+    swipe = { divider, lastX: e.clientX, lastY: e.clientY, resizing: true };
+    highway.hover = divider;
+    els.highway.setPointerCapture(e.pointerId);
+    return;
+  }
+  swipe = { x: e.clientX, y: e.clientY, lastY: e.clientY, sheet: highway.sheetAt(px, py), moved: 0 };
+});
+els.highway.addEventListener('dblclick', (e) => { // double click on a divider: back to the default size
+  const divider = highway.dividerAt(...canvasPoint(e), slopFor(e));
+  if (divider) { highway.resetSizes(divider); highway.onResize?.(); }
 });
 els.highway.addEventListener('pointermove', (e) => {
-  if (!swipe?.sheet) return;
+  if (swipe?.resizing) {
+    highway.dragDivider(swipe.divider, e.clientX - swipe.lastX, e.clientY - swipe.lastY);
+    swipe.lastX = e.clientX;
+    swipe.lastY = e.clientY;
+    return;
+  }
+  if (!swipe) { // hovering: light the divider up and show the resize cursor
+    const d = highway.dividerAt(...canvasPoint(e), slopFor(e));
+    highway.hover = d;
+    els.highway.style.cursor = d ? (d.type === 'row' ? 'row-resize' : 'col-resize') : '';
+    return;
+  }
+  if (!swipe.sheet) return;
   const dy = swipe.lastY - e.clientY; // dragging the lyrics up shows the next lines
   swipe.lastY = e.clientY;
   swipe.moved += Math.abs(dy);
   if (swipe.moved > 6 && swipe.sheet.step) highway.scrollSheet(swipe.sheet, dy / swipe.sheet.step);
 });
+els.highway.addEventListener('pointerleave', () => { if (!swipe) { highway.hover = null; els.highway.style.cursor = ''; } });
 els.highway.addEventListener('pointerup', (e) => {
   if (!swipe) return;
+  if (swipe.resizing) { // the drag is over: keep the sizes
+    swipe = null;
+    highway.hover = null;
+    highway.onResize?.();
+    return;
+  }
   const { x, y, sheet, moved } = swipe;
   swipe = null;
   if (sheet) { // a tap on a lyric line seeks to it
@@ -1564,7 +1599,7 @@ els.highway.addEventListener('pointerup', (e) => {
   const dy = e.clientY - y;
   if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) highway.shiftFocus(dx < 0 ? 1 : -1);
 });
-els.highway.addEventListener('pointercancel', () => { swipe = null; });
+els.highway.addEventListener('pointercancel', () => { swipe = null; highway.hover = null; });
 els.highway.addEventListener('wheel', (e) => { // the mouse wheel scrolls the lyrics when the pointer is over them
   const sheet = highway.sheetAt(...canvasPoint(e));
   if (!sheet || !sheet.step) return;
