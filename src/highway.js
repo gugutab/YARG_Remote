@@ -1129,9 +1129,9 @@ export class Highway {
     g.fillRect(x0, 0, laneW * chart.lanes, h);
     g.globalCompositeOperation = 'source-over';
     // the board and the notes entering from the top dissolve into the background (an eased fade)
-    const fadeH = h * 0.2;
+    const fadeH = h * 0.12;
     const fade = g.createLinearGradient(0, 0, 0, fadeH);
-    for (const [at, a] of [[0, 1], [0.25, 0.85], [0.5, 0.5], [0.75, 0.17], [1, 0]]) fade.addColorStop(at, this.fadeStyle(a));
+    for (let n = 0; n <= 12; n++) { const u = n / 12; fade.addColorStop(u, this.fadeStyle((1 - u * u * u * (u * (u * 6 - 15) + 10)).toFixed(3))); } // smootherstep: eases at both ends
     g.globalCompositeOperation = this.layered ? 'destination-out' : 'source-over';
     g.fillStyle = fade;
     g.fillRect(0, 0, w, fadeH);

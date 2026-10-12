@@ -314,9 +314,9 @@ export function renderLanes3D(hw, t, w, h) {
   g.globalCompositeOperation = 'source-over';
   // far edge fades into the background
   // (an eased fade, so the board dissolves instead of ending in a visible edge)
-  const fadeH = h * 0.42;
+  const fadeH = h * 0.26;
   const grad = g.createLinearGradient(0, 0, 0, fadeH);
-  for (const [at, a] of [[0, 1], [0.2, 0.95], [0.4, 0.78], [0.6, 0.48], [0.8, 0.18], [0.92, 0.05], [1, 0]]) grad.addColorStop(at, hw.fadeStyle(a));
+  for (let n = 0; n <= 12; n++) { const u = n / 12; grad.addColorStop(u, hw.fadeStyle((1 - u * u * u * (u * (u * 6 - 15) + 10)).toFixed(3))); } // smootherstep: eases at both ends
   g.globalCompositeOperation = hw.layered ? 'destination-out' : 'source-over';
   g.fillStyle = grad;
   g.fillRect(0, 0, w, fadeH);  g.globalCompositeOperation = 'source-over';
