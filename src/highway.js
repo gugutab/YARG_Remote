@@ -661,50 +661,11 @@ export class Highway {
     else g.fillRect(0, Math.round(h / 2), w, 1);
   }
 
-  // Karaoke: only the lyrics. Alone, they fill the stage as a sheet (two sheets, vocal 1 and vocal 2, when the harmony
-  // voices have words of their own); next to other charts, the line being sung (one per voice).
+  // Karaoke: only the lyrics, as a sheet that scrolls (two sheets, vocal 1 and vocal 2, when the harmony voices have words of
+  // their own), alone on the stage or in the band above the other charts.
   renderKaraoke(t, w, h, pane) {
-    const g = this.g;
-    const split = (pane.chart.lyrics2 || []).length > 0;
-    if (this.vocalAlone) {
-      if (!split) {
-        this.renderLyricSheet(t, w, h, this.karaokeLines(pane, 'main'), this.sheetState(pane, 'main'), 0, 0, this.lyricCtx(pane));
-        return;
-      }
-      this.renderSheetsSplit(t, w, h, pane, 0, 0);
-      return;
-    }
-    const keys = split ? ['v1', 'v2'] : ['main'];
-    const rows = keys.map((k) => this.karaokeLines(pane, k));
-    if (rows.every((l) => !l.length)) {
-      g.font = '600 16px system-ui';
-      g.textAlign = 'center';
-      g.fillStyle = 'rgba(255,255,255,0.5)';
-      g.fillText('No lyrics in this chart', w / 2, h / 2);
-      return;
-    }
-    if (split) { // one line per voice: the one being sung, or the next one when it is near
-      const big = Math.max(16, Math.min(h * 0.16, 40, w * 0.06));
-      rows.forEach((lines, k) => {
-        const { current, next } = karaokeAt(lines, t);
-        const cy = h * (k === 0 ? 0.3 : 0.72);
-        if (current) this.drawKaraokeLine(current, big, w, cy, 0.95, t);
-        else if (next) {
-          const shown = this.drawKaraokeLine(next, big * 0.8, w, cy, 0.6, null);
-          const cd = this.countdownState(pane, t, true);
-          if (cd) this.drawCountdownBadge(Math.max(big + 8, shown.x - big * 0.8 - 14), cy, big * 0.8, cd);
-        }
-      });
-      return;
-    }
-    const { current, next } = karaokeAt(rows[0], t);
-    const big = Math.max(18, Math.min(h * 0.2, 54, w * 0.07));
-    if (current) this.drawKaraokeLine(current, big, w, h * 0.42, 0.95, t);
-    if (next) {
-      const cd = !current ? this.countdownState(pane, t, true) : null;
-      if (cd) this.drawCountdownBadge(w / 2, h * 0.3, Math.min(big * 0.75, h * 0.22), cd); // the countdown has a line of its own, above the next one
-      this.drawKaraokeLine(next, big * 0.72, w, cd ? h * 0.74 : current ? h * 0.74 : h * 0.5, current ? 0.55 : 0.8, null);
-    }
+    if ((pane.chart.lyrics2 || []).length > 0) this.renderSheetsSplit(t, w, h, pane, 0, 0);
+    else this.renderLyricSheet(t, w, h, this.karaokeLines(pane, 'main'), this.sheetState(pane, 'main'), 0, 0, this.lyricCtx(pane));
   }
 
   renderLanes(t, w, h) {
