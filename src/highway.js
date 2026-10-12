@@ -741,7 +741,7 @@ export class Highway {
     const yOfPitch = (p) => bottom - ((p - lo) / (hi - lo)) * (bottom - top);
     const mid = (top + bottom) / 2; // talkies (unpitched notes) sit in the middle of the pitch area
     const lyricY = bottom + h * 0.055; // lyrics sit right under the note area
-    const percussionY = mid; // percussion hits sit in the vertical middle of the chart
+    const percussionY = ((second ? top : 0) + h) / 2; // percussion hits sit in the vertical middle of the chart (below the second lyric line, if any)
     const xOf = (time) => hitX + (time - t) * pxPerSec;
     const ahead = BASE_LOOKAHEAD_SEC + ENTRY_MARGIN_SEC;
     const behind = hitX / pxPerSec + 0.5; // how long after the hit line a note is still on the stage (it scrolls off the left edge)
