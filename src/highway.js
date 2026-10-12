@@ -162,7 +162,7 @@ export class Highway {
         g.clip();
         g.translate(0, vh);
         if ((vocal.chart.lyrics2 || []).length > 0) this.renderSheetsSplit(t, w, h - vh, vocal, 0, vh); // harmony: one sheet per voice
-        else this.renderLyricSheet(t, w, h - vh, this.karaokeLines(vocal, 'main'), this.sheetState(vocal, 'main'), 0, vh);
+        else this.renderLyricSheet(t, w, h - vh, this.karaokeLines(vocal, 'main'), this.sheetState(vocal, 'main'), 0, vh, this.countdownState(vocal, t));
         g.restore();
       }
       this.vocalAlone = false;
@@ -282,27 +282,28 @@ export class Highway {
 
   // The wait countdown: while the chart has nothing to play for 9 s or more, the seconds until its next note, in a ring that
   // empties (YARG's WaitCountdown). Drawn over the pane's centre.
-  drawCountdown(pane, t, w, h) {
-    if (!this.countdowns) return;
+  // The countdown running for a pane at `t`: { remaining, total } or null.
+  countdownState(pane, t) {
+    if (!this.countdowns) return null;
     pane.countdowns ??= waitCountdowns(pane.chart);
     const c = countdownAt(pane.countdowns, t);
-    if (!c || c.remaining < 0.25) return;
+    return c && c.remaining >= 0.25 ? c : null;
+  }
+
+  // The countdown badge: a ring that empties around the seconds left, centred at (cx, cy).
+  drawCountdownBadge(cx, cy, r, c) {
     const g = this.g;
     const fadeIn = Math.min(1, (c.total - c.remaining) / 0.5); // eases in at the start of the gap, out as the notes return
     const fadeOut = Math.min(1, c.remaining / 0.6);
-    const alpha = Math.min(fadeIn, fadeOut);
-    const r = Math.max(26, Math.min(h * 0.2, w * 0.2, 70));
-    const cx = w / 2;
-    const cy = pane.chart.mode === 'vocals' ? h * 0.45 : h * 0.4;
     const secs = Math.ceil(c.remaining);
     const urgent = c.remaining <= 3.05;
     g.save();
-    g.globalAlpha = alpha;
+    g.globalAlpha = Math.min(fadeIn, fadeOut);
     g.beginPath();
     g.arc(cx, cy, r, 0, Math.PI * 2);
     g.fillStyle = 'rgba(8,11,16,0.72)';
     g.fill();
-    g.lineWidth = Math.max(4, r * 0.1);
+    g.lineWidth = Math.max(3, r * 0.1);
     g.strokeStyle = 'rgba(255,255,255,0.14)';
     g.stroke();
     g.beginPath(); // what is left of the gap
@@ -317,6 +318,20 @@ export class Highway {
     g.fillText(String(secs), cx, cy + r * 0.04);
     g.textBaseline = 'alphabetic';
     g.restore();
+  }
+
+  // The wait countdown of a chart pane (YARG's WaitCountdown), over the centre; in the vocal notes view it sits to the left of
+  // the hit line, where the notes are not. (Karaoke shows it beside the next line instead, see renderLyricSheet.)
+  drawCountdown(pane, t, w, h) {
+    const c = this.countdownState(pane, t);
+    if (!c) return;
+    if (pane.chart.mode === 'vocals') {
+      const hitX = w * 0.15;
+      const r = Math.max(18, Math.min(hitX * 0.4, h * 0.2, 60));
+      this.drawCountdownBadge(hitX / 2, h * 0.42, r, c);
+      return;
+    }
+    this.drawCountdownBadge(w / 2, h * 0.4, Math.max(26, Math.min(h * 0.2, w * 0.2, 70)), c);
   }
 
   // Small dots at the bottom: how many fretboards there are and which ones are in view (swipe sideways to change).
@@ -372,6 +387,7 @@ export class Highway {
       x += sw + (syl.join ? 0 : gw);
     });
     g.textBaseline = 'alphabetic';
+    return { x: (w - total) / 2, total };
   }
 
   // Lines of a lyric list, cached per pane. 'main' = the merged static lyrics (YARG's), 'v1' = the lead voice's own words,
@@ -395,7 +411,7 @@ export class Highway {
   // A lyric sheet that scrolls, drawn at the current origin of the canvas (which sits at x0, y0 of the whole canvas): it
   // follows the line being sung (that line is filled as it goes, and bigger); wheel / drag moves it by hand and it glides
   // back to the singer a few seconds after you stop. Clicking a line seeks to it.
-  renderLyricSheet(t, w, h, lines, state, x0 = 0, y0 = 0) {
+  renderLyricSheet(t, w, h, lines, state, x0 = 0, y0 = 0, cd = null) {
     const g = this.g;
     const sheet = { x: x0, y: y0, w, h, step: 0, hits: [], state };
     this.sheets.push(sheet);
@@ -429,7 +445,11 @@ export class Highway {
       if (y - small * 0.6 < 0) continue; // a row cut by the top edge would look broken
       const cur = singing && i === idx;
       const past = i < first ? 0.3 : Math.max(0.3, 0.7 - Math.max(0, i - first) * 0.06);
-      this.drawKaraokeLine(lines[i], cur ? big : small, w, y, cur ? 0.95 : past, cur ? t : null);
+      const shown = this.drawKaraokeLine(lines[i], cur ? big : small, w, y, cur ? 0.95 : past, cur ? t : null);
+      if (cd && i === idx + 1) { // the wait countdown sits at the left of the next line to be sung
+        const r = Math.max(14, Math.min(step * 0.38, 30));
+        this.drawCountdownBadge(Math.max(r + 8, shown.x - r - 16), y, r, cd);
+      }
       sheet.hits.push({ y: y + y0, half: step / 2, time: lines[i].start });
     }
   }
@@ -474,7 +494,7 @@ export class Highway {
       g.rect(bx, by, bw, bh);
       g.clip();
       g.translate(bx, by);
-      this.renderLyricSheet(t, bw, bh, this.karaokeLines(pane, key), this.sheetState(pane, key), x0 + bx, y0 + by);
+      this.renderLyricSheet(t, bw, bh, this.karaokeLines(pane, key), this.sheetState(pane, key), x0 + bx, y0 + by, this.countdownState(pane, t));
       caption(name, 12, 14);
       g.restore();
     });
@@ -490,7 +510,7 @@ export class Highway {
     const split = (pane.chart.lyrics2 || []).length > 0;
     if (this.vocalAlone) {
       if (!split) {
-        this.renderLyricSheet(t, w, h, this.karaokeLines(pane, 'main'), this.sheetState(pane, 'main'), 0, 0);
+        this.renderLyricSheet(t, w, h, this.karaokeLines(pane, 'main'), this.sheetState(pane, 'main'), 0, 0, this.countdownState(pane, t));
         return;
       }
       this.renderSheetsSplit(t, w, h, pane, 0, 0);
@@ -511,14 +531,23 @@ export class Highway {
         const { current, next } = karaokeAt(lines, t);
         const cy = h * (k === 0 ? 0.3 : 0.72);
         if (current) this.drawKaraokeLine(current, big, w, cy, 0.95, t);
-        else if (next) this.drawKaraokeLine(next, big * 0.8, w, cy, 0.6, null);
+        else if (next) {
+          const shown = this.drawKaraokeLine(next, big * 0.8, w, cy, 0.6, null);
+          const cd = this.countdownState(pane, t);
+          if (cd) this.drawCountdownBadge(Math.max(big + 8, shown.x - big * 0.8 - 14), cy, big * 0.8, cd);
+        }
       });
       return;
     }
     const { current, next } = karaokeAt(rows[0], t);
     const big = Math.max(18, Math.min(h * 0.2, 54, w * 0.07));
     if (current) this.drawKaraokeLine(current, big, w, h * 0.42, 0.95, t);
-    if (next) this.drawKaraokeLine(next, big * 0.72, w, current ? h * 0.74 : h * 0.5, current ? 0.55 : 0.8, null);
+    if (next) {
+      const ny = current ? h * 0.74 : h * 0.5;
+      const shown = this.drawKaraokeLine(next, big * 0.72, w, ny, current ? 0.55 : 0.8, null);
+      const cd = this.countdownState(pane, t);
+      if (cd) this.drawCountdownBadge(Math.max(big * 0.7 + 8, shown.x - big * 0.7 - 14), ny, big * 0.7, cd); // at the left of the next line
+    }
   }
 
   renderLanes(t, w, h) {
