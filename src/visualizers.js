@@ -458,7 +458,7 @@ const coverViz = (ctx) => {
       g.save();
       g.imageSmoothingEnabled = true;
       g.imageSmoothingQuality = 'high';
-      g.translate(w / 2 + Math.sin(s.t * 0.05 + s.clock * 0.07) * w * 0.05, h / 2 + Math.cos(s.t * 0.043 + s.clock * 0.05) * h * 0.05);
+      g.translate(w / 2 + Math.sin(s.t * 0.05) * w * 0.05, h / 2 + Math.cos(s.t * 0.043) * h * 0.05); // (song time only: it stands still when the music is paused)
       g.scale(zoom, zoom);
       const x0 = -size / 2;
       const y0 = -size / 2;
