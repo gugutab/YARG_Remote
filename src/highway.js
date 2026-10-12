@@ -916,9 +916,9 @@ export class Highway {
     // harmonies first, so the lead is drawn on top
     for (const harmony of chart.harmonies || []) {
       const base = HARMONY_COLORS[harmony.part] || HARMONY_COLORS[1];
-      this.vocalNotes(harmony.notes, t, ahead, behind, xOf, yOfPitch, mid, 4, [tintWhite(base, 0.7), base], hitX); // the part past the hit line is lit, like the lead's
+      this.vocalNotes(harmony.notes, t, ahead, behind, xOf, yOfPitch, [top, bottom], 4, [tintWhite(base, 0.7), base], hitX); // the part past the hit line is lit, like the lead's
     }
-    this.vocalNotes(chart.notes, t, ahead, behind, xOf, yOfPitch, mid, 6, [tintWhite(VOCAL_LEAD, 0.6), VOCAL_LEAD], hitX); // lit: a lighter shade of the note's own colour
+    this.vocalNotes(chart.notes, t, ahead, behind, xOf, yOfPitch, [top, bottom], 6, [tintWhite(VOCAL_LEAD, 0.6), VOCAL_LEAD], hitX); // lit: a lighter shade of the note's own colour
 
     // percussion: a drum-head marker per hit, in the vertical middle of the chart; a hit flashes when it crosses the line and
     // then dims as it scrolls off.
@@ -1004,7 +1004,7 @@ export class Highway {
   // Notes of a vocal part: rounded pitched bars, a ribbon joining a pitch slide to the note before it (same colour as the
   // notes), and talkies (unpitched notes, '#', '^', '*') as a dashed box in the middle of the pitch area.
   // colors = [passed, idle]: the part of a note that is past the hit line is painted `passed`. null keeps the current fill.
-  vocalNotes(notes, t, ahead, behind, xOf, yOfPitch, mid, half, colors, hitX) {
+  vocalNotes(notes, t, ahead, behind, xOf, yOfPitch, area, half, colors, hitX) {
     const g = this.g;
     const keep = g.fillStyle;
     for (let i = 0; i < notes.length; i++) {
@@ -1022,11 +1022,11 @@ export class Highway {
         if (n.talkie) {
           g.save();
           g.globalAlpha *= 0.35;
-          g.fillRect(x1, mid - half * 2, bw, half * 4);
+          g.fillRect(x1, area[0], bw, area[1] - area[0]); // a free note fills the whole chart area above the lyrics
           g.restore();
           g.setLineDash([4, 3]);
           g.lineWidth = 2;
-          g.strokeRect(x1, mid - half * 2, bw, half * 4);
+          g.strokeRect(x1, area[0], bw, area[1] - area[0]);
           g.setLineDash([]);
           return;
         }
