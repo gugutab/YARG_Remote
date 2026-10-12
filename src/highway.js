@@ -544,17 +544,16 @@ export class Highway {
       sheet.hits.push({ y: y + y0, half: step / 2, time: lines[i].start });
       hovered = this.hoverRow(sheet, x0, y0, y, step, lines[i].start, shown.x + shown.total) ?? hovered;
     }
-    const fade = Math.min(56, h * 0.18); // the lines dissolve into the background at the top and bottom edges, fully hidden at the very edge
+    const fade = Math.min(46, h * 0.16); // the lines dissolve into the background at the top and bottom edges: opaque at the very edge, easing out
+    const ramp = [[0, 1], [0.1, 0.96], [0.45, 0.55], [1, 0]]; // [position from the edge, opacity of the background]
     const fadeIn = g.createLinearGradient(0, 0, 0, fade);
-    fadeIn.addColorStop(0, `rgba(${this.bgRgb},1)`);
-    fadeIn.addColorStop(0.3, `rgba(${this.bgRgb},1)`);
-    fadeIn.addColorStop(1, `rgba(${this.bgRgb},0)`);
+    const fadeOut = g.createLinearGradient(0, h, 0, h - fade);
+    for (const [pos, alpha] of ramp) {
+      fadeIn.addColorStop(pos, `rgba(${this.bgRgb},${alpha})`);
+      fadeOut.addColorStop(pos, `rgba(${this.bgRgb},${alpha})`);
+    }
     g.fillStyle = fadeIn;
     g.fillRect(0, 0, w, fade);
-    const fadeOut = g.createLinearGradient(0, h - fade, 0, h);
-    fadeOut.addColorStop(0, `rgba(${this.bgRgb},0)`);
-    fadeOut.addColorStop(0.7, `rgba(${this.bgRgb},1)`);
-    fadeOut.addColorStop(1, `rgba(${this.bgRgb},1)`);
     g.fillStyle = fadeOut;
     g.fillRect(0, h - fade, w, fade);
     // The jump button: it slides and fades in when the pointer has rested on a row, and out when it leaves.
