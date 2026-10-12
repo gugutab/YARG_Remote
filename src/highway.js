@@ -361,6 +361,7 @@ export class Highway {
     g.clip();
     g.translate(x, y);
     const saved = { view: this.view, noteStyle: this.noteStyle, neck: this.neck };
+    this.neckGlobal = saved.neck; // the default the vocal chart's speed is measured against
     this.view = this.paneOpt(pane.key, 'view');
     this.noteStyle = this.paneOpt(pane.key, 'noteStyle');
     this.neck = this.paneOpt(pane.key, 'neck');
@@ -1143,8 +1144,9 @@ export class Highway {
     const g = this.g;
     const chart = this.chart;
     const hitX = w * 0.15;
-    const pxPerSec = (w * 0.85) / BASE_LOOKAHEAD_SEC;
-    const [lo, hi] = this.vocalRange(t, BASE_LOOKAHEAD_SEC + 1.5);
+    const look = BASE_LOOKAHEAD_SEC / (this.neck / (this.neckGlobal || this.neck)); // neck speed: how much time the window shows (the default shows the base)
+    const pxPerSec = (w * 0.85) / look;
+    const [lo, hi] = this.vocalRange(t, look + 1.5);
     const second = (chart.lyrics2 || []).length > 0; // harmony charts: the other voices' own words get a line above the chart
     const secondSize = Math.max(15, Math.min(26, h * 0.08));
     const secondY = secondSize * 0.85 + 6;
@@ -1173,7 +1175,7 @@ export class Highway {
     const mid = (top + bottom) / 2; // talkies (unpitched notes) sit in the middle of the pitch area
     const percussionY = this.vocalCenterY(chart, h); // percussion hits sit in the vertical middle of the chart
     const xOf = (time) => hitX + (time - t) * pxPerSec;
-    const ahead = BASE_LOOKAHEAD_SEC + ENTRY_MARGIN_SEC;
+    const ahead = look + ENTRY_MARGIN_SEC;
     const behind = hitX / pxPerSec + 0.5; // how long after the hit line a note is still on the stage (it scrolls off the left edge)
 
     // beat and measure lines, vertical (the same marks the lane charts have), behind everything else

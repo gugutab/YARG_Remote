@@ -1978,7 +1978,7 @@ function buildPaneMenu() {
     paint();
     return box;
   };
-  if (ins.mode !== 'vocals') part('Neck speed', optRange('neck', 0.5, 3, 0.1, () => highway.neck, (v) => `${v.toFixed(1)}×`));
+  part('Neck speed', optRange('neck', 0.5, 3, 0.1, () => highway.neck, (v) => `${v.toFixed(1)}×`));
   part('Chart delay', optRange('delay', -1, 1, 0.05, () => 0, (v) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)} s`));
   const free = hiddenGroups().length - current.choosers.length; // instruments with no slot yet
   const row = els.paneMenuActions; // at the end of the menu: swap, add and remove
