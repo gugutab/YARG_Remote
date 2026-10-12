@@ -21,13 +21,13 @@ import { createThumbs, renderCoverThumb } from './thumbs.js';
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
-  'app', 'library', 'toggleLibrary', 'closeLibrary', 'splitter', 'libTab', 'songTab', 'closeSong', 'closeSongInfo', 'npPlay', 'npPreview', 'npSeek', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
+  'app', 'library', 'closeLibrary', 'splitter', 'libTab', 'songTab', 'closeSong', 'closeSongInfo', 'npPlay', 'npPreview', 'npSeek', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
-  'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'sectionBtn', 'sectionPop', 'sectionText', 'partDiff', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
+  'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
   'fullscreen', 'barHide', 'barShow', 'specialCard', 'specialList', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
-  'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay', 'infoMenu',
+  'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
 ].map((id) => [id, $(id)]));
 
@@ -97,7 +97,7 @@ function setLibraryOpen(open, persist = true) {
 // Edge tabs reopen a closed panel.
 function syncPanelUi() {
   const tabs = prefs.get('panels.tabs') && !narrow();
-  els.libTab.hidden = !(tabs && !libraryOpen());
+  els.libTab.hidden = libraryOpen(); // like the top bar's show button: it is always there while the library is hidden (also on a phone, where the library is a drawer)
   els.songTab.hidden = !(tabs && !songPanelOpen());
 }
 (() => { // the panels at startup: open, closed, or as they were last time (the "Panels" settings)
@@ -117,7 +117,6 @@ window.matchMedia('(max-width: 700px)').addEventListener('change', (e) => {
   else { try { const last = JSON.parse(localStorage.getItem('yargremote.panelState')) || {}; els.app.classList.toggle('song-closed', last.song === false && last.library !== false); } catch { /* keep */ } }
   syncPanelUi();
 });
-els.toggleLibrary.addEventListener('click', () => setLibraryOpen(!libraryOpen(), false));
 els.closeLibrary.addEventListener('click', () => setLibraryOpen(false, false));
 els.scrim.addEventListener('click', () => setLibraryOpen(false, false));
 els.welcomeOpen.addEventListener('click', () => setLibraryOpen(true));
@@ -886,81 +885,9 @@ function renderPickers() {
     return card;
   }));
   layoutInstrumentCards();
-  renderPartMenu();
-}
-
-// Top-bar item: one chip for instrument + difficulty, opening a compact vertical list (icon, name, difficulty buttons).
-// Drums are one row with a second line of mode buttons.
-function renderPartMenu() {
-  const ins = currentInstrument();
-  const diffInfo = DIFFICULTIES.find((d) => d.id === els.difficulty.value);
-  const diffLabel = diffInfo?.label;
-  const diffShort = diffInfo?.short;
-  els.partIcon.setAttribute('href', `#i-${ins ? INSTRUMENT_ICON[ins.base] || 'music' : 'music'}`);
-  els.partText.textContent = ins ? ins.label : 'No instrument';
-  const letter = ins && ins.mode !== 'vocals' && diffShort ? diffShort : '';
-  els.partDiff.textContent = letter;
-  els.partDiff.title = diffLabel || '';
-  els.partDiff.hidden = !letter; // difficulty as a single letter, like the list rows
-  const shortMode = { four: '4', five: '5', pro: 'Pro', extended: String(EXTENDED_DRUM_LANES.length) };
-  els.partPop.replaceChildren(...(current ? instrumentGroups() : []).map((group) => {
-    const o = group.chosen;
-    const { diffs, chosen } = diffFor(o);
-    const row = document.createElement('div');
-    row.className = 'prow';
-    row.dataset.active = String(group.active);
-    row.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[o.base] || 'music'}"/></svg><span class="prow-name"></span>`;
-    row.querySelector('.prow-name').textContent = group.label;
-    row.addEventListener('click', () => { selectInstrument(o.id, chosen?.id); });
-    if (!group.active) row.append(pinButton(group));
-    row.dataset.pinned = String(group.pinned);
-    if (o.mode !== 'vocals') {
-      const seg = document.createElement('div');
-      seg.className = 'seg compact';
-      for (const d of diffs) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.textContent = d.short; // E, M, H, X
-        btn.title = d.label;
-        btn.setAttribute('aria-label', `${group.label}, ${d.label}`);
-        btn.setAttribute('aria-pressed', String((group.active || group.pinned) && d.id === chosen?.id));
-        btn.addEventListener('click', (e) => { e.stopPropagation(); pickDifficulty(group, o, d.id); });
-        seg.append(btn);
-      }
-      row.append(seg);
-    }
-    if (group.options.length > 1) {
-      const line = document.createElement('div');
-      line.className = 'modes-line';
-      const modes = document.createElement('div');
-      modes.className = 'seg compact modes';
-      for (const m of group.options) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.textContent = shortMode[m.drumMode] ?? (m.harmony ? 'H' : 'V');
-        btn.title = m.modeLabel ?? m.label;
-        btn.setAttribute('aria-label', m.label);
-        btn.setAttribute('aria-pressed', String(group.active && m.id === els.instrument.value));
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          current.modeChoice[group.key] = m.id;
-          selectInstrument(m.id, diffFor(m).chosen?.id);
-        });
-        modes.append(btn);
-      }
-      if (o.mode === 'vocals') { // no difficulty buttons: the modes take the same line as the name
-        row.append(modes);
-      } else {
-        line.append(modes);
-        row.append(line);
-      }
-    }
-    return row;
-  }));
 }
 
 els.infoPopMore.addEventListener('click', () => { closePopovers(); setInfoOpen(true); });
-els.infoMenu.addEventListener('click', () => setLibraryOpen(!libraryOpen()));
 els.infoPlay.addEventListener('click', () => togglePlay());
 
 function showPlayInfo(on) {
@@ -1369,7 +1296,7 @@ for (const btn of document.querySelectorAll('[data-reset]')) {
   btn.addEventListener('click', () => setSetting(btn.dataset.reset, SETTING_DEFAULTS[btn.dataset.reset]));
 }
 
-const popovers = [[els.infoBtn, els.infoPop], [els.partBtn, els.partPop], [els.sectionBtn, els.sectionPop], [els.mixerBtn, els.mixerPop], [els.settingsBtn, els.settingsPop]];
+const popovers = [[els.infoBtn, els.infoPop], [els.sectionBtn, els.sectionPop], [els.mixerBtn, els.mixerPop], [els.settingsBtn, els.settingsPop]];
 function closePopovers(except) {
   for (const [btn, pop] of popovers) {
     if (pop === except) continue;

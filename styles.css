@@ -1166,3 +1166,11 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .seg button[aria-pressed="true"]:hover:not(:disabled) { filter: brightness(1.14); }
 .seg button:active:not(:disabled) { filter: brightness(.92); }
 .seg button:disabled { cursor: default; }
+
+/* the library hides and shows like the top bar: a chevron in its header, a small chevron button where it was */
+.lib-hide svg { transform: rotate(90deg); } /* points left: where the library goes */
+.lib-hide { opacity: .7; }
+.lib-hide:hover { opacity: 1; }
+.edge-tab.lib-show svg { transform: rotate(-90deg); } /* points right: where it comes back */
+.edge-tab.lib-show { height: 56px; }
+@media (max-width: 700px) { .edge-tab.lib-show:not([hidden]) { display: grid !important; } }
