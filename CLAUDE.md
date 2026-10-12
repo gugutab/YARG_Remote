@@ -262,3 +262,4 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - Vocals alone, notes view: the karaoke part under the band has no base layer either (same as karaoke mode); only the band's own lyric row keeps its track.
 - The instrument tag of each window sits in its top right corner (it was top left) and its menu opens right-aligned under it (`syncPaneTags`, no `align-left` on `#paneMenu`).
 - The instrument tags are more see-through: background 0.3 normally, 0.55 on hover or when open.
+- 3D fretboard overlays (star power, solos, fills, rolls) are no longer cut at the hit line: the band runs down to the end of the board (`ROAD_NEAR`).

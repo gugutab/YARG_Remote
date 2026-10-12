@@ -67,8 +67,9 @@ export function renderLanes3D(hw, t, w, h) {
   const span = (spans, color) => {
     g.fillStyle = color;
     for (const s of spans || []) {
-      if (s.end < t || s.start > t + windowSec) continue;
-      quad(depth(s.start), depth(s.end), -half, half);
+      if ((s.end - t) / windowSec < ROAD_NEAR || s.start > t + windowSec) continue;
+      const near = Math.max(ROAD_NEAR, Math.min(1, (s.start - t) / windowSec)); // the band goes on past the hit line, to the end of the board
+      quad(near, depth(s.end), -half, half);
       g.fill();
     }
   };
