@@ -162,7 +162,7 @@ export class Highway {
         g.clip();
         g.translate(0, vh);
         if ((vocal.chart.lyrics2 || []).length > 0) this.renderSheetsSplit(t, w, h - vh, vocal, 0, vh); // harmony: one sheet per voice
-        else this.renderLyricSheet(t, w, h - vh, this.karaokeLines(vocal, 'main'), this.sheetState(vocal, 'main'), 0, vh, this.countdownState(vocal, t));
+        else this.renderLyricSheet(t, w, h - vh, this.karaokeLines(vocal, 'main'), this.sheetState(vocal, 'main'), 0, vh, this.countdownState(vocal, t, true));
         g.restore();
       }
       this.vocalAlone = false;
@@ -283,10 +283,11 @@ export class Highway {
   // The wait countdown: while the chart has nothing to play for 9 s or more, the seconds until its next note, in a ring that
   // empties (YARG's WaitCountdown). Drawn over the pane's centre.
   // The countdown running for a pane at `t`: { remaining, total } or null.
-  countdownState(pane, t) {
+  countdownState(pane, t, lyrics = false) {
     if (!this.countdowns) return null;
-    pane.countdowns ??= waitCountdowns(pane.chart);
-    const c = countdownAt(pane.countdowns, t);
+    if (lyrics) pane.countdownsLyrics ??= waitCountdowns(pane.chart, { percussion: false }); // karaoke: percussion hits are no singing
+    else pane.countdowns ??= waitCountdowns(pane.chart);
+    const c = countdownAt(lyrics ? pane.countdownsLyrics : pane.countdowns, t);
     return c && c.remaining >= 0.25 ? c : null;
   }
 
@@ -494,7 +495,7 @@ export class Highway {
       g.rect(bx, by, bw, bh);
       g.clip();
       g.translate(bx, by);
-      this.renderLyricSheet(t, bw, bh, this.karaokeLines(pane, key), this.sheetState(pane, key), x0 + bx, y0 + by, this.countdownState(pane, t));
+      this.renderLyricSheet(t, bw, bh, this.karaokeLines(pane, key), this.sheetState(pane, key), x0 + bx, y0 + by, this.countdownState(pane, t, true));
       caption(name, 12, 14);
       g.restore();
     });
@@ -510,7 +511,7 @@ export class Highway {
     const split = (pane.chart.lyrics2 || []).length > 0;
     if (this.vocalAlone) {
       if (!split) {
-        this.renderLyricSheet(t, w, h, this.karaokeLines(pane, 'main'), this.sheetState(pane, 'main'), 0, 0, this.countdownState(pane, t));
+        this.renderLyricSheet(t, w, h, this.karaokeLines(pane, 'main'), this.sheetState(pane, 'main'), 0, 0, this.countdownState(pane, t, true));
         return;
       }
       this.renderSheetsSplit(t, w, h, pane, 0, 0);
@@ -533,7 +534,7 @@ export class Highway {
         if (current) this.drawKaraokeLine(current, big, w, cy, 0.95, t);
         else if (next) {
           const shown = this.drawKaraokeLine(next, big * 0.8, w, cy, 0.6, null);
-          const cd = this.countdownState(pane, t);
+          const cd = this.countdownState(pane, t, true);
           if (cd) this.drawCountdownBadge(Math.max(big + 8, shown.x - big * 0.8 - 14), cy, big * 0.8, cd);
         }
       });
@@ -545,7 +546,7 @@ export class Highway {
     if (next) {
       const ny = current ? h * 0.74 : h * 0.5;
       const shown = this.drawKaraokeLine(next, big * 0.72, w, ny, current ? 0.55 : 0.8, null);
-      const cd = this.countdownState(pane, t);
+      const cd = this.countdownState(pane, t, true);
       if (cd) this.drawCountdownBadge(Math.max(big * 0.7 + 8, shown.x - big * 0.7 - 14), ny, big * 0.7, cd); // at the left of the next line
     }
   }
@@ -740,7 +741,7 @@ export class Highway {
     const yOfPitch = (p) => bottom - ((p - lo) / (hi - lo)) * (bottom - top);
     const mid = (top + bottom) / 2; // talkies (unpitched notes) sit in the middle of the pitch area
     const lyricY = bottom + h * 0.055; // lyrics sit right under the note area
-    const percussionY = h * 0.92;
+    const percussionY = mid; // percussion hits sit in the vertical middle of the chart
     const xOf = (time) => hitX + (time - t) * pxPerSec;
     const ahead = BASE_LOOKAHEAD_SEC + ENTRY_MARGIN_SEC;
     const behind = hitX / pxPerSec + 0.5; // how long after the hit line a note is still on the stage (it scrolls off the left edge)
@@ -762,8 +763,8 @@ export class Highway {
     }
     this.vocalNotes(chart.notes, t, ahead, behind, xOf, yOfPitch, mid, 6, [tintWhite(VOCAL_LEAD, 0.6), VOCAL_LEAD], hitX); // lit: a lighter shade of the note's own colour
 
-    // percussion: a drum-head marker per hit on its own row. Played hits are solid, the ones that are not played are hollow;
-    // a hit flashes when it crosses the line and then dims as it scrolls off.
+    // percussion: a drum-head marker per hit, in the vertical middle of the chart; a hit flashes when it crosses the line and
+    // then dims as it scrolls off.
     for (const p of chart.percussion || []) {
       if (p.time < t - behind || p.time > t + ahead) continue;
       const x = xOf(p.time);
@@ -780,19 +781,13 @@ export class Highway {
       }
       g.beginPath();
       g.arc(x, percussionY, r, 0, Math.PI * 2);
-      if (p.played) {
-        g.fillStyle = '#e6edf3';
-        g.fill();
-        g.beginPath();
-        g.arc(x, percussionY, r * 0.5, 0, Math.PI * 2);
-        g.lineWidth = 2;
-        g.strokeStyle = 'rgba(13,17,23,0.55)';
-        g.stroke();
-      } else {
-        g.lineWidth = 2;
-        g.strokeStyle = '#6e7681';
-        g.stroke();
-      }
+      g.fillStyle = '#e6edf3';
+      g.fill();
+      g.beginPath();
+      g.arc(x, percussionY, r * 0.5, 0, Math.PI * 2);
+      g.lineWidth = 2;
+      g.strokeStyle = 'rgba(13,17,23,0.55)';
+      g.stroke();
       g.restore();
     }
 

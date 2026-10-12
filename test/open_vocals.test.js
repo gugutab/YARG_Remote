@@ -64,7 +64,7 @@ test('solo vocals: lead notes, percussion and lyrics only, no harmony parts', ()
   const chart = buildChart(harmonyMidi(), VOCALS, EXPERT);
   assert.deepEqual(chart.notes.map((n) => n.pitch), [60]);
   assert.deepEqual(chart.harmonies, []);
-  assert.deepEqual(chart.percussion.map((p) => p.played), [true, false]);
+  assert.equal(chart.percussion.length, 1); // only note 96 is a percussion hit; 97 (not played) is ignored, as in YARG's MidReader
   assert.deepEqual(chart.lyrics.map((l) => l.text), ['Hel-']);
 });
 
@@ -75,7 +75,7 @@ test('harmony: HARM1 leads, HARM2/3 sit behind, lyrics and percussion fall back 
   assert.deepEqual(chart.notes.map((n) => n.pitch), [64]);
   assert.deepEqual(chart.harmonies.map((h) => [h.part, h.notes.map((n) => n.pitch)]), [[2, [67]]]);
   assert.deepEqual(chart.lyrics.map((l) => l.text), ['Hel-']);
-  assert.deepEqual(chart.percussion.map((p) => p.played), [true, false]);
+  assert.equal(chart.percussion.length, 1); // only note 96 is a percussion hit; 97 (not played) is ignored, as in YARG's MidReader
   assert.deepEqual(instrumentOptions(midi).map((i) => i.id), ['vocals', 'harmony']);
   assert.equal(availableDifficulties(midi, HARMONY).length, 1);
 });

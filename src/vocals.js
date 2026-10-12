@@ -10,7 +10,6 @@ const RANGE_SHIFT_NOTE = 0;
 const LYRIC_SHIFT_NOTE = 1;
 const PHRASE_NOTES = [105, 106]; // LYRICS_PHRASE_1/2: both are a scoring phrase and a static lyric phrase
 const PERCUSSION_NOTE = 96;
-const NONPLAYED_PERCUSSION_NOTE = 97;
 const DUMMY_RANGE = { time: 0, length: 0, min: 48, max: 72 }; // GetRangeShifts: `new(48, 72, 0, 0, 0, 0)`
 
 // Symbols that only mark timing or scoring are not shown (LyricSymbols.VOCALS_STRIP_SYMBOLS, including quotation marks);
@@ -281,11 +280,11 @@ export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
   const harmony = harmonyParts.length > 0;
   const soloTrack = midi.tracks.find((t) => t.name.toUpperCase() === 'PART VOCALS');
 
-  // Percussion (YARG.Core VocalsTrack): 96 is played, 97 is not played.
-  const percussionTrack = track.notes.some((n) => n.pitch === PERCUSSION_NOTE || n.pitch === NONPLAYED_PERCUSSION_NOTE) || !soloTrack ? track : soloTrack;
+  // Percussion (YARG.Core MidReader.ProcessLists): note 96 is a percussion hit; 97 is ignored.
+  const percussionTrack = track.notes.some((n) => n.pitch === PERCUSSION_NOTE) || !soloTrack ? track : soloTrack;
   const percussion = percussionTrack.notes
-    .filter((n) => n.pitch === PERCUSSION_NOTE || n.pitch === NONPLAYED_PERCUSSION_NOTE)
-    .map((n) => ({ time: toSec(n.tick), played: n.pitch === PERCUSSION_NOTE }));
+    .filter((n) => n.pitch === PERCUSSION_NOTE) // 97 (not played) has no handler in YARG's MidReader: it is not a note
+    .map((n) => ({ time: toSec(n.tick) }));
 
   // Harmony charts may keep their lyrics (and phrases) on PART VOCALS.
   let events = lyricEventsOf(track);

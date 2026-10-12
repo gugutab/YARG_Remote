@@ -39,3 +39,9 @@ test('countdownAt finds the running countdown and its remaining time', () => {
   assert.deepEqual(countdownAt(list, 44), { remaining: 1, total: 15 });
   assert.equal(countdownAt([], 5), null);
 });
+
+test('percussion: false counts a percussion section as a rest (for the lyric views)', () => {
+  const c = { notes: [{ time: 1, end: 2 }, { time: 40, end: 41 }], percussion: [{ time: 10 }, { time: 15 }, { time: 20 }, { time: 25 }, { time: 30 }] };
+  assert.deepEqual(waitCountdowns(c), [{ start: 30, end: 40 }]); // hits every 5 s keep the gaps short, until the last one
+  assert.deepEqual(waitCountdowns(c, { percussion: false }), [{ start: 2, end: 40 }]);
+});
