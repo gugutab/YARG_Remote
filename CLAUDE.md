@@ -260,3 +260,4 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - Vocal window: the default band height is 20 px shorter than before (alone `min(34%, 280) - 20`, with other instruments `- 40`), and in the notes view the lyric line and its track sit flush with the bottom of the window (`lyricY = h - 0.75 × font`).
 - Vocal notes view: the lyric syllables have a dark outline (`strokeText` under the fill, width 0.16 × font, min 3 px).
 - Vocals alone, notes view: the karaoke part under the band has no base layer either (same as karaoke mode); only the band's own lyric row keeps its track.
+- The instrument tag of each window sits in its top right corner (it was top left) and its menu opens right-aligned under it (`syncPaneTags`, no `align-left` on `#paneMenu`).
