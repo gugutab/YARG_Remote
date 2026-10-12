@@ -296,7 +296,7 @@ export function sectionAt(sections, t) {
 
 // Bars of the "spectrum": the energy each of `bars` positions gets from the notes sounding around t (held notes hold their level,
 // ended ones decay), as a soft blob around the note's position. Writes into `out` (a Float32Array of `bars`).
-export function spectrumAt(events, t, bars, out) {
+export function spectrumAt(events, t, bars, out, spread = 3) {
   out.fill(0, 0, bars);
   const from = lowerBound(events.times, t - 1.4 - events.maxLen);
   for (let i = from; i < events.count && events.times[i] <= t + 0.02; i++) {
@@ -305,9 +305,9 @@ export function spectrumAt(events, t, bars, out) {
     const e = age <= Math.min(held, 4) ? 1 : Math.exp(-(age - Math.min(held, 4)) / 0.22);
     if (e < 0.03) continue;
     const c = events.pos[i] * (bars - 1);
-    const lo = Math.max(0, Math.floor(c - 6));
-    const hi = Math.min(bars - 1, Math.ceil(c + 6));
-    for (let b = lo; b <= hi; b++) out[b] += e * Math.exp(-((b - c) ** 2) / 6);
+    const lo = Math.max(0, Math.floor(c - 2 * spread));
+    const hi = Math.min(bars - 1, Math.ceil(c + 2 * spread));
+    for (let b = lo; b <= hi; b++) out[b] += e * Math.exp(-((b - c) ** 2) / (2 * spread * spread));
   }
   return out;
 }
@@ -393,14 +393,12 @@ const coverViz = (ctx) => {
         g.fillRect(0, 0, w, h);
         return;
       }
-      const size = Math.max(w, h) * 1.3;
-      const punch = s.beat.pulse * 0.025 + s.beat.measurePulse * 0.03;
+      const size = Math.max(w, h) * 1.08;
       g.save();
       g.imageSmoothingEnabled = true;
       g.imageSmoothingQuality = 'high';
       g.translate(w / 2 + Math.sin(s.t * 0.05 + s.clock * 0.07) * w * 0.05, h / 2 + Math.cos(s.t * 0.043 + s.clock * 0.05) * h * 0.05);
-      g.rotate(Math.sin(s.t * 0.031) * 0.07);
-      g.scale(1.04 + 0.05 * Math.sin(s.t * 0.06) + punch, 1.04 + 0.05 * Math.sin(s.t * 0.06) + punch);
+      g.scale(1.02 + 0.03 * Math.sin(s.t * 0.06), 1.02 + 0.03 * Math.sin(s.t * 0.06));
       g.drawImage(cv, -size / 2, -size / 2, size, size);
       g.globalCompositeOperation = 'lighter'; // a flash on the beat, a little bigger than the picture under it
       g.globalAlpha = 0.18 * s.beat.pulse + 0.1 * s.beat.measurePulse + 0.1 * s.hit;
@@ -411,61 +409,52 @@ const coverViz = (ctx) => {
 };
 
 const auroraViz = (ctx) => {
-  let low = null;
   const grads = memo();
   const sky = memo();
   return {
     draw(g, s) {
-      const lw = Math.max(80, Math.round(s.w / 6));
-      const lh = Math.max(60, Math.round(s.h / 6));
-      if (!low || low.width !== lw || low.height !== lh) low = makeCanvas(lw, lh);
-      const o = low.getContext('2d');
+      const { w, h } = s;
       const pal = ctx.song.palette;
-      o.globalCompositeOperation = 'source-over';
-      o.globalAlpha = 1;
-      o.fillStyle = sky(`${lh}${pal.v[0]}`, () => {
-        const gr = o.createLinearGradient(0, 0, 0, lh);
+      g.save();
+      g.fillStyle = sky(`${h}${pal.v[0]}`, () => {
+        const gr = g.createLinearGradient(0, 0, 0, h);
         gr.addColorStop(0, rgba(pal.v[2], 0.16));
         gr.addColorStop(1, rgba(pal.v[0], 0.3));
         return gr;
       });
-      o.clearRect(0, 0, lw, lh);
-      o.fillRect(0, 0, lw, lh);
-      o.globalCompositeOperation = 'lighter';
+      g.fillRect(0, 0, w, h);
+      g.globalCompositeOperation = 'lighter';
       const drive = 0.55 + 0.45 * s.density + 0.4 * s.sp;
-      const gradSet = grads(`${lw}x${lh}${pal.v.join()}`, () => pal.v.map((c) => {
-        const gr = o.createLinearGradient(0, 0, 0, lh * 0.7);
+      const gradSet = grads(`${w}x${h}${pal.v.join()}`, () => pal.v.map((c) => {
+        const gr = g.createLinearGradient(0, 0, 0, h * 0.7);
         gr.addColorStop(0, rgba(c, 0));
         gr.addColorStop(0.4, rgba(c, 0.8));
         gr.addColorStop(1, rgba(c, 0));
         return gr;
       }));
+      const step = 6; // px between the points of a ribbon's edge (the curves are smooth: this is plenty at full resolution)
       for (let k = 0; k < 4; k++) {
         const ph = s.beat.pos * 0.16 * (1 + k * 0.25) + k * 2.1 + ctx.song.seed % 7;
-        const base = lh * (0.1 + 0.2 * k) + s.vocal * lh * 0.04;
-        const amp = lh * (0.06 + 0.025 * k) * (0.8 + s.density * 0.7);
-        const thick = lh * (0.3 + 0.06 * k) * (1 + s.beat.pulse * 0.12);
-        const f = 0.04 + 0.012 * k;
-        o.save();
-        o.translate(0, base - lh * 0.1);
-        o.globalAlpha = Math.min(1, 0.5 * drive + 0.1 * s.beat.measurePulse);
-        o.fillStyle = gradSet[k % gradSet.length];
-        o.beginPath();
+        const base = h * (0.1 + 0.2 * k) + s.vocal * h * 0.04;
+        const amp = h * (0.06 + 0.025 * k) * (0.8 + s.density * 0.7);
+        const thick = h * (0.3 + 0.06 * k);
+        const f = 0.04 / 6 * (1 + 0.3 * k); // radians per px
+        g.save();
+        g.translate(0, base - h * 0.1);
+        g.globalAlpha = Math.min(1, 0.5 * drive);
+        g.fillStyle = gradSet[k % gradSet.length];
+        g.beginPath();
         const up = [];
-        for (let x = 0; x <= lw + 4; x += 4) {
+        for (let x = 0; x <= w + step; x += step) {
           const y = Math.sin(x * f + ph) * amp + Math.sin(x * f * 2.3 - ph * 1.7) * amp * 0.4;
           up.push(y);
-          if (x === 0) o.moveTo(x, y); else o.lineTo(x, y);
+          if (x === 0) g.moveTo(x, y); else g.lineTo(x, y);
         }
-        for (let i = up.length - 1; i >= 0; i--) o.lineTo(i * 4, up[i] * 0.6 + thick);
-        o.closePath();
-        o.fill();
-        o.restore();
+        for (let i = up.length - 1; i >= 0; i--) g.lineTo(i * step, up[i] * 0.6 + thick);
+        g.closePath();
+        g.fill();
+        g.restore();
       }
-      g.save();
-      g.imageSmoothingEnabled = true;
-      g.imageSmoothingQuality = 'high';
-      g.drawImage(low, 0, 0, s.w, s.h);
       g.restore();
     },
   };
@@ -646,36 +635,56 @@ const ringsViz = (ctx) => ({
   },
 });
 
+const EQ_ECHOES = [0.09, 0.2, 0.34]; // seconds back: the delayed copies that trail behind the bars
 const eqViz = (ctx) => {
-  const bars = new Float32Array(96);
-  const grad = memo();
+  const now = new Float32Array(96);
+  const past = new Float32Array(96);
+  const peak = new Float32Array(96);
+  const level = (v) => Math.min(1.15, 1 - Math.exp(-v * 1.1));
   return {
     draw(g, s) {
       const { w, h } = s;
       const pal = ctx.song.palette;
-      const n = Math.max(24, Math.min(96, Math.round(w / 22)));
-      spectrumAt(ctx.song.events, s.t, n, bars);
+      const n = Math.max(32, Math.min(96, Math.round(w / 16)));
       const bw = w / n;
-      const maxH = h * 0.5;
+      const spread = Math.max(3, n / 14); // each note lights a wide soft hill, so the bars fill the whole width
+      const maxH = h * 0.9; // the bars hang from the top edge and reach most of the way down
+      spectrumAt(ctx.song.events, s.t, n, now, spread);
+      peak.fill(0, 0, n); // the highest level over the last 0.5 s, shown as a cap that "falls"
+      for (let k = 0; k <= 5; k++) {
+        spectrumAt(ctx.song.events, s.t - k * 0.1, n, past, spread);
+        for (let b = 0; b < n; b++) peak[b] = Math.max(peak[b], level(past[b]) - k * 0.05);
+      }
       g.save();
-      g.fillStyle = grad(`${h}${pal.v[0]}${pal.va}`, () => {
-        const gr = g.createLinearGradient(0, h, 0, h - maxH);
-        gr.addColorStop(0, rgba(pal.v[0], 0.9));
-        gr.addColorStop(1, rgba(pal.va, 0.95));
-        return gr;
+      g.globalCompositeOperation = 'lighter';
+      const colorAt = (b, a) => { // the palette across the bars, brighter where it is louder
+        const m = b / (n - 1);
+        const c = m < 0.5 ? pal.v[0] : pal.va;
+        return rgba(c, a);
+      };
+      EQ_ECHOES.forEach((dt, e) => { // trails: the same spectrum a moment earlier, longer and fainter
+        spectrumAt(ctx.song.events, s.t - dt, n, past, spread);
+        const a = 0.2 - e * 0.05;
+        for (let b = 0; b < n; b++) {
+          const v = Math.min(1.15, level(past[b]) + 0.03);
+          g.fillStyle = colorAt(b, a);
+          g.fillRect(b * bw + bw * 0.1, 0, bw * 0.8, v * maxH * (1 + 0.06 * (e + 1)));
+        }
       });
       for (let b = 0; b < n; b++) {
-        const idle = 0.035 + 0.025 * Math.sin(b * 0.55 + s.beat.pos * 1.3) + 0.03 * s.beat.pulse;
-        const v = (1 - Math.exp(-bars[b] * 1.1)) * (1 + 0.12 * s.beat.pulse) + idle;
-        const bh = Math.min(1.1, v) * maxH;
-        g.fillRect(b * bw + bw * 0.14, h - bh, bw * 0.72, bh);
-      }
-      g.globalAlpha = 0.28; // a mirror along the top edge
-      g.translate(0, h);
-      g.scale(1, -1);
-      for (let b = 0; b < n; b++) {
-        const v = (1 - Math.exp(-bars[b] * 1.1)) + 0.03;
-        g.fillRect(b * bw + bw * 0.14, h - Math.min(1.1, v) * maxH * 0.6, bw * 0.72, Math.min(1.1, v) * maxH * 0.6);
+        const idle = 0.04 + 0.03 * Math.sin(b * 0.45 + s.beat.pos * 1.3);
+        const v = Math.min(1.15, level(now[b]) + idle);
+        const bh = v * maxH;
+        const x = b * bw + bw * 0.12;
+        const gr = g.createLinearGradient(0, 0, 0, bh);
+        gr.addColorStop(0, colorAt(b, 0.35));
+        gr.addColorStop(1, colorAt(b, 0.95));
+        g.fillStyle = gr;
+        g.fillRect(x, 0, bw * 0.76, bh);
+        g.fillStyle = 'rgba(255,255,255,0.85)'; // the tip glows
+        g.fillRect(x, bh - 3, bw * 0.76, 3);
+        const ph = Math.min(1.15, peak[b] + idle) * maxH; // the peak cap
+        if (ph > bh + 4) { g.fillStyle = colorAt(b, 0.9); g.fillRect(x, ph - 2, bw * 0.76, 2); }
       }
       g.restore();
     },
@@ -749,10 +758,9 @@ export async function loadCover(url) {
   const sy = (img.naturalHeight - side) / 2;
   sg.drawImage(img, sx, sy, side, side, 0, 0, 32, 32);
   const palette = extractPalette(sg.getImageData(0, 0, 32, 32).data);
-  const big = makeCanvas(64, 64);
-  const bg = big.getContext('2d');
-  try { bg.filter = 'blur(3px)'; } catch { /* no filter support: the upscaling alone blurs */ }
-  bg.drawImage(img, sx, sy, side, side, -4, -4, 72, 72);
+  const px = Math.min(512, side); // a sharp copy (the dark overlay already keeps it from competing with the notes)
+  const big = makeCanvas(px, px);
+  big.getContext('2d').drawImage(img, sx, sy, side, side, 0, 0, px, px);
   return { palette, canvas: big };
 }
 
