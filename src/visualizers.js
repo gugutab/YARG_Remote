@@ -312,6 +312,55 @@ export function spectrumAt(events, t, bars, out, spread = 3) {
   return out;
 }
 
+// ---------- Shapes of the newer effects (pure) ----------
+
+// Album art as cloth: how the strip at u (0..1 across the picture) is moved. Two travelling sine waves whose phase is the beat
+// position (tempo-locked) plus a slow drift of the song time. dy -1..1 (vertical offset, in units of the amplitude), slope -1..1
+// (how steep the wave is there: the light/shade of the fabric), sy a tiny vertical scale around 1, rx -1..1 (horizontal ripple).
+export function clothAt(u, pos, t, out = {}) {
+  const p1 = u * TAU * 0.85 - pos * 0.8;
+  const p2 = u * TAU * 1.9 - pos * 1.35 - t * 0.2 + 1.7;
+  out.dy = 0.65 * Math.sin(p1) + 0.35 * Math.sin(p2);
+  out.slope = (0.65 * Math.cos(p1) * 0.85 + 0.35 * Math.cos(p2) * 1.9) / (0.65 * 0.85 + 0.35 * 1.9);
+  out.sy = 1 + 0.008 * Math.sin(p2 + 1);
+  out.rx = Math.sin(u * TAU * 1.3 - pos * 0.7 + 0.6);
+  return out;
+}
+
+// The bars of a circular spectrum: 2m bars mirrored left and right, angle 0 pointing up at the top and growing downwards on each
+// side. angle[i] is in radians (canvas angle), bin[i] the spectrum bar (0..m-1) it shows.
+export function radialLayout(m) {
+  const angle = new Float32Array(2 * m);
+  const bin = new Uint16Array(2 * m);
+  for (let k = 0; k < m; k++) {
+    const a = (k + 0.5) / m * Math.PI;
+    angle[k] = -Math.PI / 2 + a; // right side, from the top down
+    bin[k] = k;
+    angle[2 * m - 1 - k] = -Math.PI / 2 - a; // left side, the mirror image
+    bin[2 * m - 1 - k] = k;
+  }
+  return { angle, bin };
+}
+
+// Stage light i of `count`: its angle (radians off straight down, positive towards +x). Each beam swings around its own rest
+// angle (a fan that leans towards the centre) with its own period in beats, so the sweep follows the tempo.
+const BEAM_BEATS = [16, 24, 32, 20, 28, 12];
+export function beamAngle(i, count, pos) {
+  const x = count > 1 ? i / (count - 1) - 0.5 : 0; // -0.5 .. 0.5 across the stage
+  return -x * 0.45 + (0.32 + 0.06 * (i % 3)) * Math.sin(pos * TAU / BEAM_BEATS[i % BEAM_BEATS.length] + i * 1.9);
+}
+
+// A value that depends on the section (fn(index)) and eases to the new one over `ramp` seconds after the section starts.
+export function sectionValue(sections, t, index, fn, ramp = 2) {
+  const cur = fn(index);
+  const sec = sections[index];
+  if (!sec || index <= 0) return cur;
+  const k = clamp01((t - sec.time) / ramp);
+  const e = k * k * (3 - 2 * k);
+  const prev = fn(index - 1);
+  return prev + (cur - prev) * e;
+}
+
 // ---------- Song data ----------
 
 // All the data the visualizers read, built once per song and chart set (not per frame).
@@ -376,8 +425,13 @@ function glowSprite(c) {
   return s;
 }
 
+// The cover as a flag in a soft breeze: drawn in vertical strips that rise and fall on two travelling waves (clothAt), with the
+// slope of the wave shading the strips lighter or darker, so it reads as fabric while the picture stays recognisable.
+const CLOTH_STRIPS = 48;
 const coverViz = (ctx) => {
   const fallback = memo();
+  const c = { dy: new Float32Array(CLOTH_STRIPS + 1), slope: new Float32Array(CLOTH_STRIPS + 1), sy: new Float32Array(CLOTH_STRIPS + 1), rx: new Float32Array(CLOTH_STRIPS + 1) };
+  const edge = {};
   return {
     draw(g, s) {
       const { w, h } = s;
@@ -394,15 +448,39 @@ const coverViz = (ctx) => {
         return;
       }
       const size = Math.max(w, h) * 1.08;
+      const zoom = 1.02 + 0.03 * Math.sin(s.t * 0.06);
+      const amp = (h * 0.02 * (0.85 + 0.3 * s.density)) / zoom; // 1.7-2.3% of the height
+      const rip = size * 0.003;
+      for (let i = 0; i <= CLOTH_STRIPS; i++) {
+        clothAt(i / CLOTH_STRIPS, s.beat.pos, s.t, edge);
+        c.dy[i] = edge.dy; c.slope[i] = edge.slope; c.sy[i] = edge.sy; c.rx[i] = edge.rx;
+      }
       g.save();
       g.imageSmoothingEnabled = true;
       g.imageSmoothingQuality = 'high';
       g.translate(w / 2 + Math.sin(s.t * 0.05 + s.clock * 0.07) * w * 0.05, h / 2 + Math.cos(s.t * 0.043 + s.clock * 0.05) * h * 0.05);
-      g.scale(1.02 + 0.03 * Math.sin(s.t * 0.06), 1.02 + 0.03 * Math.sin(s.t * 0.06));
-      g.drawImage(cv, -size / 2, -size / 2, size, size);
-      g.globalCompositeOperation = 'lighter'; // a flash on the beat, a little bigger than the picture under it
-      g.globalAlpha = 0.18 * s.beat.pulse + 0.1 * s.beat.measurePulse + 0.1 * s.hit;
-      g.drawImage(cv, -size * 0.53, -size * 0.53, size * 1.06, size * 1.06);
+      g.scale(zoom, zoom);
+      const x0 = -size / 2;
+      const y0 = -size / 2;
+      const overlap = 1 / zoom; // one screen pixel, so no seam shows between two strips
+      const srcW = cv.width / CLOTH_STRIPS;
+      const xs = (i) => x0 + (i / CLOTH_STRIPS) * size + c.rx[i] * rip;
+      for (let i = 0; i < CLOTH_STRIPS; i++) {
+        const xa = xs(i);
+        const dw = xs(i + 1) - xa + overlap;
+        const sy = (c.sy[i] + c.sy[i + 1]) / 2;
+        const hh = size * sy;
+        const dy = (c.dy[i] + c.dy[i + 1]) / 2;
+        const sx = i * srcW;
+        const sw = Math.min(srcW + (overlap * srcW) / Math.max(1, dw - overlap), cv.width - sx);
+        g.drawImage(cv, sx, 0, sw, cv.height, xa, y0 + dy * amp - (hh - size) / 2, dw, hh);
+      }
+      for (let i = 0; i < CLOTH_STRIPS; i++) { // light on the slopes that face up, shade on the others
+        const sl = (c.slope[i] + c.slope[i + 1]) / 2;
+        const xa = xs(i);
+        g.fillStyle = sl > 0 ? `rgba(255,255,255,${(sl * 0.16).toFixed(3)})` : `rgba(0,0,0,${(-sl * 0.2).toFixed(3)})`;
+        g.fillRect(xa, y0 - amp, xs(i + 1) - xa + overlap, size + amp * 2);
+      }
       g.restore();
     },
   };
@@ -725,17 +803,309 @@ const embersViz = (ctx) => {
   };
 };
 
+const mixRgb = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+
+// A circular equalizer around a spinning record: the same wide hills, echoes and peak caps as the MIDI equalizer, mirrored on both
+// sides and bent into a ring. The record is the cover (or a palette disc), turning with the tempo.
+const RADIAL_BINS = 40; // spectrum bars per side
+const radialViz = (ctx) => {
+  const lay = radialLayout(RADIAL_BINS);
+  const now = new Float32Array(RADIAL_BINS);
+  const past = new Float32Array(RADIAL_BINS);
+  const peak = new Float32Array(RADIAL_BINS);
+  const disc = memo();
+  const level = (v) => Math.min(1.15, 1 - Math.exp(-v * 1.1));
+  const M = RADIAL_BINS;
+  return {
+    draw(g, s) {
+      const { w, h } = s;
+      const song = ctx.song;
+      const pal = song.palette;
+      const cx = w / 2;
+      const cy = h / 2;
+      const base = Math.min(w, h);
+      const discR = base * 0.2;
+      const ringR = discR * 1.14;
+      const maxLen = base * 0.25;
+      const spread = Math.max(2.5, M / 14);
+      spectrumAt(song.events, s.t, M, now, spread);
+      peak.fill(0);
+      for (let k = 0; k <= 5; k++) {
+        spectrumAt(song.events, s.t - k * 0.1, M, past, spread);
+        for (let b = 0; b < M; b++) peak[b] = Math.max(peak[b], level(past[b]) - k * 0.05);
+      }
+      const idle = (b) => 0.05 + 0.035 * Math.sin(b * 0.5 + s.beat.pos * 1.3);
+      const groupColors = [pal.v[0], pal.va, pal.v[2]];
+      const groupOf = (b) => (b < M * 0.34 ? 0 : b < M * 0.67 ? 1 : 2);
+      const N = 2 * M;
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      g.lineJoin = 'round';
+      EQ_ECHOES.forEach((dt, e) => { // the same spectrum a moment earlier, as fainter outer rings
+        spectrumAt(song.events, s.t - dt, M, past, spread);
+        g.beginPath();
+        for (let i = 0; i < N; i++) {
+          const r = ringR + Math.min(1.15, level(past[lay.bin[i]]) + 0.03) * maxLen * (1 + 0.06 * (e + 1));
+          const a = lay.angle[i];
+          if (i === 0) g.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); else g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+        }
+        g.closePath();
+        g.fillStyle = rgba(pal.va, 0.07 - e * 0.015);
+        g.fill();
+        g.strokeStyle = rgba(pal.v[0], 0.28 - e * 0.07);
+        g.lineWidth = 1.5;
+        g.stroke();
+      });
+      const bw = (TAU * ringR) / N * 0.64;
+      g.lineWidth = bw;
+      for (let grp = 0; grp < 3; grp++) { // bars, one path per colour
+        g.beginPath();
+        for (let i = 0; i < N; i++) {
+          const b = lay.bin[i];
+          if (groupOf(b) !== grp) continue;
+          const a = lay.angle[i];
+          const len = Math.min(1.15, level(now[b]) + idle(b)) * maxLen;
+          const cos = Math.cos(a);
+          const sin = Math.sin(a);
+          g.moveTo(cx + cos * ringR, cy + sin * ringR);
+          g.lineTo(cx + cos * (ringR + len), cy + sin * (ringR + len));
+        }
+        g.strokeStyle = rgba(groupColors[grp], 0.9);
+        g.stroke();
+      }
+      g.lineWidth = bw;
+      g.beginPath(); // glowing tips
+      for (let i = 0; i < N; i++) {
+        const b = lay.bin[i];
+        const a = lay.angle[i];
+        const r = ringR + Math.min(1.15, level(now[b]) + idle(b)) * maxLen;
+        g.moveTo(cx + Math.cos(a) * (r - 3), cy + Math.sin(a) * (r - 3));
+        g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+      }
+      g.strokeStyle = 'rgba(255,255,255,0.8)';
+      g.stroke();
+      for (let grp = 0; grp < 3; grp++) { // peak caps
+        g.beginPath();
+        for (let i = 0; i < N; i++) {
+          const b = lay.bin[i];
+          if (groupOf(b) !== grp) continue;
+          const a = lay.angle[i];
+          const bar = Math.min(1.15, level(now[b]) + idle(b)) * maxLen;
+          const r = Math.min(1.15, peak[b] + idle(b)) * maxLen;
+          if (r <= bar + 4) continue;
+          g.moveTo(cx + Math.cos(a) * (ringR + r - 2), cy + Math.sin(a) * (ringR + r - 2));
+          g.lineTo(cx + Math.cos(a) * (ringR + r), cy + Math.sin(a) * (ringR + r));
+        }
+        g.strokeStyle = rgba(groupColors[grp], 0.9);
+        g.stroke();
+      }
+      g.restore();
+      // the record: dark backing, the cover (or palette) turning with the tempo, grooves and sheen that stay put, a tiny hole
+      g.save();
+      const spin = s.beat.pos * 0.12;
+      g.fillStyle = 'rgba(6,6,10,0.9)';
+      g.beginPath();
+      g.arc(cx, cy, discR * 1.05, 0, TAU);
+      g.fill();
+      g.beginPath();
+      g.arc(cx, cy, discR, 0, TAU);
+      g.clip();
+      g.translate(cx, cy);
+      g.rotate(spin);
+      if (song.coverCanvas) {
+        g.imageSmoothingEnabled = true;
+        g.imageSmoothingQuality = 'high';
+        g.drawImage(song.coverCanvas, -discR, -discR, discR * 2, discR * 2);
+      } else {
+        g.fillStyle = disc(`${discR}${pal.v.join()}`, () => {
+          const gr = g.createLinearGradient(-discR, 0, discR, 0);
+          pal.v.forEach((c, k) => gr.addColorStop(k / 3, rgba(c, 1)));
+          return gr;
+        });
+        g.fillRect(-discR, -discR, discR * 2, discR * 2);
+      }
+      g.rotate(-spin);
+      g.strokeStyle = 'rgba(0,0,0,0.22)';
+      g.lineWidth = 1;
+      g.beginPath();
+      for (let k = 0; k < 9; k++) {
+        const r = discR * (0.28 + 0.078 * k);
+        g.moveTo(r, 0);
+        g.arc(0, 0, r, 0, TAU);
+      }
+      g.stroke();
+      g.fillStyle = 'rgba(255,255,255,0.07)'; // the shine of the vinyl: two opposite wedges
+      for (const a of [-0.9, Math.PI - 0.9]) {
+        g.beginPath();
+        g.moveTo(0, 0);
+        g.arc(0, 0, discR, a, a + 0.55);
+        g.closePath();
+        g.fill();
+      }
+      g.restore();
+      g.save();
+      g.strokeStyle = 'rgba(255,255,255,0.28)';
+      g.lineWidth = 1.5;
+      g.beginPath();
+      g.arc(cx, cy, discR, 0, TAU);
+      g.stroke();
+      g.fillStyle = 'rgba(8,8,12,0.95)';
+      g.beginPath();
+      g.arc(cx, cy, discR * 0.045, 0, TAU);
+      g.fill();
+      g.strokeStyle = 'rgba(255,255,255,0.35)';
+      g.beginPath();
+      g.arc(cx, cy, discR * 0.045, 0, TAU);
+      g.stroke();
+      g.restore();
+    },
+  };
+};
+
+// Stage lights hanging from the top edge, each sweeping on its own period of beats (beamAngle), in the cover colours and added
+// together. Busy music and singing make them brighter and wider; star power turns them warm and widens the sweep.
+const spotViz = (ctx) => {
+  const haze = memo();
+  return {
+    draw(g, s) {
+      const { w, h } = s;
+      const pal = ctx.song.palette;
+      const n = w > 1100 ? 6 : 5;
+      const len = h * 1.25;
+      const drive = clamp01(0.75 + 0.3 * s.density + 0.25 * s.vocal + 0.15 * s.sp);
+      g.save();
+      g.fillStyle = haze(`${h}${pal.v[2]}${pal.va}`, () => {
+        const gr = g.createLinearGradient(0, 0, 0, h);
+        gr.addColorStop(0, rgba(pal.v[2], 0.14));
+        gr.addColorStop(0.6, rgba(pal.v[2], 0.04));
+        gr.addColorStop(1, rgba(pal.va, 0.12));
+        return gr;
+      });
+      g.fillRect(0, 0, w, h);
+      g.globalCompositeOperation = 'lighter';
+      const warm = [255, 190, 90];
+      for (let i = 0; i < n; i++) {
+        const x = (w * (i + 0.5)) / n;
+        const ang = beamAngle(i, n, s.beat.pos) * (1 + 0.35 * s.sp);
+        const col = mixRgb(pal.v[i % 4], warm, 0.65 * s.sp).map(Math.round);
+        const half = 0.1 + 0.025 * s.vocal + 0.02 * s.density; // half-opening of the cone, radians
+        g.save();
+        g.translate(x, -4);
+        g.rotate(-ang);
+        const gr = g.createLinearGradient(0, 0, 0, len);
+        gr.addColorStop(0, rgba(col, 0.75));
+        gr.addColorStop(0.55, rgba(col, 0.22));
+        gr.addColorStop(1, rgba(col, 0));
+        g.fillStyle = gr;
+        [[0.5, 0.5], [1, 0.35], [2, 0.16]].forEach(([wide, a]) => { // soft edges: nested cones
+          const hw = Math.tan(half * wide) * len;
+          g.globalAlpha = Math.min(1, a * drive * 1.7);
+          g.beginPath();
+          g.moveTo(0, 0);
+          g.lineTo(-hw, len);
+          g.lineTo(hw, len);
+          g.closePath();
+          g.fill();
+        });
+        g.restore();
+        g.globalAlpha = 1;
+        const hitX = x + Math.tan(ang) * h * 0.97; // the pool of light on the floor
+        g.save();
+        g.translate(hitX, h * 0.97);
+        g.scale(1, 0.16);
+        const pr = h * (0.2 + 0.05 * s.vocal);
+        const pool = g.createRadialGradient(0, 0, 0, 0, 0, pr);
+        pool.addColorStop(0, rgba(col, 0.5 * drive));
+        pool.addColorStop(1, rgba(col, 0));
+        g.fillStyle = pool;
+        g.fillRect(-pr, -pr, pr * 2, pr * 2);
+        g.restore();
+        const lamp = g.createRadialGradient(x, 0, 0, x, 0, 26); // the fixture
+        lamp.addColorStop(0, 'rgba(255,255,255,0.8)');
+        lamp.addColorStop(0.3, rgba(col, 0.5));
+        lamp.addColorStop(1, rgba(col, 0));
+        g.fillStyle = lamp;
+        g.fillRect(x - 26, 0, 52, 26);
+      }
+      g.restore();
+    },
+  };
+};
+
+// Rounded polygons rushing at the viewer. Ring i sits at depth fract(travel + i/N); the travel advances with the tempo and goes
+// faster through busy parts, so the picture is a pure function of the song time. Rings fade in far away and out up close, take the
+// palette colours in turn, and the twist along the tunnel changes with the section.
+const TUNNEL_RINGS = 14;
+function roundedPolygon(g, cx, cy, r, sides, rot, round) {
+  const pts = [];
+  for (let k = 0; k < sides; k++) pts.push([cx + Math.cos(rot + (k / sides) * TAU) * r, cy + Math.sin(rot + (k / sides) * TAU) * r]);
+  const rad = r * round;
+  const last = pts[sides - 1];
+  g.moveTo((last[0] + pts[0][0]) / 2, (last[1] + pts[0][1]) / 2);
+  for (let k = 0; k < sides; k++) {
+    const p = pts[k];
+    const q = pts[(k + 1) % sides];
+    g.arcTo(p[0], p[1], (p[0] + q[0]) / 2, (p[1] + q[1]) / 2, rad);
+  }
+  g.closePath();
+}
+const tunnelViz = (ctx) => ({
+  draw(g, s) {
+    const { w, h } = s;
+    const song = ctx.song;
+    const pal = song.palette;
+    const cx = w / 2 + Math.sin(s.beat.pos * 0.07) * w * 0.03;
+    const cy = h / 2 + Math.cos(s.beat.pos * 0.05) * h * 0.03;
+    const R = Math.hypot(w, h) * 0.62;
+    const twist = sectionValue(song.sections, s.t, s.section, (k) => 0.5 + ((k * 7) % 5) * 0.22, 2.5);
+    const run = s.beat.pos * 0.05 + s.travel * 0.12;
+    const unit = Math.min(w, h) / 900;
+    const warm = [255, 190, 90];
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    g.lineJoin = 'round';
+    for (let i = 0; i < TUNNEL_RINGS; i++) {
+      const q = run + i / TUNNEL_RINGS;
+      const z = fract(q);
+      const id = Math.floor(q);
+      const fade = Math.sin(Math.PI * Math.min(1, z * 1.1)) ** 0.7; // fades in at the far end, out close up
+      if (fade < 0.01) continue;
+      const r = R * z * z * 0.8 + 3;
+      const rot = s.beat.pos * 0.02 + z * twist * 2.2 + (i % 2) * 0.2;
+      const k = ((id % 4) + 4) % 4;
+      const col = mixRgb(mixRgb(pal.v[k], pal.v[(k + 1) % 4], z), warm, 0.6 * s.sp).map(Math.round);
+      g.beginPath();
+      roundedPolygon(g, cx, cy, r, i % 2 ? 6 : 8, rot, 0.16);
+      g.strokeStyle = rgba(col, 0.5 * fade);
+      g.lineWidth = (5 + 24 * z ** 1.5) * unit;
+      g.stroke();
+      g.strokeStyle = rgba(col, fade);
+      g.lineWidth = (1.5 + 7 * z ** 1.5) * unit;
+      g.stroke();
+    }
+    const core = g.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * 0.3);
+    core.addColorStop(0, rgba(mixRgb(pal.va, warm, 0.5 * s.sp), 0.2 + 0.2 * s.density));
+    core.addColorStop(1, rgba(pal.va, 0));
+    g.fillStyle = core;
+    g.fillRect(0, 0, w, h);
+    g.restore();
+  },
+});
+
 // ---------- Registry ----------
 
 export const VISUALIZERS = [
   { id: 'none', label: 'None', hint: 'Plain background', swatch: 'transparent', create: null },
-  { id: 'cover', label: 'Album art', hint: 'The cover, blurred, pulsing on the beat', swatch: 'linear-gradient(135deg,#6b5b95,#d9822b)', create: coverViz },
+  { id: 'cover', label: 'Album art', hint: 'The cover, waving softly like cloth', swatch: 'linear-gradient(135deg,#6b5b95,#d9822b)', create: coverViz },
   { id: 'aurora', label: 'Aurora', hint: 'Flowing ribbons in the cover colours', swatch: 'linear-gradient(135deg,#0f9b8e,#6a4fc2)', create: auroraViz },
   { id: 'synthwave', label: 'Synthwave', hint: 'Grid and sun, rolling with the beats', swatch: 'linear-gradient(180deg,#ff5fa2,#ffb347 55%,#3a1c71)', create: synthViz },
   { id: 'warp', label: 'Warp', hint: 'Stars that rush faster in busy parts', swatch: 'radial-gradient(circle,#fff 0 6%,#4a6fd8 40%,#0a1030)', create: warpViz },
   { id: 'rings', label: 'Beat rings', hint: 'A ring for every beat, thicker on bars', swatch: 'repeating-radial-gradient(circle,#7fd1ff 0 3px,#10203a 3px 9px)', create: ringsViz },
   { id: 'equalizer', label: 'MIDI equalizer', hint: 'Bars driven by the notes being played', swatch: 'linear-gradient(90deg,#3ddc97 0 20%,#ffd23f 20% 40%,#ff7043 40% 60%,#ffd23f 60% 80%,#3ddc97 80%)', create: eqViz },
   { id: 'embers', label: 'Embers', hint: 'Sparks rising with the energy', swatch: 'radial-gradient(circle at 50% 80%,#ffb347,#8b1e1e 55%,#1a0a0a)', create: embersViz },
+  { id: 'radial', label: 'Radial spectrum', hint: 'A ring of bars around a spinning record', swatch: 'radial-gradient(circle,#222 0 22%,#f6c344 24% 30%,#222 32% 40%,#ff6b9d 42% 62%,#14142a 64%)', create: radialViz },
+  { id: 'spotlights', label: 'Spotlights', hint: 'Stage lights sweeping with the tempo', swatch: 'conic-gradient(from 160deg at 50% 0,#0a0a1a 0 4%,#ffd36b 10%,#0a0a1a 18% 30%,#7fd1ff 36%,#0a0a1a 44% 56%,#ff7aa8 62%,#0a0a1a 70%)', create: spotViz },
+  { id: 'tunnel', label: 'Tunnel', hint: 'Rounded rings rushing towards you', swatch: 'repeating-radial-gradient(circle,#0b0b1e 0 3px,#6be0d0 3px 5px,#0b0b1e 5px 9px,#c06bff 9px 11px)', create: tunnelViz },
 ];
 
 export const VISUALIZER_IDS = VISUALIZERS.map((v) => v.id);
@@ -765,7 +1135,7 @@ export async function loadCover(url) {
 }
 
 // What Highway.setVisualizer gets. getSource() -> { key, song, charts, coverUrl }: `key` changes when the charts do.
-// Draws the chosen visualizer, then an overlay of the stage colour (the transparency setting) so the notes stay readable.
+// Draws the chosen visualizer (blurred when `blur` > 0), then an overlay of the stage colour (1 - visibility) so the notes stay readable.
 export function createDriver({ getSource }) {
   const state = { t: 0, w: 0, h: 0, dpr: 1, beat: {}, density: 0, travel: 0, sp: 0, solo: 0, vocal: 0, perc: 0, hit: 0, section: 0, clock: 0 };
   let id = 'none';
@@ -775,8 +1145,36 @@ export function createDriver({ getSource }) {
   let vizFor = null;
   let failed = false;
   let coverToken = 0;
+  let lowA = null; // blur: the effect drawn small (the downscale is already a blur), then blurred into lowB
+  let lowB = null;
+  let filterOk = null;
+  const drawBlurred = (g, s, bgRgb) => {
+    const sc = driver.blur <= 6 ? 0.5 : driver.blur <= 16 ? 0.35 : 0.25;
+    const cw = Math.max(8, Math.round(s.w * s.dpr * sc));
+    const ch = Math.max(8, Math.round(s.h * s.dpr * sc));
+    lowA ??= makeCanvas(cw, ch);
+    lowB ??= makeCanvas(cw, ch);
+    for (const c of [lowA, lowB]) if (c.width !== cw || c.height !== ch) { c.width = cw; c.height = ch; }
+    const a = lowA.getContext('2d');
+    a.setTransform(cw / s.w, 0, 0, ch / s.h, 0, 0);
+    a.fillStyle = `rgb(${bgRgb})`;
+    a.fillRect(0, 0, s.w, s.h);
+    a.save();
+    try { viz.draw(a, s); } finally { a.restore(); }
+    const b = lowB.getContext('2d');
+    b.setTransform(1, 0, 0, 1, 0, 0);
+    b.clearRect(0, 0, cw, ch);
+    if (filterOk === null) { b.filter = 'blur(1px)'; filterOk = b.filter !== 'none'; }
+    if (filterOk) b.filter = `blur(${(driver.blur * s.dpr * sc).toFixed(2)}px)`;
+    b.drawImage(lowA, 0, 0);
+    b.filter = 'none';
+    g.imageSmoothingEnabled = true;
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(lowB, 0, 0, s.w, s.h);
+  };
   const driver = {
-    transparency: 0.35, // how much of the stage colour covers the visualizer
+    visibility: 0.65, // 0..1: how much of the visualizer shows through (the stage colour covers the rest)
+    blur: 0, // px of blur on the visualizer (not on the notes); 0 costs nothing
     get id() { return id; },
     select(next) {
       id = VISUALIZER_IDS.includes(next) ? next : 'none';
@@ -827,13 +1225,13 @@ export function createDriver({ getSource }) {
       s.section = sectionAt(data.sections, t);
       g.save();
       try {
-        viz.draw(g, s);
+        if (driver.blur > 0) drawBlurred(g, s, bgRgb); else viz.draw(g, s);
       } catch (err) {
         failed = true; // never take the whole chart down with a background
         console.error('Visualizer failed:', err);
       }
       g.restore();
-      g.fillStyle = `rgba(${bgRgb},${driver.transparency.toFixed(3)})`;
+      g.fillStyle = `rgba(${bgRgb},${(1 - driver.visibility).toFixed(3)})`;
       g.fillRect(0, 0, w, h);
       const ms = performance.now() - t0;
       stats[id] = stats[id] === undefined ? ms : stats[id] * 0.9 + ms * 0.1;

@@ -2045,7 +2045,7 @@ els.barShow.addEventListener('click', () => setBarHidden(false));
 
 // ---------- Background visualizer ----------
 // One animated background behind every fretboard (src/visualizers.js, Highway.setVisualizer). The picker is a popover from the
-// tools row; the choice and the brightness live in prefs (highway.visualizer, highway.visualizerIntensity).
+// tools row; the choice, its visibility and its blur live in prefs (highway.visualizer, highway.visualizerVisibility, highway.visualizerBlur).
 let vizSrc = null;
 const vizDriver = createVisualizerDriver({
   getSource() { // rebuilt only when the charts on screen change (setCharts makes a new panes array)
@@ -2063,18 +2063,27 @@ const vizDriver = createVisualizerDriver({
 });
 const vizBtn = document.getElementById('visualizerBtn');
 const vizPop = document.getElementById('visualizerPop');
-const vizLevel = document.createElement('label');
-vizLevel.className = 'viz-level';
-vizLevel.innerHTML = '<span>Transparency</span><input type="range" min="0" max="90" step="5"><output></output>';
-const vizLevelInput = vizLevel.querySelector('input');
-vizLevelInput.addEventListener('input', () => prefs.set('highway.visualizerTransparency', Number(vizLevelInput.value)));
+// A slider row led by an icon instead of a text label (shown only when a visualizer is selected).
+function vizSlider(icon, label, min, max, step, pref) {
+  const row = document.createElement('label');
+  row.className = 'viz-level viz-slider';
+  row.title = label;
+  row.innerHTML = `<svg aria-hidden="true"><use href="#${icon}"/></svg><input type="range" min="${min}" max="${max}" step="${step}" aria-label="${label}"><output></output>`;
+  const input = row.querySelector('input');
+  input.addEventListener('input', () => prefs.set(pref, Number(input.value)));
+  return { row, input, output: row.querySelector('output') };
+}
+const vizVis = vizSlider('i-eye', 'Visibility', 10, 95, 5, 'highway.visualizerVisibility');
+const vizBlur = vizSlider('i-blur', 'Blur', 0, 40, 1, 'highway.visualizerBlur');
 const vizColor = document.createElement('div'); // the stage colour: shown with "None" too, and behind visualizers that let it through
 vizColor.className = 'viz-level viz-color';
 vizColor.innerHTML = '<span>Background</span><span class="viz-color-row"><input type="color" aria-label="Stage colour"><button type="button" class="seg-btn">Theme</button></span><output></output>';
 const vizColorInput = vizColor.querySelector('input');
 vizColorInput.addEventListener('input', () => { prefs.set('highway.stageColor', vizColorInput.value); prefs.set('highway.stageColorOn', true); });
 vizColor.querySelector('button').addEventListener('click', () => prefs.set('highway.stageColorOn', false));
-vizPop.replaceChildren(...VISUALIZERS.map((v) => {
+const vizList = document.createElement('div'); // scrolls when the effects do not fit; the sliders below stay in view
+vizList.className = 'viz-list';
+vizList.replaceChildren(...VISUALIZERS.map((v) => {
   const row = document.createElement('div');
   row.className = 'prow';
   row.dataset.id = v.id;
@@ -2086,19 +2095,25 @@ vizPop.replaceChildren(...VISUALIZERS.map((v) => {
   row.querySelector('small').textContent = v.hint;
   row.addEventListener('click', () => prefs.set('highway.visualizer', v.id)); // the list stays open: the chart behind shows the result
   return row;
-}), vizLevel, vizColor);
+}));
+const vizFoot = document.createElement('div');
+vizFoot.className = 'viz-foot';
+vizFoot.append(vizVis.row, vizBlur.row, vizColor);
+vizPop.replaceChildren(vizList, vizFoot);
 function syncVizPop() {
   const id = prefs.get('highway.visualizer');
   for (const row of vizPop.querySelectorAll('.prow')) {
     row.dataset.active = String(row.dataset.id === id);
     row.setAttribute('aria-selected', String(row.dataset.id === id));
   }
-  vizLevel.hidden = id === 'none';
-  vizLevelInput.value = prefs.get('highway.visualizerTransparency');
+  vizVis.row.hidden = vizBlur.row.hidden = id === 'none';
+  vizVis.input.value = prefs.get('highway.visualizerVisibility');
+  vizBlur.input.value = prefs.get('highway.visualizerBlur');
   const custom = prefs.get('highway.stageColorOn');
   vizColorInput.value = custom ? prefs.get('highway.stageColor') : themeStage;
   vizColor.querySelector('button').hidden = !custom;
-  vizLevel.querySelector('output').textContent = `${vizLevelInput.value}%`;
+  vizVis.output.textContent = `${vizVis.input.value}%`;
+  vizBlur.output.textContent = `${vizBlur.input.value}px`;
 }
 popovers.push([vizBtn, vizPop]);
 registerPopover(vizBtn, vizPop);
@@ -2317,7 +2332,8 @@ const EFFECTS = {
   'ui.radius': (v) => document.documentElement.style.setProperty('--radius', `${v}px`),
   'ui.font': (v) => document.documentElement.style.setProperty('--font', fontCss(v)),
   'highway.visualizer': (v) => { vizDriver.select(v); highway.setVisualizer(vizDriver.fn); syncVizPop(); },
-  'highway.visualizerTransparency': (v) => { vizDriver.transparency = v / 100; syncVizPop(); },
+  'highway.visualizerVisibility': (v) => { vizDriver.visibility = v / 100; syncVizPop(); },
+  'highway.visualizerBlur': (v) => { vizDriver.blur = v; syncVizPop(); },
   'highway.stageColorOn': () => { applyStage(); syncVizPop(); },
   'highway.stageColor': () => { applyStage(); syncVizPop(); },
   'ui.animations': (v) => { document.documentElement.dataset.motion = v ? 'on' : 'off'; },

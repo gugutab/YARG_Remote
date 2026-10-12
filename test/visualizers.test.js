@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   extractPalette, fallbackPalette, beatInfo, beatIndexAt, densityHistogram, densityAt, travelAt, spanAmount,
-  buildEvents, spectrumAt, hitLevel, vocalLevel, pulseAfter, hash01, buildSongData, VISUALIZERS,
+  buildEvents, spectrumAt, hitLevel, vocalLevel, pulseAfter, hash01, buildSongData, VISUALIZERS, clothAt, radialLayout, beamAngle, sectionValue,
 } from '../src/visualizers.js';
 
 const px = (list) => Uint8ClampedArray.from(list.flatMap(([r, g, b, a = 255]) => [r, g, b, a]));
@@ -119,4 +119,58 @@ test('song data is built from the charts and the registry has none plus at least
   assert.equal(VISUALIZERS[0].id, 'none');
   assert.ok(VISUALIZERS.filter((v) => v.create).length >= 5);
   assert.equal(new Set(VISUALIZERS.map((v) => v.id)).size, VISUALIZERS.length);
+});
+
+test('cloth: bounded, continuous across the picture, travelling with the beat and song time', () => {
+  let prev = clothAt(0, 3, 10);
+  for (let i = 1; i <= 100; i++) {
+    const c = clothAt(i / 100, 3, 10);
+    assert.ok(Math.abs(c.dy) <= 1 && Math.abs(c.slope) <= 1 && Math.abs(c.rx) <= 1 && Math.abs(c.sy - 1) < 0.01);
+    assert.ok(Math.abs(c.dy - prev.dy) < 0.2, 'no jumps between neighbouring strips');
+    prev = c;
+  }
+  assert.notEqual(clothAt(0.4, 3, 10).dy, clothAt(0.4, 4, 10).dy);
+  assert.equal(clothAt(0.4, 3, 10).dy, clothAt(0.4, 3, 10).dy, 'a pure function of the position and time');
+  const a = clothAt(0.3, 5, 1).dy;
+  const b = clothAt(0.3 + 1e-4, 5, 1).dy;
+  assert.ok(Math.sign((b - a) * 1e4) === Math.sign(clothAt(0.3, 5, 1).slope), 'the slope matches the wave');
+});
+
+test('radial layout: mirrored bars, top to bottom on each side, every bin used twice', () => {
+  const m = 10;
+  const { angle, bin } = radialLayout(m);
+  assert.equal(angle.length, 2 * m);
+  for (let k = 0; k < m; k++) {
+    assert.equal(bin[k], k);
+    assert.equal(bin[2 * m - 1 - k], k);
+    assert.ok(Math.abs(angle[k] + Math.PI / 2 + (angle[2 * m - 1 - k] + Math.PI / 2)) < 1e-6, 'left mirrors right around the top');
+    assert.ok(Math.cos(angle[k]) > 0 && Math.cos(angle[2 * m - 1 - k]) > 0 === false);
+  }
+  assert.ok(angle[0] < angle[m - 1], 'the right side runs clockwise');
+});
+
+test('spotlights sweep with the beat position, each on its own period, and stay inside the stage', () => {
+  for (let i = 0; i < 6; i++) {
+    for (let pos = 0; pos < 64; pos += 0.5) assert.ok(Math.abs(beamAngle(i, 6, pos)) < 0.9);
+  }
+  assert.notEqual(beamAngle(0, 5, 3), beamAngle(1, 5, 3));
+  assert.equal(beamAngle(2, 5, 7), beamAngle(2, 5, 7));
+  assert.ok(Math.abs(beamAngle(0, 5, 0) - beamAngle(0, 5, 16)) < 1e-9, 'beam 0 repeats every 16 beats');
+});
+
+test('sectionValue eases from the previous section value to the new one', () => {
+  const secs = [{ time: 0 }, { time: 10 }, { time: 20 }];
+  const fn = (k) => k * 10;
+  assert.equal(sectionValue(secs, 5, 0, fn), 0);
+  assert.equal(sectionValue(secs, 10, 1, fn), 0);
+  assert.equal(sectionValue(secs, 11, 1, fn), 5);
+  assert.equal(sectionValue(secs, 15, 1, fn), 10);
+  assert.equal(sectionValue([], 3, 0, fn), 0);
+});
+
+test('the registry has the new effects with a swatch and a hint', () => {
+  for (const id of ['radial', 'spotlights', 'tunnel']) {
+    const v = VISUALIZERS.find((x) => x.id === id);
+    assert.ok(v && v.create && v.swatch && v.hint && v.label);
+  }
 });

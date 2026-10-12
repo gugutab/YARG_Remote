@@ -1210,7 +1210,11 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .perf-detail { margin: 0; font: inherit; white-space: pre; }
 
 /* Background visualizer picker (#visualizerPop) */
-.viz-pop { width: min(300px, calc(100vw - 16px)); display: flex; flex-direction: column; gap: 4px; padding: 8px; }
+.viz-pop { width: min(300px, calc(100vw - 16px)); display: flex; flex-direction: column; gap: 4px; padding: 8px; overflow: hidden; max-height: min(80vh, 640px); }
+.viz-list { display: flex; flex-direction: column; gap: 4px; min-height: 0; flex: 1 1 auto; overflow-y: auto; }
+.viz-foot { flex: none; display: flex; flex-direction: column; gap: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
+.viz-pop .viz-slider { grid-template-columns: 20px 1fr 40px; }
+.viz-pop .viz-slider svg { width: 18px; height: 18px; color: var(--muted); }
 .viz-pop .prow { align-items: center; }
 .viz-sw { flex: none; width: 34px; height: 22px; border-radius: 6px; border: 1px solid var(--line); background-size: cover; }
 .viz-sw[data-none] { background: repeating-linear-gradient(45deg, transparent 0 5px, var(--line) 5px 6px); }
