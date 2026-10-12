@@ -345,6 +345,7 @@ export class Highway {
     g.clip();
     g.translate(x, y);
     this.chart = pane.chart;
+    this.curPane = pane;
     this.maxLength = pane.maxLength;
     this.vRange = pane.vRange;
     if (pane.chart.mode === 'vocals' && this.vocalView === 'karaoke') this.trackBase(0, 0, pw, ph); // (the notes view draws its own, see renderVocals)
@@ -1124,10 +1125,22 @@ export class Highway {
     const lyricY = h - fontSize * 0.5 - 10; // the lyrics sit 10 px above the bottom edge
     const bottom = lyricY - fontSize * 0.5 - 16; // and 16 px of air between them and the notes
     // The track: the note area is nearly see-through (the visualizer shows), the rows of lyrics keep their readable base.
-    this.trackBase(0, 0, w, h, 0.15);
-    const lyricTop = lyricY - fontSize * 0.8; // snug: just above the letters
-    this.trackBase(0, lyricTop, w, h - lyricTop, 0.68); // (together with the first layer: about 0.72)
-    if (second) this.trackBase(0, 0, w, secondY + secondSize * 0.45, 0.68);
+    // The lyric track hugs the words, centred on them, and fades away while a percussion section or a rest with a countdown runs.
+    const st = (chart.trackFade ??= { k: 1, at: performance.now() });
+    const nowMs = performance.now();
+    const counting = this.curPane && this.countdownState(this.curPane, t) ? 0 : 1;
+    st.k += (counting - st.k) * (1 - Math.exp(-Math.min(0.1, (nowMs - st.at) / 1000) / 0.2));
+    st.at = nowMs;
+    const trackA = 0.3 * st.k; // (the 0.15 layer under it is not drawn while it is hidden either)
+    this.trackBase(0, 0, w, h, 0.15 * st.k);
+    if (trackA > 0.004) {
+      const mid1 = lyricY - fontSize * 0.33; // the middle of the letters (the baseline is lyricY)
+      this.trackBase(0, mid1 - fontSize * 0.75, w, fontSize * 1.5, trackA);
+      if (second) {
+        const mid2 = secondY - secondSize * 0.33;
+        this.trackBase(0, Math.max(0, mid2 - secondSize * 0.75), w, secondSize * 1.5, trackA);
+      }
+    }
     const yOfPitch = (p) => bottom - ((p - lo) / (hi - lo)) * (bottom - top);
     const mid = (top + bottom) / 2; // talkies (unpitched notes) sit in the middle of the pitch area
     const percussionY = this.vocalCenterY(chart, h); // percussion hits sit in the vertical middle of the chart
