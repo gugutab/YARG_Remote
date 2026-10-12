@@ -299,7 +299,7 @@ export class Highway {
     const secs = Math.ceil(c.remaining);
     const urgent = c.remaining <= 3.05;
     g.save();
-    g.globalAlpha = Math.min(fadeIn, fadeOut);
+    g.globalAlpha *= Math.min(fadeIn, fadeOut);
     g.beginPath();
     g.arc(cx, cy, r, 0, Math.PI * 2);
     g.fillStyle = 'rgba(8,11,16,0.72)';
@@ -447,18 +447,28 @@ export class Highway {
     const step = Math.max(small * 1.55, big * 1.15);
     sheet.step = step;
     const top = big * 0.95;
+    // The wait countdown has a row of its own just before the next line to be sung: the lines from there on make room for it.
+    state.cdShift = (state.cdShift ?? 0) + ((cd ? 1 : 0) - (state.cdShift ?? 0)) * (1 - Math.exp(-dt / 0.18));
+    if (cd) state.lastCd = cd;
+    const shift = state.cdShift > 0.01 ? state.cdShift * step : 0;
+    if (shift > 0 && state.lastCd) {
+      const r = Math.max(14, Math.min(step * 0.38, 30));
+      const cy = top + (idx + 1 - state.pos) * step; // where the next line was: the countdown takes its place, the line moves down
+      if (cy - r > 0 && cy - r < h) {
+        g.save();
+        g.globalAlpha = Math.min(1, state.cdShift);
+        this.drawCountdownBadge(w / 2, cy, r, state.lastCd);
+        g.restore();
+      }
+    }
     const from = Math.max(0, Math.floor(state.pos) - 1);
     for (let i = from; i < lines.length; i++) {
-      const y = top + (i - state.pos) * step;
+      const y = top + (i - state.pos) * step + (i >= idx + 1 ? shift : 0);
       if (y - step / 2 > h) break;
       if (y - small * 0.6 < 0) continue; // a row cut by the top edge would look broken
       const cur = singing && i === idx;
       const past = i < first ? 0.3 : Math.max(0.3, 0.7 - Math.max(0, i - first) * 0.06);
-      const shown = this.drawKaraokeLine(lines[i], cur ? big : small, w, y, cur ? 0.95 : past, cur ? t : null);
-      if (cd && i === idx + 1) { // the wait countdown sits at the left of the next line to be sung
-        const r = Math.max(14, Math.min(step * 0.38, 30));
-        this.drawCountdownBadge(Math.max(r + 8, shown.x - r - 16), y, r, cd);
-      }
+      this.drawKaraokeLine(lines[i], cur ? big : small, w, y, cur ? 0.95 : past, cur ? t : null);
       sheet.hits.push({ y: y + y0, half: step / 2, time: lines[i].start });
     }
   }
@@ -552,10 +562,9 @@ export class Highway {
     const big = Math.max(18, Math.min(h * 0.2, 54, w * 0.07));
     if (current) this.drawKaraokeLine(current, big, w, h * 0.42, 0.95, t);
     if (next) {
-      const ny = current ? h * 0.74 : h * 0.5;
-      const shown = this.drawKaraokeLine(next, big * 0.72, w, ny, current ? 0.55 : 0.8, null);
-      const cd = this.countdownState(pane, t, true);
-      if (cd) this.drawCountdownBadge(Math.max(big * 0.7 + 8, shown.x - big * 0.7 - 14), ny, big * 0.7, cd); // at the left of the next line
+      const cd = !current ? this.countdownState(pane, t, true) : null;
+      if (cd) this.drawCountdownBadge(w / 2, h * 0.3, Math.min(big * 0.75, h * 0.22), cd); // the countdown has a line of its own, above the next one
+      this.drawKaraokeLine(next, big * 0.72, w, cd ? h * 0.74 : current ? h * 0.74 : h * 0.5, current ? 0.55 : 0.8, null);
     }
   }
 
