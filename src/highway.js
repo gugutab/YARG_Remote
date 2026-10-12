@@ -545,7 +545,12 @@ export class Highway {
       hovered = this.hoverRow(sheet, x0, y0, y, step, lines[i].start, shown.x + shown.total) ?? hovered;
     }
     const fade = Math.min(92, h * 0.32); // the lines dissolve into the background at the top and bottom edges: opaque at the very edge, easing out
-    const ramp = [[0, 1], [0.18, 1], [0.55, 0.7], [1, 0]]; // [position from the edge, opacity of the background]
+    const ramp = []; // [position from the edge, opacity of the background]: opaque at the edge, then a smootherstep, which eases both ends
+    for (let n = 0; n <= 16; n++) {
+      const pos = n / 16;
+      const u = Math.max(0, (pos - 0.12) / 0.88);
+      ramp.push([pos, 1 - u * u * u * (u * (u * 6 - 15) + 10)]);
+    }
     const fadeIn = g.createLinearGradient(0, 0, 0, fade);
     const fadeOut = g.createLinearGradient(0, h, 0, h - fade);
     for (const [pos, alpha] of ramp) {
