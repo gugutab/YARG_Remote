@@ -26,7 +26,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'sectionBtn', 'sectionPop', 'sectionText', 'partDiff', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'fullscreen', 'barHide', 'barShow', 'specialCard', 'specialList', 'paneTags', 'paneMenu', 'paneMenuDyn', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'fullscreen', 'barHide', 'barShow', 'specialCard', 'specialList', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay', 'infoMenu',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
 ].map((id) => [id, $(id)]));
@@ -1727,12 +1727,8 @@ function buildPaneMenu() {
   const canClose = group.pinned || groups.some((g) => g.pinned);
   const head = document.createElement('div');
   head.className = 'pm-head';
-  head.innerHTML = `<svg class="pm-icon"><use href="#i-${INSTRUMENT_ICON[ins.base] || 'music'}"/></svg><b></b><button type="button" class="icon small-icon pm-close" aria-label="Close this instrument"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12h8"/></svg></button>`;
+  head.innerHTML = `<svg class="pm-icon"><use href="#i-${INSTRUMENT_ICON[ins.base] || 'music'}"/></svg><b></b>`;
   head.querySelector('b').textContent = group.label;
-  const close = head.querySelector('.pm-close'); // a window with a bar, not an X: it takes this instrument off the screen
-  close.disabled = !canClose;
-  close.title = canClose ? 'Close this instrument' : 'It is the only instrument on screen';
-  close.addEventListener('click', () => { closePane(group); els.paneMenu.hidden = true; });
   host.append(head);
   if (ins.mode !== 'vocals' && diffs.length) part('Difficulty', seg(diffs, (d) => d.id === chosen?.id, (d) => pickDifficulty(group, ins, d.id)));
   if (group.options.length > 1) { // the type: 4 lanes / Pro / Pro 7 lanes, Vocals / Harmony
@@ -1743,18 +1739,22 @@ function buildPaneMenu() {
     }));
   }
   const free = hiddenGroups().length - current.choosers.length; // instruments with no slot yet
-  const row = document.createElement('div');
-  row.className = 'pm-actions';
-  for (const [label, enabled, onClick] of [['Swap instrument', hiddenGroups().length > 0, () => swapPane(group)], ['Add instrument', free > 0, addPane]]) {
+  const row = els.paneMenuActions; // at the end of the menu: swap, add and remove
+  row.replaceChildren();
+  for (const [label, enabled, onClick, cls] of [
+    ['Swap instrument', hiddenGroups().length > 0, () => swapPane(group), 'chip-btn'],
+    ['Add instrument', free > 0, addPane, 'chip-btn'],
+    ['Remove instrument', canClose, () => { closePane(group); els.paneMenu.hidden = true; }, 'chip-btn pm-remove'],
+  ]) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'chip-btn';
+    b.className = cls;
     b.textContent = label;
     b.disabled = !enabled;
+    if (label.startsWith('Remove') && !enabled) b.title = 'It is the only instrument on screen';
     b.addEventListener('click', onClick);
     row.append(b);
   }
-  host.append(row);
 }
 
 // ---------- Several fretboards: swipe (or drag) sideways to bring the next one into view when they do not all fit ----------

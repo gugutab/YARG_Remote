@@ -1149,3 +1149,9 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .pc-head b { color: var(--text); }
 .pc-head .icon svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; width: 14px; height: 14px; }
 .pc-cards { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); align-content: start; }
+
+/* the actions at the end of the instrument menu: swap and add side by side, remove in an alert colour below */
+#paneMenuActions { flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--line); }
+#paneMenuActions .chip-btn { flex: 1 1 calc(50% - 3px); }
+#paneMenuActions .pm-remove { flex-basis: 100%; color: #ff8a8a; border-color: rgba(255, 107, 107, .55); background: rgba(255, 107, 107, .1); }
+#paneMenuActions .pm-remove:hover:not(:disabled) { background: rgba(255, 107, 107, .22); border-color: #ff6b6b; color: #ffb4b4; }
