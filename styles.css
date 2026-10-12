@@ -1220,3 +1220,17 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .viz-pop .viz-level { display: grid; grid-template-columns: 70px 1fr 40px; align-items: center; gap: 8px; padding: 6px 8px 2px; font-size: 13px; color: var(--muted); }
 .viz-pop .viz-level[hidden] { display: none; }
 .viz-pop .viz-level output { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Loop on the seek bar: a translucent band between two draggable handles, and the hover tooltip */
+.seekbox .loop-band { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--accent) 38%, transparent); border-top: 2px solid var(--accent); pointer-events: none; z-index: 1; }
+.seekbox .loop-handle { position: absolute; top: -2px; bottom: -2px; width: 14px; margin-left: -7px; z-index: 3; cursor: ew-resize; touch-action: none; }
+.seekbox .loop-handle::before { content: ''; position: absolute; left: 5px; right: 5px; top: 0; bottom: 0; background: var(--accent); border-radius: 2px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5); }
+.seekbox .loop-handle[data-which="start"]::before { border-radius: 4px 0 0 4px; left: 4px; right: 6px; }
+.seekbox .loop-handle[data-which="end"]::before { border-radius: 0 4px 4px 0; left: 6px; right: 4px; }
+.seekbox .loop-handle:hover::before, .seekbox .loop-handle.dragging::before { background: #fff; }
+.seek-tip { position: fixed; z-index: 200; pointer-events: none; padding: 4px 8px; border-radius: 8px; background: var(--panel-2, #222); color: var(--text, #fff); border: 1px solid var(--line); font-size: 12px; font-weight: 600; white-space: nowrap; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4); font-variant-numeric: tabular-nums; }
+.seek-tip[hidden] { display: none; }
+.prow .row-loop { flex: none; width: 24px; height: 24px; opacity: 0.55; }
+.prow:hover .row-loop, .prow .row-loop[aria-pressed="true"] { opacity: 1; }
+.prow .row-loop[aria-pressed="true"] { color: var(--accent); }
+#loopBtn[aria-pressed="true"] { color: var(--accent); }

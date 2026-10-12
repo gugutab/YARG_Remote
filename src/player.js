@@ -327,6 +327,7 @@ export class MultiTrackPlayer {
   get playing() { return this.impl.playing; }
   get stems() { return this.impl.stems; }
   get rate() { return this.speed; }
+  get outputLatency() { return this.impl.outputLatency || 0; } // seconds until the sound is heard (worklet engine)
   setMaster(value) { this.master.gain.value = value; }
   setVolume(id, value) { this.impl.setVolume(id, value); }
   setRate(rate) { this.speed = rate; this.impl.setRate(rate); }

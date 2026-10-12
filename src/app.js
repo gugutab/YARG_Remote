@@ -20,6 +20,7 @@ import { saveLibrary, loadLibrary, loadThumb, saveThumb, clearThumbs } from './s
 import { filterSongs, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, anchorLabel } from './songlist.js';
 import { createVirtualList, DEFAULT_CARDS } from './virtuallist.js';
 import { createThumbs, renderCoverThumb } from './thumbs.js';
+import { snapPoints, snapTime, clampLoop, currentSectionRange, sectionRange, loopForSection, shouldWrap, MIN_LOOP } from './looprange.js';
 import { VISUALIZERS, createDriver as createVisualizerDriver } from './visualizers.js';
 
 const $ = (id) => document.getElementById(id);
@@ -27,7 +28,7 @@ const els = Object.fromEntries([
   'app', 'library', 'closeLibrary', 'splitter', 'libTab', 'songTab', 'closeSong', 'closeSongInfo', 'npPlay', 'npPreview', 'npSeek', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
-  'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
+  'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
   'fullscreen', 'barHide', 'barShow', 'specialCard', 'specialList', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
@@ -542,6 +543,7 @@ async function selectSong(song) {
   player.pause();
   syncPlayButton();
   ready = false;
+  setLoop(null); // a loop belongs to one song
   audioLoad = null;
   current = null;
   chart = null;
@@ -1076,6 +1078,14 @@ function fillSectionOptions() {
     row.querySelector('.prow-time').textContent = fmt(x.time);
     row.querySelector('.prow-name').textContent = x.name;
     row.addEventListener('click', () => { seekToSection(i); closePopovers(); });
+    const lb = document.createElement('button');
+    lb.type = 'button';
+    lb.className = 'icon small-icon row-loop';
+    lb.title = 'Loop this section (with a loop on: extend it to include this section)';
+    lb.setAttribute('aria-label', `Loop ${x.name}`);
+    lb.innerHTML = '<svg><use href="#i-loop"/></svg>';
+    lb.addEventListener('click', (e) => { e.stopPropagation(); loopSectionRow(i); lb.blur(); }); // (blur: keys like R, Space and G keep working)
+    row.append(lb);
     return row;
   }));
   activeSection = -2;
@@ -1097,6 +1107,7 @@ function paintSectionTicks() {
     tick.title = s.name;
     els.seekbox.append(tick);
   }
+  paintLoop(); // the section starts moved with the delay; the loop stays where it is in song time
 }
 
 function setActiveSection(index) {
@@ -1509,6 +1520,111 @@ els.seekbox.addEventListener('wheel', (e) => {
   previewStop = null;
   player.seek(to);
 }, { passive: false });
+
+// ---------- Loop (A-B repeat) ----------
+// The loop is a range of PLAYER time (the seek bar's scale), so it survives instrument / difficulty changes and is
+// cleared when another song opens. State is per session. Two handles on the seek bar move its ends (magnets on the
+// section starts, the song start and end; Alt turns them off); a band shows the region.
+// Wrap rule: playback jumps back to the start only when it leaves the END of the region from INSIDE it. A loop is
+// dormant while playback is outside the region (after a seek before or past it) and re-arms once playback enters it.
+let loop = null; // { start, end } or null
+let loopPrev = null; // the previous frame's time, to tell a wrap from a seek
+let loopDrag = null;
+const LOOP_SNAP_PX = 10;
+const sectionStartsPlayer = () => (chart?.sections ?? []).map((s) => s.time + settings.chartDelay);
+const seekMax = () => Number(els.seek.max) || 0;
+// x position of a time on the seek bar, the same mapping as the section ticks (12 px thumb travel)
+const timeLeft = (at) => `calc(${(at / (seekMax() || 1)).toFixed(5)} * (100% - 12px) + 6px)`;
+
+function setLoop(range) {
+  loop = range && seekMax() > 0 ? range : null;
+  loopPrev = null;
+  paintLoop();
+}
+function paintLoop() {
+  const on = !!loop;
+  els.loopBtn.setAttribute('aria-pressed', String(on));
+  els.loopBtn.title = on ? 'End the loop (R)' : 'Loop the current section (R)';
+  for (const el of [els.loopBand, els.loopStart, els.loopEnd]) el.hidden = !on;
+  if (!on) return;
+  els.loopStart.style.left = timeLeft(loop.start);
+  els.loopEnd.style.left = timeLeft(loop.end);
+  els.loopBand.style.left = timeLeft(loop.start);
+  els.loopBand.style.width = `calc(${((loop.end - loop.start) / seekMax()).toFixed(5)} * (100% - 12px))`;
+}
+async function toggleLoop() {
+  if (loop) { setLoop(null); return; }
+  if (!chart || !(await ensureAudio())) return;
+  setLoop(currentSectionRange(sectionStartsPlayer(), player.currentTime(), player.duration));
+}
+function loopSectionRow(i) {
+  const sec = sectionRange(sectionStartsPlayer(), i, seekMax());
+  if (sec) setLoop(loopForSection(loop, sec));
+}
+els.loopBtn.addEventListener('click', toggleLoop);
+
+// Dragging a handle (mouse and touch): pointer capture keeps the move events on the handle; the seek input is untouched.
+function timeAtClientX(x) {
+  const r = els.seek.getBoundingClientRect();
+  const travel = Math.max(1, r.width - 12);
+  return Math.max(0, Math.min(seekMax(), ((x - r.left - 6) / travel) * seekMax()));
+}
+const pxPerSec = () => (els.seek.getBoundingClientRect().width - 12) / (seekMax() || 1);
+const loopLabel = (which) => (which === 'start' ? 'Loop start' : 'Loop end');
+for (const handle of [els.loopStart, els.loopEnd]) {
+  handle.addEventListener('pointerdown', (e) => {
+    if (!loop || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add('dragging');
+    loopDrag = { which: handle.dataset.which, id: e.pointerId };
+    showSeekTip(e.clientX, loop[loopDrag.which], loopLabel(loopDrag.which));
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (!loopDrag || loopDrag.id !== e.pointerId || !loop) return;
+    let t = timeAtClientX(e.clientX);
+    if (!e.altKey) t = snapTime(t, snapPoints(sectionStartsPlayer(), seekMax()), pxPerSec(), LOOP_SNAP_PX);
+    setLoop(clampLoop(loopDrag.which, t, loop, seekMax(), MIN_LOOP));
+    showSeekTip(e.clientX, loop[loopDrag.which], loopLabel(loopDrag.which));
+  });
+  const end = (e) => {
+    if (!loopDrag || loopDrag.id !== e.pointerId) return;
+    loopDrag = null;
+    handle.classList.remove('dragging');
+    hideSeekTip();
+  };
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+  handle.addEventListener('lostpointercapture', end);
+}
+
+// Hover tooltip on the seek bar: the section under the pointer and the time there (or a loop handle's time).
+// Fixed-position and pointer-events:none, so it also works with the top bar collapsed (only the 4 px line shows).
+function showSeekTip(x, time, label) {
+  const tip = els.seekTip;
+  tip.textContent = `${label} · ${fmt(time)}`;
+  tip.hidden = false;
+  const r = els.seekbox.getBoundingClientRect();
+  const w = tip.offsetWidth;
+  tip.style.left = `${Math.max(4, Math.min(window.innerWidth - w - 4, x - w / 2))}px`;
+  tip.style.top = `${r.bottom + 6}px`;
+}
+function hideSeekTip() { els.seekTip.hidden = true; }
+els.seekbox.addEventListener('pointermove', (e) => {
+  if (!(seekMax() > 0) || loopDrag) return;
+  const handle = e.target.closest?.('.loop-handle');
+  if (handle && loop) {
+    const which = handle.dataset.which;
+    showSeekTip(handle.getBoundingClientRect().left + 7, loop[which], loopLabel(which));
+    return;
+  }
+  const t = timeAtClientX(e.clientX); // while the seek input is dragged this shows the dragged time
+  const secs = chart?.sections ?? [];
+  const name = secs.length ? secs[sectionIndexAt(secs, t - settings.chartDelay)].name : '';
+  showSeekTip(e.clientX, t, name || 'Position');
+});
+els.seekbox.addEventListener('pointerleave', () => { if (!loopDrag) hideSeekTip(); });
 
 async function togglePlay() {
   if (!chart) return;
@@ -2020,6 +2136,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.code === 'BracketLeft') highway.shiftFocus(-1);
   else if (e.code === 'KeyK' && highway.panes.some((p) => p.chart.mode === 'vocals')) setVocalView(highway.vocalView === 'karaoke' ? 'track' : 'karaoke');
   else if (e.code === 'KeyP') cyclePerfOverlay();
+  else if (e.code === 'KeyR' && chart) toggleLoop();
   else if (e.code === 'KeyG') cycleVisualizer(e.shiftKey ? -1 : 1);
   else if (e.code === 'KeyN') setNoteStyle(highway.noteStyle === 'rect' ? 'round' : 'rect');
   else if (e.code === 'BracketLeft') stepSection(-1);
@@ -2032,11 +2149,18 @@ document.addEventListener('keydown', (e) => {
 // Jumps in the song (seeking, a section, a lyric line) are animated on the fretboards: the notes rush past to the new place
 // instead of the chart snapping there. Only what the highway draws is eased; the clock, the sections and the audio use the real time.
 let vis = { shown: null, last: null, anim: null, chart: null, step: 0 };
+let instantJump = false; // the next jump is not animated (the loop wrap-around)
 const MOTION_BLUR_MIN_STEP = 0.06; // seconds of song per frame from which the jump is blurred
 const SEEK_JUMP_SEC = 0.75; // a bigger step between two frames than playback or a drag can make
 function visualChartTime(ct) {
   const now = performance.now();
   if (!prefs.get('highway.seekAnimation') || vis.chart !== chart || vis.last === null) {
+    instantJump = false; // (a pending instant jump is moot: nothing is animated now)
+    vis = { shown: ct, last: ct, anim: null, chart, step: 0 };
+    return ct;
+  }
+  if (instantJump) { // a loop wrap: land at once, no rush and no blur
+    instantJump = false;
     vis = { shown: ct, last: ct, anim: null, chart, step: 0 };
     return ct;
   }
@@ -2058,7 +2182,18 @@ function frame() {
   const frameStart = performance.now();
   let drawMs = 0;
   if (current && chart) {
-    const t = player.currentTime();
+    let t = player.currentTime();
+    if (loop && player.playing) {
+      // Look-ahead: the audio restarts after the output latency, so asking a little early makes the new start audible
+      // right when the old end would have been heard.
+      const ahead = ((player.outputLatency || 0) + 0.01) * player.rate;
+      if (shouldWrap(loop, loopPrev, t, ahead)) {
+        player.seek(loop.start);
+        instantJump = true;
+        t = loop.start;
+      }
+    }
+    loopPrev = t;
     if (previewStop != null && (!player.playing || t >= previewStop)) {
       if (player.playing) { player.pause(); syncPlayButton(); }
       previewStop = null;
