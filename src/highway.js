@@ -252,12 +252,12 @@ export class Highway {
 
   // The track of the vocals (the chart and the lyrics): a semi-transparent base in the stage colour, so the words and notes read well
   // over a visualizer. It is the same colour as the stage, so without a visualizer nothing changes.
-  trackBase(x, y, w, h) {
+  trackBase(x, y, w, h, alpha = 0.72) {
     if (!this.visualizer) return;
     const g = this.g;
-    g.fillStyle = `rgba(${this.bgRgb},0.72)`;
+    g.fillStyle = `rgba(${this.bgRgb},${alpha})`;
     g.fillRect(x, y, w, h);
-    g.fillStyle = 'rgba(255,255,255,0.03)';
+    g.fillStyle = `rgba(255,255,255,${(0.03 * alpha / 0.72).toFixed(3)})`;
     g.fillRect(x, y, w, h);
   }
 
@@ -346,7 +346,7 @@ export class Highway {
     this.chart = pane.chart;
     this.maxLength = pane.maxLength;
     this.vRange = pane.vRange;
-    if (pane.chart.mode === 'vocals') this.trackBase(0, 0, pw, ph);
+    if (pane.chart.mode === 'vocals' && this.vocalView === 'karaoke') this.trackBase(0, 0, pw, ph); // (the notes view draws its own, see renderVocals)
     if (pane.chart.mode === 'vocals') {
       if (this.vocalView === 'karaoke') this.renderKaraoke(t, pw, ph, pane);
       else this.renderVocals(t, pw, ph);
@@ -1123,6 +1123,10 @@ export class Highway {
     const fontSize = Math.max(18, Math.min(30, h * 0.095)); // lyric size, grows with the band
     const lyricY = h - fontSize * 0.5 - 10; // the lyrics sit 10 px above the bottom edge
     const bottom = lyricY - fontSize * 0.5 - 16; // and 16 px of air between them and the notes
+    // The track: the note area is nearly see-through (the visualizer shows), the rows of lyrics keep their readable base.
+    this.trackBase(0, 0, w, h, 0.15);
+    this.trackBase(0, bottom, w, h - bottom, 0.68); // (together with the first layer: about 0.72)
+    if (second) this.trackBase(0, 0, w, top, 0.68);
     const yOfPitch = (p) => bottom - ((p - lo) / (hi - lo)) * (bottom - top);
     const mid = (top + bottom) / 2; // talkies (unpitched notes) sit in the middle of the pitch area
     const percussionY = this.vocalCenterY(chart, h); // percussion hits sit in the vertical middle of the chart
