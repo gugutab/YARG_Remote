@@ -1546,7 +1546,12 @@ highway.onResize = () => { try { localStorage.setItem('yargremote.paneSizes', JS
 els.highway.addEventListener('pointerdown', (e) => {
   const [px, py] = canvasPoint(e);
   const back = highway.sheetButtonAt(px, py);
-  if (back) { highway.resumeSheet(back); return; } // "Back to autoscroll"
+  if (back) { highway.resumeSheet(back); return; } // "Autoscroll"
+  const play = highway.sheetPlayButtonAt(px, py);
+  if (play) { // "Play from here"
+    if (ready) { player.seek(Math.max(0, play.playBtn.time + settings.chartDelay)); highway.resumeSheet(play); }
+    return;
+  }
   const divider = highway.dividerAt(px, py, slopFor(e));
   if (divider) { // resizing: drag a divider between two fretboards, or the one under the vocal band
     swipe = { divider, lastX: e.clientX, lastY: e.clientY, resizing: true };
@@ -1568,6 +1573,7 @@ els.highway.addEventListener('pointermove', (e) => {
     return;
   }
   if (!swipe) { // hovering: light the divider up and show the resize cursor
+    highway.pointerAt(...canvasPoint(e));
     const d = highway.dividerAt(...canvasPoint(e), slopFor(e));
     highway.hover = d;
     els.highway.style.cursor = d ? (d.type === 'row' ? 'row-resize' : 'col-resize') : '';
@@ -1579,7 +1585,7 @@ els.highway.addEventListener('pointermove', (e) => {
   swipe.moved += Math.abs(dy);
   if (swipe.moved > 6 && swipe.sheet.step) highway.scrollSheet(swipe.sheet, dy / swipe.sheet.step);
 });
-els.highway.addEventListener('pointerleave', () => { if (!swipe) { highway.hover = null; els.highway.style.cursor = ''; } });
+els.highway.addEventListener('pointerleave', () => { highway.pointer = null; if (!swipe) { highway.hover = null; els.highway.style.cursor = ''; } });
 els.highway.addEventListener('pointerup', (e) => {
   if (!swipe) return;
   if (swipe.resizing) { // the drag is over: keep the sizes
@@ -1588,15 +1594,9 @@ els.highway.addEventListener('pointerup', (e) => {
     highway.onResize?.();
     return;
   }
-  const { x, y, sheet, moved } = swipe;
+  const { x, y, sheet } = swipe;
   swipe = null;
-  if (sheet) { // a tap on a lyric line seeks to it
-    if (moved <= 6 && ready) {
-      const time = highway.sheetLineAt(sheet, canvasPoint(e)[1]);
-      if (time !== null) { player.seek(Math.max(0, time + settings.chartDelay)); highway.resumeSheet(sheet); }
-    }
-    return;
-  }
+  if (sheet) return; // (dragging the lyrics only scrolls them; playing from a line is the button that shows when the pointer rests on it)
   const dx = e.clientX - x;
   const dy = e.clientY - y;
   if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) highway.shiftFocus(dx < 0 ? 1 : -1);

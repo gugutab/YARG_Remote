@@ -66,6 +66,7 @@ export class Highway {
     this.vocalH = null; // height of the vocal band in px, once the user dragged its divider (null: the default)
     this.dividers = []; // the draggable dividers drawn this frame
     this.hover = null; // the divider under the pointer
+    this.pointer = null; // the pointer over the canvas, for the "play from here" button on the lyrics: { x, y, t0, key, shown }
     this.onResize = null; // called when a drag ends, so the page can keep the sizes
     this.layout = { w: 0, sum: 1, keys: [] };
     this.vocalView = 'track'; // 'track' (notes + lyrics) or 'karaoke' (the lyrics alone)
@@ -505,6 +506,7 @@ export class Highway {
     sheet.step = step;
     const top = small * 0.1 + step; // where the row in focus sits: the row before it is half above the top edge
     const badgeR = Math.max(14, Math.min(step * 0.38, 30));
+    let hovered = null; // the row under the resting pointer, if any
     let seenFrom = Infinity;
     let seenTo = -Infinity; // the time range of the lines on screen, for the rail
     const from = Math.max(0, Math.floor(state.pos) - 2);
@@ -520,6 +522,7 @@ export class Highway {
           if (end - t >= 0.25) this.drawCountdownBadge(w / 2, y, badgeR, { remaining: end - t, total });
         } else this.drawCountdownBadge(w / 2, y, badgeR, { remaining: total, total, dim: t >= end ? 0.28 : 0.55 }); // past / to come
         sheet.hits.push({ y: y + y0, half: step / 2, time: start });
+        hovered = this.hoverRow(sheet, x0, y0, y, step, start) ?? hovered;
         continue;
       }
       const i = row.i;
@@ -529,6 +532,35 @@ export class Highway {
       const past = i < first ? 0.3 : Math.max(0.3, 0.7 - Math.max(0, i - first) * 0.06);
       this.drawKaraokeLine(lines[i], cur ? big : small, w, y, cur ? 0.95 : past, cur ? t : null);
       sheet.hits.push({ y: y + y0, half: step / 2, time: lines[i].start });
+      hovered = this.hoverRow(sheet, x0, y0, y, step, lines[i].start) ?? hovered;
+    }
+    if (hovered && this.pointer?.shown && this.pointer.key === hovered.key) { // the pointer rested on a row: offer to play from there
+      const label = 'Play from here';
+      g.font = '600 13px system-ui';
+      const bw = g.measureText(label).width + 44;
+      const bh = 28;
+      const bx = 18;
+      const by = hovered.y - bh / 2;
+      g.fillStyle = 'rgba(30,40,55,0.95)';
+      g.beginPath();
+      if (g.roundRect) g.roundRect(bx, by, bw, bh, 14);
+      else g.rect(bx, by, bw, bh);
+      g.fill();
+      g.lineWidth = 1;
+      g.strokeStyle = 'rgba(108,182,255,0.7)';
+      g.stroke();
+      g.fillStyle = '#cfe6ff';
+      g.beginPath(); // a small play triangle
+      g.moveTo(bx + 13, by + bh / 2 - 5);
+      g.lineTo(bx + 13, by + bh / 2 + 5);
+      g.lineTo(bx + 21, by + bh / 2);
+      g.closePath();
+      g.fill();
+      g.textAlign = 'left';
+      g.textBaseline = 'middle';
+      g.fillText(label, bx + 28, by + bh / 2 + 1);
+      g.textBaseline = 'alphabetic';
+      sheet.playBtn = { x: x0 + bx, y: y0 + by, w: bw, h: bh, time: hovered.time };
     }
     this.drawSheetRail(t, w, h, ctx, rows, lines, seenFrom, seenTo);
     if (state.following === false) { // back to following the singer
@@ -608,6 +640,7 @@ export class Highway {
 
   // Wheel / drag over a sheet (`lines` = how many lines to move).
   scrollSheet(sheet, lines) {
+    if (this.pointer) { this.pointer.shown = false; this.pointer.key = null; }
     const st = sheet.state;
     if (st.following !== false) { st.following = false; st.hold = st.pos ?? 0; } // scrolling by hand stops the autoscroll
     st.hold = Math.max(0, Math.min((st.rows?.length ?? 1) - 1, st.hold + lines));
@@ -622,10 +655,28 @@ export class Highway {
     sheet.state.following = true;
   }
 
-  // The start time (chart seconds) of the lyric line drawn at canvas height y in a sheet, or null.
-  sheetLineAt(sheet, y) {
-    const hit = sheet.hits.find((r) => Math.abs(y - r.y) <= r.half);
-    return hit ? hit.time : null;
+  // Is the pointer over this row of a sheet? If it is, remember which row, and when it stays there for 0.6 s the page shows
+  // the "Play from here" button. Returns { key, time, y } (y in sheet coordinates) or null.
+  hoverRow(sheet, x0, y0, y, step, time) {
+    const pt = this.pointer;
+    if (!pt || pt.x < x0 || pt.x >= x0 + sheet.w || Math.abs(pt.y - (y + y0)) > step / 2) return null;
+    const key = `${x0},${y0},${time}`;
+    if (pt.key !== key) { pt.key = key; pt.shown = false; pt.t0 = performance.now(); } // another row: wait again
+    else if (!pt.shown && performance.now() - pt.t0 >= 600) pt.shown = true;
+    return { key, time, y };
+  }
+
+  // The pointer moved over the canvas: a real move (more than 4 px) restarts the wait for the button.
+  pointerAt(x, y) {
+    const pt = this.pointer;
+    if (pt && Math.hypot(x - pt.x, y - pt.y) <= 4) return;
+    this.pointer = { x, y, t0: performance.now(), key: pt?.key ?? null, shown: pt?.shown ?? false };
+    if (this.sheetPlayButtonAt(x, y)) this.pointer.t0 = pt?.t0 ?? performance.now(); // moving onto the button keeps it
+  }
+
+  // The sheet whose "Play from here" button is under the canvas point (x, y), or null.
+  sheetPlayButtonAt(x, y) {
+    return this.sheets.find((sh) => sh.playBtn && x >= sh.playBtn.x && x <= sh.playBtn.x + sh.playBtn.w && y >= sh.playBtn.y && y <= sh.playBtn.y + sh.playBtn.h) ?? null;
   }
 
   // Two lyric sheets, VOCAL 1 (the lead's words) and VOCAL 2 (the other voices'), side by side in a wide area and one above
