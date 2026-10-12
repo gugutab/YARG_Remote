@@ -321,6 +321,14 @@ export class Highway {
     g.restore();
   }
 
+  // The vertical middle of the vocal chart: of the whole band, or of what is below the second lyric line (harmony charts).
+  vocalCenterY(chart, h) {
+    if (!(chart.lyrics2 || []).length) return h / 2;
+    const secondSize = Math.max(15, Math.min(26, h * 0.08));
+    const top = secondSize * 0.85 + 6 + secondSize * 0.75;
+    return (top + h) / 2;
+  }
+
   // The wait countdown of a chart pane (YARG's WaitCountdown), over the centre; in the vocal notes view it sits to the left of
   // the hit line, where the notes are not. (Karaoke shows it beside the next line instead, see renderLyricSheet.)
   drawCountdown(pane, t, w, h) {
@@ -329,7 +337,7 @@ export class Highway {
     if (pane.chart.mode === 'vocals') {
       const hitX = w * 0.15;
       const r = Math.max(18, Math.min(hitX * 0.4, h * 0.2, 60));
-      this.drawCountdownBadge(hitX / 2, h * 0.42, r, c);
+      this.drawCountdownBadge(hitX / 2, this.vocalCenterY(pane.chart, h), r, c); // same height as the percussion
       return;
     }
     this.drawCountdownBadge(w / 2, h * 0.4, Math.max(26, Math.min(h * 0.2, w * 0.2, 70)), c);
@@ -741,7 +749,7 @@ export class Highway {
     const yOfPitch = (p) => bottom - ((p - lo) / (hi - lo)) * (bottom - top);
     const mid = (top + bottom) / 2; // talkies (unpitched notes) sit in the middle of the pitch area
     const lyricY = bottom + h * 0.055; // lyrics sit right under the note area
-    const percussionY = ((second ? top : 0) + h) / 2; // percussion hits sit in the vertical middle of the chart (below the second lyric line, if any)
+    const percussionY = this.vocalCenterY(chart, h); // percussion hits sit in the vertical middle of the chart
     const xOf = (time) => hitX + (time - t) * pxPerSec;
     const ahead = BASE_LOOKAHEAD_SEC + ENTRY_MARGIN_SEC;
     const behind = hitX / pxPerSec + 0.5; // how long after the hit line a note is still on the stage (it scrolls off the left edge)
@@ -750,7 +758,8 @@ export class Highway {
     for (const b of chart.beats || []) {
       if (b.time < t - behind || b.time > t + ahead) continue;
       g.fillStyle = b.measure ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)';
-      g.fillRect(Math.round(xOf(b.time)), 0, b.measure ? 2 : 1, h);
+      const lw = b.measure ? 2 : 1;
+      g.fillRect(Math.round(xOf(b.time) - lw / 2), 0, lw, h); // centred on the beat, so what sits on it (percussion) lines up
     }
 
     g.fillStyle = 'rgba(255,255,255,0.7)';
