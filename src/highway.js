@@ -73,6 +73,12 @@ export class Highway {
     this.onResize = null; // called when a drag ends, so the page can keep the sizes
     this.layout = { w: 0, sum: 1, keys: [] };
     this.vocalView = 'track'; // 'track' (notes + lyrics) or 'karaoke' (the lyrics alone)
+    this.visualizer = null; // (g, w, h, t, bgRgb) => draws the shared background behind every pane, or null (src/visualizers.js)
+  }
+
+  // The background visualizer: one drawing for the whole canvas, under all the panes. null removes it.
+  setVisualizer(fn) {
+    this.visualizer = typeof fn === 'function' ? fn : null;
   }
 
   setBackground(hex) {
@@ -159,6 +165,16 @@ export class Highway {
     const side = this.blurCanvas.getContext('2d');
     const dpr = cw / w;
     try {
+      if (this.visualizer && this.panes.length) { // the background is drawn once and reused by every sample
+        this.vizCanvas ??= document.createElement('canvas');
+        if (this.vizCanvas.width !== cw || this.vizCanvas.height !== ch) { this.vizCanvas.width = cw; this.vizCanvas.height = ch; }
+        const vg = this.vizCanvas.getContext('2d');
+        vg.setTransform(dpr, 0, 0, dpr, 0, 0);
+        vg.fillStyle = this.bg;
+        vg.fillRect(0, 0, w, h);
+        this.visualizer(vg, w, h, times[times.length - 1], this.bgRgb);
+        this.vizFrame = this.vizCanvas;
+      }
       times.forEach((t, i) => {
         this.g = side; // every method draws on this.g
         side.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -171,6 +187,7 @@ export class Highway {
       });
     } finally {
       this.g = main;
+      this.vizFrame = null;
     }
   }
 
@@ -178,6 +195,10 @@ export class Highway {
     const g = this.g;
     g.fillStyle = this.bg;
     g.fillRect(0, 0, w, h);
+    if (this.visualizer && this.panes.length) {
+      if (this.vizFrame) g.drawImage(this.vizFrame, 0, 0, w, h); // motion blur: drawn once for all the samples (renderBlur)
+      else this.visualizer(g, w, h, t, this.bgRgb);
+    }
 
     this.sheets = [];
     this.dividers = [];

@@ -10,6 +10,7 @@
 //   `when(get)` hides the item unless it returns true; `keywords` feed the search box.
 
 import { PRESETS } from './themes.js';
+import { VISUALIZERS } from './visualizers.js';
 import { DETAIL_CHIPS } from './songinfo.js';
 
 export const FONT_OPTIONS = [
@@ -93,7 +94,11 @@ export const SECTIONS = [
       { id: 'highway.lyricsAbove', type: 'range', label: 'Lyrics above the line being sung', help: 'How much of the lyric sheets (karaoke) shows the lines before the current one, as a share of their height.', min: 0, max: 40, step: 1, unit: '%', default: 12 },
       { id: 'highway.seekAnimation', type: 'toggle', label: 'Animate jumps in the song', help: 'When you seek or jump to a section, the notes scroll to the new place instead of snapping.', default: true },
       { id: 'highway.motionBlur', type: 'toggle', label: 'Motion blur on jumps', help: 'While the notes rush to the new place after a seek, draw a trail behind them.', default: true, when: (get) => get('highway.seekAnimation') },
+      { id: 'highway.visualizer', type: 'choice', label: 'Background visualizer', help: 'An animation behind all the fretboards, driven by the album art, the beats and the notes. Key: G.', options: VISUALIZERS.map((v) => ({ value: v.id, label: v.label })), default: 'none', keywords: 'background animation aurora synthwave warp rings equalizer embers cover' },
+      { id: 'highway.visualizerIntensity', type: 'range', label: 'Visualizer brightness', help: 'Lower keeps the notes easier to read.', min: 10, max: 100, step: 5, unit: '%', default: 60, when: (get) => get('highway.visualizer') !== 'none' },
       { id: 'highway.neck', type: 'range', label: 'Starting neck speed', help: 'Only the spacing of the notes, not the music speed.', min: 0.5, max: 3, step: 0.1, unit: '×', default: 1.2 },
+      { id: 'perf.overlay', type: 'choice', label: 'Performance overlay', help: 'FPS and other meters over the fretboards. Key: P cycles off, compact, detailed.', options: [{ value: 'off', label: 'Off' }, { value: 'compact', label: 'FPS' }, { value: 'detailed', label: 'Detailed' }], default: 'off', keywords: 'fps frame rate performance meter debug' },
+      { id: 'perf.position', type: 'choice', label: 'Overlay position', options: [{ value: 'top-left', label: 'Top left' }, { value: 'top-right', label: 'Top right' }, { value: 'bottom-left', label: 'Bottom left' }, { value: 'bottom-right', label: 'Bottom right' }], default: 'bottom-right', when: (get) => get('perf.overlay') !== 'off' },
       { id: 'highway.barHidden', type: 'choice', label: 'Top bar at startup', options: [{ value: 'shown', label: 'Shown' }, { value: 'hidden', label: 'Hidden' }, { value: 'last', label: 'As I left it' }], default: 'last' },
     ],
   },

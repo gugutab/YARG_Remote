@@ -3,11 +3,13 @@ import { parseChart } from './chartfile.js';
 import { DIFFICULTIES, EXTENDED_DRUM_LANES, instrumentOptions, availableDifficulties, buildChart, sectionIndexAt } from './chart.js';
 import { MultiTrackPlayer } from './player.js';
 import { Highway } from './highway.js';
+import { PerfMeter } from './perf.js';
+import { createPerfOverlay, PERF_MODES } from './perf-overlay.js';
 import { specialNotes, neighbourTime } from './specials.js';
 import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, readBytes, serializeSongs, restoreSongs, restoreRemoteSongs } from './library.js';
 import { songDelaySeconds, plainText } from './ini.js';
 import { previewWindow } from './preview.js';
-import { metaRows, extraRows, chartStats, bpmLabel, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel } from './songinfo.js';
+import { metaRows, extraRows, chartStats, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel } from './songinfo.js';
 import { parseRoute, formatRoute } from './route.js';
 import { createSettings } from './settings.js';
 import { SECTIONS, buildDefaults, FONT_OPTIONS } from './settings-schema.js';
@@ -18,6 +20,7 @@ import { saveLibrary, loadLibrary, loadThumb, saveThumb, clearThumbs } from './s
 import { filterSongs, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, anchorLabel } from './songlist.js';
 import { createVirtualList, DEFAULT_CARDS } from './virtuallist.js';
 import { createThumbs, renderCoverThumb } from './thumbs.js';
+import { VISUALIZERS, createDriver as createVisualizerDriver } from './visualizers.js';
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
@@ -34,6 +37,23 @@ const els = Object.fromEntries([
 for (const img of [els.cover, els.infoCover, els.infoPopCover]) img.addEventListener('error', () => { img.hidden = true; });
 const player = new MultiTrackPlayer();
 const highway = new Highway(els.highway);
+const perf = new PerfMeter();
+const perfOverlay = createPerfOverlay({
+  stage: document.getElementById('stage'), meter: perf, onCycle: () => cyclePerfOverlay(),
+  probes: () => {
+    const c = els.highway, mem = performance.memory, ctx = player.ctx;
+    const mb = (n) => Math.round(n / 1048576);
+    const lat = ctx ? Math.round(((ctx.outputLatency || 0) || (ctx.baseLatency || 0)) * 1000) : null;
+    return {
+      canvas: `${c.width}x${c.height}`, dpr: window.devicePixelRatio, panes: highway.panes.length,
+      heap: mem ? `${mb(mem.usedJSHeapSize)} / ${mb(mem.jsHeapSizeLimit)} MB` : null,
+      latency: lat == null ? null : `${lat} ms`,
+    };
+  },
+});
+function cyclePerfOverlay() {
+  prefs.set('perf.overlay', PERF_MODES[(PERF_MODES.indexOf(prefs.get('perf.overlay')) + 1) % PERF_MODES.length]);
+}
 let songs = [];
 let current = null; // { song, midi, coverUrl, options }
 let connectedRoot = null; // folder handle of the library on screen, when it came from the File System Access API
@@ -1894,6 +1914,62 @@ if (prefs.get('highway.neck') !== SETTING_DEFAULTS.neck) setSetting('neck', pref
 els.barHide.addEventListener('click', () => setBarHidden(true));
 els.barShow.addEventListener('click', () => setBarHidden(false));
 
+// ---------- Background visualizer ----------
+// One animated background behind every fretboard (src/visualizers.js, Highway.setVisualizer). The picker is a popover from the
+// tools row; the choice and the brightness live in prefs (highway.visualizer, highway.visualizerIntensity).
+let vizSrc = null;
+const vizDriver = createVisualizerDriver({
+  getSource() { // rebuilt only when the charts on screen change (setCharts makes a new panes array)
+    if (!current || !highway.panes.length) return null;
+    if (vizSrc?.key !== highway.panes) {
+      const ini = current.song.ini || {};
+      vizSrc = {
+        key: highway.panes, coverUrl: current.coverUrl,
+        song: { title: plainText(current.song.title), artist: plainText(current.song.artist), genre: ini.genre, year: ini.year, length: (Number(ini.song_length) || 0) / 1000, bpmRange: bpmRange(current.midi?.tempos) },
+        charts: highway.panes.map((p) => p.chart).filter(Boolean),
+      };
+    }
+    return vizSrc;
+  },
+});
+const vizBtn = document.getElementById('visualizerBtn');
+const vizPop = document.getElementById('visualizerPop');
+const vizLevel = document.createElement('label');
+vizLevel.className = 'viz-level';
+vizLevel.innerHTML = '<span>Brightness</span><input type="range" min="10" max="100" step="5"><output></output>';
+const vizLevelInput = vizLevel.querySelector('input');
+vizLevelInput.addEventListener('input', () => prefs.set('highway.visualizerIntensity', Number(vizLevelInput.value)));
+vizPop.replaceChildren(...VISUALIZERS.map((v) => {
+  const row = document.createElement('div');
+  row.className = 'prow';
+  row.dataset.id = v.id;
+  row.setAttribute('role', 'option');
+  row.innerHTML = '<span class="viz-sw"></span><span class="viz-text"><span class="prow-name"></span><small></small></span>';
+  const sw = row.querySelector('.viz-sw');
+  if (v.id === 'none') sw.dataset.none = ''; else sw.style.background = v.swatch;
+  row.querySelector('.prow-name').textContent = v.label;
+  row.querySelector('small').textContent = v.hint;
+  row.addEventListener('click', () => prefs.set('highway.visualizer', v.id)); // the list stays open: the chart behind shows the result
+  return row;
+}), vizLevel);
+function syncVizPop() {
+  const id = prefs.get('highway.visualizer');
+  for (const row of vizPop.querySelectorAll('.prow')) {
+    row.dataset.active = String(row.dataset.id === id);
+    row.setAttribute('aria-selected', String(row.dataset.id === id));
+  }
+  vizLevel.hidden = id === 'none';
+  vizLevelInput.value = prefs.get('highway.visualizerIntensity');
+  vizLevel.querySelector('output').textContent = `${vizLevelInput.value}%`;
+}
+popovers.push([vizBtn, vizPop]);
+registerPopover(vizBtn, vizPop);
+function cycleVisualizer(step) { // key G (Shift+G goes back)
+  const i = VISUALIZERS.findIndex((v) => v.id === prefs.get('highway.visualizer'));
+  const next = VISUALIZERS[(i + step + VISUALIZERS.length) % VISUALIZERS.length];
+  prefs.set('highway.visualizer', next.id);
+}
+
 // ---------- Fullscreen and idle bar ----------
 let idleTimer = 0;
 function setImmersive() {
@@ -1943,6 +2019,8 @@ document.addEventListener('keydown', (e) => {
   else if (e.code === 'BracketRight') highway.shiftFocus(1);
   else if (e.code === 'BracketLeft') highway.shiftFocus(-1);
   else if (e.code === 'KeyK' && highway.panes.some((p) => p.chart.mode === 'vocals')) setVocalView(highway.vocalView === 'karaoke' ? 'track' : 'karaoke');
+  else if (e.code === 'KeyP') cyclePerfOverlay();
+  else if (e.code === 'KeyG') cycleVisualizer(e.shiftKey ? -1 : 1);
   else if (e.code === 'KeyN') setNoteStyle(highway.noteStyle === 'rect' ? 'round' : 'rect');
   else if (e.code === 'BracketLeft') stepSection(-1);
   else if (e.code === 'BracketRight') stepSection(1);
@@ -1977,6 +2055,8 @@ function visualChartTime(ct) {
 }
 
 function frame() {
+  const frameStart = performance.now();
+  let drawMs = 0;
   if (current && chart) {
     const t = player.currentTime();
     if (previewStop != null && (!player.playing || t >= previewStop)) {
@@ -1991,8 +2071,14 @@ function frame() {
     const shownTime = visualChartTime(chartTime);
     if (vis.anim && Math.abs(vis.step) > MOTION_BLUR_MIN_STEP && prefs.get('highway.motionBlur')) { // a fast jump: blur the motion
       const span = Math.max(-0.6, Math.min(0.6, vis.step * 0.85)); // the exposure: most of the frame, within limits
+      const d0 = performance.now();
       highway.renderBlur(Array.from({ length: 8 }, (_, k) => shownTime - span * (1 - k / 7)));
-    } else highway.render(shownTime);
+      drawMs = performance.now() - d0;
+    } else {
+      const d0 = performance.now();
+      highway.render(shownTime);
+      drawMs = performance.now() - d0;
+    }
     syncPaneTags();
     const index = chart.sections.length ? sectionIndexAt(chart.sections, chartTime) : -1;
     if (index >= 0) setActiveSection(index);
@@ -2006,9 +2092,13 @@ function frame() {
       els.npTime.textContent = `${fmt(t)} / ${fmt(player.duration)}`;
     }
   } else {
+    const d0 = performance.now();
     highway.render(0);
+    drawMs = performance.now() - d0;
     syncPaneTags();
   }
+  perf.frame(frameStart, drawMs);
+  perfOverlay.tick(frameStart);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -2052,6 +2142,8 @@ const EFFECTS = {
   'highway.paneMin': (v) => highway.setPaneMin(v),
   'highway.view': (v) => { if (highway.view !== v) setView(v); },
   'highway.noteStyle': (v) => setNoteStyle(v),
+  'perf.overlay': (v) => perfOverlay.setMode(v),
+  'perf.position': (v) => perfOverlay.setPosition(v),
   'details.chips': applyDetails, 'details.cover': applyDetails, 'details.quote': applyDetails, 'details.sections': applyDetails,
   'details.layout': applyDetails, 'details.stemNames': applyDetails, 'details.maxWidth': applyDetails, 'details.compact': applyDetails,
   'library.cardStyle': (v) => { list.setMode(v); syncViewSeg(); },
@@ -2067,6 +2159,8 @@ const EFFECTS = {
   'theme.saved': applyThemeSetting,
   'ui.radius': (v) => document.documentElement.style.setProperty('--radius', `${v}px`),
   'ui.font': (v) => document.documentElement.style.setProperty('--font', fontCss(v)),
+  'highway.visualizer': (v) => { vizDriver.select(v); highway.setVisualizer(vizDriver.fn); syncVizPop(); },
+  'highway.visualizerIntensity': (v) => { vizDriver.intensity = v / 100; syncVizPop(); },
   'ui.animations': (v) => { document.documentElement.dataset.motion = v ? 'on' : 'off'; },
 };
 for (const [id, fn] of Object.entries(EFFECTS)) fn(prefs.get(id));

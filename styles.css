@@ -1196,3 +1196,27 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 
 /* a list that does not scroll has no rail: its rows use that space too */
 .songs-wrap.no-scroll.no-scroll { --rail-w: 0px; }
+
+/* Performance overlay (src/perf-overlay.js) */
+.perf-overlay { position: absolute; z-index: 4; margin: 10px; padding: 6px 9px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .14); background: rgba(13, 17, 23, .72); color: #e6edf3; font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; cursor: pointer; pointer-events: auto; user-select: none; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.perf-overlay[hidden] { display: none; }
+.perf-overlay[data-pos="top-left"] { top: 44px; left: 0; }
+.perf-overlay[data-pos="top-right"] { top: 44px; right: 0; }
+.perf-overlay[data-pos="bottom-left"] { bottom: 0; left: 0; }
+.perf-overlay[data-pos="bottom-right"] { bottom: 0; right: 0; }
+.perf-fps { font-weight: 700; font-size: 13px; }
+.perf-overlay[data-mode="compact"] .perf-graph, .perf-overlay[data-mode="compact"] .perf-detail { display: none; }
+.perf-graph { display: block; width: 120px; height: 28px; margin: 4px 0; background: rgba(255, 255, 255, .05); }
+.perf-detail { margin: 0; font: inherit; white-space: pre; }
+
+/* Background visualizer picker (#visualizerPop) */
+.viz-pop { width: min(300px, calc(100vw - 16px)); display: flex; flex-direction: column; gap: 4px; padding: 8px; }
+.viz-pop .prow { align-items: center; }
+.viz-sw { flex: none; width: 34px; height: 22px; border-radius: 6px; border: 1px solid var(--line); background-size: cover; }
+.viz-sw[data-none] { background: repeating-linear-gradient(45deg, transparent 0 5px, var(--line) 5px 6px); }
+.viz-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.viz-text small { color: var(--muted); font-weight: 400; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prow[data-active="true"] .viz-text small { color: inherit; opacity: .8; }
+.viz-pop .viz-level { display: grid; grid-template-columns: 70px 1fr 40px; align-items: center; gap: 8px; padding: 6px 8px 2px; font-size: 13px; color: var(--muted); }
+.viz-pop .viz-level[hidden] { display: none; }
+.viz-pop .viz-level output { text-align: right; font-variant-numeric: tabular-nums; }
