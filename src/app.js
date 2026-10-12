@@ -2279,6 +2279,7 @@ function frame() {
     if (!seeking) {
       const barT = Math.max(0, Math.min(player.duration, shownTime + settings.chartDelay)); // the eased time: the thumb rushes along with the fretboards after a seek
       els.seek.value = barT;
+      els.seekbox.classList.toggle('animating', !!vis.anim);
       paintSeek();
       els.timeNow.textContent = fmt(barT);
     }

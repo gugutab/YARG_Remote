@@ -1244,3 +1244,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 #loopBtn[aria-pressed="true"] { color: var(--accent); }
 .pc-head .pc-all { margin-left: auto; padding: 3px 10px; font-size: 12px; border-radius: 999px; }
 .pc-head .pc-all[hidden] { display: none; }
+
+/* the thumb stays visible while a seek animation runs */
+.seekbox.animating input::-webkit-slider-thumb { opacity: 1; margin-top: -3px; }
+.seekbox.animating input::-moz-range-thumb { opacity: 1; }
