@@ -74,7 +74,7 @@ export class Highway {
     this.onResize = null; // called when a drag ends, so the page can keep the sizes
     this.layout = { w: 0, sum: 1, keys: [] };
     this.vocalView = 'track'; // 'track' (notes + lyrics) or 'karaoke' (the lyrics alone)
-    this.trackOpacity = 0.5; // how opaque the board of a fretboard is (setting highway.trackOpacity)
+    this.trackOpacity = 0.75; // how opaque the board of a fretboard is (setting highway.trackOpacity)
     this.visualizer = null; // (g, w, h, t, bgRgb) => draws the shared background behind every pane, or null (src/visualizers.js)
   }
 
