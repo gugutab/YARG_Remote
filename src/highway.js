@@ -40,6 +40,7 @@ import {
 export { firstVisibleIndex } from './gfx.js';
 import { renderLanes3D } from './highway3d.js';
 import { buildKaraokeLines, karaokeAt, syllableProgress } from './karaoke.js';
+import { waitCountdowns, countdownAt } from './countdown.js';
 
 const RECT_WIDEN_2D = 1.18;
 const VOCAL_LEAD = '#5b8def'; // lead vocal notes
@@ -60,6 +61,7 @@ export class Highway {
     this.focus = 0; // first fretboard in view when they do not all fit
     this.perScreen = 1;
     this.sheets = []; // the lyric sheets on screen this frame: { x, y, w, h, step, hits, state } (canvas coordinates)
+    this.countdowns = true; // show the wait countdowns
     this.vocalView = 'track'; // 'track' (notes + lyrics) or 'karaoke' (the lyrics alone)
   }
 
@@ -196,6 +198,7 @@ export class Highway {
     } else if (this.view === '3d') renderLanes3D(this, t, pw, ph);
     else this.renderLanes(t, pw, ph);
     pane.vRange = this.vRange;
+    if (!(pane.chart.mode === 'vocals' && this.vocalView === 'karaoke')) this.drawCountdown(pane, t, pw, ph);
     if (labelled && pane.label) {
       g.font = '600 12px system-ui';
       g.textAlign = 'left';
@@ -210,6 +213,45 @@ export class Highway {
       g.fillText(pane.label, 16, 19);
       g.textBaseline = 'alphabetic';
     }
+    g.restore();
+  }
+
+  // The wait countdown: while the chart has nothing to play for 9 s or more, the seconds until its next note, in a ring that
+  // empties (YARG's WaitCountdown). Drawn over the pane's centre.
+  drawCountdown(pane, t, w, h) {
+    if (!this.countdowns) return;
+    pane.countdowns ??= waitCountdowns(pane.chart);
+    const c = countdownAt(pane.countdowns, t);
+    if (!c || c.remaining < 0.25) return;
+    const g = this.g;
+    const fadeIn = Math.min(1, (c.total - c.remaining) / 0.5); // eases in at the start of the gap, out as the notes return
+    const fadeOut = Math.min(1, c.remaining / 0.6);
+    const alpha = Math.min(fadeIn, fadeOut);
+    const r = Math.max(26, Math.min(h * 0.2, w * 0.2, 70));
+    const cx = w / 2;
+    const cy = pane.chart.mode === 'vocals' ? h * 0.45 : h * 0.4;
+    const secs = Math.ceil(c.remaining);
+    const urgent = c.remaining <= 3.05;
+    g.save();
+    g.globalAlpha = alpha;
+    g.beginPath();
+    g.arc(cx, cy, r, 0, Math.PI * 2);
+    g.fillStyle = 'rgba(8,11,16,0.72)';
+    g.fill();
+    g.lineWidth = Math.max(4, r * 0.1);
+    g.strokeStyle = 'rgba(255,255,255,0.14)';
+    g.stroke();
+    g.beginPath(); // what is left of the gap
+    g.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (c.remaining / c.total));
+    g.strokeStyle = urgent ? '#13f0a6' : '#6cb6ff';
+    g.lineCap = 'round';
+    g.stroke();
+    g.fillStyle = urgent ? '#13f0a6' : '#ffffff';
+    g.font = `700 ${Math.round(r * 1.05)}px system-ui`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(String(secs), cx, cy + r * 0.04);
+    g.textBaseline = 'alphabetic';
     g.restore();
   }
 

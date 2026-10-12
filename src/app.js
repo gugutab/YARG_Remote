@@ -1729,6 +1729,7 @@ function applyDetails() {
   if (current) renderMeta(current.song, current.midi); // the chips
 }
 const EFFECTS = {
+  'highway.countdown': (v) => { highway.countdowns = v; },
   'highway.vocalView': (v) => { if (highway.vocalView !== v) setVocalView(v); },
   'highway.paneMin': (v) => highway.setPaneMin(v),
   'highway.view': (v) => { if (highway.view !== v) setView(v); },
