@@ -807,6 +807,8 @@ export function createDriver({ getSource }) {
       s.dpr = g.getTransform().a || 1;
       s.clock = performance.now() / 1000;
       beatInfo(data.beats, t, s.beat);
+      s.beat.pulse = 0; // no punch on the beat (it read as flicker); the tempo-locked motion (beat.pos) stays
+      s.beat.measurePulse = 0;
       s.density = densityAt(data.density, t);
       s.travel = travelAt(data.density, t);
       s.sp = spanAmount(data.starPower, t);

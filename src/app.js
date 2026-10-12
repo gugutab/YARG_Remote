@@ -1557,9 +1557,15 @@ async function toggleLoop() {
   if (!chart || !(await ensureAudio())) return;
   setLoop(currentSectionRange(sectionStartsPlayer(), player.currentTime(), player.duration));
 }
+// A loop changed while the song plays and it no longer covers the playhead: rewind to its start (paused, the playhead stays).
+function rewindIntoLoop() {
+  if (!loop || !ready || !player.playing) return;
+  const now = player.currentTime();
+  if (now < loop.start || now >= loop.end) player.seek(loop.start);
+}
 function loopSectionRow(i) {
   const sec = sectionRange(sectionStartsPlayer(), i, seekMax());
-  if (sec) setLoop(loopForSection(loop, sec));
+  if (sec) { setLoop(loopForSection(loop, sec)); rewindIntoLoop(); }
 }
 els.loopBtn.addEventListener('click', toggleLoop);
 
@@ -1593,6 +1599,7 @@ for (const handle of [els.loopStart, els.loopEnd]) {
     loopDrag = null;
     handle.classList.remove('dragging');
     hideSeekTip();
+    rewindIntoLoop();
   };
   handle.addEventListener('pointerup', end);
   handle.addEventListener('pointercancel', end);
