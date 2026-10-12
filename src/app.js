@@ -84,6 +84,7 @@ function savePanelState() {
 function setSongPanelOpen(open) {
   if (narrow()) return; // a phone shows one thing at a time
   if (!open && !libraryOpen()) setLibraryOpen(true); // never both closed
+  if (!open) els.app.style.setProperty('--main-w', `${Math.round(document.querySelector('.main').getBoundingClientRect().width)}px`); // it slides out by its own width
   els.app.classList.toggle('song-closed', !open);
   syncPanelUi();
   savePanelState();
@@ -96,9 +97,8 @@ function setLibraryOpen(open, persist = true) {
 }
 // Edge tabs reopen a closed panel.
 function syncPanelUi() {
-  const tabs = prefs.get('panels.tabs') && !narrow();
   els.libTab.hidden = libraryOpen(); // like the top bar's show button: it is always there while the library is hidden (also on a phone, where the library is a drawer)
-  els.songTab.hidden = !(tabs && !songPanelOpen());
+  els.songTab.hidden = narrow() || songPanelOpen(); // the song panel's is the same, mirrored
 }
 (() => { // the panels at startup: open, closed, or as they were last time (the "Panels" settings)
   if (narrow()) { setLibraryOpen(false, false); return; }
@@ -1962,7 +1962,6 @@ const EFFECTS = {
   'highway.paneMin': (v) => highway.setPaneMin(v),
   'highway.view': (v) => { if (highway.view !== v) setView(v); },
   'highway.noteStyle': (v) => setNoteStyle(v),
-  'panels.tabs': syncPanelUi,
   'details.chips': applyDetails, 'details.cover': applyDetails, 'details.quote': applyDetails, 'details.sections': applyDetails,
   'details.layout': applyDetails, 'details.stemNames': applyDetails, 'details.maxWidth': applyDetails, 'details.compact': applyDetails,
   'library.cardStyle': (v) => { list.setMode(v); syncViewSeg(); },

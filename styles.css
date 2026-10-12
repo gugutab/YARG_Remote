@@ -72,7 +72,7 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
   padding: 10px;
   background: var(--panel);
   border-right: 1px solid var(--line);
-  transition: margin-left .2s ease;
+  transition: margin-left .2s ease, width .2s ease;
   min-height: 0;
 }
 .app.lib-closed .library { margin-left: calc(var(--lib-w) * -1); }
@@ -1039,8 +1039,10 @@ body.settings-open { overflow: hidden; }
 #info[data-names="always"] .card-volume .mix-row.has-expand { grid-template-columns: 36px auto 84px 1fr 40px 28px; }
 
 /* ---------- Round 72: panels that close and reopen ---------- */
-.app.song-closed .main { display: none; }
-.app.song-closed .library, .app.song-closed.lib-closed .library { flex: 1; width: auto; margin-left: 0; }
+.app { --main-w: 600px; }
+.main { transition: margin-right .2s ease, visibility 0s; } /* the song panel slides out to the right like the library to the left */
+.app.song-closed .main { flex: none; width: var(--main-w); margin-right: calc(var(--main-w) * -1); visibility: hidden; pointer-events: none; transition: margin-right .2s ease, visibility 0s .2s; }
+.app.song-closed .library, .app.song-closed.lib-closed .library { flex: none; width: 100%; margin-left: 0; } /* the library takes the whole screen: its width animates like the song panel's margin, so the two slide together */
 .app.song-closed .splitter { display: none; }
 .app.song-closed .songs-wrap { margin-right: 0; }
 .close-song, .close-song-info { opacity: .8; }
@@ -1174,3 +1176,9 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .edge-tab.lib-show svg { transform: rotate(-90deg); } /* points right: where it comes back */
 .edge-tab.lib-show { height: 56px; }
 @media (max-width: 700px) { .edge-tab.lib-show:not([hidden]) { display: grid !important; } }
+
+.song-hide svg { transform: rotate(-90deg); } /* points right: where the song panel goes */
+.song-hide { opacity: .7; }
+.song-hide:hover { opacity: 1; }
+.edge-tab.song-show svg { transform: rotate(90deg); } /* points left: where it comes back */
+.edge-tab.song-show { height: 56px; }

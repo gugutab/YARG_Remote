@@ -79,7 +79,6 @@ export const SECTIONS = [
       { id: 'panels.libraryStart', group: 'At startup', type: 'choice', label: 'Library panel', options: [{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }, { value: 'last', label: 'As I left it' }], default: 'open' },
       { id: 'panels.songStart', group: 'At startup', type: 'choice', label: 'Song panel', options: [{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }, { value: 'last', label: 'As I left it' }], default: 'open' },
       { id: 'panels.openSongOnSelect', group: 'Behaviour', type: 'toggle', label: 'Open the song panel when I pick a song', help: 'Only matters when the song panel is closed.', default: true },
-      { id: 'panels.tabs', group: 'Behaviour', type: 'toggle', label: 'Reopen tab for the song panel', help: 'A small tab on the right edge while the song panel is closed. (The library has its own chevron button, always.)', default: true },
     ],
   },
   {
