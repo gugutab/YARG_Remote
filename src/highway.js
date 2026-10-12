@@ -613,14 +613,14 @@ export class Highway {
         if (jump.target === 1 && k > 0.5) sheet.playBtn = { x: x0 + bx, y: y0 + by, w: bw, h: bh, time: jump.spec.time };
       }
     }
-    this.drawSheetRail(t, w, h, ctx, rows, lines, seenFrom, seenTo);
-    if (state.following === false) { // back to following the singer
+    const rail = this.drawSheetRail(t, w, h, ctx, rows, lines, seenFrom, seenTo);
+    if (state.following === false) { // back to following the singer: next to the song marker on the rail (bottom centre without a rail)
       const label = 'Autoscroll';
       g.font = '600 13px system-ui';
       const bw = g.measureText(label).width + 28;
       const bh = 30;
-      const bx = (w - bw) / 2;
-      const by = h - bh - 14;
+      const bx = rail ? rail.rx - 10 - bw : (w - bw) / 2;
+      const by = rail ? Math.max(rail.y0, Math.min(rail.y1 - bh, rail.my - bh / 2)) : h - bh - 14;
       g.fillStyle = 'rgba(30,40,55,0.92)';
       g.beginPath();
       if (g.roundRect) g.roundRect(bx, by, bw, bh, 15);
@@ -644,7 +644,7 @@ export class Highway {
   drawSheetRail(t, w, h, ctx, rows, lines, seenFrom, seenTo) {
     const g = this.g;
     const dur = ctx.duration;
-    if (!(dur > 0) || h < 80) return;
+    if (!(dur > 0) || h < 80) return null;
     const rx = w - 18;
     const rw = 6;
     const y0 = 12;
@@ -653,8 +653,6 @@ export class Highway {
     g.save();
     g.fillStyle = 'rgba(255,255,255,0.08)';
     g.fillRect(rx, y0, rw, y1 - y0);
-    g.fillStyle = 'rgba(108,182,255,0.28)'; // how much of the song has played
-    g.fillRect(rx, y0, rw, Math.max(0, yOf(t) - y0));
     for (const gap of ctx.pauses) { // rests
       g.fillStyle = 'rgba(139,148,158,0.55)';
       g.fillRect(rx, yOf(gap.start), rw, Math.max(2, yOf(gap.end) - yOf(gap.start)));
@@ -673,15 +671,12 @@ export class Highway {
       g.strokeRect(rx - 2.5, yOf(seenFrom), rw + 5, Math.max(6, yOf(seenTo) - yOf(seenFrom)));
     }
     const my = yOf(t); // where the song is
+    g.fillStyle = `rgba(${this.bgRgb},0.62)`; // an overlay on the part that has played: what is behind is dimmed, what is ahead is bright
+    g.fillRect(rx - 2, y0 - 1, rw + 4, Math.max(0, my - y0 + 1));
     g.fillStyle = '#ffffff';
     g.fillRect(rx - 3, my - 1, rw + 6, 2);
-    g.font = '600 10px system-ui';
-    g.textAlign = 'right';
-    g.textBaseline = 'middle';
-    g.fillStyle = 'rgba(255,255,255,0.7)';
-    g.fillText(`${Math.round(Math.max(0, Math.min(1, t / dur)) * 100)}%`, rx - 10, Math.min(y1 - 6, Math.max(y0 + 6, my)));
-    g.textBaseline = 'alphabetic';
     g.restore();
+    return { rx, my, y0, y1 };
   }
 
   // The sheet under the canvas point (x, y), or null.
