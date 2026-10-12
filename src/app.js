@@ -1350,7 +1350,7 @@ function setSetting(name, value) {
   }
   for (const out of document.querySelectorAll(`[data-out="${name}"]`)) out.textContent = SETTING_FORMAT[name](value);
   for (const btn of document.querySelectorAll(`[data-reset="${name}"]`)) btn.disabled = value === SETTING_DEFAULTS[name];
-  if (name === 'chartDelay') paintSectionTicks();
+  if (name === 'chartDelay') { paintSectionTicks(); highway.delay = value; }
   if (name === 'speed') player.setRate(value);
   if (name === 'neck') highway.setNeckSpeed(value);
 }
@@ -1576,7 +1576,9 @@ els.highway.addEventListener('pointermove', (e) => {
     highway.pointerAt(...canvasPoint(e));
     const d = highway.dividerAt(...canvasPoint(e), slopFor(e));
     highway.hover = d;
-    els.highway.style.cursor = d ? (d.type === 'row' ? 'row-resize' : 'col-resize') : '';
+    const jump = highway.sheetPlayButtonAt(...canvasPoint(e)); // over the "jump to" button of a lyric row
+    els.highway.style.cursor = jump ? 'pointer' : d ? (d.type === 'row' ? 'row-resize' : 'col-resize') : '';
+    els.highway.title = jump ? `Jump to ${highway.fmtTime(jump.playBtn.time + settings.chartDelay)}` : '';
     return;
   }
   if (!swipe.sheet) return;

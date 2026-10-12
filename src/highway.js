@@ -66,6 +66,7 @@ export class Highway {
     this.vocalH = null; // height of the vocal band in px, once the user dragged its divider (null: the default)
     this.dividers = []; // the draggable dividers drawn this frame
     this.hover = null; // the divider under the pointer
+    this.delay = 0; // the chart delay, so times shown on the lyrics match the seek bar
     this.pointer = null; // the pointer over the canvas, for the "play from here" button on the lyrics: { x, y, t0, key, shown }
     this.onResize = null; // called when a drag ends, so the page can keep the sizes
     this.layout = { w: 0, sum: 1, keys: [] };
@@ -522,7 +523,7 @@ export class Highway {
           if (end - t >= 0.25) this.drawCountdownBadge(w / 2, y, badgeR, { remaining: end - t, total });
         } else this.drawCountdownBadge(w / 2, y, badgeR, { remaining: total, total, dim: t >= end ? 0.28 : 0.55 }); // past / to come
         sheet.hits.push({ y: y + y0, half: step / 2, time: start });
-        hovered = this.hoverRow(sheet, x0, y0, y, step, start) ?? hovered;
+        hovered = this.hoverRow(sheet, x0, y0, y, step, start, w / 2 + badgeR) ?? hovered;
         continue;
       }
       const i = row.i;
@@ -530,35 +531,38 @@ export class Highway {
       seenTo = Math.max(seenTo, lines[i].end);
       const cur = singing && i === idx;
       const past = i < first ? 0.3 : Math.max(0.3, 0.7 - Math.max(0, i - first) * 0.06);
-      this.drawKaraokeLine(lines[i], cur ? big : small, w, y, cur ? 0.95 : past, cur ? t : null);
+      const shown = this.drawKaraokeLine(lines[i], cur ? big : small, w, y, cur ? 0.95 : past, cur ? t : null);
       sheet.hits.push({ y: y + y0, half: step / 2, time: lines[i].start });
-      hovered = this.hoverRow(sheet, x0, y0, y, step, lines[i].start) ?? hovered;
+      hovered = this.hoverRow(sheet, x0, y0, y, step, lines[i].start, shown.x + shown.total) ?? hovered;
     }
     if (hovered && this.pointer?.shown && this.pointer.key === hovered.key) { // the pointer rested on a row: offer to play from there
-      const label = 'Play from here';
-      g.font = '600 13px system-ui';
+      const label = this.fmtTime(hovered.time + this.delay); // the time it jumps to, as the seek bar shows it
+      g.font = '600 12.5px system-ui';
       const bw = g.measureText(label).width + 44;
-      const bh = 28;
-      const bx = 18;
+      const bh = 26;
+      const bx = Math.min(hovered.right + 16, w - bw - 34); // right of the text, clear of the rail
       const by = hovered.y - bh / 2;
-      g.fillStyle = 'rgba(30,40,55,0.95)';
+      const pt = this.pointer;
+      const hot = pt.x >= x0 + bx && pt.x <= x0 + bx + bw && pt.y >= y0 + by && pt.y <= y0 + by + bh; // the pointer is on the button
+      g.fillStyle = hot ? 'rgba(58,92,140,0.98)' : 'rgba(30,40,55,0.95)';
       g.beginPath();
-      if (g.roundRect) g.roundRect(bx, by, bw, bh, 14);
+      if (g.roundRect) g.roundRect(bx, by, bw, bh, 13);
       else g.rect(bx, by, bw, bh);
       g.fill();
-      g.lineWidth = 1;
-      g.strokeStyle = 'rgba(108,182,255,0.7)';
+      g.lineWidth = hot ? 1.5 : 1;
+      g.strokeStyle = hot ? '#9fd0ff' : 'rgba(108,182,255,0.6)';
       g.stroke();
-      g.fillStyle = '#cfe6ff';
-      g.beginPath(); // a small play triangle
-      g.moveTo(bx + 13, by + bh / 2 - 5);
-      g.lineTo(bx + 13, by + bh / 2 + 5);
-      g.lineTo(bx + 21, by + bh / 2);
+      g.fillStyle = hot ? '#ffffff' : '#cfe6ff';
+      g.fillRect(bx + 11, by + bh / 2 - 5, 2, 10); // the jump-to icon: a triangle running to a bar
+      g.beginPath();
+      g.moveTo(bx + 16, by + bh / 2 - 5);
+      g.lineTo(bx + 16, by + bh / 2 + 5);
+      g.lineTo(bx + 24, by + bh / 2);
       g.closePath();
       g.fill();
       g.textAlign = 'left';
       g.textBaseline = 'middle';
-      g.fillText(label, bx + 28, by + bh / 2 + 1);
+      g.fillText(label, bx + 31, by + bh / 2 + 1);
       g.textBaseline = 'alphabetic';
       sheet.playBtn = { x: x0 + bx, y: y0 + by, w: bw, h: bh, time: hovered.time };
     }
@@ -657,13 +661,18 @@ export class Highway {
 
   // Is the pointer over this row of a sheet? If it is, remember which row, and when it stays there for 0.6 s the page shows
   // the "Play from here" button. Returns { key, time, y } (y in sheet coordinates) or null.
-  hoverRow(sheet, x0, y0, y, step, time) {
+  hoverRow(sheet, x0, y0, y, step, time, right) {
     const pt = this.pointer;
     if (!pt || pt.x < x0 || pt.x >= x0 + sheet.w || Math.abs(pt.y - (y + y0)) > step / 2) return null;
     const key = `${x0},${y0},${time}`;
     if (pt.key !== key) { pt.key = key; pt.shown = false; pt.t0 = performance.now(); } // another row: wait again
     else if (!pt.shown && performance.now() - pt.t0 >= 600) pt.shown = true;
-    return { key, time, y };
+    return { key, time, y, right };
+  }
+
+  fmtTime(sec) {
+    const m = Math.floor(Math.max(0, sec) / 60);
+    return `${m}:${String(Math.floor(Math.max(0, sec) % 60)).padStart(2, '0')}`;
   }
 
   // The pointer moved over the canvas: a real move (more than 4 px) restarts the wait for the button.
