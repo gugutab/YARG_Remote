@@ -266,3 +266,4 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - Neck speed also works on the vocal chart, and the vocal speed is fixed in pixels: `VOCAL_PX_PER_SEC` (340 px/s, a 1000 px window shows 2.5 s) times `neck / global neck`; a wider window shows more music ahead, a narrower one less.
 - The instrument tags show only the icon and the arrow; the name (with the difficulty) is the tooltip and the aria-label.
 - Album art visualizer: back to the strip cloth (the two-pass organic version was rejected), but its drift uses only the song time, so it freezes when paused.
+- Album art camera: it pans very slowly (periods of ~5 and ~6.5 minutes of song time) over the whole cover, including the parts cropped off screen, up to the picture's edge (`room` in `coverViz`).

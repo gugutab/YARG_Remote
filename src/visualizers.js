@@ -458,7 +458,10 @@ const coverViz = (ctx) => {
       g.save();
       g.imageSmoothingEnabled = true;
       g.imageSmoothingQuality = 'high';
-      g.translate(w / 2 + Math.sin(s.t * 0.05) * w * 0.05, h / 2 + Math.cos(s.t * 0.043) * h * 0.05); // (song time only: it stands still when the music is paused)
+      // The camera drifts very slowly over the whole picture, also the parts that are off screen (the cover is a square cropped to the
+      // window), going as far as the edge without showing it. Song time only: it stands still when the music is paused.
+      const room = (extent, view) => Math.max(view * 0.03, (size * zoom - view) / 2 - amp * zoom * 1.5);
+      g.translate(w / 2 + Math.sin(s.t * 0.021 + 0.6) * room(size, w), h / 2 + Math.sin(s.t * 0.016 + 2.2) * room(size, h));
       g.scale(zoom, zoom);
       const x0 = -size / 2;
       const y0 = -size / 2;
