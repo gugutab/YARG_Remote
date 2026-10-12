@@ -1153,7 +1153,7 @@ export class Highway {
     const second = (chart.lyrics2 || []).length > 0; // harmony charts: the other voices' own words get a line above the chart
     const secondSize = Math.max(15, Math.min(26, h * 0.08));
     const secondY = secondSize * 0.75; // the harmony line (and its track) sits right at the top edge
-    const top = second ? secondY + secondSize * 0.75 : h * 0.08; // pitch area: below the second lyric line, if any, to 76% of the canvas
+    const top = second ? secondY + secondSize * 0.75 : 8; // pitch area: below the second lyric line, if any, to 76% of the canvas
     const fontSize = Math.max(18, Math.min(30, h * 0.095)); // lyric size, grows with the band
     const lyricY = h - fontSize * 0.75; // the lyrics and their track sit right at the bottom edge of the window
     const bottom = lyricY - fontSize * 0.5 - 16; // and 16 px of air between them and the notes
