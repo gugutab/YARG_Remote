@@ -2281,7 +2281,7 @@ function frame() {
     const index = chart.sections.length ? sectionIndexAt(chart.sections, chartTime) : -1;
     if (index >= 0) setActiveSection(index);
     if (!seeking) {
-      const barT = Math.max(0, Math.min(player.duration, shownTime + settings.chartDelay)); // the eased time: the thumb rushes along with the fretboards after a seek
+      const barT = t; // the bar is always at the real position: the thumb is already where the song went and only the fretboards travel there
       els.seek.value = barT;
       els.seekbox.classList.toggle('animating', !!vis.anim);
       paintSeek();
