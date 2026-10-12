@@ -544,14 +544,16 @@ export class Highway {
       sheet.hits.push({ y: y + y0, half: step / 2, time: lines[i].start });
       hovered = this.hoverRow(sheet, x0, y0, y, step, lines[i].start, shown.x + shown.total) ?? hovered;
     }
-    const fade = Math.min(36, h * 0.14); // the lines dissolve into the background at the top and bottom edges
+    const fade = Math.min(56, h * 0.18); // the lines dissolve into the background at the top and bottom edges, fully hidden at the very edge
     const fadeIn = g.createLinearGradient(0, 0, 0, fade);
     fadeIn.addColorStop(0, `rgba(${this.bgRgb},1)`);
+    fadeIn.addColorStop(0.3, `rgba(${this.bgRgb},1)`);
     fadeIn.addColorStop(1, `rgba(${this.bgRgb},0)`);
     g.fillStyle = fadeIn;
     g.fillRect(0, 0, w, fade);
     const fadeOut = g.createLinearGradient(0, h - fade, 0, h);
     fadeOut.addColorStop(0, `rgba(${this.bgRgb},0)`);
+    fadeOut.addColorStop(0.7, `rgba(${this.bgRgb},1)`);
     fadeOut.addColorStop(1, `rgba(${this.bgRgb},1)`);
     g.fillStyle = fadeOut;
     g.fillRect(0, h - fade, w, fade);
