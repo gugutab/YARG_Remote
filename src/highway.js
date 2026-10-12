@@ -628,7 +628,7 @@ export class Highway {
           const lead = Math.min(10, half * 1.5); // tucks under both bars so no seam shows
           const xs = xa - lead;
           const xe = x1 + lead;
-          const tw = Math.min(xe - xs, 70); // the pitch change happens just before the note: the ribbon holds the old pitch until then
+          const tw = xe - xs; // the pitch glides over the whole gap, a smooth S, instead of jumping
           const xc = xe - tw;
           const cx = xc + tw / 2;
           g.beginPath();
