@@ -535,36 +535,57 @@ export class Highway {
       sheet.hits.push({ y: y + y0, half: step / 2, time: lines[i].start });
       hovered = this.hoverRow(sheet, x0, y0, y, step, lines[i].start, shown.x + shown.total) ?? hovered;
     }
-    if (hovered && this.pointer?.shown && this.pointer.key === hovered.key) { // the pointer rested on a row: offer to play from there
+    // The jump button: it slides and fades in when the pointer has rested on a row, and out when it leaves.
+    const jump = (this.jump ??= { k: 0, target: 0, spec: null, at: 0 });
+    const sheetKey = `${x0},${y0}`;
+    if (hovered && this.pointer?.shown && this.pointer.key === hovered.key) {
       const label = this.fmtTime(hovered.time + this.delay); // the time it jumps to, as the seek bar shows it
       g.font = '600 12.5px system-ui';
       const bw = g.measureText(label).width + 44;
       const bh = 26;
-      const bx = Math.min(hovered.right + 16, w - bw - 34); // right of the text, clear of the rail
-      const by = hovered.y - bh / 2;
-      const pt = this.pointer;
-      const hot = pt.x >= x0 + bx && pt.x <= x0 + bx + bw && pt.y >= y0 + by && pt.y <= y0 + by + bh; // the pointer is on the button
-      g.fillStyle = hot ? 'rgba(58,92,140,0.98)' : 'rgba(30,40,55,0.95)';
-      g.beginPath();
-      if (g.roundRect) g.roundRect(bx, by, bw, bh, 13);
-      else g.rect(bx, by, bw, bh);
-      g.fill();
-      g.lineWidth = hot ? 1.5 : 1;
-      g.strokeStyle = hot ? '#9fd0ff' : 'rgba(108,182,255,0.6)';
-      g.stroke();
-      g.fillStyle = hot ? '#ffffff' : '#cfe6ff';
-      g.fillRect(bx + 11, by + bh / 2 - 5, 2, 10); // the jump-to icon: a triangle running to a bar
-      g.beginPath();
-      g.moveTo(bx + 16, by + bh / 2 - 5);
-      g.lineTo(bx + 16, by + bh / 2 + 5);
-      g.lineTo(bx + 24, by + bh / 2);
-      g.closePath();
-      g.fill();
-      g.textAlign = 'left';
-      g.textBaseline = 'middle';
-      g.fillText(label, bx + 31, by + bh / 2 + 1);
-      g.textBaseline = 'alphabetic';
-      sheet.playBtn = { x: x0 + bx, y: y0 + by, w: bw, h: bh, time: hovered.time };
+      jump.spec = { key: sheetKey, label, bw, bh, bx: Math.min(hovered.right + 16, w - bw - 34), by: hovered.y - bh / 2, time: hovered.time }; // right of the text, clear of the rail
+      jump.target = 1;
+    } else if (jump.spec?.key === sheetKey) jump.target = 0;
+    if (jump.spec?.key === sheetKey) {
+      const nowJ = performance.now();
+      const dtJ = Math.min(0.1, (nowJ - (jump.at || nowJ)) / 1000);
+      jump.at = nowJ;
+      jump.k += (jump.target - jump.k) * (1 - Math.exp(-dtJ / 0.07));
+      if (jump.target === 0 && jump.k < 0.02) jump.spec = null;
+      else {
+        const { label, bw, bh, bx, by } = jump.spec;
+        const pt = this.pointer;
+        const hot = jump.target === 1 && !!pt && pt.x >= x0 + bx && pt.x <= x0 + bx + bw && pt.y >= y0 + by && pt.y <= y0 + by + bh; // the pointer is on the button
+        const k = jump.k;
+        g.save();
+        g.globalAlpha = k;
+        g.translate(bx + bw / 2 - (1 - k) * 10, by + bh / 2); // comes in from the left, growing
+        g.scale(0.82 + 0.18 * k, 0.82 + 0.18 * k);
+        g.translate(-(bx + bw / 2), -(by + bh / 2));
+        g.fillStyle = hot ? 'rgba(58,92,140,0.98)' : 'rgba(30,40,55,0.95)';
+        g.beginPath();
+        if (g.roundRect) g.roundRect(bx, by, bw, bh, 13);
+        else g.rect(bx, by, bw, bh);
+        g.fill();
+        g.lineWidth = hot ? 1.5 : 1;
+        g.strokeStyle = hot ? '#9fd0ff' : 'rgba(108,182,255,0.6)';
+        g.stroke();
+        g.fillStyle = hot ? '#ffffff' : '#cfe6ff';
+        g.fillRect(bx + 11, by + bh / 2 - 5, 2, 10); // the jump-to icon: a triangle running to a bar
+        g.beginPath();
+        g.moveTo(bx + 16, by + bh / 2 - 5);
+        g.lineTo(bx + 16, by + bh / 2 + 5);
+        g.lineTo(bx + 24, by + bh / 2);
+        g.closePath();
+        g.fill();
+        g.font = '600 12.5px system-ui';
+        g.textAlign = 'left';
+        g.textBaseline = 'middle';
+        g.fillText(label, bx + 31, by + bh / 2 + 1);
+        g.textBaseline = 'alphabetic';
+        g.restore();
+        if (jump.target === 1 && k > 0.5) sheet.playBtn = { x: x0 + bx, y: y0 + by, w: bw, h: bh, time: jump.spec.time };
+      }
     }
     this.drawSheetRail(t, w, h, ctx, rows, lines, seenFrom, seenTo);
     if (state.following === false) { // back to following the singer
