@@ -229,7 +229,7 @@ export class Highway {
       this.vocalAlone = true;
       if (this.vocalView === 'karaoke') this.drawPane(vocal, t, 0, 0, w, h); // the lyrics fill the stage (renderKaraoke)
       else { // the chart keeps the height it has next to other charts; the rest of the lyrics fill the space below
-        const vh = this.bandHeight(h, Math.min(h * 0.34, 280));
+        const vh = this.bandHeight(h, Math.min(h * 0.34, 280) - 20);
         this.drawPane(vocal, t, 0, 0, w, vh);
         this.drawDivider({ type: 'row', y: vh - 1, w });
         this.trackBase(0, vh, w, h - vh);
@@ -247,7 +247,7 @@ export class Highway {
     }
     let top = 0;
     if (vocal) { // vocals use the top of the other tracks
-      top = this.bandHeight(h, (this.vocalView === 'karaoke' ? Math.min(h * 0.3, 230) : Math.min(h * 0.34, 280)) - 20); // 20 px shorter than the band of vocals alone
+      top = this.bandHeight(h, (this.vocalView === 'karaoke' ? Math.min(h * 0.3, 230) : Math.min(h * 0.34, 280)) - 40); // 20 px shorter than the band of vocals alone
       this.drawPane(vocal, t, 0, 0, w, top);
       this.drawDivider({ type: 'row', y: top - 1, w });
     }
@@ -1151,7 +1151,7 @@ export class Highway {
     const secondY = secondSize * 0.85 + 6;
     const top = second ? secondY + secondSize * 0.75 : h * 0.08; // pitch area: below the second lyric line, if any, to 76% of the canvas
     const fontSize = Math.max(18, Math.min(30, h * 0.095)); // lyric size, grows with the band
-    const lyricY = h - fontSize * 0.5 - 10; // the lyrics sit 10 px above the bottom edge
+    const lyricY = h - fontSize * 0.75; // the lyrics and their track sit right at the bottom edge of the window
     const bottom = lyricY - fontSize * 0.5 - 16; // and 16 px of air between them and the notes
     // The track: the note area is nearly see-through (the visualizer shows), the rows of lyrics keep their readable base.
     // The lyric track hugs the words, centred on them, and fades away while a percussion section or a rest with a countdown runs.
