@@ -1777,6 +1777,25 @@ function pickInto(chooser, group, ins, diffId) {
   current.pins.add(group.key);
   updateChart();
 }
+// "Add all": every instrument not on screen goes up at once, each with the type and difficulty its card shows.
+function addAllInto(chooser) {
+  const groups = hiddenGroups();
+  current.choosers = current.choosers.filter((c) => c !== chooser);
+  if (!groups.length) { updateChart(); return; }
+  const picks = groups.map((group) => {
+    const ins = group.options.find((o) => o.id === chooser.modes[group.key]) ?? group.chosen;
+    return { group, ins, diffId: diffFor(ins).chosen?.id };
+  });
+  for (const { group, ins, diffId } of picks) { current.modeChoice[group.key] = ins.id; current.diffChoice[ins.id] = diffId; }
+  if (current.hiddenActive) { // the slot was the only instrument's: the first pick becomes the active one, the rest are pinned
+    current.hiddenActive = false;
+    for (const { group } of picks.slice(1)) current.pins.add(group.key);
+    selectInstrument(picks[0].ins.id, picks[0].diffId);
+    return;
+  }
+  for (const { group } of picks) current.pins.add(group.key);
+  updateChart();
+}
 function cancelChooser(chooser) {
   current.choosers = current.choosers.filter((c) => c !== chooser);
   if (!current.choosers.length) current.hiddenActive = false; // nothing was picked: the instrument that was swapped is back
@@ -1787,8 +1806,11 @@ function fillChooser(el, key) {
   if (!chooser) return;
   const head = document.createElement('div');
   head.className = 'pc-head';
-  head.innerHTML = '<b>Choose an instrument</b><button type="button" class="icon small-icon" title="Cancel" aria-label="Cancel"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>';
-  head.querySelector('button').addEventListener('click', () => cancelChooser(chooser));
+  head.innerHTML = '<b>Choose an instrument</b><button type="button" class="pc-all" title="Put every instrument on screen">Add all</button><button type="button" class="icon small-icon pc-cancel" title="Cancel" aria-label="Cancel"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>';
+  head.querySelector('.pc-cancel').addEventListener('click', () => cancelChooser(chooser));
+  const all = head.querySelector('.pc-all');
+  all.hidden = hiddenGroups().length < 2;
+  all.addEventListener('click', () => addAllInto(chooser));
   const cards = document.createElement('div');
   cards.className = 'pc-cards';
   for (const group of hiddenGroups()) {

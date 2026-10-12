@@ -1242,3 +1242,5 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .prow:hover .row-loop, .prow .row-loop[aria-pressed="true"] { opacity: 1; }
 .prow .row-loop[aria-pressed="true"] { color: var(--accent); }
 #loopBtn[aria-pressed="true"] { color: var(--accent); }
+.pc-head .pc-all { margin-left: auto; padding: 3px 10px; font-size: 12px; border-radius: 999px; }
+.pc-head .pc-all[hidden] { display: none; }
