@@ -45,6 +45,9 @@ import { waitCountdowns, countdownAt } from './countdown.js';
 const RECT_WIDEN_2D = 1.18;
 const VOCAL_LEAD = '#5b8def'; // lead vocal notes
 
+// Speed of the vocal chart in pixels per second at the default neck speed: a 1000 px wide window shows 2.5 s ahead, a wider one more.
+const VOCAL_PX_PER_SEC = (1000 * 0.85) / BASE_LOOKAHEAD_SEC;
+
 export class Highway {
   constructor(canvas) {
     this.canvas = canvas;
@@ -1144,8 +1147,8 @@ export class Highway {
     const g = this.g;
     const chart = this.chart;
     const hitX = w * 0.15;
-    const look = BASE_LOOKAHEAD_SEC / (this.neck / (this.neckGlobal || this.neck)); // neck speed: how much time the window shows (the default shows the base)
-    const pxPerSec = (w * 0.85) / look;
+    const pxPerSec = VOCAL_PX_PER_SEC * (this.neck / (this.neckGlobal || this.neck)); // a fixed speed in pixels: a wider window shows more music ahead
+    const look = (w * 0.85) / pxPerSec; // seconds of music from the hit line to the right edge
     const [lo, hi] = this.vocalRange(t, look + 1.5);
     const second = (chart.lyrics2 || []).length > 0; // harmony charts: the other voices' own words get a line above the chart
     const secondSize = Math.max(15, Math.min(26, h * 0.08));

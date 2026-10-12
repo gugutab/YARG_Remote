@@ -263,5 +263,5 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - The instrument tag of each window sits in its top right corner (it was top left) and its menu opens right-aligned under it (`syncPaneTags`, no `align-left` on `#paneMenu`).
 - The instrument tags are more see-through: background 0.3 normally, 0.55 on hover or when open.
 - 3D fretboard overlays (star power, solos, fills, rolls) are no longer cut at the hit line: the band runs down to the end of the board (`ROAD_NEAR`).
-- Neck speed also works on the vocal chart: the window shows `BASE_LOOKAHEAD_SEC / (neck / global neck)` seconds, so the default looks as before.
+- Neck speed also works on the vocal chart, and the vocal speed is fixed in pixels: `VOCAL_PX_PER_SEC` (340 px/s, a 1000 px window shows 2.5 s) times `neck / global neck`; a wider window shows more music ahead, a narrower one less.
 - The instrument tags show only the icon and the arrow; the name (with the difficulty) is the tooltip and the aria-label.
