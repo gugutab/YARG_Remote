@@ -1479,6 +1479,16 @@ els.seek.addEventListener('input', () => {
   els.timeNow.textContent = fmt(Number(els.seek.value));
 });
 els.seek.addEventListener('change', () => { previewStop = null; player.seek(Number(els.seek.value)); seeking = false; });
+// The mouse wheel over the seek bar moves the song: up goes forward, down goes back, 5 s per notch (1 s with Shift).
+els.seekbox.addEventListener('wheel', (e) => {
+  if (!ready) return;
+  e.preventDefault(); // (the page would otherwise scroll or zoom)
+  const delta = e.deltaY || e.deltaX; // with Shift some browsers report the wheel as horizontal
+  const notches = -delta / (e.deltaMode === 1 ? 3 : 100); // a notch is 100 px or 3 lines; smooth touchpads give fractions
+  const to = Math.max(0, Math.min(player.duration, player.currentTime() + notches * (e.shiftKey ? 1 : 5)));
+  previewStop = null;
+  player.seek(to);
+}, { passive: false });
 
 async function togglePlay() {
   if (!chart) return;
