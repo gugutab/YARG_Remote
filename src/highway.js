@@ -249,6 +249,20 @@ export class Highway {
     if (lanes.length > per) this.drawPaneDots(lanes.length, per, w, h);
   }
 
+  // An offscreen canvas for one fretboard (its size in device pixels), reused between panes and frames.
+  layerFor(pw, ph, dpr) {
+    const lw = Math.max(1, Math.round(pw * dpr));
+    const lh = Math.max(1, Math.round(ph * dpr));
+    this.layer ??= document.createElement('canvas');
+    if (this.layer.width !== lw || this.layer.height !== lh) { this.layer.width = lw; this.layer.height = lh; }
+    return this.layer;
+  }
+
+  // Colour stops for an edge fade: while a fretboard is drawn on its own layer the fade erases (alpha), otherwise it paints the stage colour.
+  fadeStyle(a) {
+    return this.layered ? `rgba(0,0,0,${a})` : `rgba(${this.bgRgb},${a})`;
+  }
+
   // The height of the vocal band: the default, or what the user dragged it to (kept within sensible limits).
   bandHeight(h, fallback) {
     const base = this.vocalH ?? fallback;
@@ -323,6 +337,24 @@ export class Highway {
     if (pane.chart.mode === 'vocals') {
       if (this.vocalView === 'karaoke') this.renderKaraoke(t, pw, ph, pane);
       else this.renderVocals(t, pw, ph);
+    } else if (this.visualizer) { // a visualizer is behind: the fades must make the board transparent, not paint the stage colour over it
+      const main = g;
+      const dpr = this.canvas.width / (this.canvas.clientWidth || 1);
+      const layer = this.layerFor(pw, ph, dpr);
+      const lg = layer.getContext('2d');
+      lg.setTransform(1, 0, 0, 1, 0, 0);
+      lg.clearRect(0, 0, layer.width, layer.height);
+      lg.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.g = lg;
+      this.layered = true;
+      try {
+        if (this.view === '3d') renderLanes3D(this, t, pw, ph);
+        else this.renderLanes(t, pw, ph);
+      } finally {
+        this.g = main;
+        this.layered = false;
+      }
+      main.drawImage(layer, 0, 0, layer.width, layer.height, 0, 0, pw, ph);
     } else if (this.view === '3d') renderLanes3D(this, t, pw, ph);
     else this.renderLanes(t, pw, ph);
     pane.vRange = this.vRange;
@@ -1027,17 +1059,21 @@ export class Highway {
     const fadeStart = Math.max(hitY + radius * 1.05, h - bottomFade);
     if (h - fadeStart > 2) {
       const bf = g.createLinearGradient(0, fadeStart, 0, h);
-      for (const [at, a] of [[0, 0], [0.3, 0.2], [0.6, 0.6], [0.85, 0.92], [1, 1]]) bf.addColorStop(at, `rgba(${this.bgRgb},${a})`);
+      for (const [at, a] of [[0, 0], [0.3, 0.2], [0.6, 0.6], [0.85, 0.92], [1, 1]]) bf.addColorStop(at, this.fadeStyle(a));
+      g.globalCompositeOperation = this.layered ? 'destination-out' : 'source-over';
       g.fillStyle = bf;
       g.fillRect(0, fadeStart, w, h - fadeStart);
+      g.globalCompositeOperation = 'source-over';
     }
 
     // the board and the notes entering from the top dissolve into the background (an eased fade)
     const fadeH = h * 0.2;
     const fade = g.createLinearGradient(0, 0, 0, fadeH);
-    for (const [at, a] of [[0, 1], [0.25, 0.85], [0.5, 0.5], [0.75, 0.17], [1, 0]]) fade.addColorStop(at, `rgba(${this.bgRgb},${a})`);
+    for (const [at, a] of [[0, 1], [0.25, 0.85], [0.5, 0.5], [0.75, 0.17], [1, 0]]) fade.addColorStop(at, this.fadeStyle(a));
+    g.globalCompositeOperation = this.layered ? 'destination-out' : 'source-over';
     g.fillStyle = fade;
     g.fillRect(0, 0, w, fadeH);
+    g.globalCompositeOperation = 'source-over';
   }
 
   // Vocals: pitch on the vertical axis, time on the horizontal axis. Lead notes are bars, harmonies

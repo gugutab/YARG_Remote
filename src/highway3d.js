@@ -302,16 +302,20 @@ export function renderLanes3D(hw, t, w, h) {
   const padBottom = hitY + padRy;
   if (h - padBottom > 2) {
     const bf = g.createLinearGradient(0, padBottom, 0, h);
-    for (const [at, a] of [[0, 0], [0.3, 0.2], [0.6, 0.6], [0.85, 0.92], [1, 1]]) bf.addColorStop(at, `rgba(${hw.bgRgb},${a})`);
+    for (const [at, a] of [[0, 0], [0.3, 0.2], [0.6, 0.6], [0.85, 0.92], [1, 1]]) bf.addColorStop(at, hw.fadeStyle(a));
+    g.globalCompositeOperation = hw.layered ? 'destination-out' : 'source-over';
     g.fillStyle = bf;
     g.fillRect(0, padBottom, w, h - padBottom);
+    g.globalCompositeOperation = 'source-over';
   }
 
   // far edge fades into the background
   // (an eased fade, so the board dissolves instead of ending in a visible edge)
   const fadeH = h * 0.42;
   const grad = g.createLinearGradient(0, 0, 0, fadeH);
-  for (const [at, a] of [[0, 1], [0.2, 0.95], [0.4, 0.78], [0.6, 0.48], [0.8, 0.18], [0.92, 0.05], [1, 0]]) grad.addColorStop(at, `rgba(${hw.bgRgb},${a})`);
+  for (const [at, a] of [[0, 1], [0.2, 0.95], [0.4, 0.78], [0.6, 0.48], [0.8, 0.18], [0.92, 0.05], [1, 0]]) grad.addColorStop(at, hw.fadeStyle(a));
+  g.globalCompositeOperation = hw.layered ? 'destination-out' : 'source-over';
   g.fillStyle = grad;
   g.fillRect(0, 0, w, fadeH);
+  g.globalCompositeOperation = 'source-over';
 }
