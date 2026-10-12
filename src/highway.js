@@ -895,6 +895,9 @@ export class Highway {
       g.fillRect(x0, y, laneW * chart.lanes, b.measure ? 2 : 1);
     }
 
+    // the track: a mostly opaque base, so a background visualizer shows only faintly through it
+    g.fillStyle = `rgba(${this.bgRgb},0.86)`;
+    g.fillRect(x0, 0, laneW * chart.lanes, h);
     // lane guides
     g.fillStyle = 'rgba(255,255,255,0.04)';
     for (let i = 0; i < chart.lanes; i++) {

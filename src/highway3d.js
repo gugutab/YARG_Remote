@@ -73,7 +73,10 @@ export function renderLanes3D(hw, t, w, h) {
     }
   };
 
-  // road
+  // road: a mostly opaque base first, so a background visualizer shows only faintly through the track
+  g.fillStyle = `rgba(${hw.bgRgb},0.86)`;
+  quad(ROAD_NEAR, ROAD_END, -half, half);
+  g.fill();
   g.fillStyle = 'rgba(255,255,255,0.045)';
   quad(ROAD_NEAR, ROAD_END, -half, half);
   g.fill();
