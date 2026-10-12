@@ -1951,6 +1951,28 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ---------- Frame loop (started once) ----------
+// Jumps in the song (seeking, a section, a lyric line) are animated on the fretboards: the notes rush past to the new place
+// instead of the chart snapping there. Only what the highway draws is eased; the clock, the sections and the audio use the real time.
+let vis = { shown: null, last: null, anim: null, chart: null };
+const SEEK_JUMP_SEC = 0.75; // a bigger step between two frames than playback or a drag can make
+function visualChartTime(ct) {
+  const now = performance.now();
+  if (!prefs.get('highway.seekAnimation') || vis.chart !== chart || vis.last === null) {
+    vis = { shown: ct, last: ct, anim: null, chart };
+    return ct;
+  }
+  if (Math.abs(ct - vis.last) > SEEK_JUMP_SEC) { // a jump: ease from where the chart is shown now
+    const from = vis.anim ? vis.shown : vis.last;
+    vis.anim = { from, t0: now, dur: Math.min(700, 280 + Math.abs(ct - from) * 25) }; // longer for longer jumps, 0.7 s at most
+  }
+  vis.last = ct;
+  if (vis.anim) {
+    const p = (now - vis.anim.t0) / vis.anim.dur;
+    if (p >= 1) { vis.anim = null; vis.shown = ct; } else vis.shown = vis.anim.from + (ct - vis.anim.from) * (1 - (1 - p) ** 3); // ease-out: fast, then settles
+  } else vis.shown = ct;
+  return vis.shown;
+}
+
 function frame() {
   if (current && chart) {
     const t = player.currentTime();
@@ -1963,7 +1985,7 @@ function frame() {
       syncPlayButton();
     }
     const chartTime = t - settings.chartDelay;
-    highway.render(chartTime);
+    highway.render(visualChartTime(chartTime));
     syncPaneTags();
     const index = chart.sections.length ? sectionIndexAt(chart.sections, chartTime) : -1;
     if (index >= 0) setActiveSection(index);

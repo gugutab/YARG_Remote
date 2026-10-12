@@ -91,6 +91,7 @@ export const SECTIONS = [
       { id: 'highway.paneMin', type: 'range', label: 'Narrowest fretboard', help: 'With several fretboards on screen, each one gets at least this width; the others wait outside (swipe, or [ and ]).', min: 200, max: 600, step: 20, unit: 'px', default: 280 },
       { id: 'highway.countdown', type: 'toggle', label: 'Wait countdowns', help: 'While an instrument has nothing to play for 9 s or more, show the seconds until its next note.', default: true },
       { id: 'highway.lyricsAbove', type: 'range', label: 'Lyrics above the line being sung', help: 'How much of the lyric sheets (karaoke) shows the lines before the current one, as a share of their height.', min: 0, max: 40, step: 1, unit: '%', default: 12 },
+      { id: 'highway.seekAnimation', type: 'toggle', label: 'Animate jumps in the song', help: 'When you seek or jump to a section, the notes scroll to the new place instead of snapping.', default: true },
       { id: 'highway.neck', type: 'range', label: 'Starting neck speed', help: 'Only the spacing of the notes, not the music speed.', min: 0.5, max: 3, step: 0.1, unit: '×', default: 1.2 },
       { id: 'highway.barHidden', type: 'choice', label: 'Top bar at startup', options: [{ value: 'shown', label: 'Shown' }, { value: 'hidden', label: 'Hidden' }, { value: 'last', label: 'As I left it' }], default: 'last' },
     ],
