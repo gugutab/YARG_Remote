@@ -1231,7 +1231,7 @@ function mixerRow(st) {
 }
 
 // One slider for a whole instrument (it scales every member), with a button that shows the individual sliders.
-function groupBlock(g) {
+function groupBlock(g, own = null) { // own: the instrument menu keeps its own open/closed state for the tracks ({ open, toggle })
   const block = document.createElement('div');
   block.className = 'mix-group';
   const row = document.createElement('div');
@@ -1257,7 +1257,11 @@ function groupBlock(g) {
     applyGroup(g);
   });
   row.querySelector('.reset').addEventListener('click', () => { g.value = 1; unmuteGroup(g); applyGroup(g); });
-  expand.addEventListener('click', () => { g.expanded = !g.expanded; renderGroup(g); });
+  if (own) view.own = own.open; // this view opens and closes on its own, not with the Stem volume card
+  expand.addEventListener('click', () => {
+    if (own) { view.own = !view.own; own.toggle(view.own); } else g.expanded = !g.expanded;
+    renderGroup(g);
+  });
   block.append(row, kids);
   return block;
 }
@@ -1284,9 +1288,10 @@ function renderGroup(g) {
     v.mute.setAttribute('aria-label', `${muted ? 'Unmute' : 'Mute'} ${g.label}`);
     v.range.setAttribute('aria-label', `${g.label} volume`);
     v.reset.disabled = g.value === 1 && !muted;
-    v.kids.hidden = !g.expanded;
-    v.expand.setAttribute('aria-expanded', String(g.expanded));
-    v.expand.title = g.expanded ? 'Collapse tracks' : 'Show each track';
+    const open = v.own ?? g.expanded;
+    v.kids.hidden = !open;
+    v.expand.setAttribute('aria-expanded', String(open));
+    v.expand.title = open ? 'Collapse tracks' : 'Show each track';
     v.expand.setAttribute('aria-label', v.expand.title);
   }
 }
@@ -1708,7 +1713,12 @@ function menuVolume(group) {
   const before = owners.map((o) => o.views.length);
   const wrap = document.createElement('div');
   wrap.className = 'mixer pm-mixer';
-  wrap.append(grouped ? groupBlock(grouped) : mixerRow(members[0]));
+  // The tracks of a group show only when their volumes differ (closed while they are all the same); the user can open them.
+  const same = members.every((m) => m.value === members[0].value && m.muted === members[0].muted);
+  current.menuExpand ??= {};
+  const own = grouped ? { open: current.menuExpand[group.key] ?? !same, toggle: (v) => { current.menuExpand[group.key] = v; } } : null;
+  wrap.append(grouped ? groupBlock(grouped, own) : mixerRow(members[0]));
+  if (grouped) renderGroup(grouped);
   menuMixViews = owners.map((owner, i) => ({ owner, added: owner.views.slice(before[i]) }));
   return wrap;
 }
