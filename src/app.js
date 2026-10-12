@@ -2277,9 +2277,10 @@ function frame() {
     const index = chart.sections.length ? sectionIndexAt(chart.sections, chartTime) : -1;
     if (index >= 0) setActiveSection(index);
     if (!seeking) {
-      els.seek.value = t;
+      const barT = Math.max(0, Math.min(player.duration, shownTime + settings.chartDelay)); // the eased time: the thumb rushes along with the fretboards after a seek
+      els.seek.value = barT;
       paintSeek();
-      els.timeNow.textContent = fmt(t);
+      els.timeNow.textContent = fmt(barT);
     }
     if (infoOpen) { // the Listen card
       if (document.activeElement !== els.npSeek) els.npSeek.value = t;

@@ -241,3 +241,4 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - Add all: the instrument chooser has an "Add all" button (when 2+ instruments are off screen) that pins every one of them at once, each with the type and difficulty its card shows (`addAllInto`).
 - Vocal track: with a visualizer on, the vocal band (chart, karaoke) and the lyric area under it get a semi-transparent stage-colour base (`trackBase`, 0.72) so notes and words read well; no change without a visualizer.
 - Lyric sheet fades with a visualizer: the rows are drawn on their own layer (`rowLayer`) and the top/bottom fades erase only the words; the rail and the jump button are drawn after, on the stage. Without a visualizer the stage-colour fade is unchanged.
+- Seek bar thumb and the time counter follow the eased time of the seek animation (`shownTime + chartDelay` in `frame()`), so they rush along with the fretboards; the audio clock and the loop use the real time.
