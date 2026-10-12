@@ -28,7 +28,7 @@ export function renderLanes3D(hw, t, w, h) {
   const roadW = portrait ? w * 0.94 : Math.min(w * 0.62, h * 1.05); // road width at the hit line
   const laneW = roadW / lanes;
   const padRy = laneW * HEAD_R * 1.05 * HEAD_TILT; // vertical radius of the hit pads
-  const hitY = h - (padRy + 26); // hit line (the pads): the 26 px below them hold the bottom fade
+  const hitY = h - (padRy + 80); // hit line (the pads): the 80 px below them hold the bottom fade
   const cx = w / 2;
   const windowSec = DEPTH_SEC / hw.neck; // neck speed shortens or stretches the visible time
   const k = 1 / FAR_SCALE - 1;
@@ -306,6 +306,12 @@ export function renderLanes3D(hw, t, w, h) {
     g.globalCompositeOperation = 'source-over';
   }
 
+  // the board's neutral dark base, as opaque as the setting says: behind the notes and the guides, and not faded at the edges
+  g.globalCompositeOperation = 'destination-over';
+  g.fillStyle = `rgba(0,0,0,${hw.trackOpacity})`;
+  quad(ROAD_NEAR, ROAD_END, -half, half);
+  g.fill();
+  g.globalCompositeOperation = 'source-over';
   // far edge fades into the background
   // (an eased fade, so the board dissolves instead of ending in a visible edge)
   const fadeH = h * 0.42;
@@ -313,11 +319,5 @@ export function renderLanes3D(hw, t, w, h) {
   for (const [at, a] of [[0, 1], [0.2, 0.95], [0.4, 0.78], [0.6, 0.48], [0.8, 0.18], [0.92, 0.05], [1, 0]]) grad.addColorStop(at, hw.fadeStyle(a));
   g.globalCompositeOperation = hw.layered ? 'destination-out' : 'source-over';
   g.fillStyle = grad;
-  g.fillRect(0, 0, w, fadeH);
-  // the board's neutral dark base, as opaque as the setting says: behind the notes and the guides, and not faded at the edges
-  g.globalCompositeOperation = 'destination-over';
-  g.fillStyle = `rgba(0,0,0,${hw.trackOpacity})`;
-  quad(ROAD_NEAR, ROAD_END, -half, half);
-  g.fill();
-  g.globalCompositeOperation = 'source-over';
+  g.fillRect(0, 0, w, fadeH);  g.globalCompositeOperation = 'source-over';
 }

@@ -1085,7 +1085,7 @@ export class Highway {
     g.globalAlpha = 1;
 
     // a very short fade at the bottom: the board dissolves right below the pads
-    const bottomFade = Math.min(h - hitY, radius * 1.05 + 28);
+    const bottomFade = Math.min(h - hitY, radius * 1.05 + 80);
     const fadeStart = Math.max(hitY + radius * 1.05, h - bottomFade);
     if (h - fadeStart > 2) {
       const bf = g.createLinearGradient(0, fadeStart, 0, h);
@@ -1096,6 +1096,11 @@ export class Highway {
       g.globalCompositeOperation = 'source-over';
     }
 
+    // the board's neutral dark base, as opaque as the setting says: behind the notes and the guides, and not faded at the edges
+    g.globalCompositeOperation = 'destination-over';
+    g.fillStyle = `rgba(0,0,0,${this.trackOpacity})`;
+    g.fillRect(x0, 0, laneW * chart.lanes, h);
+    g.globalCompositeOperation = 'source-over';
     // the board and the notes entering from the top dissolve into the background (an eased fade)
     const fadeH = h * 0.2;
     const fade = g.createLinearGradient(0, 0, 0, fadeH);
@@ -1103,10 +1108,6 @@ export class Highway {
     g.globalCompositeOperation = this.layered ? 'destination-out' : 'source-over';
     g.fillStyle = fade;
     g.fillRect(0, 0, w, fadeH);
-    // the board's neutral dark base, as opaque as the setting says: behind the notes and the guides, and not faded at the edges
-    g.globalCompositeOperation = 'destination-over';
-    g.fillStyle = `rgba(0,0,0,${this.trackOpacity})`;
-    g.fillRect(x0, 0, laneW * chart.lanes, h);
     g.globalCompositeOperation = 'source-over';
   }
 
