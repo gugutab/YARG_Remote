@@ -960,9 +960,6 @@ export class Highway {
       g.fillRect(x0, y, laneW * chart.lanes, b.measure ? 2 : 1);
     }
 
-    // the board: a neutral dark base (not the stage colour), as opaque as the setting says
-    g.fillStyle = `rgba(0,0,0,${this.trackOpacity})`;
-    g.fillRect(x0, 0, laneW * chart.lanes, h);
     // lane guides
     g.fillStyle = 'rgba(255,255,255,0.04)';
     for (let i = 0; i < chart.lanes; i++) {
@@ -1106,6 +1103,10 @@ export class Highway {
     g.globalCompositeOperation = this.layered ? 'destination-out' : 'source-over';
     g.fillStyle = fade;
     g.fillRect(0, 0, w, fadeH);
+    // the board's neutral dark base, as opaque as the setting says: behind the notes and the guides, and not faded at the edges
+    g.globalCompositeOperation = 'destination-over';
+    g.fillStyle = `rgba(0,0,0,${this.trackOpacity})`;
+    g.fillRect(x0, 0, laneW * chart.lanes, h);
     g.globalCompositeOperation = 'source-over';
   }
 
@@ -1134,10 +1135,10 @@ export class Highway {
     const trackA = 0.3 * st.k; // (the 0.15 layer under it is not drawn while it is hidden either)
     this.trackBase(0, 0, w, h, 0.15 * st.k);
     if (trackA > 0.004) {
-      const mid1 = lyricY - fontSize * 0.33; // the middle of the letters (the baseline is lyricY)
+      const mid1 = lyricY; // the middle of the letters (they are drawn with a middle baseline)
       this.trackBase(0, mid1 - fontSize * 0.75, w, fontSize * 1.5, trackA);
       if (second) {
-        const mid2 = secondY - secondSize * 0.33;
+        const mid2 = secondY;
         this.trackBase(0, Math.max(0, mid2 - secondSize * 0.75), w, secondSize * 1.5, trackA);
       }
     }

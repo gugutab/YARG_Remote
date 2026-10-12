@@ -73,10 +73,7 @@ export function renderLanes3D(hw, t, w, h) {
     }
   };
 
-  // road: a neutral dark base first, as opaque as the setting says
-  g.fillStyle = `rgba(0,0,0,${hw.trackOpacity})`;
-  quad(ROAD_NEAR, ROAD_END, -half, half);
-  g.fill();
+  // road (its dark base is added at the very end, behind everything, so the edge fades do not thin it)
   g.fillStyle = 'rgba(255,255,255,0.045)';
   quad(ROAD_NEAR, ROAD_END, -half, half);
   g.fill();
@@ -317,5 +314,10 @@ export function renderLanes3D(hw, t, w, h) {
   g.globalCompositeOperation = hw.layered ? 'destination-out' : 'source-over';
   g.fillStyle = grad;
   g.fillRect(0, 0, w, fadeH);
+  // the board's neutral dark base, as opaque as the setting says: behind the notes and the guides, and not faded at the edges
+  g.globalCompositeOperation = 'destination-over';
+  g.fillStyle = `rgba(0,0,0,${hw.trackOpacity})`;
+  quad(ROAD_NEAR, ROAD_END, -half, half);
+  g.fill();
   g.globalCompositeOperation = 'source-over';
 }
