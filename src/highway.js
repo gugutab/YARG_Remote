@@ -287,7 +287,7 @@ export class Highway {
     const g = this.g;
     const hot = this.hover && this.hover.type === d.type && this.hover.a === d.a && this.hover.b === d.b;
     this.dividers.push(d);
-    g.fillStyle = hot ? 'rgba(108,182,255,0.9)' : 'rgba(0,0,0,0.25)';
+    g.fillStyle = hot ? 'rgba(108,182,255,0.9)' : 'rgba(0,0,0,0.1)';
     if (d.type === 'row') g.fillRect(0, d.y, d.w, hot ? 3 : 1);
     else g.fillRect(d.x - (hot ? 1 : 0), d.y, hot ? 3 : 1, d.h);
   }
