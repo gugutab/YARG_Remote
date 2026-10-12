@@ -59,8 +59,7 @@ export class Highway {
     this.paneMin = 280; // narrowest a fretboard may get before the others move out of view (swipe to bring them in)
     this.focus = 0; // first fretboard in view when they do not all fit
     this.perScreen = 1;
-    this.sheetRect = null; // where the lyric sheet is (canvas coordinates), when it is on screen
-    this.sheetManual = 0; // lines the user scrolled away from the singer
+    this.sheets = []; // the lyric sheets on screen this frame: { x, y, w, h, step, hits, state } (canvas coordinates)
     this.vocalView = 'track'; // 'track' (notes + lyrics) or 'karaoke' (the lyrics alone)
   }
 
@@ -136,8 +135,7 @@ export class Highway {
     g.fillStyle = this.bg;
     g.fillRect(0, 0, w, h);
 
-    this.sheetRect = null;
-    this.sheetHits = [];
+    this.sheets = [];
     if (!this.panes.length) return; // the page shows its own welcome / loading overlay
     const vocal = this.panes.find((p) => p.chart.mode === 'vocals');
     const lanes = this.panes.filter((p) => p.chart.mode !== 'vocals');
@@ -155,7 +153,7 @@ export class Highway {
         g.rect(0, vh, w, h - vh);
         g.clip();
         g.translate(0, vh);
-        this.renderLyricSheet(t, w, h - vh, vocal, vh);
+        this.renderLyricSheet(t, w, h - vh, this.karaokeLines(vocal, 'main'), this.sheetState(vocal, 'main'), 0, vh);
         g.restore();
       }
       this.vocalAlone = false;
@@ -269,23 +267,36 @@ export class Highway {
     g.textBaseline = 'alphabetic';
   }
 
-  karaokeLines(pane) {
-    pane.karaoke ??= buildKaraokeLines(pane.chart.lyrics || [], pane.chart.phrases);
-    return pane.karaoke;
+  // Lines of a lyric list, cached per pane. 'main' = the merged static lyrics (YARG's), 'v1' = the lead voice's own words,
+  // 'v2' = the other voices' own words (harmony charts).
+  karaokeLines(pane, key = 'main') {
+    pane.kl ??= {};
+    if (!pane.kl[key]) {
+      const c = pane.chart;
+      pane.kl[key] = key === 'v2' ? buildKaraokeLines(c.lyrics2 || [])
+        : key === 'v1' ? buildKaraokeLines(c.lyrics1?.length ? c.lyrics1 : c.lyrics || [])
+          : buildKaraokeLines(c.lyrics || [], c.phrases);
+    }
+    return pane.kl[key];
   }
 
-  // The lyrics as a sheet that scrolls: it follows the line being sung (the current line is filled as it goes and bigger);
-  // wheel / drag moves it by hand, and it glides back to the singer a few seconds after you stop. Clicking a line seeks to it.
-  renderLyricSheet(t, w, h, pane, yOff = 0) {
+  sheetState(pane, key) {
+    pane.ss ??= {};
+    return (pane.ss[key] ??= { pos: null, manual: 0, touched: 0, at: 0 });
+  }
+
+  // A lyric sheet that scrolls, drawn at the current origin of the canvas (which sits at x0, y0 of the whole canvas): it
+  // follows the line being sung (that line is filled as it goes, and bigger); wheel / drag moves it by hand and it glides
+  // back to the singer a few seconds after you stop. Clicking a line seeks to it.
+  renderLyricSheet(t, w, h, lines, state, x0 = 0, y0 = 0) {
     const g = this.g;
-    const lines = this.karaokeLines(pane);
-    this.sheetRect = { y: yOff, h };
-    this.sheetHits = [];
+    const sheet = { x: x0, y: y0, w, h, step: 0, hits: [], state };
+    this.sheets.push(sheet);
     if (!lines.length) {
       g.font = '600 16px system-ui';
       g.textAlign = 'center';
       g.fillStyle = 'rgba(255,255,255,0.5)';
-      g.fillText('No lyrics in this chart', w / 2, h / 2);
+      g.fillText('No lyrics here', w / 2, h / 2);
       return;
     }
     let idx = -1;
@@ -293,63 +304,106 @@ export class Highway {
     const singing = idx >= 0 && t <= lines[idx].end + 2.5;
     const first = singing ? idx : idx + 1;
     const now = performance.now();
-    if (this.sheetManual && now - this.sheetTouched > 3500) this.sheetManual = 0; // back to following the singer
-    const target = Math.max(0, Math.min(lines.length - 1, first + this.sheetManual));
-    const dt = Math.min(0.25, (now - (this.sheetAt || now)) / 1000);
-    this.sheetAt = now;
-    if (this.sheetPos == null || !Number.isFinite(this.sheetPos) || Math.abs(target - this.sheetPos) > 40) this.sheetPos = target;
-    else this.sheetPos += (target - this.sheetPos) * (1 - Math.exp(-dt / 0.12));
+    if (state.manual && now - state.touched > 3500) state.manual = 0; // back to following the singer
+    const target = Math.max(0, Math.min(lines.length - 1, first + state.manual));
+    const dt = Math.min(0.25, (now - (state.at || now)) / 1000);
+    state.at = now;
+    if (state.pos == null || !Number.isFinite(state.pos) || Math.abs(target - state.pos) > 40) state.pos = target;
+    else state.pos += (target - state.pos) * (1 - Math.exp(-dt / 0.12));
     const big = Math.max(18, Math.min(h * 0.16, 46, w * 0.06));
     const small = Math.max(14, big * 0.72);
     const step = Math.max(small * 1.55, big * 1.15);
-    this.sheetStep = step;
+    sheet.step = step;
     const top = big * 0.95;
-    const from = Math.max(0, Math.floor(this.sheetPos) - 1);
+    const from = Math.max(0, Math.floor(state.pos) - 1);
     for (let i = from; i < lines.length; i++) {
-      const y = top + (i - this.sheetPos) * step;
+      const y = top + (i - state.pos) * step;
       if (y - step / 2 > h) break;
       if (y - small * 0.6 < 0) continue; // a row cut by the top edge would look broken
       const cur = singing && i === idx;
       const past = i < first ? 0.3 : Math.max(0.3, 0.7 - Math.max(0, i - first) * 0.06);
       this.drawKaraokeLine(lines[i], cur ? big : small, w, y, cur ? 0.95 : past, cur ? t : null);
-      this.sheetHits.push({ y: y + yOff, half: step / 2, time: lines[i].start });
+      sheet.hits.push({ y: y + y0, half: step / 2, time: lines[i].start });
     }
   }
 
-  // Wheel / drag over the sheet (`lines` = how many lines to move).
-  scrollSheet(lines) {
-    if (!this.sheetRect) return;
-    this.sheetManual = (this.sheetManual || 0) + lines;
-    this.sheetTouched = performance.now();
+  // The sheet under the canvas point (x, y), or null.
+  sheetAt(x, y) {
+    return this.sheets.find((s) => x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h) ?? null;
   }
 
-  // Is the canvas point (x, y) over the lyric sheet?
-  overSheet(y) {
-    return !!this.sheetRect && y >= this.sheetRect.y && y < this.sheetRect.y + this.sheetRect.h;
+  // Wheel / drag over a sheet (`lines` = how many lines to move).
+  scrollSheet(sheet, lines) {
+    sheet.state.manual = (sheet.state.manual || 0) + lines;
+    sheet.state.touched = performance.now();
   }
 
-  // The start time (chart seconds) of the lyric line drawn at canvas height y, or null.
-  sheetLineAt(y) {
-    const hit = (this.sheetHits || []).find((r) => Math.abs(y - r.y) <= r.half);
+  // The start time (chart seconds) of the lyric line drawn at canvas height y in a sheet, or null.
+  sheetLineAt(sheet, y) {
+    const hit = sheet.hits.find((r) => Math.abs(y - r.y) <= r.half);
     return hit ? hit.time : null;
   }
 
-  // Karaoke: only the lyrics. Alone, they fill the stage as a sheet; next to other charts the line being sung and the next one.
+  // Karaoke: only the lyrics. Alone, they fill the stage as a sheet (two sheets, vocal 1 and vocal 2, when the harmony
+  // voices have words of their own); next to other charts, the line being sung (one per voice).
   renderKaraoke(t, w, h, pane) {
     const g = this.g;
+    const split = (pane.chart.lyrics2 || []).length > 0;
     if (this.vocalAlone) {
-      this.renderLyricSheet(t, w, h, pane, 0);
+      if (!split) {
+        this.renderLyricSheet(t, w, h, this.karaokeLines(pane, 'main'), this.sheetState(pane, 'main'), 0, 0);
+        return;
+      }
+      // two sheets side by side on a wide stage, one above the other on a narrow one
+      const cols = w >= 760 && w >= h * 1.1;
+      const caption = (text, x, y) => {
+        g.font = '700 12px system-ui';
+        g.textAlign = 'left';
+        g.textBaseline = 'middle';
+        g.fillStyle = 'rgba(255,255,255,0.45)';
+        g.fillText(text, x, y);
+        g.textBaseline = 'alphabetic';
+      };
+      const parts = [['v1', 'VOCAL 1'], ['v2', 'VOCAL 2']];
+      parts.forEach(([key, name], k) => {
+        const bw = cols ? w / 2 : w;
+        const bh = cols ? h : h / 2;
+        const bx = cols ? k * bw : 0;
+        const by = cols ? 0 : k * bh;
+        g.save();
+        g.beginPath();
+        g.rect(bx, by, bw, bh);
+        g.clip();
+        g.translate(bx, by);
+        this.renderLyricSheet(t, bw, bh, this.karaokeLines(pane, key), this.sheetState(pane, key), bx, by);
+        caption(name, 12, 14);
+        g.restore();
+      });
+      g.fillStyle = 'rgba(255,255,255,0.12)';
+      if (cols) g.fillRect(Math.round(w / 2), 0, 1, h);
+      else g.fillRect(0, Math.round(h / 2), w, 1);
       return;
     }
-    const lines = this.karaokeLines(pane);
-    if (!lines.length) {
+    const keys = split ? ['v1', 'v2'] : ['main'];
+    const rows = keys.map((k) => this.karaokeLines(pane, k));
+    if (rows.every((l) => !l.length)) {
       g.font = '600 16px system-ui';
       g.textAlign = 'center';
       g.fillStyle = 'rgba(255,255,255,0.5)';
       g.fillText('No lyrics in this chart', w / 2, h / 2);
       return;
     }
-    const { current, next } = karaokeAt(lines, t);
+    if (split) { // one line per voice: the one being sung, or the next one when it is near
+      const big = Math.max(16, Math.min(h * 0.16, 40, w * 0.06));
+      rows.forEach((lines, k) => {
+        const { current, next } = karaokeAt(lines, t);
+        const cy = h * (k === 0 ? 0.3 : 0.72);
+        if (current) this.drawKaraokeLine(current, big, w, cy, 0.95, t);
+        else if (next) this.drawKaraokeLine(next, big * 0.8, w, cy, 0.6, null);
+      });
+      return;
+    }
+    const { current, next } = karaokeAt(rows[0], t);
     const big = Math.max(18, Math.min(h * 0.2, 54, w * 0.07));
     if (current) this.drawKaraokeLine(current, big, w, h * 0.42, 0.95, t);
     if (next) this.drawKaraokeLine(next, big * 0.72, w, current ? h * 0.74 : h * 0.5, current ? 0.55 : 0.8, null);
@@ -537,9 +591,11 @@ export class Highway {
     const hitX = w * 0.15;
     const pxPerSec = (w * 0.85) / BASE_LOOKAHEAD_SEC;
     const [lo, hi] = this.vocalRange(t, BASE_LOOKAHEAD_SEC + 1.5);
-    const second = (chart.lyrics2 || []).length > 0; // harmony charts: the other voices' own words get a second line
-    const top = h * 0.08; // pitch area: top 8% to 76% of the canvas (66% when there is a second lyric line)
-    const bottom = h * (second ? 0.66 : 0.76);
+    const second = (chart.lyrics2 || []).length > 0; // harmony charts: the other voices' own words get a line above the chart
+    const secondSize = Math.max(15, Math.min(26, h * 0.08));
+    const secondY = secondSize * 0.85 + 6;
+    const top = second ? secondY + secondSize * 0.75 : h * 0.08; // pitch area: below the second lyric line, if any, to 76% of the canvas
+    const bottom = h * 0.76;
     const yOfPitch = (p) => bottom - ((p - lo) / (hi - lo)) * (bottom - top);
     const mid = (top + bottom) / 2; // talkies (unpitched notes) sit in the middle of the pitch area
     const lyricY = bottom + h * 0.055; // lyrics sit right under the note area
@@ -621,7 +677,7 @@ export class Highway {
       }
     };
     lyricRow(second && chart.lyrics1?.length ? chart.lyrics1 : chart.lyrics, lyricY, fontSize, ['#ffffff', '#13f0a6', '#595959']); // with a second line, the first one is the lead's own words
-    if (second) lyricRow(chart.lyrics2, lyricY + fontSize * 1.05, fontSize * 0.85, ['#9fe3d0', '#2fd9c4', '#4b6b66']);
+    if (second) lyricRow(chart.lyrics2, secondY, secondSize, ['#9fe3d0', '#2fd9c4', '#4b6b66']); // the other voices, above the chart
     g.textBaseline = 'alphabetic';
   }
 

@@ -342,12 +342,15 @@ export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
     lyrics1 = lead.filter((l) => !l.hidden && l.text).map((l) => ({ time: l.time, end: l.end, text: l.text, join: l.join }));
     const sameAs = (list, l) => list.some((o) => o.text === l.text && Math.abs(o.time - l.time) < 0.2);
     for (const e of walkedExtra) {
-      for (const p of e.walked) {
-        for (const l of p.lyrics) {
-          if (l.hidden || !l.text || sameAs(lead, l) || sameAs(lyrics2, l)) continue;
-          lyrics2.push({ time: l.time, end: l.end, text: l.text, join: l.join, part: e.part });
-        }
-      }
+      const seq = e.walked.flatMap((p) => p.lyrics.filter((l) => !l.hidden && l.text)); // this voice's words, in order
+      const keep = seq.map((l) => !sameAs(lead, l) && !sameAs(lyrics2, l));
+      seq.forEach((l, k) => {
+        if (!keep[k]) return;
+        // A syllable only joins the next one when that one is shown too and close by (words the lead also sings are dropped).
+        const next = seq[k + 1];
+        const joined = l.join && next && keep[k + 1] && next.time - (l.end > l.time ? l.end : l.time) < 0.8;
+        lyrics2.push({ time: l.time, end: l.end, text: l.text, join: !!joined, part: e.part });
+      });
     }
     lyrics2.sort((x, y) => x.time - y.time);
   }

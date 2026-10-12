@@ -1534,17 +1534,20 @@ els.vocalChoice.addEventListener('click', (e) => { const b = e.target.closest('[
 
 // ---------- Several fretboards: swipe (or drag) sideways to bring the next one into view when they do not all fit ----------
 els.highway.style.touchAction = 'none'; // the stage does not scroll: the gestures are ours
-const canvasY = (e) => e.clientY - els.highway.getBoundingClientRect().top;
+const canvasPoint = (e) => {
+  const r = els.highway.getBoundingClientRect();
+  return [e.clientX - r.left, e.clientY - r.top];
+};
 let swipe = null;
 els.highway.addEventListener('pointerdown', (e) => {
-  swipe = { x: e.clientX, y: e.clientY, lastY: e.clientY, sheet: highway.overSheet(canvasY(e)), moved: 0 };
+  swipe = { x: e.clientX, y: e.clientY, lastY: e.clientY, sheet: highway.sheetAt(...canvasPoint(e)), moved: 0 };
 });
 els.highway.addEventListener('pointermove', (e) => {
   if (!swipe?.sheet) return;
   const dy = swipe.lastY - e.clientY; // dragging the lyrics up shows the next lines
   swipe.lastY = e.clientY;
   swipe.moved += Math.abs(dy);
-  if (swipe.moved > 6 && highway.sheetStep) highway.scrollSheet(dy / highway.sheetStep);
+  if (swipe.moved > 6 && swipe.sheet.step) highway.scrollSheet(swipe.sheet, dy / swipe.sheet.step);
 });
 els.highway.addEventListener('pointerup', (e) => {
   if (!swipe) return;
@@ -1552,8 +1555,8 @@ els.highway.addEventListener('pointerup', (e) => {
   swipe = null;
   if (sheet) { // a tap on a lyric line seeks to it
     if (moved <= 6 && ready) {
-      const time = highway.sheetLineAt(canvasY(e));
-      if (time !== null) { player.seek(Math.max(0, time + settings.chartDelay)); }
+      const time = highway.sheetLineAt(sheet, canvasPoint(e)[1]);
+      if (time !== null) player.seek(Math.max(0, time + settings.chartDelay));
     }
     return;
   }
@@ -1563,9 +1566,10 @@ els.highway.addEventListener('pointerup', (e) => {
 });
 els.highway.addEventListener('pointercancel', () => { swipe = null; });
 els.highway.addEventListener('wheel', (e) => { // the mouse wheel scrolls the lyrics when the pointer is over them
-  if (!highway.overSheet(canvasY(e)) || !highway.sheetStep) return;
+  const sheet = highway.sheetAt(...canvasPoint(e));
+  if (!sheet || !sheet.step) return;
   e.preventDefault();
-  highway.scrollSheet(e.deltaY / highway.sheetStep);
+  highway.scrollSheet(sheet, e.deltaY / sheet.step);
 }, { passive: false });
 
 // ---------- Note style: circles or rounded rectangles ----------
