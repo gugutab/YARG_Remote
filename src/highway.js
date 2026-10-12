@@ -348,7 +348,6 @@ export class Highway {
     this.curPane = pane;
     this.maxLength = pane.maxLength;
     this.vRange = pane.vRange;
-    if (pane.chart.mode === 'vocals' && this.vocalView === 'karaoke') this.trackBase(0, 0, pw, ph); // (the notes view draws its own, see renderVocals)
     if (pane.chart.mode === 'vocals') {
       if (this.vocalView === 'karaoke') this.renderKaraoke(t, pw, ph, pane);
       else this.renderVocals(t, pw, ph);
