@@ -503,15 +503,15 @@ export class Highway {
     const small = Math.max(14, big * 0.72);
     const step = Math.max(small * 1.55, big * 1.15);
     sheet.step = step;
-    const top = big * 0.95;
+    const top = small * 0.1 + step; // where the row in focus sits: the row before it is half above the top edge
     const badgeR = Math.max(14, Math.min(step * 0.38, 30));
     let seenFrom = Infinity;
     let seenTo = -Infinity; // the time range of the lines on screen, for the rail
-    const from = Math.max(0, Math.floor(state.pos) - 1);
+    const from = Math.max(0, Math.floor(state.pos) - 2);
     for (let r = from; r < rows.length; r++) {
       const y = top + (r - state.pos) * step;
       if (y - step / 2 > h) break;
-      if (y - small * 0.6 < 0) continue; // a row cut by the top edge would look broken
+      if (y + small * 0.7 < 0) continue; // only rows fully above the edge are skipped: the one before the focus shows its lower half
       const row = rows[r];
       if (row.type === 'cd') {
         const { start, end } = row.gap;
