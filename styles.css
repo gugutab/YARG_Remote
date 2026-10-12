@@ -1253,3 +1253,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .pane-menu .pm-range { display: grid; grid-template-columns: 1fr 52px 22px; align-items: center; gap: 6px; }
 .pane-menu .pm-range output { text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
 .pane-menu .pm-range .reset:disabled { opacity: .3; }
+
+/* The instrument tag shows only the icon and the arrow (the name is its tooltip and accessible label) */
+.pane-tag span { display: none; }
+.pane-tag { gap: 5px; padding: 0 8px; }

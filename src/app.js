@@ -1738,7 +1738,7 @@ function syncPaneTags() {
     }
     el.dataset.key = r.key;
     if (el._icon !== r.icon) { el.querySelector('use').setAttribute('href', `#i-${r.icon}`); el._icon = r.icon; }
-    if (el._label !== r.label) { el.querySelector('span').textContent = r.label; el._label = r.label; el._w = 0; }
+    if (el._label !== r.label) { el.querySelector('span').textContent = r.label; el.title = r.label; el.setAttribute('aria-label', r.label); el._label = r.label; el._w = 0; }
     if (!el._w) el._w = el.offsetWidth; // measured when the label changes, not every frame
     const tx = `translate(${Math.round(r.x + r.w - 8 - el._w)}px, ${Math.round(r.y + 8)}px)`; // the top right corner of its window
     if (el._tx !== tx) { el.style.transform = tx; el._tx = tx; }
