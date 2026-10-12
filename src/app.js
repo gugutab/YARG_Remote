@@ -1034,7 +1034,7 @@ async function jumpToSpecial(item, dir) {
   if (!(await ensureAudio())) return;
   const target = neighbourTime(item.times, player.currentTime() - settings.chartDelay, dir);
   if (target === null) return;
-  player.seek(Math.max(0, target - 1.5 + settings.chartDelay));
+  seekTo(Math.max(0, target - 1.5 + settings.chartDelay));
   if (infoOpen) setInfoOpen(false);
 }
 
@@ -1132,7 +1132,7 @@ function setActiveSection(index) {
 function seekToSection(i) {
   const section = chart?.sections[i];
   if (!section) return;
-  player.seek(Math.max(0, section.time + settings.chartDelay));
+  seekTo(Math.max(0, section.time + settings.chartDelay));
 }
 els.sectionSelect.addEventListener('change', () => seekToSection(Number(els.sectionSelect.value)));
 els.back.addEventListener('click', () => stepSection(-1));
@@ -1518,7 +1518,7 @@ els.seek.addEventListener('input', () => {
   seeking = true;
   els.timeNow.textContent = fmt(Number(els.seek.value));
 });
-els.seek.addEventListener('change', () => { previewStop = null; player.seek(Number(els.seek.value)); seeking = false; });
+els.seek.addEventListener('change', () => { previewStop = null; seekTo(Number(els.seek.value)); seeking = false; });
 // The mouse wheel over the seek bar moves the song: up goes forward, down goes back, 5 s per notch (1 s with Shift).
 els.seekbox.addEventListener('wheel', (e) => {
   if (!ready) return;
@@ -1527,7 +1527,7 @@ els.seekbox.addEventListener('wheel', (e) => {
   const notches = -delta / (e.deltaMode === 1 ? 3 : 100); // a notch is 100 px or 3 lines; smooth touchpads give fractions
   const to = Math.max(0, Math.min(player.duration, player.currentTime() + notches * (e.shiftKey ? 1 : 5)));
   previewStop = null;
-  player.seek(to);
+  seekTo(to);
 }, { passive: false });
 
 // ---------- Loop (A-B repeat) ----------
@@ -1570,7 +1570,7 @@ async function toggleLoop() {
 function rewindIntoLoop() {
   if (!loop || !ready || !player.playing) return;
   const now = player.currentTime();
-  if (now < loop.start || now >= loop.end) player.seek(loop.start);
+  if (now < loop.start || now >= loop.end) seekTo(loop.start);
 }
 function loopSectionRow(i) {
   const sec = sectionRange(sectionStartsPlayer(), i, seekMax());
@@ -1641,6 +1641,17 @@ els.seekbox.addEventListener('pointermove', (e) => {
   showSeekTip(e.clientX, t, name || 'Position');
 });
 els.seekbox.addEventListener('pointerleave', () => { if (!loopDrag) hideSeekTip(); });
+
+// A seek. While the song plays and the jump is long enough to be animated, the audio is not cut to the new place: it rushes
+// through the skipped stretch for as long as the fretboards take to get there (see scrub.js), then plays on. Paused, or with the
+// animation off, it is immediate.
+function seekTo(t) {
+  const dist = Math.abs(t - player.currentTime());
+  if (!ready || !player.playing || dist <= SEEK_JUMP_SEC || !prefs.get('highway.seekAnimation')) { player.seek(t); return; }
+  const ms = seekAnimMs(dist);
+  pendingSeekDur = ms;
+  player.scrubTo(t, ms);
+}
 
 async function togglePlay() {
   if (!chart) return;
@@ -1969,7 +1980,7 @@ els.highway.addEventListener('pointerdown', (e) => {
   if (back) { highway.resumeSheet(back); return; } // "Autoscroll"
   const play = highway.sheetPlayButtonAt(px, py);
   if (play) { // "Play from here"
-    if (ready) { player.seek(Math.max(0, play.playBtn.time + settings.chartDelay)); highway.resumeSheet(play); }
+    if (ready) { seekTo(Math.max(0, play.playBtn.time + settings.chartDelay)); highway.resumeSheet(play); }
     return;
   }
   const divider = highway.dividerAt(px, py, slopFor(e));
@@ -2203,8 +2214,8 @@ document.addEventListener('keydown', (e) => {
   else if (e.code === 'KeyN') setNoteStyle(highway.noteStyle === 'rect' ? 'round' : 'rect');
   else if (e.code === 'BracketLeft') stepSection(-1);
   else if (e.code === 'BracketRight') stepSection(1);
-  else if (e.code === 'ArrowLeft' && ready) player.seek(Math.max(0, player.currentTime() - 5));
-  else if (e.code === 'ArrowRight' && ready) player.seek(Math.min(player.duration, player.currentTime() + 5));
+  else if (e.code === 'ArrowLeft' && ready) seekTo(Math.max(0, player.currentTime() - 5));
+  else if (e.code === 'ArrowRight' && ready) seekTo(Math.min(player.duration, player.currentTime() + 5));
 });
 
 // ---------- Frame loop (started once) ----------
@@ -2214,6 +2225,8 @@ let vis = { shown: null, last: null, anim: null, chart: null, step: 0 };
 let instantJump = false; // the next jump is not animated (the loop wrap-around)
 const MOTION_BLUR_MIN_STEP = 0.06; // seconds of song per frame from which the jump is blurred
 const SEEK_JUMP_SEC = 0.75; // a bigger step between two frames than playback or a drag can make
+const seekAnimMs = (dist) => Math.min(700, 280 + dist * 25); // longer for longer jumps, 0.7 s at most
+let pendingSeekDur = null; // set by seekTo: the duration the audio scrub takes, so the fretboards' animation lasts the same
 function visualChartTime(ct) {
   const now = performance.now();
   if (!prefs.get('highway.seekAnimation') || vis.chart !== chart || vis.last === null) {
@@ -2228,7 +2241,8 @@ function visualChartTime(ct) {
   }
   if (Math.abs(ct - vis.last) > SEEK_JUMP_SEC) { // a jump: ease from where the chart is shown now
     const from = vis.anim ? vis.shown : vis.last;
-    vis.anim = { from, t0: now, dur: Math.min(700, 280 + Math.abs(ct - from) * 25) }; // longer for longer jumps, 0.7 s at most
+    vis.anim = { from, t0: now, dur: pendingSeekDur ?? seekAnimMs(Math.abs(ct - from)) };
+    pendingSeekDur = null;
   }
   vis.last = ct;
   const before = vis.shown;

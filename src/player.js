@@ -165,6 +165,7 @@ class WorkletPlayer {
     this.offset = 0; // chart position (s) when paused
     this.history = []; // recent { time, pos } reports from the worklet (audio time and source seconds)
     this.epoch = 0; // bumped on load/seek: reports from before are ignored
+    this.scrub = null; // { to, end }: a seek that is rushing through the skipped stretch; `end` is the audio time it ends at
     this.stems = new Map(); // id -> true (the app only checks that stems exist)
   }
 
@@ -246,6 +247,10 @@ class WorkletPlayer {
   currentTime() {
     if (!this.playing) return this.offset;
     const heardAt = this.ctx.currentTime - this.outputLatency;
+    if (this.scrub) { // the chart goes to the target at once (its own animation travels there); the sound catches up when the scrub ends
+      if (heardAt < this.scrub.end) return this.scrub.to;
+      this.scrub = null;
+    }
     return Math.min(this.duration, Math.max(0, positionAt(this.history, heardAt, this.rate)));
   }
 
@@ -274,12 +279,27 @@ class WorkletPlayer {
   pause() {
     if (!this.playing) return;
     this.offset = this.currentTime();
+    this.scrub = null;
     this.node.port.postMessage({ type: 'pause' });
     this.playing = false;
   }
 
+  // A seek while playing that takes `ms`: the audio rushes through the skipped stretch (see scrub.js), then plays on from the target.
+  scrubTo(seconds, ms) {
+    const to = Math.max(0, Math.min(this.duration, seconds));
+    if (!this.playing || !(ms > 0)) { this.seek(to); return; }
+    const from = this.currentTime();
+    const dur = Math.round((ms / 1000) * this.ctx.sampleRate);
+    this.epoch++;
+    this.scrub = { to, end: this.ctx.currentTime + ms / 1000 };
+    this.history = [{ time: this.scrub.end, pos: to }]; // until the worklet reports for real after the scrub
+    this.offset = to;
+    this.node.port.postMessage({ type: 'scrub', from: Math.round(from * this.ctx.sampleRate), to: Math.round(to * this.ctx.sampleRate), dur, epoch: this.epoch });
+  }
+
   seek(seconds) {
     const t = Math.max(0, Math.min(this.duration, seconds));
+    this.scrub = null;
     if (this.playing) this.startAt(t);
     else {
       this.offset = t;
@@ -335,5 +355,6 @@ export class MultiTrackPlayer {
   play() { return this.impl.play(); }
   pause() { this.impl.pause(); }
   seek(seconds) { this.impl.seek(seconds); }
+  scrubTo(seconds, ms) { if (this.impl.scrubTo) this.impl.scrubTo(seconds, ms); else this.impl.seek(seconds); } // (the legacy engine just cuts)
   stop() { this.impl.stop(); }
 }
