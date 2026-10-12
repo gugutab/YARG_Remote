@@ -214,6 +214,7 @@ export class Highway {
         const vh = this.bandHeight(h, Math.min(h * 0.34, 280));
         this.drawPane(vocal, t, 0, 0, w, vh);
         this.drawDivider({ type: 'row', y: vh - 1, w });
+        this.trackBase(0, vh, w, h - vh);
         g.save();
         g.beginPath();
         g.rect(0, vh, w, h - vh);
@@ -247,6 +248,17 @@ export class Highway {
       x += pw;
     });
     if (lanes.length > per) this.drawPaneDots(lanes.length, per, w, h);
+  }
+
+  // The track of the vocals (the chart and the lyrics): a semi-transparent base in the stage colour, so the words and notes read well
+  // over a visualizer. It is the same colour as the stage, so without a visualizer nothing changes.
+  trackBase(x, y, w, h) {
+    if (!this.visualizer) return;
+    const g = this.g;
+    g.fillStyle = `rgba(${this.bgRgb},0.72)`;
+    g.fillRect(x, y, w, h);
+    g.fillStyle = 'rgba(255,255,255,0.03)';
+    g.fillRect(x, y, w, h);
   }
 
   // An offscreen canvas for one fretboard (its size in device pixels), reused between panes and frames.
@@ -334,6 +346,7 @@ export class Highway {
     this.chart = pane.chart;
     this.maxLength = pane.maxLength;
     this.vRange = pane.vRange;
+    if (pane.chart.mode === 'vocals') this.trackBase(0, 0, pw, ph);
     if (pane.chart.mode === 'vocals') {
       if (this.vocalView === 'karaoke') this.renderKaraoke(t, pw, ph, pane);
       else this.renderVocals(t, pw, ph);
