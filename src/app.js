@@ -1046,15 +1046,15 @@ function updateChart() {
   }
   for (const c of current.choosers) if (c.at === null) items.push({ chooser: true, key: `choose:${c.id}` }); // an added one goes last
   highway.setCharts(items);
-  for (const [key, el] of chooserEls) fillChooser(el, key); // the cards follow the instruments that are not on screen
   renderSpecials();
   fillSectionOptions();
   const hasLanes = items.some((x) => x.chooser || x.chart.mode !== 'vocals');
   const hasVocals = items.some((x) => !x.chooser && x.chart.mode === 'vocals');
   for (const g of els.paneMenu.querySelectorAll('[data-needs]')) g.hidden = !(g.dataset.needs === 'lanes' ? hasLanes : hasVocals); // view options: notes or karaoke for vocals, view and shape for fretboards
+  renderPickers(); // (it records the active instrument's difficulty, which the menu and the chooser cards read: they come after it)
   if (!items.some((x) => !x.chooser)) els.paneMenu.hidden = true;
   else if (!els.paneMenu.hidden) buildPaneMenu(); // keep an open menu up to date
-  renderPickers();
+  for (const [key, el] of chooserEls) fillChooser(el, key); // the cards follow the instruments that are not on screen
   renderLoadState();
 }
 
