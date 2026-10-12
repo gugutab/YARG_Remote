@@ -1510,12 +1510,11 @@ document.addEventListener('click', (e) => {
 
 // ---------- Transport ----------
 els.play.addEventListener('click', togglePlay);
-function paintSeek() {
+function paintSeek(at = Number(els.seek.value)) { // the fill: the playing position (the thumb alone follows the pointer while it is dragged)
   const max = Number(els.seek.max) || 1;
-  els.seek.style.setProperty('--pct', `${Math.min(100, (Number(els.seek.value) / max) * 100)}%`);
+  els.seek.style.setProperty('--pct', `${Math.min(100, (at / max) * 100)}%`);
 }
 els.seek.addEventListener('input', () => {
-  paintSeek();
   seeking = true;
   els.timeNow.textContent = fmt(Number(els.seek.value));
 });
@@ -2280,7 +2279,8 @@ function frame() {
     syncPaneTags();
     const index = chart.sections.length ? sectionIndexAt(chart.sections, chartTime) : -1;
     if (index >= 0) setActiveSection(index);
-    if (!seeking) {
+    if (seeking) paintSeek(t); // dragging: the thumb is in the user's hand, the fill goes on with the music
+    else {
       const barT = t; // the bar is always at the real position: the thumb is already where the song went and only the fretboards travel there
       els.seek.value = barT;
       els.seekbox.classList.toggle('animating', !!vis.anim);

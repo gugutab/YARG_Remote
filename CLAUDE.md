@@ -244,3 +244,4 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - Seek bar: the thumb, the fill and the time counter always show the real position (the thumb is already at the target after a seek); only the fretboards animate towards it. `.seekbox.animating` keeps the thumb visible meanwhile.
 - The seek thumb is hidden until hover, but `.seekbox.animating` (set from `vis.anim` in `frame()`) keeps it visible while a seek animation runs.
 - A `#/song/<id>/play` link (startup, reload, hashchange) loads the audio together with the song (`loadAudioWithSong` → `ensureAudio()`), ready to press Play; browsers block sound before a click, so it does not start by itself. `#/song/<id>` (details) still loads no audio.
+- Dragging the seek thumb: only the thumb (and the time label) follow the pointer; the fill keeps following the playing position (`paintSeek(t)` in `frame()`) until the button is released, when the seek happens.
