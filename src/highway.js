@@ -601,11 +601,12 @@ export class Highway {
     const keep = g.fillStyle;
     for (let i = 0; i < notes.length; i++) {
       const n = notes[i];
-      if (n.end < t - behind || n.time > t + ahead) continue; // a note stays until it has left the stage on the left
+      const prev = notes[i - 1];
+      const joined = n.slide && prev && !prev.talkie && prev.time <= t + ahead; // a continuation shows with the note it continues
+      if (n.end < t - behind || (n.time > t + ahead && !joined)) continue; // a note stays until it has left the stage on the left
       const x1 = xOf(n.time);
       const x2 = Math.max(x1 + 6, xOf(n.end));
       const bw = x2 - x1;
-      const prev = notes[i - 1];
       const y = yOfPitch(n.pitch);
       const shape = (color) => {
         g.fillStyle = color;
@@ -627,12 +628,16 @@ export class Highway {
           const lead = Math.min(10, half * 1.5); // tucks under both bars so no seam shows
           const xs = xa - lead;
           const xe = x1 + lead;
-          const cx = (xs + xe) / 2;
+          const tw = Math.min(xe - xs, 70); // the pitch change happens just before the note: the ribbon holds the old pitch until then
+          const xc = xe - tw;
+          const cx = xc + tw / 2;
           g.beginPath();
           g.moveTo(xs, ya - half);
+          g.lineTo(xc, ya - half);
           g.bezierCurveTo(cx, ya - half, cx, y - half, xe, y - half);
           g.lineTo(xe, y + half);
-          g.bezierCurveTo(cx, y + half, cx, ya + half, xs, ya + half);
+          g.bezierCurveTo(cx, y + half, cx, ya + half, xc, ya + half);
+          g.lineTo(xs, ya + half);
           g.closePath();
           g.fill();
         }
@@ -642,7 +647,7 @@ export class Highway {
         g.fill();
       };
       shape(colors ? colors[1] : keep);
-      if (colors && x1 < hitX) { // only the part that has crossed the hit line changes colour
+      if (colors && (joined ? xOf(prev.end) : x1) < hitX) { // (the ribbon of a continuation starts at the previous note's end) // only the part that has crossed the hit line changes colour
         g.save();
         g.beginPath();
         g.rect(-1e4, -1e4, hitX + 1e4, 2e4);
