@@ -544,8 +544,8 @@ export class Highway {
       sheet.hits.push({ y: y + y0, half: step / 2, time: lines[i].start });
       hovered = this.hoverRow(sheet, x0, y0, y, step, lines[i].start, shown.x + shown.total) ?? hovered;
     }
-    const fade = Math.min(46, h * 0.16); // the lines dissolve into the background at the top and bottom edges: opaque at the very edge, easing out
-    const ramp = [[0, 1], [0.1, 0.96], [0.45, 0.55], [1, 0]]; // [position from the edge, opacity of the background]
+    const fade = Math.min(92, h * 0.32); // the lines dissolve into the background at the top and bottom edges: opaque at the very edge, easing out
+    const ramp = [[0, 1], [0.18, 1], [0.55, 0.7], [1, 0]]; // [position from the edge, opacity of the background]
     const fadeIn = g.createLinearGradient(0, 0, 0, fade);
     const fadeOut = g.createLinearGradient(0, h, 0, h - fade);
     for (const [pos, alpha] of ramp) {
