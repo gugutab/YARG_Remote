@@ -153,7 +153,8 @@ export class Highway {
         g.rect(0, vh, w, h - vh);
         g.clip();
         g.translate(0, vh);
-        this.renderLyricSheet(t, w, h - vh, this.karaokeLines(vocal, 'main'), this.sheetState(vocal, 'main'), 0, vh);
+        if ((vocal.chart.lyrics2 || []).length > 0) this.renderSheetsSplit(t, w, h - vh, vocal, 0, vh); // harmony: one sheet per voice
+        else this.renderLyricSheet(t, w, h - vh, this.karaokeLines(vocal, 'main'), this.sheetState(vocal, 'main'), 0, vh);
         g.restore();
       }
       this.vocalAlone = false;
@@ -344,6 +345,38 @@ export class Highway {
     return hit ? hit.time : null;
   }
 
+  // Two lyric sheets, VOCAL 1 (the lead's words) and VOCAL 2 (the other voices'), side by side in a wide area and one above
+  // the other in a narrow one. The area is at (x0, y0) of the canvas and the origin is already there.
+  renderSheetsSplit(t, w, h, pane, x0, y0) {
+    const g = this.g;
+    const cols = w >= 760 && w >= h * 1.1;
+    const caption = (text, x, y) => {
+      g.font = '700 12px system-ui';
+      g.textAlign = 'left';
+      g.textBaseline = 'middle';
+      g.fillStyle = 'rgba(255,255,255,0.45)';
+      g.fillText(text, x, y);
+      g.textBaseline = 'alphabetic';
+    };
+    [['v1', 'VOCAL 1'], ['v2', 'VOCAL 2']].forEach(([key, name], k) => {
+      const bw = cols ? w / 2 : w;
+      const bh = cols ? h : h / 2;
+      const bx = cols ? k * bw : 0;
+      const by = cols ? 0 : k * bh;
+      g.save();
+      g.beginPath();
+      g.rect(bx, by, bw, bh);
+      g.clip();
+      g.translate(bx, by);
+      this.renderLyricSheet(t, bw, bh, this.karaokeLines(pane, key), this.sheetState(pane, key), x0 + bx, y0 + by);
+      caption(name, 12, 14);
+      g.restore();
+    });
+    g.fillStyle = 'rgba(255,255,255,0.12)';
+    if (cols) g.fillRect(Math.round(w / 2), 0, 1, h);
+    else g.fillRect(0, Math.round(h / 2), w, 1);
+  }
+
   // Karaoke: only the lyrics. Alone, they fill the stage as a sheet (two sheets, vocal 1 and vocal 2, when the harmony
   // voices have words of their own); next to other charts, the line being sung (one per voice).
   renderKaraoke(t, w, h, pane) {
@@ -354,34 +387,7 @@ export class Highway {
         this.renderLyricSheet(t, w, h, this.karaokeLines(pane, 'main'), this.sheetState(pane, 'main'), 0, 0);
         return;
       }
-      // two sheets side by side on a wide stage, one above the other on a narrow one
-      const cols = w >= 760 && w >= h * 1.1;
-      const caption = (text, x, y) => {
-        g.font = '700 12px system-ui';
-        g.textAlign = 'left';
-        g.textBaseline = 'middle';
-        g.fillStyle = 'rgba(255,255,255,0.45)';
-        g.fillText(text, x, y);
-        g.textBaseline = 'alphabetic';
-      };
-      const parts = [['v1', 'VOCAL 1'], ['v2', 'VOCAL 2']];
-      parts.forEach(([key, name], k) => {
-        const bw = cols ? w / 2 : w;
-        const bh = cols ? h : h / 2;
-        const bx = cols ? k * bw : 0;
-        const by = cols ? 0 : k * bh;
-        g.save();
-        g.beginPath();
-        g.rect(bx, by, bw, bh);
-        g.clip();
-        g.translate(bx, by);
-        this.renderLyricSheet(t, bw, bh, this.karaokeLines(pane, key), this.sheetState(pane, key), bx, by);
-        caption(name, 12, 14);
-        g.restore();
-      });
-      g.fillStyle = 'rgba(255,255,255,0.12)';
-      if (cols) g.fillRect(Math.round(w / 2), 0, 1, h);
-      else g.fillRect(0, Math.round(h / 2), w, 1);
+      this.renderSheetsSplit(t, w, h, pane, 0, 0);
       return;
     }
     const keys = split ? ['v1', 'v2'] : ['main'];
