@@ -1577,8 +1577,9 @@ els.highway.addEventListener('pointermove', (e) => {
     const d = highway.dividerAt(...canvasPoint(e), slopFor(e));
     highway.hover = d;
     const jump = highway.sheetPlayButtonAt(...canvasPoint(e)); // over the "jump to" button of a lyric row
-    els.highway.style.cursor = jump ? 'pointer' : d ? (d.type === 'row' ? 'row-resize' : 'col-resize') : '';
-    els.highway.title = jump ? `Jump to ${highway.fmtTime(jump.playBtn.time + settings.chartDelay)}` : '';
+    const toCurrent = highway.sheetButtonAt(...canvasPoint(e)); // over the button that goes back to the line being sung
+    els.highway.style.cursor = jump || toCurrent ? 'pointer' : d ? (d.type === 'row' ? 'row-resize' : 'col-resize') : '';
+    els.highway.title = jump ? `Jump to ${highway.fmtTime(jump.playBtn.time + settings.chartDelay)}` : toCurrent ? 'Jump to the line being sung' : '';
     return;
   }
   if (!swipe.sheet) return;

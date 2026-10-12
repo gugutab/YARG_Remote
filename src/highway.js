@@ -549,7 +549,7 @@ export class Highway {
           if (end - t >= 0.25) this.drawCountdownBadge(w / 2, y, badgeR, { remaining: end - t, total });
         } else this.drawCountdownBadge(w / 2, y, badgeR, { remaining: total, total, dim: t >= end ? 0.28 : 0.55 }); // past / to come
         sheet.hits.push({ y: y + y0, half: step / 2, time: start });
-        hovered = this.hoverRow(sheet, x0, y0, y, step, start, w / 2 + badgeR) ?? hovered;
+        hovered = this.hoverRow(sheet, x0, y0, y, step, start, w / 2 - badgeR, w / 2 + badgeR, badgeR) ?? hovered;
         continue;
       }
       const i = row.i;
@@ -559,7 +559,7 @@ export class Highway {
       const past = i < first ? 0.3 : Math.max(0.3, 0.7 - Math.max(0, i - first) * 0.06);
       const shown = this.drawKaraokeLine(lines[i], cur ? big : small, w, y, cur ? 0.95 : past, cur ? t : null);
       sheet.hits.push({ y: y + y0, half: step / 2, time: lines[i].start });
-      hovered = this.hoverRow(sheet, x0, y0, y, step, lines[i].start, shown.x + shown.total) ?? hovered;
+      hovered = this.hoverRow(sheet, x0, y0, y, step, lines[i].start, shown.x, shown.x + shown.total, (cur ? big : small) * 0.7) ?? hovered;
     }
     const fade = Math.min(92, h * 0.32); // the lines dissolve into the background at the top and bottom edges: opaque at the very edge, easing out
     const ramp = []; // [position from the edge, opacity of the background]: opaque at the very edge, then a smootherstep over the whole band, which eases both ends
@@ -633,38 +633,46 @@ export class Highway {
     const rail = this.drawSheetRail(t, w, h, ctx, rows, lines, seenFrom, seenTo);
     // The Autoscroll button (back to following the singer), shown only while the line being sung is off screen: next to the song marker on the rail, bottom centre without a rail.
     // It slides in from the right and fades while the sheet is held, and goes back the same way.
-    const wantBtn = state.following === false && !state.curVisible ? 1 : 0; // only when the line being sung is out of view
     const nowB = performance.now();
+    if (state.following === false && !state.curVisible) state.offSince ??= nowB; // how long the line being sung has been out of view
+    else state.offSince = null;
+    // only when it has been out of view for a few seconds, so a short exit does not flash the button
+    const wantBtn = state.offSince !== null && nowB - state.offSince >= 2500 ? 1 : 0;
     const dtB = Math.min(0.1, (nowB - (state.btnAt || nowB)) / 1000);
     state.btnAt = nowB;
     state.btnK = (state.btnK ?? 0) + (wantBtn - (state.btnK ?? 0)) * (1 - Math.exp(-dtB / 0.07));
     if (!wantBtn && state.btnK < 0.02) state.btnK = 0;
     if (state.btnK > 0) {
       const k = state.btnK;
-      const label = 'Autoscroll';
-      g.font = '600 13px system-ui';
-      const bw = g.measureText(label).width + 28;
-      const bh = 30;
+      const bw = 34;
+      const bh = 34;
       const bx = rail ? rail.rx - 10 - bw : (w - bw) / 2;
       const by = rail ? Math.max(rail.y0, Math.min(rail.y1 - bh, rail.my - bh / 2)) : h - bh - 14;
+      const ptB = this.pointer;
+      const hotB = wantBtn === 1 && !!ptB && ptB.x >= x0 + bx && ptB.x <= x0 + bx + bw && ptB.y >= y0 + by && ptB.y <= y0 + by + bh;
       g.save();
       g.globalAlpha = k;
       g.translate(bx + bw / 2 + (1 - k) * 10, by + bh / 2); // comes in from the right, growing
       g.scale(0.82 + 0.18 * k, 0.82 + 0.18 * k);
       g.translate(-(bx + bw / 2), -(by + bh / 2));
-      g.fillStyle = 'rgba(30,40,55,0.92)';
+      g.fillStyle = hotB ? 'rgba(58,92,140,0.98)' : 'rgba(30,40,55,0.95)';
       g.beginPath();
-      if (g.roundRect) g.roundRect(bx, by, bw, bh, 15);
+      if (g.roundRect) g.roundRect(bx, by, bw, bh, 17);
       else g.rect(bx, by, bw, bh);
       g.fill();
-      g.lineWidth = 1;
-      g.strokeStyle = 'rgba(108,182,255,0.7)';
+      g.lineWidth = hotB ? 1.5 : 1;
+      g.strokeStyle = hotB ? '#9fd0ff' : 'rgba(108,182,255,0.7)';
       g.stroke();
-      g.fillStyle = '#cfe6ff';
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.fillText(label, bx + bw / 2, by + bh / 2 + 1);
-      g.textBaseline = 'alphabetic';
+      g.fillStyle = hotB ? '#ffffff' : '#cfe6ff';
+      const cx = bx + bw / 2;
+      const cy = by + bh / 2;
+      g.fillRect(cx - 8, cy - 7, 2.5, 14); // the jump-to icon: a triangle running to a bar
+      g.beginPath();
+      g.moveTo(cx - 3, cy - 7);
+      g.lineTo(cx - 3, cy + 7);
+      g.lineTo(cx + 8, cy);
+      g.closePath();
+      g.fill();
       g.restore();
       if (wantBtn && k > 0.5) sheet.button = { x: x0 + bx, y: y0 + by, w: bw, h: bh };
     }
@@ -735,9 +743,16 @@ export class Highway {
 
   // Is the pointer over this row of a sheet? If it is, remember which row, and when it stays there for 0.6 s the page shows
   // the "Play from here" button. Returns { key, time, y } (y in sheet coordinates) or null.
-  hoverRow(sheet, x0, y0, y, step, time, right) {
+  hoverRow(sheet, x0, y0, y, step, time, left, right, halfH) {
     const pt = this.pointer;
-    if (!pt || pt.x < x0 || pt.x >= x0 + sheet.w || Math.abs(pt.y - (y + y0)) > step / 2) return null;
+    if (!pt) return null;
+    // the pointer must be over the text itself (a little slack at its right, towards the button), not anywhere on the line...
+    const inText = pt.x >= x0 + left - 10 && pt.x <= x0 + right + 18 && Math.abs(pt.y - (y + y0)) <= halfH;
+    // ...or on the button that this row is offering
+    const sp = this.jump?.spec;
+    const onBtn = !!sp && this.jump.target === 1 && sp.key === `${x0},${y0}` && sp.time === time
+      && pt.x >= x0 + sp.bx && pt.x <= x0 + sp.bx + sp.bw && pt.y >= y0 + sp.by && pt.y <= y0 + sp.by + sp.bh;
+    if (!inText && !onBtn) return null;
     const key = `${x0},${y0},${time}`;
     if (pt.key !== key) { pt.key = key; pt.shown = false; pt.t0 = performance.now(); } // another row: wait again
     else if (!pt.shown && performance.now() - pt.t0 >= 600) pt.shown = true;
