@@ -100,11 +100,12 @@ export class Highway {
 
   // items: [{ chart, label }]. The first lane chart keeps the view when the others do not fit.
   setCharts(items) {
-    this.panes = items.map(({ chart, label, key, icon }) => {
+    this.panes = items.map(({ chart, label, key, icon, chooser }) => {
+      if (chooser) return { chooser: true, chart: null, label: '', icon: 'music', key, maxLength: 0, vRange: null }; // a slot the page fills with the instrument cards
       markStarPowerNotes(chart);
       return { chart, label: label ?? '', icon: icon ?? 'music', key: key ?? label ?? '', maxLength: Math.max(0, ...chart.notes.map((n) => n.length || 0)), vRange: null }; // the vocal range is re-fitted per chart
     });
-    this.chart = this.panes[0]?.chart ?? null;
+    this.chart = this.panes.find((p) => p.chart)?.chart ?? null;
     this.focus = 0;
   }
 
@@ -117,7 +118,7 @@ export class Highway {
   }
 
   laneCount() {
-    return this.panes.filter((p) => p.chart.mode !== 'vocals').length;
+    return this.panes.filter((p) => p.chart?.mode !== 'vocals').length;
   }
 
   // Swipe: brings the next (or previous) fretboard into view when they do not all fit. Returns whether it moved.
@@ -151,8 +152,8 @@ export class Highway {
     this.dividers = [];
     this.paneRects = [];
     if (!this.panes.length) return; // the page shows its own welcome / loading overlay
-    const vocal = this.panes.find((p) => p.chart.mode === 'vocals');
-    const lanes = this.panes.filter((p) => p.chart.mode !== 'vocals');
+    const vocal = this.panes.find((p) => p.chart?.mode === 'vocals');
+    const lanes = this.panes.filter((p) => p.chart?.mode !== 'vocals');
     const many = this.panes.length > 1;
     if (!lanes.length) { // vocals alone
       this.vocalAlone = true;
@@ -253,7 +254,12 @@ export class Highway {
   // One chart in the rectangle (x, y, pw, ph): the drawing code sees a canvas of that size.
   drawPane(pane, t, x, y, pw, ph) {
     const g = this.g;
-    this.paneRects.push({ key: pane.key, label: pane.label, icon: pane.icon, x, y, w: pw, h: ph }); // the page puts the instrument tags here
+    this.paneRects.push({ key: pane.key, label: pane.label, icon: pane.icon, chooser: !!pane.chooser, x, y, w: pw, h: ph }); // the page puts the instrument tags (or the chooser) here
+    if (pane.chooser) { // nothing to draw: the page shows the instrument cards here
+      g.fillStyle = 'rgba(255,255,255,0.025)';
+      g.fillRect(x, y, pw, ph);
+      return;
+    }
     g.save();
     g.beginPath();
     g.rect(x, y, pw, ph);

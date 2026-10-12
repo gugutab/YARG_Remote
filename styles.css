@@ -1127,3 +1127,25 @@ button.icon.close-song-info { position: absolute; top: 10px; right: 14px; z-inde
 /* the top bar's play button lights up under the pointer */
 button.icon.primary:hover:not(:disabled) { filter: brightness(1.18); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
 button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
+
+/* ---------- compact instrument menu, and the chooser that fills a slot ---------- */
+.pane-menu { width: min(240px, calc(100vw - 16px)); gap: 8px; padding: 10px; }
+#paneMenuDyn { gap: 8px; }
+.pane-menu .fp-group { gap: 3px; }
+.pane-menu .seg button { padding: 4px 8px; font-size: 12px; }
+.pm-head { gap: 6px; font-size: 14px; }
+.pm-head b { flex: 1; min-width: 0; }
+.pm-head .pm-icon { width: 18px; height: 18px; color: var(--accent); fill: currentColor; flex: none; }
+.pm-head .pm-close { width: 26px; height: 26px; flex: none; }
+.pm-head .pm-close svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.pm-head .pm-close:hover:not(:disabled) { color: #ff8a8a; }
+.pm-head .pm-close:disabled { opacity: .4; }
+.pm-actions { display: flex; gap: 6px; }
+.pm-actions .chip-btn { flex: 1; justify-content: center; padding: 5px 6px; font-size: 12px; }
+.pm-actions .chip-btn:disabled { opacity: .45; cursor: default; }
+.pm-view { gap: 8px; padding-top: 8px; }
+.pane-chooser { position: absolute; pointer-events: auto; overflow: auto; box-sizing: border-box; padding: 10px; background: rgba(13, 17, 23, .9); border: 1px dashed var(--line); border-radius: 12px; display: flex; flex-direction: column; gap: 8px; }
+.pc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
+.pc-head b { color: var(--text); }
+.pc-head .icon svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; width: 14px; height: 14px; }
+.pc-cards { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); align-content: start; }

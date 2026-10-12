@@ -532,7 +532,7 @@ async function selectSong(song) {
     img.hidden = !coverUrl;
   }
 
-  current = { song, midi, coverUrl, options: instrumentOptions(midi, song.ini), diffChoice: {}, pins: new Set(), statsCache: new Map(), expandedStats: new Set(), modeChoice: {} };
+  current = { song, midi, coverUrl, options: instrumentOptions(midi, song.ini), diffChoice: {}, pins: new Set(), choosers: [], chooserSeq: 0, hiddenActive: false, statsCache: new Map(), expandedStats: new Set(), modeChoice: {} };
   renderMeta(song, midi); // adds the BPM chip
   renderList({ keepScroll: true }); // highlight the loaded song
   syncUrl();
@@ -1035,20 +1035,24 @@ function updateChart() {
   chart = ins && diff ? buildChart(current.midi, ins, diff, current.song.ini) : null;
   // Every chart on screen, in the order of the instruments: the active one plus the pinned ones.
   const items = [];
+  current.choosers ??= [];
   for (const group of instrumentGroups()) {
     if (group.active) current.pins.delete(group.key);
-    const shown = group.active ? chart : group.pinned ? (() => { const o = group.chosen; const d = diffFor(o).chosen; return d ? buildChart(current.midi, o, d, current.song.ini) : null; })() : null;
+    for (const c of current.choosers) if (c.at === group.key) items.push({ chooser: true, key: `choose:${c.id}` }); // a swap: the chooser takes the slot of the instrument that left
+    const shown = group.active && current.hiddenActive ? null : group.active ? chart : group.pinned ? (() => { const o = group.chosen; const d = diffFor(o).chosen; return d ? buildChart(current.midi, o, d, current.song.ini) : null; })() : null;
     if (!shown) continue;
     const d = group.active ? diff : diffFor(group.chosen).chosen;
     items.push({ chart: shown, key: group.key, icon: INSTRUMENT_ICON[group.chosen.base] || 'music', label: shown.mode === 'vocals' ? group.label : `${group.label} · ${d.short}` });
   }
+  for (const c of current.choosers) if (c.at === null) items.push({ chooser: true, key: `choose:${c.id}` }); // an added one goes last
   highway.setCharts(items);
+  for (const [key, el] of chooserEls) fillChooser(el, key); // the cards follow the instruments that are not on screen
   renderSpecials();
   fillSectionOptions();
-  const hasLanes = items.some((x) => x.chart.mode !== 'vocals');
-  const hasVocals = items.some((x) => x.chart.mode === 'vocals');
+  const hasLanes = items.some((x) => x.chooser || x.chart.mode !== 'vocals');
+  const hasVocals = items.some((x) => !x.chooser && x.chart.mode === 'vocals');
   for (const g of els.paneMenu.querySelectorAll('[data-needs]')) g.hidden = !(g.dataset.needs === 'lanes' ? hasLanes : hasVocals); // view options: notes or karaoke for vocals, view and shape for fretboards
-  if (!items.length) els.paneMenu.hidden = true;
+  if (!items.some((x) => !x.chooser)) els.paneMenu.hidden = true;
   else if (!els.paneMenu.hidden) buildPaneMenu(); // keep an open menu up to date
   renderPickers();
   renderLoadState();
@@ -1539,6 +1543,23 @@ function syncPaneTags() {
   const seen = new Set();
   for (const r of highway.paneRects) {
     seen.add(r.key);
+    if (r.chooser) { // a slot for choosing an instrument: the cards fill the rectangle
+      let box = chooserEls.get(r.key);
+      if (!box) {
+        box = document.createElement('div');
+        box.className = 'pane-chooser';
+        els.paneTags.append(box);
+        chooserEls.set(r.key, box);
+        fillChooser(box, r.key);
+      }
+      const st = `${Math.round(r.x + 8)}|${Math.round(r.y + 8)}|${Math.round(r.w - 16)}|${Math.round(r.h - 16)}`;
+      if (box._st !== st) {
+        const [bx, by, bw, bh] = st.split('|');
+        Object.assign(box.style, { left: `${bx}px`, top: `${by}px`, width: `${bw}px`, height: `${bh}px` });
+        box._st = st;
+      }
+      continue;
+    }
     let el = paneTags.get(r.key);
     if (!el) {
       el = document.createElement('button');
@@ -1558,6 +1579,7 @@ function syncPaneTags() {
     if (el._open !== open) { el.setAttribute('aria-expanded', String(open)); el._open = open; }
   }
   for (const [key, el] of paneTags) if (!seen.has(key)) { el.remove(); paneTags.delete(key); }
+  for (const [key, el] of chooserEls) if (!seen.has(key)) { el.remove(); chooserEls.delete(key); }
 }
 
 function openPaneMenu(key, anchor) {
@@ -1569,22 +1591,106 @@ function openPaneMenu(key, anchor) {
   placePopover(anchor, els.paneMenu);
 }
 
-// Replace / add / close, for the instruments of the song.
-function replacePane(group, other) {
-  if (group.pinned) { current.pins.delete(group.key); current.pins.add(other.key); updateChart(); }
-  else selectInstrument(other.chosen.id, diffFor(other.chosen).chosen?.id); // the active one: the other becomes the active
-  menuKey = other.key;
-}
-function addPane(other) {
-  current.pins.add(other.key);
-  updateChart();
-}
+// Close / swap / add, for the instruments of the song. A swap or an add opens a slot where the instrument cards are shown.
 function closePane(group) {
   if (group.pinned) { current.pins.delete(group.key); updateChart(); return; }
   const next = instrumentGroups().find((g) => g.pinned); // the active one closes: another one takes its place
   if (!next) return;
   current.pins.delete(next.key);
   selectInstrument(next.chosen.id, diffFor(next.chosen).chosen?.id);
+}
+const hiddenGroups = () => instrumentGroups().filter((g) => !(g.active && !current.hiddenActive) && !g.pinned);
+function openChooser(at) {
+  current.chooserSeq = (current.chooserSeq ?? 0) + 1;
+  current.choosers.push({ id: current.chooserSeq, at, modes: {} });
+}
+function swapPane(group) { // the fretboard and its tag go; the cards to choose the next instrument take its place
+  if (group.pinned) current.pins.delete(group.key);
+  else {
+    const next = instrumentGroups().find((g) => g.pinned);
+    if (next) { current.pins.delete(next.key); selectInstrument(next.chosen.id, diffFor(next.chosen).chosen?.id); }
+    else current.hiddenActive = true; // the only instrument: it keeps driving the timeline, but is not drawn until another is chosen
+  }
+  openChooser(group.key);
+  els.paneMenu.hidden = true;
+  updateChart();
+}
+function addPane() {
+  openChooser(null);
+  els.paneMenu.hidden = true;
+  updateChart();
+}
+
+// The instrument cards shown in a chooser slot: instrument, type and difficulty, like the details screen's.
+const chooserEls = new Map();
+function pickInto(chooser, group, ins, diffId) {
+  current.choosers = current.choosers.filter((c) => c !== chooser);
+  current.modeChoice[group.key] = ins.id;
+  if (current.hiddenActive) { // the slot was the only instrument's: the pick becomes the active one
+    current.hiddenActive = false;
+    selectInstrument(ins.id, diffId);
+    return;
+  }
+  current.diffChoice[ins.id] = diffId;
+  current.pins.add(group.key);
+  updateChart();
+}
+function cancelChooser(chooser) {
+  current.choosers = current.choosers.filter((c) => c !== chooser);
+  if (!current.choosers.length) current.hiddenActive = false; // nothing was picked: the instrument that was swapped is back
+  updateChart();
+}
+function fillChooser(el, key) {
+  const chooser = current?.choosers?.find((c) => `choose:${c.id}` === key);
+  if (!chooser) return;
+  const head = document.createElement('div');
+  head.className = 'pc-head';
+  head.innerHTML = '<b>Choose an instrument</b><button type="button" class="icon small-icon" title="Cancel" aria-label="Cancel"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>';
+  head.querySelector('button').addEventListener('click', () => cancelChooser(chooser));
+  const cards = document.createElement('div');
+  cards.className = 'pc-cards';
+  for (const group of hiddenGroups()) {
+    const ins = group.options.find((o) => o.id === chooser.modes[group.key]) ?? group.chosen; // the type the card shows
+    const { diffs, chosen } = diffFor(ins);
+    const card = document.createElement('div');
+    card.className = 'icard';
+    const top = document.createElement('button');
+    top.type = 'button';
+    top.className = 'icard-head';
+    top.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[ins.base] || 'music'}"/></svg><span class="icard-name"></span>`;
+    top.querySelector('.icard-name').textContent = group.label;
+    top.addEventListener('click', () => pickInto(chooser, group, ins, chosen?.id));
+    card.append(top);
+    if (group.options.length > 1) { // the type
+      const modes = document.createElement('div');
+      modes.className = 'seg';
+      for (const o of group.options) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = o.modeLabel ?? o.label;
+        b.setAttribute('aria-pressed', String(o.id === ins.id));
+        b.addEventListener('click', () => { chooser.modes[group.key] = o.id; fillChooser(el, key); });
+        modes.append(b);
+      }
+      card.append(modes);
+    }
+    if (ins.mode !== 'vocals') {
+      const seg = document.createElement('div');
+      seg.className = 'seg';
+      for (const d of diffs) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = d.label;
+        b.setAttribute('aria-pressed', String(d.id === chosen?.id));
+        b.addEventListener('click', () => pickInto(chooser, group, ins, d.id));
+        seg.append(b);
+      }
+      card.append(seg);
+    }
+    cards.append(card);
+  }
+  if (!cards.children.length) cards.textContent = 'Every instrument of this song is on screen.';
+  el.replaceChildren(head, cards);
 }
 
 function buildPaneMenu() {
@@ -1618,10 +1724,15 @@ function buildPaneMenu() {
     }
     return box;
   };
+  const canClose = group.pinned || groups.some((g) => g.pinned);
   const head = document.createElement('div');
   head.className = 'pm-head';
-  head.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[ins.base] || 'music'}"/></svg><b></b>`;
+  head.innerHTML = `<svg class="pm-icon"><use href="#i-${INSTRUMENT_ICON[ins.base] || 'music'}"/></svg><b></b><button type="button" class="icon small-icon pm-close" aria-label="Close this instrument"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12h8"/></svg></button>`;
   head.querySelector('b').textContent = group.label;
+  const close = head.querySelector('.pm-close'); // a window with a bar, not an X: it takes this instrument off the screen
+  close.disabled = !canClose;
+  close.title = canClose ? 'Close this instrument' : 'It is the only instrument on screen';
+  close.addEventListener('click', () => { closePane(group); els.paneMenu.hidden = true; });
   host.append(head);
   if (ins.mode !== 'vocals' && diffs.length) part('Difficulty', seg(diffs, (d) => d.id === chosen?.id, (d) => pickDifficulty(group, ins, d.id)));
   if (group.options.length > 1) { // the type: 4 lanes / Pro / Pro 7 lanes, Vocals / Harmony
@@ -1631,33 +1742,19 @@ function buildPaneMenu() {
       else selectInstrument(m.option.id, diffFor(m.option).chosen?.id);
     }));
   }
-  const hidden = groups.filter((g) => !g.active && !g.pinned);
-  const list = (title, onPick) => {
-    if (!hidden.length) return;
-    const box = document.createElement('div');
-    box.className = 'pm-list';
-    for (const other of hidden) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'pm-item';
-      b.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[other.chosen.base] || 'music'}"/></svg><span></span>`;
-      b.querySelector('span').textContent = other.label;
-      b.addEventListener('click', () => onPick(other));
-      box.append(b);
-    }
-    part(title, box);
-  };
-  list('Swap with', (other) => replacePane(group, other));
-  list('Add instrument', addPane);
-  const canClose = group.pinned || groups.some((g) => g.pinned);
-  const close = document.createElement('button');
-  close.type = 'button';
-  close.className = 'pm-item pm-close';
-  close.disabled = !canClose;
-  close.title = canClose ? '' : 'It is the only instrument on screen';
-  close.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg><span>Close this instrument</span>';
-  close.addEventListener('click', () => { closePane(group); els.paneMenu.hidden = true; });
-  host.append(close);
+  const free = hiddenGroups().length - current.choosers.length; // instruments with no slot yet
+  const row = document.createElement('div');
+  row.className = 'pm-actions';
+  for (const [label, enabled, onClick] of [['Swap instrument', hiddenGroups().length > 0, () => swapPane(group)], ['Add instrument', free > 0, addPane]]) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip-btn';
+    b.textContent = label;
+    b.disabled = !enabled;
+    b.addEventListener('click', onClick);
+    row.append(b);
+  }
+  host.append(row);
 }
 
 // ---------- Several fretboards: swipe (or drag) sideways to bring the next one into view when they do not all fit ----------
