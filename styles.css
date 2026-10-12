@@ -1219,6 +1219,10 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .prow[data-active="true"] .viz-text small { color: inherit; opacity: .8; }
 .viz-pop .viz-level { display: grid; grid-template-columns: 70px 1fr 40px; align-items: center; gap: 8px; padding: 6px 8px 2px; font-size: 13px; color: var(--muted); }
 .viz-pop .viz-level[hidden] { display: none; }
+.viz-pop .viz-color { grid-template-columns: 70px 1fr; }
+.viz-pop .viz-color output { display: none; }
+.viz-pop .viz-color-row { display: flex; align-items: center; gap: 8px; }
+.viz-pop .viz-color input[type=color] { width: 44px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; }
 .viz-pop .viz-level output { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* Loop on the seek bar: a translucent band between two draggable handles, and the hover tooltip */

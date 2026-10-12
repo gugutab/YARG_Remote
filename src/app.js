@@ -74,10 +74,16 @@ let pendingSongId = null; // song clicked while detached; opened once the folder
 // ---------- Settings and theme (applied first, so the first frame already has the right colours) ----------
 const prefs = createSettings({ defaults: buildDefaults(), storage: (() => { try { return localStorage; } catch { return null; } })() });
 const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+let themeStage = '#0d1117';
+// The stage colour: the theme's, or the one picked in the visualizer menu / settings.
+function applyStage() {
+  highway.setBackground(prefs.get('highway.stageColorOn') ? prefs.get('highway.stageColor') : themeStage);
+}
 function applyThemeSetting() {
   const theme = resolveTheme({ preset: prefs.get('theme.preset'), overrides: prefs.get('theme.overrides'), saved: prefs.get('theme.saved') }, darkQuery.matches);
   applyTheme(theme);
-  highway.setBackground(theme.vars.stage);
+  themeStage = theme.vars.stage;
+  applyStage();
   try { // read by the inline script in index.html before the first paint
     const css = {};
     for (const k of ['--bg', '--panel', '--panel-2', '--line', '--text', '--muted', '--accent', '--accent-text', '--stage', '--stage-rgb', 'color-scheme']) css[k] = document.documentElement.style.getPropertyValue(k);
@@ -2059,9 +2065,15 @@ const vizBtn = document.getElementById('visualizerBtn');
 const vizPop = document.getElementById('visualizerPop');
 const vizLevel = document.createElement('label');
 vizLevel.className = 'viz-level';
-vizLevel.innerHTML = '<span>Brightness</span><input type="range" min="10" max="100" step="5"><output></output>';
+vizLevel.innerHTML = '<span>Transparency</span><input type="range" min="0" max="90" step="5"><output></output>';
 const vizLevelInput = vizLevel.querySelector('input');
-vizLevelInput.addEventListener('input', () => prefs.set('highway.visualizerIntensity', Number(vizLevelInput.value)));
+vizLevelInput.addEventListener('input', () => prefs.set('highway.visualizerTransparency', Number(vizLevelInput.value)));
+const vizColor = document.createElement('div'); // the stage colour: shown with "None" too, and behind visualizers that let it through
+vizColor.className = 'viz-level viz-color';
+vizColor.innerHTML = '<span>Background</span><span class="viz-color-row"><input type="color" aria-label="Stage colour"><button type="button" class="seg-btn">Theme</button></span><output></output>';
+const vizColorInput = vizColor.querySelector('input');
+vizColorInput.addEventListener('input', () => { prefs.set('highway.stageColor', vizColorInput.value); prefs.set('highway.stageColorOn', true); });
+vizColor.querySelector('button').addEventListener('click', () => prefs.set('highway.stageColorOn', false));
 vizPop.replaceChildren(...VISUALIZERS.map((v) => {
   const row = document.createElement('div');
   row.className = 'prow';
@@ -2074,7 +2086,7 @@ vizPop.replaceChildren(...VISUALIZERS.map((v) => {
   row.querySelector('small').textContent = v.hint;
   row.addEventListener('click', () => prefs.set('highway.visualizer', v.id)); // the list stays open: the chart behind shows the result
   return row;
-}), vizLevel);
+}), vizLevel, vizColor);
 function syncVizPop() {
   const id = prefs.get('highway.visualizer');
   for (const row of vizPop.querySelectorAll('.prow')) {
@@ -2082,7 +2094,10 @@ function syncVizPop() {
     row.setAttribute('aria-selected', String(row.dataset.id === id));
   }
   vizLevel.hidden = id === 'none';
-  vizLevelInput.value = prefs.get('highway.visualizerIntensity');
+  vizLevelInput.value = prefs.get('highway.visualizerTransparency');
+  const custom = prefs.get('highway.stageColorOn');
+  vizColorInput.value = custom ? prefs.get('highway.stageColor') : themeStage;
+  vizColor.querySelector('button').hidden = !custom;
   vizLevel.querySelector('output').textContent = `${vizLevelInput.value}%`;
 }
 popovers.push([vizBtn, vizPop]);
@@ -2302,7 +2317,9 @@ const EFFECTS = {
   'ui.radius': (v) => document.documentElement.style.setProperty('--radius', `${v}px`),
   'ui.font': (v) => document.documentElement.style.setProperty('--font', fontCss(v)),
   'highway.visualizer': (v) => { vizDriver.select(v); highway.setVisualizer(vizDriver.fn); syncVizPop(); },
-  'highway.visualizerIntensity': (v) => { vizDriver.intensity = v / 100; syncVizPop(); },
+  'highway.visualizerTransparency': (v) => { vizDriver.transparency = v / 100; syncVizPop(); },
+  'highway.stageColorOn': () => { applyStage(); syncVizPop(); },
+  'highway.stageColor': () => { applyStage(); syncVizPop(); },
   'ui.animations': (v) => { document.documentElement.dataset.motion = v ? 'on' : 'off'; },
 };
 for (const [id, fn] of Object.entries(EFFECTS)) fn(prefs.get(id));

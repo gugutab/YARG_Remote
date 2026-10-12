@@ -765,7 +765,7 @@ export async function loadCover(url) {
 }
 
 // What Highway.setVisualizer gets. getSource() -> { key, song, charts, coverUrl }: `key` changes when the charts do.
-// Draws the chosen visualizer, then a dark overlay (the intensity setting) so the notes stay readable.
+// Draws the chosen visualizer, then an overlay of the stage colour (the transparency setting) so the notes stay readable.
 export function createDriver({ getSource }) {
   const state = { t: 0, w: 0, h: 0, dpr: 1, beat: {}, density: 0, travel: 0, sp: 0, solo: 0, vocal: 0, perc: 0, hit: 0, section: 0, clock: 0 };
   let id = 'none';
@@ -776,7 +776,7 @@ export function createDriver({ getSource }) {
   let failed = false;
   let coverToken = 0;
   const driver = {
-    intensity: 0.6,
+    transparency: 0.35, // how much of the stage colour covers the visualizer
     get id() { return id; },
     select(next) {
       id = VISUALIZER_IDS.includes(next) ? next : 'none';
@@ -833,7 +833,7 @@ export function createDriver({ getSource }) {
         console.error('Visualizer failed:', err);
       }
       g.restore();
-      g.fillStyle = `rgba(${bgRgb},${(0.8 - 0.75 * driver.intensity).toFixed(3)})`;
+      g.fillStyle = `rgba(${bgRgb},${driver.transparency.toFixed(3)})`;
       g.fillRect(0, 0, w, h);
       const ms = performance.now() - t0;
       stats[id] = stats[id] === undefined ? ms : stats[id] * 0.9 + ms * 0.1;
