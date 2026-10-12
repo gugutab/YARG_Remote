@@ -2284,7 +2284,7 @@ function frame() {
       const barT = t; // the bar is always at the real position: the thumb is already where the song went and only the fretboards travel there
       els.seek.value = barT;
       els.seekbox.classList.toggle('animating', !!vis.anim);
-      paintSeek();
+      paintSeek(vis.anim ? Math.max(0, Math.min(player.duration, shownTime + settings.chartDelay)) : barT); // the fill travels with the fretboards (the thumb is already at the target)
       els.timeNow.textContent = fmt(barT);
     }
     if (infoOpen) { // the Listen card
