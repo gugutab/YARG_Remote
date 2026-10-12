@@ -749,7 +749,7 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .active-filters .chip svg.x { width: 12px; height: 12px; color: var(--muted); }
 
 /* Round 52: the top bar can be hidden; the stage then takes the whole height and a small tab brings the bar back */
-.app.bar-hidden .topbar { height: 0; padding: 0; min-height: 0; } /* collapsed: only the seek bar (and its section ticks) stays, as a thin line */
+.app.bar-hidden .topbar { margin-top: calc(4px - var(--bar-h)); } /* collapsed: the bar slides up out of the screen as one piece, like the library to the left; only its seek line (4 px) and the section ticks stay */
 .app.bar-hidden .topbar > *, .app.bar-hidden .tb-main > * { visibility: hidden; } /* hidden but laid out, so the buttons keep the same horizontal limit */
 .app.bar-hidden .tb-main > .seekbox { visibility: visible; }
 .app.bar-hidden .topbar > .tb-main { visibility: visible; }
@@ -1184,8 +1184,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .edge-tab.song-show { height: 56px; }
 
 /* ---------- the top bar hides and shows like the library: it slides (0.2 s) and a small chevron tab brings it back ---------- */
-.topbar { transition: height .2s ease, padding .2s ease; }
-.app.bar-hidden .topbar { overflow: hidden; }
+.topbar { transition: margin-top .2s ease; } /* the same kind of motion as the library's margin-left: nothing is squeezed while it moves */
 .app.bar-hidden .topbar > *, .app.bar-hidden .tb-main > * { transition: visibility 0s .2s; } /* its content stays visible while it slides away */
 .app.bar-hidden .tb-main > .seekbox, .app.bar-hidden .topbar > .tb-main { transition: none; }
 .app.bar-hidden button.icon.stage-btn.bar-show.edge-top, button.icon.stage-btn.bar-show.edge-top { position: absolute; left: 50%; right: auto; top: 12px; transform: translateX(-50%); width: 56px; height: 26px; min-width: 0; padding: 0; border-radius: 10px; z-index: 40; background: var(--panel); border: 1px solid var(--line); color: var(--muted); backdrop-filter: none; }
