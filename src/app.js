@@ -26,7 +26,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'partBtn', 'partPop', 'partText', 'partIcon', 'sectionBtn', 'sectionPop', 'sectionText', 'partDiff', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'fullscreen', 'barHide', 'barShow', 'specialCard', 'specialList', 'fpSpecials', 'fpSpecialsGroup', 'fretBtn', 'fretPop', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'fullscreen', 'barHide', 'barShow', 'specialCard', 'specialList', 'paneTags', 'paneMenu', 'paneMenuDyn', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay', 'infoMenu',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
 ].map((id) => [id, $(id)]));
@@ -970,8 +970,6 @@ function showPlayInfo(on) {
   els.transport.hidden = !on;
   els.seekbox.hidden = !on;
   els.tools.hidden = !on;
-  els.fretBtn.hidden = true; // shown once there is a lane chart (updateChart)
-  els.fretPop.hidden = true;
 }
 
 function fillInstrumentOptions() {
@@ -997,7 +995,7 @@ function currentInstrument() {
 // Special notes of the active chart: what kinds there are, how many, and buttons to jump to the previous / next one.
 function renderSpecials() {
   const list = specialNotes(chart);
-  for (const host of [els.specialList, els.fpSpecials]) {
+  for (const host of [els.specialList]) {
     host.replaceChildren(...list.map((item) => {
       const row = document.createElement('div');
       row.className = 'spc-row';
@@ -1019,7 +1017,6 @@ function renderSpecials() {
     }));
   }
   els.specialCard.hidden = list.length === 0;
-  els.fpSpecialsGroup.hidden = list.length === 0;
 }
 
 // Seeks to the next / previous occurrence (a little before it, so it arrives on the chart) and shows the chart.
@@ -1043,16 +1040,16 @@ function updateChart() {
     const shown = group.active ? chart : group.pinned ? (() => { const o = group.chosen; const d = diffFor(o).chosen; return d ? buildChart(current.midi, o, d, current.song.ini) : null; })() : null;
     if (!shown) continue;
     const d = group.active ? diff : diffFor(group.chosen).chosen;
-    items.push({ chart: shown, key: group.key, label: shown.mode === 'vocals' ? group.label : `${group.label} · ${d.short}` });
+    items.push({ chart: shown, key: group.key, icon: INSTRUMENT_ICON[group.chosen.base] || 'music', label: shown.mode === 'vocals' ? group.label : `${group.label} · ${d.short}` });
   }
   highway.setCharts(items);
   renderSpecials();
   fillSectionOptions();
   const hasLanes = items.some((x) => x.chart.mode !== 'vocals');
   const hasVocals = items.some((x) => x.chart.mode === 'vocals');
-  for (const g of els.fretPop.querySelectorAll('[data-needs]')) g.hidden = !(g.dataset.needs === 'lanes' ? hasLanes : hasVocals);
-  els.fretBtn.hidden = items.length === 0; // the chart options: view and notes for fretboards, notes or karaoke for vocals
-  if (els.fretBtn.hidden) els.fretPop.hidden = true;
+  for (const g of els.paneMenu.querySelectorAll('[data-needs]')) g.hidden = !(g.dataset.needs === 'lanes' ? hasLanes : hasVocals); // view options: notes or karaoke for vocals, view and shape for fretboards
+  if (!items.length) els.paneMenu.hidden = true;
+  else if (!els.paneMenu.hidden) buildPaneMenu(); // keep an open menu up to date
   renderPickers();
   renderLoadState();
 }
@@ -1363,7 +1360,7 @@ for (const btn of document.querySelectorAll('[data-reset]')) {
   btn.addEventListener('click', () => setSetting(btn.dataset.reset, SETTING_DEFAULTS[btn.dataset.reset]));
 }
 
-const popovers = [[els.infoBtn, els.infoPop], [els.partBtn, els.partPop], [els.sectionBtn, els.sectionPop], [els.mixerBtn, els.mixerPop], [els.settingsBtn, els.settingsPop], [els.fretBtn, els.fretPop]];
+const popovers = [[els.infoBtn, els.infoPop], [els.partBtn, els.partPop], [els.sectionBtn, els.sectionPop], [els.mixerBtn, els.mixerPop], [els.settingsBtn, els.settingsPop]];
 function closePopovers(except) {
   for (const [btn, pop] of popovers) {
     if (pop === except) continue;
@@ -1397,6 +1394,8 @@ function registerPopover(btn, pop) {
   pop.addEventListener('click', (e) => e.stopPropagation());
 }
 for (const [btn, pop] of popovers) registerPopover(btn, pop);
+popovers.push([{ setAttribute() {} }, els.paneMenu]); // the instrument menu is opened by the tags over the charts (see below)
+els.paneMenu.addEventListener('click', (e) => e.stopPropagation());
 
 // The library's <select>s (sort, genre, decade) keep their native element as the value holder but are shown and
 // picked through a popover in the same style as the section and instrument lists (the native list ignores the theme).
@@ -1531,6 +1530,135 @@ function setVocalView(view) {
 }
 setVocalView(prefs.get('highway.vocalView'));
 els.vocalChoice.addEventListener('click', (e) => { const b = e.target.closest('[data-vocal]'); if (b) setVocalView(b.dataset.vocal); });
+
+// ---------- Instrument tags: a tag over every chart opens a menu for that instrument ----------
+// The charts are canvas drawings, so the tags are real buttons that follow the rectangles the highway reports (paneRects).
+const paneTags = new Map();
+let menuKey = null; // the instrument whose menu is open
+function syncPaneTags() {
+  const seen = new Set();
+  for (const r of highway.paneRects) {
+    seen.add(r.key);
+    let el = paneTags.get(r.key);
+    if (!el) {
+      el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'pane-tag';
+      el.innerHTML = '<svg><use href=""/></svg><span></span><i class="chev"></i>';
+      el.addEventListener('click', (e) => { e.stopPropagation(); openPaneMenu(el.dataset.key, el); });
+      els.paneTags.append(el);
+      paneTags.set(r.key, el);
+    }
+    el.dataset.key = r.key;
+    if (el._icon !== r.icon) { el.querySelector('use').setAttribute('href', `#i-${r.icon}`); el._icon = r.icon; }
+    if (el._label !== r.label) { el.querySelector('span').textContent = r.label; el._label = r.label; }
+    const tx = `translate(${Math.round(r.x + 8)}px, ${Math.round(r.y + 8)}px)`;
+    if (el._tx !== tx) { el.style.transform = tx; el._tx = tx; }
+    const open = menuKey === r.key && !els.paneMenu.hidden;
+    if (el._open !== open) { el.setAttribute('aria-expanded', String(open)); el._open = open; }
+  }
+  for (const [key, el] of paneTags) if (!seen.has(key)) { el.remove(); paneTags.delete(key); }
+}
+
+function openPaneMenu(key, anchor) {
+  if (!els.paneMenu.hidden && menuKey === key) { els.paneMenu.hidden = true; return; } // the tag again closes it
+  closePopovers(els.paneMenu);
+  menuKey = key;
+  buildPaneMenu();
+  els.paneMenu.hidden = false;
+  placePopover(anchor, els.paneMenu);
+}
+
+// Replace / add / close, for the instruments of the song.
+function replacePane(group, other) {
+  if (group.pinned) { current.pins.delete(group.key); current.pins.add(other.key); updateChart(); }
+  else selectInstrument(other.chosen.id, diffFor(other.chosen).chosen?.id); // the active one: the other becomes the active
+  menuKey = other.key;
+}
+function addPane(other) {
+  current.pins.add(other.key);
+  updateChart();
+}
+function closePane(group) {
+  if (group.pinned) { current.pins.delete(group.key); updateChart(); return; }
+  const next = instrumentGroups().find((g) => g.pinned); // the active one closes: another one takes its place
+  if (!next) return;
+  current.pins.delete(next.key);
+  selectInstrument(next.chosen.id, diffFor(next.chosen).chosen?.id);
+}
+
+function buildPaneMenu() {
+  const host = els.paneMenuDyn;
+  host.replaceChildren();
+  if (!current) return;
+  const groups = instrumentGroups();
+  const group = groups.find((g) => g.key === menuKey);
+  if (!group) { els.paneMenu.hidden = true; return; }
+  const ins = group.chosen;
+  const { diffs, chosen } = diffFor(ins);
+  const part = (title, node) => {
+    const box = document.createElement('div');
+    box.className = 'fp-group';
+    const label = document.createElement('span');
+    label.className = 'fp-label';
+    label.textContent = title;
+    box.append(label, node);
+    host.append(box);
+  };
+  const seg = (items, pressed, onPick) => {
+    const box = document.createElement('div');
+    box.className = 'seg fret-seg';
+    for (const item of items) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = item.label;
+      b.setAttribute('aria-pressed', String(pressed(item)));
+      b.addEventListener('click', () => onPick(item));
+      box.append(b);
+    }
+    return box;
+  };
+  const head = document.createElement('div');
+  head.className = 'pm-head';
+  head.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[ins.base] || 'music'}"/></svg><b></b>`;
+  head.querySelector('b').textContent = group.label;
+  host.append(head);
+  if (ins.mode !== 'vocals' && diffs.length) part('Difficulty', seg(diffs, (d) => d.id === chosen?.id, (d) => pickDifficulty(group, ins, d.id)));
+  if (group.options.length > 1) { // the type: 4 lanes / Pro / Pro 7 lanes, Vocals / Harmony
+    part('Type', seg(group.options.map((o) => ({ label: o.modeLabel ?? o.label, option: o })), (m) => m.option.id === ins.id, (m) => {
+      current.modeChoice[group.key] = m.option.id;
+      if (group.pinned) updateChart(); // a fretboard shown next to the active one stays in place
+      else selectInstrument(m.option.id, diffFor(m.option).chosen?.id);
+    }));
+  }
+  const hidden = groups.filter((g) => !g.active && !g.pinned);
+  const list = (title, onPick) => {
+    if (!hidden.length) return;
+    const box = document.createElement('div');
+    box.className = 'pm-list';
+    for (const other of hidden) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pm-item';
+      b.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[other.chosen.base] || 'music'}"/></svg><span></span>`;
+      b.querySelector('span').textContent = other.label;
+      b.addEventListener('click', () => onPick(other));
+      box.append(b);
+    }
+    part(title, box);
+  };
+  list('Swap with', (other) => replacePane(group, other));
+  list('Add instrument', addPane);
+  const canClose = group.pinned || groups.some((g) => g.pinned);
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'pm-item pm-close';
+  close.disabled = !canClose;
+  close.title = canClose ? '' : 'It is the only instrument on screen';
+  close.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg><span>Close this instrument</span>';
+  close.addEventListener('click', () => { closePane(group); els.paneMenu.hidden = true; });
+  host.append(close);
+}
 
 // ---------- Several fretboards: swipe (or drag) sideways to bring the next one into view when they do not all fit ----------
 els.highway.style.touchAction = 'none'; // the stage does not scroll: the gestures are ours
@@ -1718,6 +1846,7 @@ function frame() {
     }
     const chartTime = t - settings.chartDelay;
     highway.render(chartTime);
+    syncPaneTags();
     const index = chart.sections.length ? sectionIndexAt(chart.sections, chartTime) : -1;
     if (index >= 0) setActiveSection(index);
     if (!seeking) {
@@ -1731,6 +1860,7 @@ function frame() {
     }
   } else {
     highway.render(0);
+    syncPaneTags();
   }
   requestAnimationFrame(frame);
 }

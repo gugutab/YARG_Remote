@@ -60,6 +60,7 @@ export class Highway {
     this.paneMin = 280; // narrowest a fretboard may get before the others move out of view (swipe to bring them in)
     this.focus = 0; // first fretboard in view when they do not all fit
     this.perScreen = 1;
+    this.paneRects = []; // where each chart is drawn this frame: { key, label, icon, x, y, w, h }
     this.sheets = []; // the lyric sheets on screen this frame: { x, y, w, h, step, hits, state } (canvas coordinates)
     this.countdowns = true; // show the wait countdowns
     this.weights = {}; // relative width of each fretboard, by pane key (dragging the dividers between them changes it)
@@ -99,9 +100,9 @@ export class Highway {
 
   // items: [{ chart, label }]. The first lane chart keeps the view when the others do not fit.
   setCharts(items) {
-    this.panes = items.map(({ chart, label, key }) => {
+    this.panes = items.map(({ chart, label, key, icon }) => {
       markStarPowerNotes(chart);
-      return { chart, label: label ?? '', key: key ?? label ?? '', maxLength: Math.max(0, ...chart.notes.map((n) => n.length || 0)), vRange: null }; // the vocal range is re-fitted per chart
+      return { chart, label: label ?? '', icon: icon ?? 'music', key: key ?? label ?? '', maxLength: Math.max(0, ...chart.notes.map((n) => n.length || 0)), vRange: null }; // the vocal range is re-fitted per chart
     });
     this.chart = this.panes[0]?.chart ?? null;
     this.focus = 0;
@@ -148,16 +149,17 @@ export class Highway {
 
     this.sheets = [];
     this.dividers = [];
+    this.paneRects = [];
     if (!this.panes.length) return; // the page shows its own welcome / loading overlay
     const vocal = this.panes.find((p) => p.chart.mode === 'vocals');
     const lanes = this.panes.filter((p) => p.chart.mode !== 'vocals');
     const many = this.panes.length > 1;
     if (!lanes.length) { // vocals alone
       this.vocalAlone = true;
-      if (this.vocalView === 'karaoke') this.drawPane(vocal, t, 0, 0, w, h, many); // the lyrics fill the stage (renderKaraoke)
+      if (this.vocalView === 'karaoke') this.drawPane(vocal, t, 0, 0, w, h); // the lyrics fill the stage (renderKaraoke)
       else { // the chart keeps the height it has next to other charts; the rest of the lyrics fill the space below
         const vh = this.bandHeight(h, Math.min(h * 0.34, 280));
-        this.drawPane(vocal, t, 0, 0, w, vh, many);
+        this.drawPane(vocal, t, 0, 0, w, vh);
         this.drawDivider({ type: 'row', y: vh - 1, w });
         g.save();
         g.beginPath();
@@ -174,7 +176,7 @@ export class Highway {
     let top = 0;
     if (vocal) { // vocals use the top of the other tracks
       top = this.bandHeight(h, (this.vocalView === 'karaoke' ? Math.min(h * 0.3, 230) : Math.min(h * 0.34, 280)) - 20); // 20 px shorter than the band of vocals alone
-      this.drawPane(vocal, t, 0, 0, w, top, many);
+      this.drawPane(vocal, t, 0, 0, w, top);
       this.drawDivider({ type: 'row', y: top - 1, w });
     }
     const per = Math.max(1, Math.min(lanes.length, Math.floor(w / this.paneMin)));
@@ -187,7 +189,7 @@ export class Highway {
     let x = 0;
     shown.forEach((pane, i) => {
       const pw = (w * weightOf(pane)) / sum;
-      this.drawPane(pane, t, x, top, pw, h - top, many);
+      this.drawPane(pane, t, x, top, pw, h - top);
       if (i > 0) this.drawDivider({ type: 'col', x: Math.round(x), y: top, h: h - top, a: shown[i - 1].key, b: pane.key });
       x += pw;
     });
@@ -249,8 +251,9 @@ export class Highway {
   }
 
   // One chart in the rectangle (x, y, pw, ph): the drawing code sees a canvas of that size.
-  drawPane(pane, t, x, y, pw, ph, labelled) {
+  drawPane(pane, t, x, y, pw, ph) {
     const g = this.g;
+    this.paneRects.push({ key: pane.key, label: pane.label, icon: pane.icon, x, y, w: pw, h: ph }); // the page puts the instrument tags here
     g.save();
     g.beginPath();
     g.rect(x, y, pw, ph);
@@ -266,20 +269,6 @@ export class Highway {
     else this.renderLanes(t, pw, ph);
     pane.vRange = this.vRange;
     if (!(pane.chart.mode === 'vocals' && this.vocalView === 'karaoke')) this.drawCountdown(pane, t, pw, ph);
-    if (labelled && pane.label) {
-      g.font = '600 12px system-ui';
-      g.textAlign = 'left';
-      g.textBaseline = 'middle';
-      const tw = g.measureText(pane.label).width;
-      g.fillStyle = 'rgba(0,0,0,0.45)';
-      g.beginPath();
-      if (g.roundRect) g.roundRect(8, 8, tw + 16, 22, 11);
-      else g.rect(8, 8, tw + 16, 22);
-      g.fill();
-      g.fillStyle = 'rgba(255,255,255,0.9)';
-      g.fillText(pane.label, 16, 19);
-      g.textBaseline = 'alphabetic';
-    }
     g.restore();
   }
 

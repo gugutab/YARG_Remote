@@ -252,31 +252,30 @@
       <main class="stage" id="stage">
         <canvas id="highway"></canvas>
         <button id="barShow" class="icon stage-btn bar-show" type="button" title="Show the top bar (B)" aria-label="Show the top bar" hidden><svg><use href="#i-chevron"/></svg></button>
-        <button id="fretBtn" class="icon stage-btn fret-btn" type="button" title="Fretboard settings" aria-label="Fretboard settings" aria-expanded="false" hidden><svg><use href="#i-sliders"/></svg></button>
-        <div class="popover fret-pop" id="fretPop" hidden>
-          <div class="fp-group" id="fpSpecialsGroup" hidden>
-            <span class="fp-label">Special notes</span>
-            <div id="fpSpecials" class="specials compact"></div>
-          </div>
-          <div class="fp-group" data-needs="vocals">
-            <span class="fp-label">Vocals</span>
-            <div class="seg fret-seg" id="vocalChoice" role="group" aria-label="Vocal view">
-              <button type="button" data-vocal="track" aria-pressed="true"><svg><use href="#i-mic"/></svg>Notes</button>
-              <button type="button" data-vocal="karaoke" aria-pressed="false"><svg><use href="#i-lyrics"/></svg>Karaoke</button>
+        <div id="paneTags" class="pane-tags"></div>
+        <div class="popover pane-menu align-left" id="paneMenu" hidden>
+          <div id="paneMenuDyn"></div>
+          <div id="paneMenuView" class="pm-view">
+            <div class="fp-group" data-needs="vocals">
+              <span class="fp-label">Vocals</span>
+              <div class="seg fret-seg" id="vocalChoice" role="group" aria-label="Vocal view">
+                <button type="button" data-vocal="track" aria-pressed="true"><svg><use href="#i-mic"/></svg>Notes</button>
+                <button type="button" data-vocal="karaoke" aria-pressed="false"><svg><use href="#i-lyrics"/></svg>Karaoke</button>
+              </div>
             </div>
-          </div>
-          <div class="fp-group" data-needs="lanes">
-            <span class="fp-label">View</span>
-            <div class="seg fret-seg" id="viewChoice" role="group" aria-label="View">
-              <button type="button" data-view="2d" aria-pressed="true"><svg><use href="#i-view-normal"/></svg>2D</button>
-              <button type="button" data-view="3d" aria-pressed="false"><svg><use href="#i-cube"/></svg>3D</button>
+            <div class="fp-group" data-needs="lanes">
+              <span class="fp-label">View</span>
+              <div class="seg fret-seg" id="viewChoice" role="group" aria-label="View">
+                <button type="button" data-view="2d" aria-pressed="true"><svg><use href="#i-view-normal"/></svg>2D</button>
+                <button type="button" data-view="3d" aria-pressed="false"><svg><use href="#i-cube"/></svg>3D</button>
+              </div>
             </div>
-          </div>
-          <div class="fp-group" data-needs="lanes">
-            <span class="fp-label">Notes</span>
-            <div class="seg fret-seg" id="noteChoice" role="group" aria-label="Note shape">
-              <button type="button" data-note="round" aria-pressed="true"><svg><use href="#i-circle"/></svg>Circles</button>
-              <button type="button" data-note="rect" aria-pressed="false"><svg><use href="#i-shapes"/></svg>Rectangles</button>
+            <div class="fp-group" data-needs="lanes">
+              <span class="fp-label">Notes</span>
+              <div class="seg fret-seg" id="noteChoice" role="group" aria-label="Note shape">
+                <button type="button" data-note="round" aria-pressed="true"><svg><use href="#i-circle"/></svg>Circles</button>
+                <button type="button" data-note="rect" aria-pressed="false"><svg><use href="#i-shapes"/></svg>Rectangles</button>
+              </div>
             </div>
           </div>
         </div>

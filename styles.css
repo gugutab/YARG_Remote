@@ -1102,3 +1102,28 @@ button.icon.close-song-info { position: absolute; top: 10px; right: 14px; z-inde
 .spc-count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; }
 .spc-row .icon svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; width: 14px; height: 14px; }
 .fret-pop .spc-name { font-size: 12.5px; }
+
+/* ---------- instrument tags over the charts, and their menu ---------- */
+.pane-tags { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+.pane-tag { position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px 0 8px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, .14); background: rgba(13, 17, 23, .62); color: #e6edf3; font: 600 12px/1 var(--font, system-ui); cursor: pointer; pointer-events: auto; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); white-space: nowrap; }
+.pane-tag:hover, .pane-tag[aria-expanded="true"] { background: rgba(13, 17, 23, .9); border-color: var(--accent); }
+.pane-tag svg { width: 16px; height: 16px; flex: none; fill: currentColor; }
+.pane-tag .chev { width: 6px; height: 6px; margin: -3px 0 0 2px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor; transform: rotate(45deg); opacity: .75; flex: none; }
+.pane-tag[aria-expanded="true"] .chev { transform: rotate(-135deg); margin-top: 3px; }
+.pane-menu { width: min(300px, calc(100vw - 16px)); display: flex; flex-direction: column; gap: 12px; }
+.pane-menu[hidden] { display: none; }
+#paneMenuDyn { display: flex; flex-direction: column; gap: 12px; }
+.pm-head { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.pm-head svg { width: 20px; height: 20px; color: var(--accent); fill: currentColor; }
+.pm-list { display: flex; flex-direction: column; gap: 2px; }
+.pm-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; background: transparent; border: 0; border-radius: 8px; color: var(--text); text-align: left; cursor: pointer; font: inherit; font-size: 13px; }
+.pm-item:hover:not(:disabled) { background: var(--panel-2); }
+.pm-item:disabled { opacity: .45; cursor: default; }
+.pm-item svg { width: 16px; height: 16px; flex: none; fill: currentColor; }
+.pm-close svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.pm-close:hover:not(:disabled) { color: #ff6b6b; }
+.pm-view { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.pm-view:not(:has(.fp-group:not([hidden]))) { display: none; }
+/* the top bar's play button lights up under the pointer */
+button.icon.primary:hover:not(:disabled) { filter: brightness(1.18); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
