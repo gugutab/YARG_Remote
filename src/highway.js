@@ -232,7 +232,6 @@ export class Highway {
         const vh = this.bandHeight(h, Math.min(h * 0.34, 280) - 20);
         this.drawPane(vocal, t, 0, 0, w, vh);
         this.drawDivider({ type: 'row', y: vh - 1, w });
-        this.trackBase(0, vh, w, h - vh);
         g.save();
         g.beginPath();
         g.rect(0, vh, w, h - vh);
