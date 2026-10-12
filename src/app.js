@@ -1953,12 +1953,13 @@ document.addEventListener('keydown', (e) => {
 // ---------- Frame loop (started once) ----------
 // Jumps in the song (seeking, a section, a lyric line) are animated on the fretboards: the notes rush past to the new place
 // instead of the chart snapping there. Only what the highway draws is eased; the clock, the sections and the audio use the real time.
-let vis = { shown: null, last: null, anim: null, chart: null };
+let vis = { shown: null, last: null, anim: null, chart: null, step: 0 };
+const MOTION_BLUR_MIN_STEP = 0.06; // seconds of song per frame from which the jump is blurred
 const SEEK_JUMP_SEC = 0.75; // a bigger step between two frames than playback or a drag can make
 function visualChartTime(ct) {
   const now = performance.now();
   if (!prefs.get('highway.seekAnimation') || vis.chart !== chart || vis.last === null) {
-    vis = { shown: ct, last: ct, anim: null, chart };
+    vis = { shown: ct, last: ct, anim: null, chart, step: 0 };
     return ct;
   }
   if (Math.abs(ct - vis.last) > SEEK_JUMP_SEC) { // a jump: ease from where the chart is shown now
@@ -1966,10 +1967,12 @@ function visualChartTime(ct) {
     vis.anim = { from, t0: now, dur: Math.min(700, 280 + Math.abs(ct - from) * 25) }; // longer for longer jumps, 0.7 s at most
   }
   vis.last = ct;
+  const before = vis.shown;
   if (vis.anim) {
     const p = (now - vis.anim.t0) / vis.anim.dur;
     if (p >= 1) { vis.anim = null; vis.shown = ct; } else vis.shown = vis.anim.from + (ct - vis.anim.from) * (1 - (1 - p) ** 3); // ease-out: fast, then settles
   } else vis.shown = ct;
+  vis.step = vis.shown - before; // how far the drawn time moved this frame
   return vis.shown;
 }
 
@@ -1985,7 +1988,11 @@ function frame() {
       syncPlayButton();
     }
     const chartTime = t - settings.chartDelay;
-    highway.render(visualChartTime(chartTime));
+    const shownTime = visualChartTime(chartTime);
+    if (vis.anim && Math.abs(vis.step) > MOTION_BLUR_MIN_STEP && prefs.get('highway.motionBlur')) { // a fast jump: blur the motion
+      const span = Math.max(-0.6, Math.min(0.6, vis.step * 0.85)); // the exposure: most of the frame, within limits
+      highway.renderBlur(Array.from({ length: 8 }, (_, k) => shownTime - span * (1 - k / 7)));
+    } else highway.render(shownTime);
     syncPaneTags();
     const index = chart.sections.length ? sectionIndexAt(chart.sections, chartTime) : -1;
     if (index >= 0) setActiveSection(index);

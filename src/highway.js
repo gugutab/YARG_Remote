@@ -144,6 +144,37 @@ export class Highway {
 
   render(t) {
     const { w, h } = this.resize();
+    this.draw(t, w, h);
+  }
+
+  // Motion blur: the chart drawn at several moments of the time that passes during one frame and averaged, so notes that rush
+  // by (a seek animation) leave a trail. `times` run from the start of the exposure to the time shown now.
+  renderBlur(times) {
+    const { w, h } = this.resize();
+    const main = this.g;
+    const cw = this.canvas.width;
+    const ch = this.canvas.height;
+    this.blurCanvas ??= document.createElement('canvas');
+    if (this.blurCanvas.width !== cw || this.blurCanvas.height !== ch) { this.blurCanvas.width = cw; this.blurCanvas.height = ch; }
+    const side = this.blurCanvas.getContext('2d');
+    const dpr = cw / w;
+    try {
+      times.forEach((t, i) => {
+        this.g = side; // every method draws on this.g
+        side.setTransform(dpr, 0, 0, dpr, 0, 0);
+        this.draw(t, w, h);
+        main.save();
+        main.setTransform(1, 0, 0, 1, 0, 0);
+        main.globalAlpha = 1 / (i + 1); // a running average of the samples
+        main.drawImage(this.blurCanvas, 0, 0);
+        main.restore();
+      });
+    } finally {
+      this.g = main;
+    }
+  }
+
+  draw(t, w, h) {
     const g = this.g;
     g.fillStyle = this.bg;
     g.fillRect(0, 0, w, h);
