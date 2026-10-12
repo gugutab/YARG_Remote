@@ -1193,3 +1193,6 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 
 /* the top bar's tab is glued to the top edge, as the library's is to the left one, and sits at the right corner */
 .app.bar-hidden button.icon.stage-btn.bar-show.edge-top { left: auto; right: var(--stage-btn-right, 12px); top: 0; transform: none; border-top: 0; border-radius: 0 0 10px 10px; }
+
+/* a list that does not scroll has no rail: its rows use that space too */
+.songs-wrap.no-scroll.no-scroll { --rail-w: 0px; }

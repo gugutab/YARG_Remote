@@ -332,8 +332,14 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     if (!rail) return;
     const H = rail.clientHeight;
     const W = rail.clientWidth;
-    const off = range() <= 0 || H <= 0; // nothing to scroll: the rail is invisible but keeps its size
+    const off = range() <= 0 || H <= 0; // nothing to scroll: the rail is invisible...
     rail.classList.toggle('off', off);
+    const wrap = scroller.closest('.songs-wrap');
+    if (wrap && wrap.classList.contains('no-scroll') !== off) { // ...and its space goes to the rows (CSS: --rail-w becomes 0)
+      wrap.classList.toggle('no-scroll', off);
+      autoColumns();
+      if (mode === 'large') { for (const entry of rows.values()) { clearTimeout(entry.timer); entry.el.remove(); } rows.clear(); schedule(); } // the chips per line follow the width
+    }
     if (off) return;
     const dpr = window.devicePixelRatio || 1;
     canvas.width = Math.round(W * dpr);
