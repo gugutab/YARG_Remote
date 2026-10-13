@@ -1473,7 +1473,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .app:not(.bar-hidden) .topbar > .tb-cover { grid-column: 1; grid-row: 1; }
   .app:not(.bar-hidden) .topbar > .tb-main { display: contents; }
   .app:not(.bar-hidden) .tb-top { grid-column: 2; grid-row: 1; align-self: center; }
-  .app:not(.bar-hidden) .transport { grid-column: 3; grid-row: 1; align-self: end; margin: 0 0 2px; gap: 4px; }
+  .app:not(.bar-hidden) .transport { grid-column: 3; grid-row: 1; align-self: end; margin: 0 0 2px; gap: 10px; }
   .app:not(.bar-hidden) .tools { grid-column: 4 / 6; grid-row: 1; align-self: center; justify-self: end; }
   /* bigger prev / play / next */
   .app:not(.bar-hidden) .transport .tp-row1 { gap: 6px; }
