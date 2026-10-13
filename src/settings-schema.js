@@ -28,6 +28,7 @@ export const SECTIONS = [
       { id: 'theme', type: 'custom', ids: ['theme.preset', 'theme.overrides', 'theme.saved'], label: 'Theme', keywords: 'colour color dark light preset accent background palette saved import export' },
       { id: 'ui.radius', type: 'range', label: 'Corner roundness', help: 'How round cards, panels and menus are.', min: 0, max: 20, step: 1, unit: 'px', default: 10 },
       { id: 'ui.font', type: 'choice', label: 'Font', options: FONT_OPTIONS.map(({ value, label }) => ({ value, label })), default: 'system' },
+      { id: 'ui.barPosition', type: 'choice', label: 'Player bar position', help: 'Where the bar with the title, the controls and the seek bar sits: under the fretboards (the seek bar is on its top edge) or above them.', options: [{ value: 'bottom', label: 'Bottom' }, { value: 'top', label: 'Top' }], default: 'bottom', keywords: 'menu top bar controls seek' },
       { id: 'ui.animations', type: 'toggle', label: 'Animations', help: 'Fades and slides in the interface. Turn off to reduce motion.', default: true, keywords: 'motion transition reduce' },
     ],
   },

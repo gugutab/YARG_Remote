@@ -1430,14 +1430,22 @@ function closePopovers(except) {
   }
 }
 // Opens the popover under its button, aligned to the button's right edge but clamped inside the viewport.
+const barAtBottom = () => els.app.classList.contains('bar-bottom');
 function placePopover(btn, pop) {
   const b = btn.getBoundingClientRect();
   const width = pop.offsetWidth;
   const anchor = pop.classList.contains('align-left') ? b.left : b.right - width; // popovers near the left edge open to the right
   const left = Math.min(Math.max(8, anchor), window.innerWidth - width - 8);
   pop.style.left = `${Math.max(8, left)}px`;
-  pop.style.top = `${b.bottom + 8}px`;
-  pop.style.maxHeight = `${Math.max(120, window.innerHeight - b.bottom - 16)}px`;
+  if (barAtBottom() && btn.closest('.topbar')) { // the bar is under the stage: its menus open upwards
+    pop.style.top = 'auto';
+    pop.style.bottom = `${window.innerHeight - b.top + 8}px`;
+    pop.style.maxHeight = `${Math.max(120, b.top - 16)}px`;
+  } else {
+    pop.style.bottom = 'auto';
+    pop.style.top = `${b.bottom + 8}px`;
+    pop.style.maxHeight = `${Math.max(120, window.innerHeight - b.bottom - 16)}px`;
+  }
 }
 window.addEventListener('resize', () => closePopovers());
 function registerPopover(btn, pop) {
@@ -1657,7 +1665,7 @@ function showSeekTip(x, time, label) {
   const r = els.seekbox.getBoundingClientRect();
   const w = tip.offsetWidth;
   tip.style.left = `${Math.max(4, Math.min(window.innerWidth - w - 4, x - w / 2))}px`;
-  tip.style.top = `${r.bottom + 6}px`;
+  tip.style.top = barAtBottom() ? `${r.top - tip.offsetHeight - 6}px` : `${r.bottom + 6}px`; // above the seek bar when the bar is at the bottom
 }
 function hideSeekTip() { els.seekTip.hidden = true; }
 els.seekbox.addEventListener('pointermove', (e) => {
@@ -2485,6 +2493,7 @@ const EFFECTS = {
   'highway.trackOpacity': (v) => { highway.trackOpacity = v / 100; },
   'highway.stageColorOn': () => { applyStage(); syncVizPop(); },
   'highway.stageColor': () => { applyStage(); syncVizPop(); },
+  'ui.barPosition': (v) => { els.app.classList.toggle('bar-bottom', v !== 'top'); closePopovers(); },
   'ui.animations': (v) => { document.documentElement.dataset.motion = v ? 'on' : 'off'; },
 };
 for (const [id, fn] of Object.entries(EFFECTS)) fn(prefs.get(id));

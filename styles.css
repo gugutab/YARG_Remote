@@ -1572,3 +1572,19 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .app:not(.bar-hidden) .now-artist { margin-top: 5px; }
   .app:not(.bar-hidden) .now-tertiary:not(:empty) { margin-top: 4px; }
 }
+
+/* ---------- The bar at the bottom (the default): the seek bar sits on its top edge ---------- */
+.app.bar-bottom .main > .topbar { order: 3; border-bottom: 0; border-top: 4px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.app.bar-bottom .main > .stage { order: 1; }
+.app.bar-bottom .seekbox { top: -6px; bottom: auto; }
+.app.bar-bottom .seekbox .tick { bottom: auto; top: 6px; }
+.app.bar-bottom .seekbox:hover .tick { bottom: auto; top: 5px; }
+.app.immersive.bar-bottom .topbar { top: auto; bottom: 0; }
+.app.immersive.idle.bar-bottom .topbar { transform: translateY(100%); }
+/* the compact bar's padding is mirrored (the seek line is above the content now) */
+@media (min-width: 701px) { .app.bar-bottom.bar-hidden .topbar { padding-top: 10px; padding-bottom: 4px; } }
+@container song (max-width: 700px) { .app.bar-bottom.bar-hidden .topbar { padding-top: 10px; padding-bottom: 4px; } }
+/* wide open bar: the time row stays next to the seek bar, which is above the buttons now */
+@container song (min-width: 800px) {
+  .app.bar-bottom:not(.bar-hidden) .transport { flex-direction: column-reverse; align-self: start; margin: 2px 0 0; }
+}
