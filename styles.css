@@ -1613,3 +1613,70 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .sc-key.capturing { border-color: var(--accent); color: var(--accent); }
 .sc-reset { opacity: .7; }
 .sc-reset[hidden] { display: inline-flex !important; visibility: hidden; }
+
+/* ---------- Accessibility pass: reduced motion, touch targets ---------- */
+/* Reduced motion: the OS preference acts as the default of Settings > Animations (app.js sets data-motion; "on" means the user
+   chose animations explicitly, so it wins). This block covers the first paint, before the script has run. */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="on"]) *, :root:not([data-motion="on"]) *::before, :root:not([data-motion="on"]) *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+
+/* Touch screens: every control gets a 44x44 px hit area. Where the layout has room the control itself grows; in the top bar,
+   the pane tags, the edge tabs and the stage buttons (fixed metrics) an invisible ::before reaches out instead, so the look and
+   the bar heights do not change. Fine pointers (mouse) are untouched. */
+@media (pointer: coarse) {
+  :where(.topbar button, .pane-tag, .edge-tab, button.stage-btn, .mix-row button:not(.stem-btn)) { position: relative; } /* zero specificity: absolute/fixed rules keep winning */
+  .topbar button::before, .pane-tag::before, .edge-tab::before, button.stage-btn::before, .mix-row button:not(.stem-btn)::before {
+    content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%);
+  }
+  .edge-left::before { left: 0; width: 44px; transform: translateY(-50%); } /* tabs on the screen edge reach inwards only */
+  .edge-right::before { left: auto; right: 0; width: 44px; transform: translateY(-50%); }
+  input[type="color"], .stem-btn { min-width: 44px; min-height: 44px; }
+
+  /* seek bar: same visual line (the track stays centred on the 16 px seekbox), a 44 px tall input that reaches towards the stage
+     (up with the bar at the bottom, down with the bar on top) so it does not take the bar's own buttons */
+  .seekbox input { height: 32px; box-sizing: border-box; margin: -16px 0 0; padding: 16px 0 0; } /* reaches only 16 px into the stage: pane tags and lyrics there stay tappable */
+  .app:not(.bar-bottom) .seekbox input { margin: 0 0 -16px; padding: 0 0 16px; }
+  .seekbox .loop-handle { top: -16px; bottom: -2px; width: 28px; }
+  .seekbox .loop-handle::before { top: 14px; bottom: 0; }
+  /* the two handles reach to opposite sides, so a short loop never leaves one under the other */
+  .seekbox .loop-handle[data-which="start"] { margin-left: -24px; }
+  .seekbox .loop-handle[data-which="end"] { margin-left: -4px; }
+  .seekbox .loop-handle[data-which="start"]::before { left: 21px; right: 3px; }
+  .seekbox .loop-handle[data-which="end"]::before { left: 3px; right: 21px; }
+  .app:not(.bar-bottom) .seekbox .loop-handle { top: -2px; bottom: -16px; }
+  .app:not(.bar-bottom) .seekbox .loop-handle::before { top: 0; bottom: 14px; }
+
+  /* divider between the panels */
+  .splitter { width: 24px; margin: 0 -13px 0 -11px; }
+  .splitter::after { left: 11px; }
+
+  /* library, details, popovers and settings: the controls grow */
+  .library button, .library select, .info button:not(.icard-head), .popover button, .popover select, .settings-page button, .settings-page select,
+  .chip, .chip-btn, .chip-select, .seg button, .view-seg button { min-height: 44px; }
+  .library button.icon, .info button.icon, .popover button.icon, .settings-page button.icon, .view-seg button, .seg.compact button, .sp-reset, .sc-reset { min-width: 44px; }
+  .chip-select select { min-height: 42px; }
+  .active-filters { max-height: 100px; }
+  .icard-head { min-height: 44px; }
+  .lib-head { min-height: 56px; }
+  .sp-nav-btn, .sc-key { min-height: 44px; }
+  .settings-page input[type="range"], .mix-row input[type="range"], .row input[type="range"], .listen input[type="range"] { min-height: 44px; }
+  .settings-page input:not([type="range"]):not([type="checkbox"]):not([type="radio"]) { min-height: 44px; }
+  .sp-switch { width: 52px; height: 44px; }
+  .sp-switch i { top: 10px; bottom: 10px; left: 5px; right: 5px; }
+  .sp-switch input { inset: 0; width: 100%; height: 100%; }
+  .search input { min-height: 44px; padding-right: 52px; }
+  .search svg { top: 14px; }
+  .search .filter-btn { top: 0; right: 0; width: 44px; height: 44px; }
+  .search .filter-btn svg { top: auto; }
+  .extra summary { min-height: 44px; display: flex; align-items: center; }
+}
+/* Touch, extended bar with room (the 2-column tool grid of a phone keeps its 28 px pitch): air between the buttons so the expanded
+   hit areas do not overlap. */
+@media (pointer: coarse) {
+  @container song (min-width: 480px) {
+    .app:not(.bar-hidden) .tools { gap: 8px; }
+    .app:not(.bar-hidden) .tp-row1 { gap: 6px; }
+  }
+  .chip-btn.sort-dir { min-width: 44px; }
+}

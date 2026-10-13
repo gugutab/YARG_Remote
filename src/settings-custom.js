@@ -154,7 +154,10 @@ export function renderDataTools(host, { settings, extra = [], notify = () => {} 
     el('button', { type: 'button', class: 'chip-btn', text: 'Import settings…', onclick: async () => {
       const text = await pickFile('.json,application/json');
       if (text == null) return;
-      try { say(`Imported ${settings.importJson(text)} settings.`); } catch (e) { say(e.message); }
+      try {
+        const { imported, skipped } = settings.importJson(text);
+        say(`Imported ${imported} settings${skipped ? ` (${skipped} skipped)` : ''}.`);
+      } catch (e) { say(e.message); }
     } }),
     el('button', { type: 'button', class: 'chip-btn danger', text: 'Reset all settings', onclick: () => {
       if (window.confirm('Reset every setting to its default?')) { settings.resetAll(); say('All settings are back to their defaults.'); }

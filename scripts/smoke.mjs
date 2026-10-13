@@ -12,7 +12,6 @@ import { fileURLToPath } from 'node:url';
 import { buildMidi, event, trackName, tempo120, on, off } from '../test/smf.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const CACHE = path.join(ROOT, '.cache', 'library.json');
 const failures = [];
 const check = (ok, label, extra = '') => {
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${label}${extra ? ` (${extra})` : ''}`);
@@ -30,7 +29,7 @@ const request = (port, target, { method = 'GET', headers = {} } = {}) => new Pro
   const req = http.request({ host: '127.0.0.1', port, path: target, method, headers }, (res) => {
     const chunks = [];
     res.on('data', (c) => chunks.push(c));
-    res.on('end', () => resolve({ status: res.statusCode, type: res.headers['content-type'] || '', body: Buffer.concat(chunks) }));
+    res.on('end', () => resolve({ status: res.statusCode, type: res.headers['content-type'] || '', etag: res.headers.etag, lastModified: res.headers['last-modified'], body: Buffer.concat(chunks) }));
   });
   req.setTimeout(10000, () => req.destroy(new Error(`timeout: ${target}`)));
   req.on('error', reject);
@@ -64,7 +63,7 @@ function moduleGraph(indexHtml) {
 }
 
 const songsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yarg-smoke-'));
-const cacheBackup = fs.existsSync(CACHE) ? fs.readFileSync(CACHE) : null; // the server overwrites the index cache
+const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yarg-smoke-cache-')); // CACHE_DIR: the real .cache is never touched
 let server;
 try {
   const dir = path.join(songsDir, 'Smoke Test - Synthetic');
@@ -79,7 +78,7 @@ try {
   const port = await freePort();
   server = spawn(process.execPath, [path.join(ROOT, 'server.mjs')], {
     cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, SONGS_DIR: songsDir, PORT: String(port), HOST: '127.0.0.1' },
+    env: { ...process.env, SONGS_DIR: songsDir, CACHE_DIR: cacheDir, PORT: String(port), HOST: '127.0.0.1' },
   });
   let log = '';
   server.stdout.on('data', (d) => { log += d; });
@@ -125,6 +124,11 @@ try {
   check(wav.status === 200 && wav.type === 'audio/wav', 'GET /songs/.../song.wav', `${wav.status} ${wav.type}`);
   const part = await get(port, `${base}/song.wav`, { Range: 'bytes=0-43' });
   check(part.status === 206 && part.body.length === 44, 'Range request on song.wav', `${part.status}, ${part.body.length} bytes`);
+  const wavHead = await request(port, `${base}/song.wav`, { method: 'HEAD' });
+  const etag = wav.etag;
+  check(!!etag && !!wav.lastModified && wavHead.status === 200, 'ETag and Last-Modified on song.wav', String(etag));
+  const cond = await get(port, `${base}/song.wav`, { 'If-None-Match': etag });
+  check(cond.status === 304 && cond.body.length === 0, 'If-None-Match answers 304', String(cond.status));
   const ini = await get(port, `${base}/song.ini`);
   check(ini.status === 200 && ini.body.toString().includes('Smoke Song'), 'GET /songs/.../song.ini', `${ini.status}`);
 
@@ -148,10 +152,7 @@ try {
     server.kill();
     await new Promise((resolve) => { server.once('exit', resolve); setTimeout(resolve, 3000); });
   }
-  try {
-    if (cacheBackup) fs.writeFileSync(CACHE, cacheBackup);
-    else fs.rmSync(CACHE, { force: true });
-  } catch { /* best effort */ }
+  fs.rmSync(cacheDir, { recursive: true, force: true });
   fs.rmSync(songsDir, { recursive: true, force: true });
 }
 

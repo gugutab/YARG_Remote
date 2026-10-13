@@ -26,8 +26,34 @@ export function entriesFromFileList(fileList) {
   }));
 }
 
+// Files read at once while scanning (getFile + parse). A library of ~750 songs would otherwise queue hundreds of handle
+// lookups at the same time; a few in flight keep the disk busy without exhausting the browser's file handles.
+export const SCAN_CONCURRENCY = 8;
+
+// Like items.map(fn) but with at most `limit` calls in flight; results keep the input order. The first rejection stops
+// new work from starting and is the one that propagates (as with Promise.all).
+export async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  let failed = false;
+  const worker = async () => {
+    while (!failed && next < items.length) {
+      const i = next++;
+      try {
+        out[i] = await fn(items[i], i);
+      } catch (err) {
+        failed = true;
+        throw err;
+      }
+    }
+  };
+  const n = Math.max(1, Math.min(Math.floor(limit) || 1, items.length));
+  await Promise.all(Array.from({ length: n }, worker));
+  return out;
+}
+
 // Groups flat entries into songs. `entries` may be an async iterable or an array.
-export async function scanSongs(entries) {
+export async function scanSongs(entries, { concurrency = SCAN_CONCURRENCY } = {}) {
   const byDir = new Map();
   const sngEntries = [];
   for await (const entry of entries) {
@@ -39,12 +65,11 @@ export async function scanSongs(entries) {
     byDir.get(dir).set(name.toLowerCase(), { name, path: entry.path, getFile: entry.getFile });
   }
 
-  const songs = [];
-  for (const [dir, files] of byDir) {
-    if (!SONG_MARKERS.some((m) => files.has(m))) continue;
+  const folders = [...byDir].filter(([, files]) => SONG_MARKERS.some((m) => files.has(m)));
+  const folderSongs = await mapLimit(folders, concurrency, async ([dir, files]) => {
     const folderName = dir.split('/').pop() || dir;
     const ini = files.has('song.ini') ? parseSongIni(new Uint8Array(await readBytes(files.get('song.ini')))) : {};
-    songs.push({
+    return {
       id: dir,
       folder: dir,
       title: String(ini.name || folderName), // song.ini values like "1999" are parsed as numbers
@@ -52,12 +77,10 @@ export async function scanSongs(entries) {
       album: String(ini.album || ''),
       ini,
       files,
-    });
-  }
-  for (const entry of sngEntries) {
-    const song = await sngSong(entry);
-    if (song) songs.push(song);
-  }
+    };
+  });
+  const sngSongs = await mapLimit(sngEntries, concurrency, sngSong);
+  const songs = [...folderSongs, ...sngSongs.filter(Boolean)];
   songs.sort((a, b) => a.title.localeCompare(b.title, 'en', { sensitivity: 'base' }));
   return songs;
 }

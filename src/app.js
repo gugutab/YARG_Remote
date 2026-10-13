@@ -14,7 +14,7 @@ import { previewWindow } from './preview.js';
 import { metaRows, extraRows, chartStats, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel } from './songinfo.js';
 import { parseRoute, formatRoute } from './route.js';
 import { createSettings } from './settings.js';
-import { SECTIONS, buildDefaults, FONT_OPTIONS } from './settings-schema.js';
+import { SECTIONS, buildDefaults, buildValidator, FONT_OPTIONS } from './settings-schema.js';
 import { resolveTheme, applyTheme } from './themes.js';
 import { mountSettings } from './settings-ui.js';
 import { renderThemeStudio, renderDataTools, renderShortcuts } from './settings-custom.js';
@@ -75,8 +75,19 @@ let detached = false; // list restored from storage without file access (browser
 let pendingSongId = null; // song clicked while detached; opened once the folder is picked again
 
 // ---------- Settings and theme (applied first, so the first frame already has the right colours) ----------
-const prefs = createSettings({ defaults: buildDefaults(), storage: (() => { try { return localStorage; } catch { return null; } })() });
+const prefs = createSettings({ defaults: buildDefaults(), validate: buildValidator(SECTIONS), storage: (() => { try { return localStorage; } catch { return null; } })() });
 const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+// Reduced motion: the OS preference sets the default of the motion settings, never an explicit choice. The settings store drops a
+// value equal to its default, so "the user switched it back on" is remembered separately (MOTION_KEY).
+const reduceQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+let osReduceMotion = reduceQuery.matches; // cached: reading .matches every frame makes Chrome skip the 'change' event
+const MOTION_IDS = ['ui.animations', 'highway.seekAnimation', 'highway.motionBlur'];
+const MOTION_KEY = 'yargremote.motionTouched';
+const motionTouched = (() => { try { return new Set(JSON.parse(localStorage.getItem(MOTION_KEY)) || []); } catch { return new Set(); } })();
+function motionPref(id) {
+  const v = prefs.get(id);
+  return v && osReduceMotion && prefs.isDefault(id) && !motionTouched.has(id) ? false : v;
+}
 let themeStage = '#0d1117';
 // The stage colour: the theme's, or the one picked in the visualizer menu / settings.
 function applyStage() {
@@ -1690,7 +1701,7 @@ els.seekbox.addEventListener('pointerleave', () => { if (!loopDrag) hideSeekTip(
 // animation off, it is immediate.
 function seekTo(t) {
   const dist = Math.abs(t - player.currentTime());
-  if (!ready || !player.playing || dist <= SEEK_JUMP_SEC || !prefs.get('highway.seekAnimation')) { player.seek(t); return; }
+  if (!ready || !player.playing || dist <= SEEK_JUMP_SEC || !motionPref('highway.seekAnimation')) { player.seek(t); return; }
   const ms = seekAnimMs(dist);
   pendingSeekDur = ms;
   player.scrubTo(t, ms);
@@ -2005,6 +2016,7 @@ function buildPaneMenu() {
     const out = box.querySelector('output');
     const reset = box.querySelector('button');
     Object.assign(input, { min, max, step });
+    input.setAttribute('aria-label', name === 'neck' ? 'Neck speed' : 'Chart delay');
     const paint = () => {
       const v = highway.paneOpt(group.key, name);
       input.value = v;
@@ -2305,7 +2317,10 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.code === 'Escape') {
     if (popovers.every(([, pop]) => pop.hidden) && infoOpen && loadInfo.state !== 'idle') setInfoOpen(false); // details -> chart
+    const open = popovers.find(([, pop]) => !pop.hidden);
+    const owner = open && (open[1] === els.paneMenu ? document.querySelector('.pane-tag[aria-expanded="true"]') : open[0]);
     closePopovers();
+    if (owner?.isConnected && owner.offsetParent !== null) owner.focus({ preventScroll: true }); // keyboard users land back on the button
     return;
   }
   if (typing) return;
@@ -2327,7 +2342,7 @@ const seekAnimMs = (dist) => Math.min(700, 280 + dist * 25); // longer for longe
 let pendingSeekDur = null; // set by seekTo: the duration the audio scrub takes, so the fretboards' animation lasts the same
 function visualChartTime(ct) {
   const now = performance.now();
-  if (!prefs.get('highway.seekAnimation') || vis.chart !== chart || vis.last === null) {
+  if (!motionPref('highway.seekAnimation') || vis.chart !== chart || vis.last === null) {
     instantJump = false; // (a pending instant jump is moot: nothing is animated now)
     vis = { shown: ct, last: ct, anim: null, chart, step: 0 };
     return ct;
@@ -2437,7 +2452,7 @@ function frame(frameTs) {
     else {
       const chartTime = t - settings.chartDelay;
       const shownTime = guarded('visual time', () => visualChartTime(chartTime)) ?? chartTime;
-      if (vis.anim && Math.abs(vis.step) > MOTION_BLUR_MIN_STEP && prefs.get('highway.motionBlur')) { // a fast jump: blur the motion
+      if (vis.anim && Math.abs(vis.step) > MOTION_BLUR_MIN_STEP && motionPref('highway.motionBlur')) { // a fast jump: blur the motion
         const span = Math.max(-0.6, Math.min(0.6, vis.step * 0.85)); // the exposure: most of the frame, within limits
         draw(() => highway.renderBlur(Array.from({ length: 8 }, (_, k) => shownTime - span * (1 - k / 7))));
       } else if (canSkipDraw(frameStart, shownTime)) { /* idle: the picture is unchanged */ } else {
@@ -2536,10 +2551,17 @@ const EFFECTS = {
   'highway.stageColorOn': () => { applyStage(); syncVizPop(); },
   'highway.stageColor': () => { applyStage(); syncVizPop(); },
   'ui.barPosition': (v) => { els.app.classList.toggle('bar-bottom', v !== 'top'); closePopovers(); },
-  'ui.animations': (v) => { document.documentElement.dataset.motion = v ? 'on' : 'off'; },
+  'ui.animations': () => { document.documentElement.dataset.motion = motionPref('ui.animations') ? 'on' : 'off'; },
 };
 for (const [id, fn] of Object.entries(EFFECTS)) fn(prefs.get(id));
-prefs.subscribe((id, value) => { wakeUp(); EFFECTS[id]?.(value); });
+prefs.subscribe((id, value) => {
+  if (MOTION_IDS.includes(id) && !motionTouched.has(id)) { // the user chose: from now on the OS preference no longer decides
+    motionTouched.add(id);
+    try { localStorage.setItem(MOTION_KEY, JSON.stringify([...motionTouched])); } catch { /* session only */ }
+  }
+  wakeUp(); EFFECTS[id]?.(value);
+});
+reduceQuery.addEventListener?.('change', (e) => { osReduceMotion = e.matches; EFFECTS['ui.animations'](); });
 
 const settingsPage = mountSettings({
   root: document.getElementById('settingsPage'), settings: prefs, sections: SECTIONS,

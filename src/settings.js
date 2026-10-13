@@ -7,15 +7,36 @@ const KEY = 'yargremote.settings';
 const clone = (v) => (v && typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-export function createSettings({ defaults = {}, storage = null, key = KEY } = {}) {
+// `validate(id, value) -> { ok, value }` (optional, see buildValidator in settings-schema.js) checks what comes from outside:
+// the stored JSON and imported files. A stored value that fails falls back to the default, silently; an imported one is
+// skipped and counted. Without it values are trusted (the unit tests of the plain store). Only ids that have a default
+// are ever read, so `__proto__` and friends in a hand-edited file cannot reach the store.
+export function createSettings({ defaults = {}, storage = null, key = KEY, validate = null } = {}) {
   let values = {}; // only what differs from the defaults
   const listeners = new Set();
+
+  // { ok, value } for an outside value; never throws.
+  const accept = (id, value) => {
+    if (!Object.hasOwn(defaults, id)) return { ok: false };
+    if (!validate) return { ok: true, value };
+    try {
+      const r = validate(id, value);
+      return r && r.ok ? { ok: true, value: r.value } : { ok: false };
+    } catch {
+      return { ok: false };
+    }
+  };
 
   try {
     const raw = storage?.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) values = parsed;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        for (const [id, value] of Object.entries(parsed)) {
+          const r = accept(id, value);
+          if (r.ok && !same(r.value, defaults[id])) values[id] = clone(r.value);
+        }
+      }
     }
   } catch { /* unreadable storage: start from the defaults */ }
 
@@ -54,7 +75,8 @@ export function createSettings({ defaults = {}, storage = null, key = KEY } = {}
     changed() { return clone(values); },
     all() { return { ...clone(defaults), ...clone(values) }; },
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
-    // JSON text of the changed settings, and the reverse (only keys of known settings are taken).
+    // JSON text of the changed settings, and the reverse: only known settings with a valid value are taken. Returns
+    // { imported, skipped }; skipped counts unknown ids and invalid values.
     exportJson() { return JSON.stringify({ app: 'yarg-remote', version: 1, settings: values }, null, 2); },
     importJson(text) {
       let data;
@@ -63,15 +85,17 @@ export function createSettings({ defaults = {}, storage = null, key = KEY } = {}
       } catch {
         throw new Error('This is not valid JSON.');
       }
-      const incoming = data?.settings && typeof data.settings === 'object' ? data.settings : null;
+      const incoming = data?.settings && typeof data.settings === 'object' && !Array.isArray(data.settings) ? data.settings : null;
       if (!incoming || data.app !== 'yarg-remote') throw new Error('This file is not a YARG Remote settings export.');
-      let n = 0;
+      let imported = 0;
+      let skipped = 0;
       for (const [id, value] of Object.entries(incoming)) {
-        if (!(id in defaults)) continue; // a setting this version does not know
-        api.set(id, value);
-        n++;
+        const r = accept(id, value); // also refuses a setting this version does not know
+        if (!r.ok) { skipped++; continue; }
+        api.set(id, r.value);
+        imported++;
       }
-      return n;
+      return { imported, skipped };
     },
   };
   return api;

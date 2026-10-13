@@ -48,10 +48,10 @@ test('settings: export / import keeps known settings only', () => {
   s.set('a', 3);
   const text = s.exportJson();
   const t = createSettings({ defaults: { a: 1, b: 2 }, storage: memory() });
-  assert.equal(t.importJson(text), 1);
+  assert.deepEqual(t.importJson(text), { imported: 1, skipped: 0 });
   assert.equal(t.get('a'), 3);
   const withUnknown = JSON.stringify({ app: 'yarg-remote', version: 1, settings: { a: 9, zzz: 1 } });
-  assert.equal(t.importJson(withUnknown), 1);
+  assert.deepEqual(t.importJson(withUnknown), { imported: 1, skipped: 1 }); // the unknown id is counted as skipped
   assert.equal(t.get('a'), 9);
   assert.throws(() => t.importJson('nope'), /valid JSON/);
   assert.throws(() => t.importJson('{"x":1}'), /not a YARG Remote/);

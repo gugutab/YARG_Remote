@@ -1,6 +1,7 @@
 // Optional server: serves the app, a song index (/api/library) and the song files (/songs/<path>) from a folder,
 // so the browser needs no folder permission (works in Firefox and from other devices on the LAN).
-//   node server.mjs [songsDir]      env: SONGS_DIR, PORT (default 8080), HOST (default 127.0.0.1, this machine only)
+//   node server.mjs [songsDir]      env: SONGS_DIR, PORT (default 8080), HOST (default 127.0.0.1, this machine only),
+//                                        CACHE_DIR (library index cache; default <app>/.cache)
 // HOST=0.0.0.0 (or a LAN address) is an explicit opt-in to serve other devices; then any Host header is accepted.
 // While bound to loopback, requests whose Host header is not an IP literal, localhost or this machine's name are
 // refused (DNS-rebinding guard).
@@ -9,6 +10,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { pipeline } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { parseSongIni } from './src/ini.js';
 import { parseMidi } from './src/midi.js';
@@ -200,40 +202,96 @@ export function hostHeaderAllowed(header) {
   return net.isIPv4(name) || name === 'localhost' || name.endsWith('.localhost') || name === os.hostname().toLowerCase();
 }
 
+// Weak validators from size + mtime (a file rewritten with the same size inside one millisecond is not a real case here).
+// `extra` is mixed into the ETag (the inner size of a .sng member, whose container stat is shared by all members).
+export function validatorsOf(stat, extra = '') {
+  const mtime = Math.trunc(stat.mtimeMs);
+  return {
+    etag: `W/"${stat.size.toString(16)}-${mtime.toString(16)}${extra ? `-${extra}` : ''}"`,
+    lastModified: new Date(mtime).toUTCString(),
+    mtimeSec: Math.floor(mtime / 1000),
+  };
+}
+
+const opaqueTag = (t) => t.trim().replace(/^W\//, '');
+
+// True when the request's validators say the client's copy is current (answer 304). If-None-Match wins over
+// If-Modified-Since (RFC 9110 13.1.3); `*` matches any existing file; tags compare weakly.
+export function isNotModified(headers, v) {
+  const inm = headers['if-none-match'];
+  if (inm !== undefined) {
+    return String(inm).split(',').some((t) => t.trim() === '*' || opaqueTag(t) === opaqueTag(v.etag));
+  }
+  const ims = Date.parse(headers['if-modified-since']);
+  return Number.isFinite(ims) && v.mtimeSec * 1000 <= ims;
+}
+
+// One byte range of a `size`-byte body. { start, end } (inclusive) for a satisfiable single range, null for no range
+// (absent header, several ranges, other units or garbage: ignored, the full body is sent) and 'unsatisfiable' (answer 416).
+// `ifRange` (If-Range header) must equal Last-Modified exactly, otherwise the range is ignored; an entity tag never
+// matches because ours are weak.
+export function parseRange(header, size, { ifRange, lastModified } = {}) {
+  const m = /^bytes=(\d*)-(\d*)$/.exec(header || '');
+  if (!m || !(m[1] || m[2])) return null;
+  if (ifRange !== undefined && String(ifRange).trim() !== lastModified) return null;
+  let start = 0;
+  let end = size - 1;
+  if (m[1]) {
+    start = Number(m[1]);
+    if (m[2]) end = Math.min(Number(m[2]), end);
+  } else {
+    const n = Number(m[2]);
+    if (n === 0) return 'unsatisfiable';
+    start = Math.max(0, size - n);
+  }
+  return start > end || start >= size ? 'unsatisfiable' : { start, end };
+}
+
+// Answers 304 or 416 itself (and returns null); otherwise returns { head: [status, headers], start, end } for a 206 or 200.
+function answer(req, res, type, size, v) {
+  const base = { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-cache', ETag: v.etag, 'Last-Modified': v.lastModified };
+  if (isNotModified(req.headers, v)) {
+    res.writeHead(304, { 'Cache-Control': base['Cache-Control'], ETag: v.etag, 'Last-Modified': v.lastModified }).end();
+    return null;
+  }
+  const range = parseRange(req.headers.range, size, { ifRange: req.headers['if-range'], lastModified: v.lastModified });
+  if (range === 'unsatisfiable') {
+    res.writeHead(416, { 'Content-Range': `bytes */${size}` }).end();
+    return null;
+  }
+  if (range) return { head: [206, { ...base, 'Content-Range': `bytes ${range.start}-${range.end}/${size}`, 'Content-Length': range.end - range.start + 1 }], ...range };
+  return { head: [200, { ...base, 'Content-Length': size }], start: 0, end: size - 1 };
+}
+
 function sendFile(req, res, file) {
   fs.stat(file, (err, stat) => {
-    if (err || !stat.isFile()) {
-      if (!res.headersSent) res.writeHead(404).end('Not found');
-      return;
-    }
-    const headers = {
-      'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream',
-      'Accept-Ranges': 'bytes',
-      'Cache-Control': 'no-cache',
-    };
-    const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
-    let start = 0;
-    let end = stat.size - 1;
-    if (range && (range[1] || range[2])) {
-      if (range[1]) {
-        start = Number(range[1]);
-        if (range[2]) end = Math.min(Number(range[2]), end);
-      } else {
-        start = Math.max(0, stat.size - Number(range[2]));
-      }
-      if (start > end || start >= stat.size) {
-        res.writeHead(416, { 'Content-Range': `bytes */${stat.size}` }).end();
+    try {
+      if (err || !stat.isFile()) {
+        if (!res.headersSent) res.writeHead(404).end('Not found');
         return;
       }
-      res.writeHead(206, { ...headers, 'Content-Range': `bytes ${start}-${end}/${stat.size}`, 'Content-Length': end - start + 1 });
-    } else {
-      res.writeHead(200, { ...headers, 'Content-Length': stat.size });
+      const a = answer(req, res, TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream', stat.size, validatorsOf(stat));
+      if (!a) return;
+      if (req.method === 'HEAD' || stat.size === 0) { // an empty file has no byte to read (createReadStream rejects end < start)
+        res.writeHead(...a.head).end();
+        return;
+      }
+      const rs = fs.createReadStream(file, { start: a.start, end: a.end });
+      res.once('close', () => rs.destroy()); // client gone: release the descriptor
+      rs.once('error', (e) => { // open failed (file vanished, no permission): still a clean HTTP answer
+        if (!res.headersSent) res.writeHead(e.code === 'ENOENT' ? 404 : 500).end(e.code === 'ENOENT' ? 'Not found' : 'Internal server error');
+      });
+      rs.once('open', () => {
+        res.writeHead(...a.head);
+        // pipeline destroys both ends when either fails or closes early, so no descriptor outlives the request and a read
+        // error after the headers just cuts the connection; the callback is empty because the error is already handled.
+        pipeline(rs, res, () => {});
+      });
+    } catch (e) {
+      console.error(`[server] ${req.method} ${String(req.url).slice(0, 200)}:`, e);
+      if (res.headersSent) res.destroy();
+      else res.writeHead(500).end('Internal server error');
     }
-    if (req.method === 'HEAD') {
-      res.end();
-      return;
-    }
-    fs.createReadStream(file, { start, end }).on('error', () => res.destroy()).pipe(res);
   });
 }
 
@@ -251,35 +309,28 @@ async function sendSngInner(req, res, songsDir, urlPath) {
   const real = await realCheck(songsDir, sngFile);
   if (real !== 'ok') return res.writeHead(real === 'missing' ? 404 : 403).end(real === 'missing' ? 'Not found' : 'Forbidden'), true;
   try {
+    const stat = await fs.promises.stat(sngFile);
     await withSngSource(sngFile, async (source) => {
       const sng = await parseSng(source);
       const inner = findSngFile(sng, innerName);
       if (!inner) return res.writeHead(404).end('Not found');
-      const size = inner.size;
-      const headers = { 'Content-Type': TYPES[path.extname(innerName).toLowerCase()] || 'application/octet-stream', 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-cache' };
-      let start = 0;
-      let end = size - 1;
-      const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
-      let partial = false;
-      if (range && (range[1] || range[2])) {
-        if (range[1]) {
-          start = Number(range[1]);
-          if (range[2]) end = Math.min(Number(range[2]), end);
-        } else {
-          start = Math.max(0, size - Number(range[2]));
-        }
-        if (start > end || start >= size) return res.writeHead(416, { 'Content-Range': `bytes */${size}` }).end();
-        partial = true;
-      }
-      if (partial) res.writeHead(206, { ...headers, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': end - start + 1 });
-      else res.writeHead(200, { ...headers, 'Content-Length': size });
-      if (req.method === 'HEAD') return res.end();
+      const a = answer(req, res, TYPES[path.extname(innerName).toLowerCase()] || 'application/octet-stream', inner.size, validatorsOf(stat, inner.size.toString(16)));
+      if (!a) return;
+      if (req.method === 'HEAD' || inner.size === 0) return res.writeHead(...a.head).end();
+      res.writeHead(...a.head);
       const CHUNK = 1 << 20;
-      for (let pos = start; pos <= end && !res.destroyed; pos += CHUNK) {
-        const bytes = await readSngBytes(source, sng, inner, pos, Math.min(pos + CHUNK, end + 1));
-        if (!res.write(bytes)) await new Promise((r) => res.once('drain', r));
+      for (let pos = a.start; pos <= a.end && !res.destroyed; pos += CHUNK) {
+        const bytes = await readSngBytes(source, sng, inner, pos, Math.min(pos + CHUNK, a.end + 1));
+        if (res.destroyed) break;
+        if (!res.write(bytes)) {
+          await new Promise((r) => { // a client that leaves while we wait for 'drain' would hang this (and the open file) forever
+            const done = () => { res.off('drain', done); res.off('close', done); r(); };
+            res.once('drain', done);
+            res.once('close', done);
+          });
+        }
       }
-      res.end();
+      if (!res.destroyed) res.end();
     });
   } catch (err) {
     if (res.headersSent) res.destroy();
@@ -290,9 +341,9 @@ async function sendSngInner(req, res, songsDir, urlPath) {
 
 // `host` is the address the server will be bound to: a loopback bind turns the Host header guard on.
 // `scan` can be replaced in tests.
-export function createServer({ songsDir, appRoot = APP_ROOT, host = '127.0.0.1', scan = scanLibrary }) {
+export function createServer({ songsDir, appRoot = APP_ROOT, host = '127.0.0.1', scan = scanLibrary, cacheDir = path.join(appRoot, '.cache') }) {
   const guardHost = isLoopbackBind(host);
-  const cacheFile = path.join(appRoot, '.cache', 'library.json');
+  const cacheFile = path.join(cacheDir, 'library.json');
   let library = null; // song index in memory
   let scanning = null;
 
@@ -308,7 +359,9 @@ export function createServer({ songsDir, appRoot = APP_ROOT, host = '127.0.0.1',
     library = await scanning;
     try {
       await fs.promises.mkdir(path.dirname(cacheFile), { recursive: true });
-      await fs.promises.writeFile(cacheFile, JSON.stringify({ version: INDEX_VERSION, songsDir, songs: library }));
+      const tmp = `${cacheFile}.${process.pid}.tmp`; // write + rename: a reader never sees half a file
+      await fs.promises.writeFile(tmp, JSON.stringify({ version: INDEX_VERSION, songsDir, songs: library }));
+      await fs.promises.rename(tmp, cacheFile);
     } catch { /* cache is optional */ }
     return library;
   }
@@ -378,7 +431,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.error(`Songs folder not found: ${songsDir}\nUsage: node server.mjs <folder> (or SONGS_DIR).`);
     process.exit(1);
   }
-  const server = createServer({ songsDir, host });
+  const cacheDir = process.env.CACHE_DIR ? path.resolve(process.env.CACHE_DIR) : undefined;
+  const server = createServer({ songsDir, host, cacheDir });
   server.listen(port, host, () => {
     const addr = server.address();
     const shown = addr.family === 'IPv6' ? `[${addr.address}]` : addr.address;

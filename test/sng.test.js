@@ -84,7 +84,7 @@ test('server indexes .sng songs (with parts) and serves inner files with ranges'
     assert.equal(songs[0].id, 'Pack/x.sng');
     assert.equal(songs[0].title, 'Served');
     assert.deepEqual(songs[0].parts, ['guitar']);
-    const server = createServer({ songsDir: dir });
+    const server = createServer({ songsDir: dir, cacheDir: path.join(dir, '.idx') }); // keep the real .cache untouched
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const base = `http://127.0.0.1:${server.address().port}`;
     try {

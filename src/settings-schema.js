@@ -9,7 +9,8 @@
 //   type 'custom'  render(host, ctx), ids    a purpose-built control (theme studio, chip picker, ...) for the settings in `ids`
 //   `when(get)` hides the item unless it returns true; `keywords` feed the search box.
 
-import { PRESETS } from './themes.js';
+import { PRESETS, THEME_KEYS, isHex } from './themes.js';
+import { ACTIONS } from './shortcuts.js';
 import { VISUALIZERS } from './visualizers.js';
 import { DETAIL_CHIPS } from './songinfo.js';
 
@@ -147,3 +148,98 @@ export function buildDefaults(sections = SECTIONS) {
 }
 
 export const PRESET_NAMES = Object.fromEntries(PRESETS.map((p) => [p.id, p.name]));
+
+// ---- Validation of stored / imported values ----
+
+const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/; // theme ids ("<slug>-<base36 time>"), also the part after "saved:"
+const COMBO_RE = /^(Shift\+)?[A-Za-z0-9_]{0,32}$/; // KeyboardEvent.code, optional Shift+, '' = no key
+const MAX_SAVED_THEMES = 50;
+const MAX_TEXT = 200;
+const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v) && [Object.prototype, null].includes(Object.getPrototypeOf(v));
+const decimals = (n) => (String(n).split('.')[1] || '').length;
+
+// Returns { ok, value } for one schema item type; `value` is the cleaned value (clamped, snapped, filtered).
+function checkItem(it, value) {
+  switch (it.type) {
+    case 'toggle':
+      return typeof value === 'boolean' ? { ok: true, value } : { ok: false };
+    case 'range': {
+      if (typeof value !== 'number' || !Number.isFinite(value)) return { ok: false };
+      const min = it.min ?? -Infinity;
+      const max = it.max ?? Infinity;
+      let v = Math.min(max, Math.max(min, value));
+      if (it.step > 0 && Number.isFinite(min)) {
+        v = min + Math.round((v - min) / it.step) * it.step;
+        v = Number(v.toFixed(Math.max(decimals(it.step), decimals(min))));
+        v = Math.min(max, Math.max(min, v));
+      }
+      return { ok: true, value: v };
+    }
+    case 'choice':
+      return it.options.some((o) => o.value === value) ? { ok: true, value } : { ok: false };
+    case 'multi': {
+      if (!Array.isArray(value)) return { ok: false };
+      const allowed = new Set(it.options.map((o) => o.value));
+      return { ok: true, value: [...new Set(value.filter((x) => allowed.has(x)))] };
+    }
+    case 'color':
+      return typeof value === 'string' && isHex(value) ? { ok: true, value: value.toLowerCase() } : { ok: false };
+    case 'text':
+      return typeof value === 'string' && value.length <= MAX_TEXT ? { ok: true, value } : { ok: false };
+    default:
+      return { ok: false };
+  }
+}
+
+const presetIds = new Set(['auto', ...PRESETS.map((p) => p.id)]);
+
+// The custom (purpose-built) settings. Their values end up in CSS (colours) and in key matching, so the shapes are strict.
+const CUSTOM_CHECKS = {
+  'theme.preset': (v) => (typeof v === 'string' && (presetIds.has(v) || (v.startsWith('saved:') && ID_RE.test(v.slice(6)))) ? { ok: true, value: v } : { ok: false }),
+  // only the known colour keys, each a #rrggbb colour; anything else is dropped
+  'theme.overrides': (v) => {
+    if (!isPlainObject(v)) return { ok: false };
+    const out = {};
+    for (const k of THEME_KEYS) if (Object.hasOwn(v, k) && typeof v[k] === 'string' && isHex(v[k])) out[k] = v[k].toLowerCase();
+    return { ok: true, value: out };
+  },
+  // [{ id, name, scheme, vars }]: at most 50, unique ids, complete valid colour sets
+  'theme.saved': (v) => {
+    if (!Array.isArray(v)) return { ok: false };
+    const out = [];
+    const seen = new Set();
+    for (const t of v) {
+      if (out.length >= MAX_SAVED_THEMES) break;
+      if (!isPlainObject(t) || typeof t.id !== 'string' || !ID_RE.test(t.id) || seen.has(t.id)) continue;
+      const name = typeof t.name === 'string' ? t.name.trim().slice(0, 40) : '';
+      if (!name || !isPlainObject(t.vars) || !THEME_KEYS.every((k) => typeof t.vars[k] === 'string' && isHex(t.vars[k]))) continue;
+      seen.add(t.id);
+      out.push({ id: t.id, name, scheme: t.scheme === 'light' ? 'light' : 'dark', vars: Object.fromEntries(THEME_KEYS.map((k) => [k, t.vars[k].toLowerCase()])) });
+    }
+    return { ok: true, value: out };
+  },
+  // { actionId: combo }: known actions only, string values
+  'shortcuts.bindings': (v) => {
+    if (!isPlainObject(v)) return { ok: false };
+    const out = {};
+    for (const a of ACTIONS) if (Object.hasOwn(v, a.id) && typeof v[a.id] === 'string' && COMBO_RE.test(v[a.id])) out[a.id] = v[a.id];
+    return { ok: true, value: out };
+  },
+};
+
+// validate(id, value) -> { ok, value } for every setting of the schema: `ok` false = the value is not acceptable (callers use
+// the default / skip the entry), otherwise `value` is the cleaned value. Unknown ids are not ok. Never throws.
+export function buildValidator(sections = SECTIONS) {
+  const items = new Map();
+  for (const s of sections) for (const it of s.items) if (it.type !== 'custom') items.set(it.id, it);
+  return (id, value) => {
+    try {
+      if (typeof id !== 'string') return { ok: false };
+      if (Object.hasOwn(CUSTOM_CHECKS, id)) return CUSTOM_CHECKS[id](value);
+      const it = items.get(id);
+      return it ? checkItem(it, value) : { ok: false };
+    } catch {
+      return { ok: false };
+    }
+  };
+}
