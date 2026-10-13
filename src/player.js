@@ -10,6 +10,7 @@ import { PitchShifter } from '../vendor/soundtouch.js';
 import { positionAt, trimHistory } from './clock.js';
 import { decodeAll } from './stemdecode.js';
 
+export const WORKLET_START_MS = 6000; // how long the audio worklet may take to start before the legacy engine is used
 const SHIFTER_BUFFER = 2048; // legacy path: samples per ScriptProcessor block (bigger = fewer dropouts)
 
 // Number of samples in a stem aligned to the chart clock. Negative delay adds silence in front.
@@ -175,7 +176,15 @@ class WorkletPlayer {
     this.setupDone ||= (async () => {
       if (!this.ctx.audioWorklet) throw Object.assign(new Error('AudioWorklet unavailable'), { workletUnavailable: true });
       try {
-        await this.ctx.audioWorklet.addModule(new URL('./player-worklet.js', import.meta.url));
+        // Chrome can leave addModule pending forever (the audio worklet thread never starts): that looked like a load screen stuck at 2%
+        // with nothing in the console. After WORKLET_START_MS the worklet engine is given up and the legacy player takes over.
+        let timer;
+        const giveUp = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`The audio worklet did not start in ${WORKLET_START_MS / 1000} s`)), WORKLET_START_MS); });
+        try {
+          await Promise.race([this.ctx.audioWorklet.addModule(new URL('./player-worklet.js', import.meta.url)), giveUp]);
+        } finally {
+          clearTimeout(timer);
+        }
         this.node = new AudioWorkletNode(this.ctx, 'yarg-mix', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
       } catch (err) {
         throw Object.assign(err, { workletUnavailable: true });
