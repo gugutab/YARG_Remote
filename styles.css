@@ -1363,3 +1363,15 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .app:not(.bar-hidden) .tools button.icon { width: 28px; height: 28px; }
   .app:not(.bar-hidden) .tools button.icon svg { width: 16px; height: 16px; }
 }
+
+/* ---------- Mobile bar, fourth pass ---------- */
+@media (max-width: 700px) {
+  /* extended: the compact button alone on the last row of the right column; prev .. section centred */
+  .app:not(.bar-hidden) .tools #barHide { grid-column: 2; grid-row: 3; }
+  .app:not(.bar-hidden) .transport { justify-content: center; }
+}
+@media (min-width: 440px) and (max-width: 700px) {
+  /* compact: with room to spare the album art is shown left of the title and artist */
+  .app.bar-hidden .tb-cover:not([hidden]) { display: block; grid-column: 1; grid-row: 1; width: 40px; height: 40px; align-self: center; border-radius: 6px; }
+  .app.bar-hidden .topbar > .tb-main { grid-column: 2 / -1; }
+}
