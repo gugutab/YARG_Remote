@@ -1396,3 +1396,11 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .app.bar-hidden .topbar .transport .time .time-sep { display: none; }
   .app.bar-hidden .now-title { font-size: 14px; }
 }
+
+/* ---------- Mobile compact bar, seventh pass: the title may use all the room that is left before it is cut ---------- */
+@media (max-width: 700px) {
+  .app.bar-hidden .tb-top { flex: 1 1 0; min-width: 0; }
+  .app.bar-hidden .now { grid-template-columns: minmax(0, auto) auto; max-width: 100%; }
+  .app.bar-hidden .now-title { max-width: none; min-width: 0; }
+  .app.bar-hidden .now-artist { max-width: none; min-width: 0; }
+}
