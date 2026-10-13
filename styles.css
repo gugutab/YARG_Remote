@@ -1494,3 +1494,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 /* Compact bar: the play button is 6 px bigger (36 px) */
 .app.bar-hidden .topbar .transport button.icon.primary { width: 36px; height: 36px; }
 .app.bar-hidden .topbar .transport button.icon.primary svg { width: 19px; height: 19px; }
+
+/* Compact bar: the info icon is taller than the title line and made the first row of the title block taller than the text, which dropped the
+   title and artist ~3 px below the buttons; its margins cancel that, so the text block is centred on the same line as the buttons */
+.app.bar-hidden .now .pop-wrap { margin-block: -4px; }
