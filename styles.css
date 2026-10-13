@@ -1466,3 +1466,19 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   /* the title may take two lines */
   .app:not(.bar-hidden) .now-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.25; }
 }
+
+/* ---------- Extended bar, wide main area: the transport is centred on the bar itself (a symmetric 5-column grid), with bigger buttons and the time row close to the seek bar ---------- */
+@container song (min-width: 800px) {
+  .app:not(.bar-hidden) .topbar { --cover-col: 92px; grid-template-columns: var(--cover-col) minmax(0, 1fr) auto minmax(0, 1fr) var(--cover-col); grid-template-rows: 1fr; column-gap: 10px; padding-left: max(8px, calc((100% - var(--bar-content-max)) / 2)); padding-right: max(8px, calc((100% - var(--bar-content-max)) / 2)); align-items: center; }
+  .app:not(.bar-hidden) .topbar > .tb-cover { grid-column: 1; grid-row: 1; }
+  .app:not(.bar-hidden) .topbar > .tb-main { display: contents; }
+  .app:not(.bar-hidden) .tb-top { grid-column: 2; grid-row: 1; align-self: center; }
+  .app:not(.bar-hidden) .transport { grid-column: 3; grid-row: 1; align-self: end; margin: 0 0 6px; gap: 4px; }
+  .app:not(.bar-hidden) .tools { grid-column: 4 / 6; grid-row: 1; align-self: center; justify-self: end; }
+  /* bigger prev / play / next */
+  .app:not(.bar-hidden) .transport .tp-row1 { gap: 6px; }
+  .app:not(.bar-hidden) .transport .tp-row1 .icon { width: 44px; height: 44px; }
+  .app:not(.bar-hidden) .transport .tp-row1 .icon svg { width: 22px; height: 22px; }
+  .app:not(.bar-hidden) .transport .tp-row1 .icon.primary { width: 54px; height: 54px; }
+  .app:not(.bar-hidden) .transport .tp-row1 .icon.primary svg { width: 28px; height: 28px; }
+}
