@@ -31,7 +31,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'fullscreen', 'barHide', 'barShow', 'specialCard', 'specialList', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'barHide', 'barShow', 'specialCard', 'specialList', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
 ].map((id) => [id, $(id)]));
@@ -2222,7 +2222,6 @@ let idleTimer = 0;
 function setImmersive() {
   const on = !!document.fullscreenElement;
   els.app.classList.toggle('immersive', on);
-  els.fullscreen.querySelector('use').setAttribute('href', on ? '#i-shrink' : '#i-expand');
   wake();
 }
 function wake() {
@@ -2234,7 +2233,6 @@ function wake() {
     }, 2500);
   }
 }
-els.fullscreen.addEventListener('click', toggleFullscreen);
 function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen();
   else els.app.requestFullscreen?.().catch(() => {});
