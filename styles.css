@@ -1261,3 +1261,9 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 
 /* The top bar is a glass window over the background of the fretboards (the visualizer shows through) */
 .topbar { background: color-mix(in srgb, var(--panel) 62%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(10px); border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }
+
+/* In the glass top bar the section selector and the button hovers are see-through too */
+.topbar .chip-btn, .topbar .chip-select { background: transparent; border-color: color-mix(in srgb, var(--line) 60%, transparent); }
+.topbar .chip-btn:hover, .topbar .chip-select:hover { background: color-mix(in srgb, var(--panel-2) 30%, transparent); border-color: var(--muted); }
+.topbar button.icon:hover { background: color-mix(in srgb, var(--panel-2) 30%, transparent); }
+.topbar button.icon.primary:hover { background: var(--accent); filter: brightness(1.12); }
