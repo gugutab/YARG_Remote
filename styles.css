@@ -1252,7 +1252,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .pane-tag { gap: 5px; padding: 0 8px; }
 
 /* The top bar is a glass window over the background of the fretboards (the visualizer shows through) */
-.topbar { background: color-mix(in srgb, var(--panel) 52%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(10px); border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }
+.topbar { background: color-mix(in srgb, var(--panel) 52%, transparent); border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }
 
 /* In the glass top bar the section selector and the button hovers are see-through too */
 .topbar .chip-btn, .topbar .chip-select { background: transparent; border-color: color-mix(in srgb, var(--line) 60%, transparent); }
@@ -1283,3 +1283,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .app.bar-hidden .tb-top { flex: 0 0 auto; }
   .app.bar-hidden .tools { gap: 0; }
 }
+
+/* The blur of the glass top bar lives on a pseudo-element: a backdrop-filter on the bar itself makes it the containing block of the
+   position: fixed popovers inside it (they were placed relative to the bar and pushed the page sideways). */
+.topbar::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
