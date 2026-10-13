@@ -311,3 +311,4 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - The compact bar uses the same maximum content width (`--bar-content-max`, 1400 px, centred through the horizontal padding) as the open bar.
 - The open bar of a wide main area (≥ 800 px) shows a third line under the artist: `Pack - Charter` (`#tertiary`, from `packOf(song)` and `song.ini.charter`, empty parts left out).
 - Wide open bar: the title/artist/pack block is bottom-aligned with the album art (`align-self: end`), and for a two-line title `fitTitleWidth` sets `--info-offset` so the info icon sits beside the longest line.
+- Wide open bar: `--info-offset` now centres the 24 px info icon on the longest title line (the icon hugs the text, no flex gap); title → artist 5 px, artist → pack/charter 4 px.

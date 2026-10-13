@@ -550,7 +550,7 @@ function fitTitleWidth() {
   const widest = rects.reduce((best, r) => (r.width > best.width ? r : best), rects[0]);
   t.style.width = `${Math.ceil(widest.width) + 2}px`;
   // the info icon goes beside the longest line of a two-line title
-  t.closest('.now')?.style.setProperty('--info-offset', `${Math.round(widest.top - t.getBoundingClientRect().top)}px`);
+  t.closest('.now')?.style.setProperty('--info-offset', `${Math.round(widest.top + widest.height / 2 - t.getBoundingClientRect().top - 12)}px`); // (12 = half of the 24 px icon)
 }
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => requestAnimationFrame(fitTitleWidth)).observe(document.querySelector('.main'));
 

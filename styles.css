@@ -1564,3 +1564,11 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .app:not(.bar-hidden) .tb-top { align-self: end; }
   .app:not(.bar-hidden) .now .pop-wrap { margin-top: calc(var(--info-offset, 0px) - 2px); }
 }
+
+/* Wide open bar: the info icon is centred on the longest title line and hugs the text; more air between title, artist and pack - charter */
+@container song (min-width: 800px) {
+  .app:not(.bar-hidden) .now { gap: 0; }
+  .app:not(.bar-hidden) .now .pop-wrap { margin-top: var(--info-offset, -2px); margin-left: -2px; }
+  .app:not(.bar-hidden) .now-artist { margin-top: 5px; }
+  .app:not(.bar-hidden) .now-tertiary:not(:empty) { margin-top: 4px; }
+}
