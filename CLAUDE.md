@@ -316,3 +316,4 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - Bar at the bottom: the expand/compact arrow is inverted (down = compact) and the bar is 8 px taller with more bottom padding.
 - Wide open bar: the text block and the transport rows are vertically centred again (no bottom alignment with the album art; no reversed rows when the bar is at the bottom).
 - Vocal notes view follows YARG's geometry (VocalTrack.cs): a note is 1.5 semitones thick (`leadHalf`, floor 6 px) and the pitch area is at most `max(150, w/6)` px tall (`vocalMaxArea`), anchored above the lyrics, so the notes sit close to the words. The pitch range itself already matched.
+- The default height of the vocal band is 20% shorter (`bandHeight` fallbacks ×0.8; the 90 px floor and the dragged height are unchanged).

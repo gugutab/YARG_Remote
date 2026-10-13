@@ -283,7 +283,7 @@ export class Highway {
       this.vocalAlone = true;
       if (this.vocalView === 'karaoke') this.drawPane(vocal, t, 0, 0, w, h); // the lyrics fill the stage (renderKaraoke)
       else { // the chart keeps the height it has next to other charts; the rest of the lyrics fill the space below
-        const vh = this.bandHeight(h, Math.min(h * 0.34, 280) - 20);
+        const vh = this.bandHeight(h, (Math.min(h * 0.34, 280) - 20) * 0.8); // (the default is 20% shorter)
         this.drawPane(vocal, t, 0, 0, w, vh);
         this.drawDivider({ type: 'row', y: vh - 1, w });
         g.save();
@@ -304,7 +304,7 @@ export class Highway {
     }
     let top = 0;
     if (vocal) { // vocals use the top of the other tracks
-      top = this.bandHeight(h, (this.vocalView === 'karaoke' ? Math.min(h * 0.3, 230) : Math.min(h * 0.34, 280)) - 40); // 20 px shorter than the band of vocals alone
+      top = this.bandHeight(h, ((this.vocalView === 'karaoke' ? Math.min(h * 0.3, 230) : Math.min(h * 0.34, 280)) - 40) * 0.8); // 20 px shorter than the band of vocals alone
       this.drawPane(vocal, t, 0, 0, w, top);
       this.drawDivider({ type: 'row', y: top - 1, w });
     }
