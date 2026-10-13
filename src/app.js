@@ -8,7 +8,7 @@ import { PerfMeter } from './perf.js';
 import { createPerfOverlay, PERF_MODES } from './perf-overlay.js';
 import { specialNotes, neighbourTime } from './specials.js';
 import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, readBytes, serializeSongs, restoreSongs, restoreRemoteSongs } from './library.js';
-import { songDelaySeconds, plainText } from './ini.js';
+import { songDelaySeconds, plainText, packOf } from './ini.js';
 import { previewWindow } from './preview.js';
 import { metaRows, extraRows, chartStats, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel } from './songinfo.js';
 import { parseRoute, formatRoute } from './route.js';
@@ -28,7 +28,7 @@ const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
   'app', 'library', 'closeLibrary', 'splitter', 'libTab', 'songTab', 'closeSongInfo', 'npPlay', 'npPreview', 'npSeek', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
-  'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
+  'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
   'barHide', 'barShow', 'specialCard', 'specialList', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
@@ -582,6 +582,7 @@ async function selectSong(song) {
   els.title.textContent = plainText(song.title);
   requestAnimationFrame(fitTitleWidth);
   els.artist.textContent = plainText(song.artist);
+  els.tertiary.textContent = [packOf(song), plainText(song.ini?.charter || '')].filter(Boolean).join(' - '); // pack - charter, shown in the wide open bar
   els.cover.hidden = true;
   els.infoCover.hidden = true;
   els.infoPopCover.hidden = true;

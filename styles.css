@@ -1552,3 +1552,9 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 @media (min-width: 701px) {
   .app.bar-hidden .topbar { --bar-content-max: 1400px; padding: 4px max(10px, calc((100% - var(--bar-content-max)) / 2)) 10px max(6px, calc((100% - var(--bar-content-max)) / 2 - 10px)); } /* (the 10 px: the empty first grid column and its gap) */
 }
+
+/* The third line of the title block (pack - charter): only in the open bar of a wide main area */
+.now-tertiary { display: none; }
+@container song (min-width: 800px) {
+  .app:not(.bar-hidden) .now-tertiary:not(:empty) { display: block; font-size: 12px; color: var(--muted); opacity: .8; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
