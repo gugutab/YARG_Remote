@@ -16,7 +16,7 @@ test('error gate: a different message passes at once', () => {
   const gate = createErrorGate(5000);
   assert.equal(gate('a', 0), true);
   assert.equal(gate('b', 1), true);
-  assert.equal(gate('a', 2), true);
+  assert.equal(gate('a', 2), false); // (each message has its own timer)
 });
 
 const stems = ['a', 'b', 'c'].map((id) => ({ id, label: id.toUpperCase() }));
