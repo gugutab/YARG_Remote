@@ -1535,3 +1535,15 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .app:not(.bar-hidden) .now { align-items: flex-start; }
   .app:not(.bar-hidden) .now .pop-wrap { margin-top: -2px; }
 }
+
+/* ---------- The expand / compact button is the priority: in a tight compact bar the title gives way, never the buttons ---------- */
+.app.bar-hidden .tb-top { min-width: 0; overflow: hidden; }
+.app.bar-hidden .tb-bottom { flex: 1 0 auto; min-width: auto; }
+.app.bar-hidden .tools { flex: none; }
+.app.bar-hidden .tools #barHide { flex: none; }
+@container song (max-width: 700px) {
+  .app.bar-hidden .tb-bottom { flex: 1 0 auto; min-width: auto; }
+}
+
+/* The current time stands out a little from the total */
+.time #timeNow { color: var(--text); font-weight: 600; }

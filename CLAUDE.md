@@ -307,3 +307,4 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - Compact bar: 3 px between the title and the artist (`.now` row gap).
 - Extended bar in a wide main area: the artist is 15 px and a title that takes two lines is balanced (`text-wrap: balance`).
 - A two-line title in the wide extended bar is shrink-wrapped to its longest line by `fitTitleWidth()` (app.js, on song change and when the main area is resized), so the info icon sits right after the text, aligned to the first line.
+- Compact bar priority: the buttons never shrink or overflow (`.tb-bottom` is `flex: 1 0 auto`, `.tools` / `#barHide` are `flex: none`); when the row is too narrow the title block (`min-width: 0`, ellipsis) gives way, so the expand button stays on screen. The current time (`#timeNow`) is `var(--text)` and semibold, the total stays muted.
