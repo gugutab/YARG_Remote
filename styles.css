@@ -1388,3 +1388,11 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .app:not(.bar-hidden) #sectionText { display: none; }
   .app.bar-hidden .section-wrap { display: none; }
 }
+
+/* ---------- Mobile compact bar, sixth pass: the time on two lines without the slash, a gap after play, a bigger title ---------- */
+@media (max-width: 700px) {
+  .app.bar-hidden .topbar .transport .time { width: auto; margin-left: 8px; }
+  .app.bar-hidden .topbar .transport .time #timeNow, .app.bar-hidden .topbar .transport .time #timeTotal { display: block; }
+  .app.bar-hidden .topbar .transport .time .time-sep { display: none; }
+  .app.bar-hidden .now-title { font-size: 14px; }
+}
