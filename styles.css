@@ -1601,3 +1601,15 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .app:not(.bar-hidden) .tb-top { align-self: center; }
   .app.bar-bottom:not(.bar-hidden) .transport { flex-direction: column; align-self: center; margin: 0; }
 }
+
+/* ---------- Shortcuts list in the settings ---------- */
+.sc-list { display: grid; gap: 2px; max-width: 560px; }
+.sc-group { margin: 14px 0 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.sc-group:first-child { margin-top: 0; }
+.sc-row { display: grid; grid-template-columns: 1fr auto 28px; align-items: center; gap: 10px; padding: 3px 0; }
+.sc-key { min-width: 96px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; text-align: center; cursor: pointer; }
+.sc-key:hover { border-color: var(--muted); }
+.sc-key.unset { color: var(--muted); font-weight: 400; }
+.sc-key.capturing { border-color: var(--accent); color: var(--accent); }
+.sc-reset { opacity: .7; }
+.sc-reset[hidden] { display: inline-flex !important; visibility: hidden; }

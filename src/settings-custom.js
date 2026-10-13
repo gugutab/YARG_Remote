@@ -1,4 +1,5 @@
 // Purpose-built controls of the settings page: the theme studio and the data/backup tools.
+import { ACTIONS, SHORTCUT_GROUPS, comboOf, effectiveBindings, assign, formatCombo } from './shortcuts.js';
 import { PRESETS, THEME_KEYS, THEME_LABELS, resolveTheme, deriveTheme, contrast, isHex } from './themes.js';
 
 const el = (tag, props = {}, ...kids) => {
@@ -162,4 +163,58 @@ export function renderDataTools(host, { settings, extra = [], notify = () => {} 
   ];
   host.append(el('div', { class: 'ts-actions' }, buttons), status);
   return () => {};
+}
+
+// The list of keyboard shortcuts: one row per action; click the key, press the new one (Esc cancels, Backspace clears it).
+export function renderShortcuts(host, { settings, notify = () => {} }) {
+  const status = el('p', { class: 'ts-hint', 'aria-live': 'polite' });
+  const say = (m) => { status.textContent = m; notify(m); };
+  const label = (id) => ACTIONS.find((a) => a.id === id)?.label ?? id;
+  let capturing = null; // { stop }
+
+  const stopCapture = () => { capturing?.stop(); capturing = null; };
+  const startCapture = (id, btn) => {
+    stopCapture();
+    btn.textContent = 'Press a key…';
+    btn.classList.add('capturing');
+    const onKey = (e) => {
+      e.preventDefault();
+      e.stopImmediatePropagation(); // the page must not act on the key meanwhile
+      if (e.code === 'Escape') { stopCapture(); render(); return; }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.code === 'Backspace' || e.code === 'Delete') { stopCapture(); setKey(id, ''); return; }
+      const combo = comboOf(e);
+      if (!combo) return;
+      stopCapture();
+      setKey(id, combo);
+    };
+    const onOut = (e) => { if (e.target !== btn) { stopCapture(); render(); } };
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('pointerdown', onOut, true);
+    capturing = { stop: () => { window.removeEventListener('keydown', onKey, true); window.removeEventListener('pointerdown', onOut, true); } };
+  };
+  const setKey = (id, combo) => {
+    const { bindings, swapped } = assign(settings.get('shortcuts.bindings') || {}, id, combo);
+    settings.set('shortcuts.bindings', bindings);
+    say(!combo ? `${label(id)}: no key.` : swapped ? `${formatCombo(combo)} was used by ${label(swapped)}: the two swapped keys.` : `${label(id)}: ${formatCombo(combo)}.`);
+  };
+
+  const list = el('div', { class: 'sc-list' });
+  const render = () => {
+    stopCapture();
+    const overrides = settings.get('shortcuts.bindings') || {};
+    const eff = effectiveBindings(overrides);
+    list.replaceChildren();
+    for (const group of SHORTCUT_GROUPS) {
+      list.append(el('h4', { class: 'sc-group', text: group }));
+      for (const a of ACTIONS.filter((x) => x.group === group)) {
+        const btn = el('button', { type: 'button', class: `sc-key${eff[a.id] ? '' : ' unset'}`, text: formatCombo(eff[a.id]), title: 'Click, then press the new key (Backspace clears it, Esc cancels)', onclick: () => startCapture(a.id, btn) });
+        const reset = el('button', { type: 'button', class: 'icon small-icon sc-reset', title: `Restore ${formatCombo(a.key)}`, 'aria-label': `Restore the default key of ${a.label}`, hidden: !(a.id in overrides), onclick: () => setKey(a.id, a.key), text: '↺' });
+        list.append(el('div', { class: 'sc-row' }, el('span', { class: 'sc-label', text: a.label }), btn, reset));
+      }
+    }
+  };
+  render();
+  host.append(list, el('div', { class: 'ts-actions' }, el('button', { type: 'button', class: 'chip-btn', text: 'Restore all default keys', onclick: () => { settings.reset('shortcuts.bindings'); say('Every shortcut is back to its default key.'); } })), status);
+  return render; // called when the setting changes (also from imports and the reset buttons)
 }

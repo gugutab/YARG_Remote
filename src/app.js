@@ -9,6 +9,7 @@ import { createPerfOverlay, PERF_MODES } from './perf-overlay.js';
 import { specialNotes, neighbourTime } from './specials.js';
 import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, readBytes, serializeSongs, restoreSongs, restoreRemoteSongs } from './library.js';
 import { songDelaySeconds, plainText, packOf } from './ini.js';
+import { actionFor, comboOf } from './shortcuts.js';
 import { previewWindow } from './preview.js';
 import { metaRows, extraRows, chartStats, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel } from './songinfo.js';
 import { parseRoute, formatRoute } from './route.js';
@@ -16,7 +17,7 @@ import { createSettings } from './settings.js';
 import { SECTIONS, buildDefaults, FONT_OPTIONS } from './settings-schema.js';
 import { resolveTheme, applyTheme } from './themes.js';
 import { mountSettings } from './settings-ui.js';
-import { renderThemeStudio, renderDataTools } from './settings-custom.js';
+import { renderThemeStudio, renderDataTools, renderShortcuts } from './settings-custom.js';
 import { saveLibrary, loadLibrary, loadThumb, saveThumb, clearThumbs } from './store.js';
 import { filterSongs, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, anchorLabel } from './songlist.js';
 import { createVirtualList, DEFAULT_CARDS } from './virtuallist.js';
@@ -569,6 +570,7 @@ async function selectSong(song) {
   }
   const token = ++loadToken;
   player.pause();
+  player.unload(); // the old song's decoded audio is freed as soon as another song is picked
   syncPlayButton();
   ready = false;
   setLoop(null); // a loop belongs to one song
@@ -2269,11 +2271,36 @@ document.addEventListener('fullscreenchange', setImmersive);
 document.addEventListener('mousemove', wake);
 
 // ---------- Keyboard ----------
+// What each shortcut action does; the keys are in src/shortcuts.js and the `shortcuts.bindings` setting.
+const SHORTCUT_HANDLERS = {
+  playPause: () => { if (chart) togglePlay(); },
+  details: () => { if (current || loadInfo.state !== 'idle') setInfoOpen(!infoOpen); },
+  library: () => setLibraryOpen(!libraryOpen()),
+  songPanel: () => setSongPanelOpen(!songPanelOpen()),
+  topBar: () => setBarHidden(!els.app.classList.contains('bar-hidden')),
+  fullscreen: () => toggleFullscreen(),
+  view3d: () => setView(highway.view === '3d' ? '2d' : '3d'),
+  focusNext: () => highway.shiftFocus(1),
+  focusPrev: () => highway.shiftFocus(-1),
+  vocalView: () => { if (highway.panes.some((p) => p.chart.mode === 'vocals')) setVocalView(highway.vocalView === 'karaoke' ? 'track' : 'karaoke'); },
+  perf: () => cyclePerfOverlay(),
+  loop: () => { if (chart) toggleLoop(); },
+  visualizerNext: () => cycleVisualizer(1),
+  visualizerPrev: () => cycleVisualizer(-1),
+  noteStyle: () => setNoteStyle(highway.noteStyle === 'rect' ? 'round' : 'rect'),
+  prevSection: () => stepSection(-1),
+  nextSection: () => stepSection(1),
+  back5: () => { if (ready) seekTo(Math.max(0, player.currentTime() - 5)); },
+  forward5: () => { if (ready) seekTo(Math.min(player.duration, player.currentTime() + 5)); },
+  settings: () => (settingsPage.isOpen() ? settingsPage.close() : settingsPage.open()),
+};
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tag = e.target.tagName;
+  const typing = ['INPUT', 'SELECT', 'TEXTAREA'].includes(tag) || e.target.isContentEditable;
+  const action = actionFor(prefs.get('shortcuts.bindings'), comboOf(e));
   if (typeof settingsPage !== 'undefined' && settingsPage.isOpen()) { // the settings page owns the keyboard while it is open
-    if (e.code === 'Escape') settingsPage.close();
+    if (e.code === 'Escape' || (action === 'settings' && !typing)) { e.preventDefault(); settingsPage.close(); }
     return;
   }
   if (e.code === 'Escape') {
@@ -2281,25 +2308,12 @@ document.addEventListener('keydown', (e) => {
     closePopovers();
     return;
   }
-  if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(tag)) return;
-  if (e.code === 'Space' && chart) { e.preventDefault(); togglePlay(); }
-  else if (e.code === 'KeyI' && (current || loadInfo.state !== 'idle')) setInfoOpen(!infoOpen);
-  else if (e.code === 'KeyL') setLibraryOpen(!libraryOpen());
-  else if (e.code === 'KeyD') setSongPanelOpen(!songPanelOpen());
-  else if (e.code === 'KeyB') setBarHidden(!els.app.classList.contains('bar-hidden'));
-  else if (e.code === 'KeyF') toggleFullscreen();
-  else if (e.code === 'KeyV') setView(highway.view === '3d' ? '2d' : '3d');
-  else if (e.code === 'BracketRight') highway.shiftFocus(1);
-  else if (e.code === 'BracketLeft') highway.shiftFocus(-1);
-  else if (e.code === 'KeyK' && highway.panes.some((p) => p.chart.mode === 'vocals')) setVocalView(highway.vocalView === 'karaoke' ? 'track' : 'karaoke');
-  else if (e.code === 'KeyP') cyclePerfOverlay();
-  else if (e.code === 'KeyR' && chart) toggleLoop();
-  else if (e.code === 'KeyG') cycleVisualizer(e.shiftKey ? -1 : 1);
-  else if (e.code === 'KeyN') setNoteStyle(highway.noteStyle === 'rect' ? 'round' : 'rect');
-  else if (e.code === 'BracketLeft') stepSection(-1);
-  else if (e.code === 'BracketRight') stepSection(1);
-  else if (e.code === 'ArrowLeft' && ready) seekTo(Math.max(0, player.currentTime() - 5));
-  else if (e.code === 'ArrowRight' && ready) seekTo(Math.min(player.duration, player.currentTime() + 5));
+  if (typing) return;
+  if (tag === 'BUTTON' && (e.code === 'Space' || e.code === 'Enter')) return; // those keys press the focused button
+  const run = action && SHORTCUT_HANDLERS[action];
+  if (!run) return;
+  e.preventDefault();
+  run();
 });
 
 // ---------- Frame loop (started once) ----------
@@ -2502,6 +2516,7 @@ prefs.subscribe((id, value) => EFFECTS[id]?.(value));
 const settingsPage = mountSettings({
   root: document.getElementById('settingsPage'), settings: prefs, sections: SECTIONS,
   renderers: {
+    'shortcuts.bindings': (host, ctx) => renderShortcuts(host, { ...ctx, notify: setStatus }),
     theme: (host, ctx) => renderThemeStudio(host, { ...ctx, prefersDark: () => darkQuery.matches, notify: setStatus }),
     'data.tools': (host, ctx) => renderDataTools(host, {
       ...ctx, notify: setStatus,
@@ -2510,9 +2525,6 @@ const settingsPage = mountSettings({
   },
 });
 document.getElementById('openSettings').addEventListener('click', () => settingsPage.open());
-document.addEventListener('keydown', (e) => {
-  if (e.key === ',' && !e.ctrlKey && !e.metaKey && !e.altKey && !['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) { e.preventDefault(); settingsPage.isOpen() ? settingsPage.close() : settingsPage.open(); }
-});
 
 // ---------- Deep links: the URL hash names the open song ----------
 // The hash is only replaced (no history entries): a reload or a shared link opens the same song, and the two panels

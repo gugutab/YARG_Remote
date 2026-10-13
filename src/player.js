@@ -50,6 +50,7 @@ class LegacyPlayer {
   // stems: [{ id, label, getFile }]; delay in seconds (see songDelaySeconds)
   async load(stems, { delay = 0, onProgress = () => {} } = {}) {
     this.stop();
+    this.unload();
     const generation = ++this.loadGeneration;
     const result = await decodeAll(stems, async (s) => {
       const file = await s.getFile();
@@ -131,6 +132,11 @@ class LegacyPlayer {
     this.offset = 0;
   }
 
+  unload() { // frees the decoded buffers
+    this.stems = new Map();
+    this.duration = 0;
+  }
+
   startSources(at) {
     for (const stem of this.stems.values()) {
       if (at >= stem.buffer.duration) continue;
@@ -204,6 +210,7 @@ class WorkletPlayer {
   async load(stems, { delay = 0, onProgress = () => {} } = {}) {
     await this.setup();
     this.stop();
+    this.unload(); // the previous song's audio goes before the new one is decoded: the peak is one song, not two
     const generation = (this.generation = (this.generation || 0) + 1);
     const result = await decodeAll(stems, async (s) => {
       const file = await s.getFile();
@@ -341,6 +348,17 @@ class WorkletPlayer {
     this.playing = false;
     this.offset = 0;
   }
+
+  // Frees the decoded audio (the worklet holds all the stems as Float32 arrays: tens of MB per song).
+  unload() {
+    this.node?.port.postMessage({ type: 'unload' });
+    this.stems = new Map();
+    this.ids = [];
+    this.volumes = new Map();
+    this.duration = 0;
+    this.epoch++;
+    this.history = [];
+  }
 }
 
 // What the app uses: the worklet engine, or the legacy one when AudioWorklet cannot be set up.
@@ -386,4 +404,5 @@ export class MultiTrackPlayer {
   seek(seconds) { this.impl.seek(seconds); }
   scrubTo(seconds, ms) { if (this.impl.scrubTo) this.impl.scrubTo(seconds, ms); else this.impl.seek(seconds); } // (the legacy engine just cuts)
   stop() { this.impl.stop(); }
+  unload() { this.impl.unload(); } // frees the decoded audio (a song change, before its audio loads)
 }

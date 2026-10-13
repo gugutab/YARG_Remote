@@ -137,3 +137,14 @@ test('clock: positions are interpolated from the report history, exactly across 
   trimHistory(history, 0.5);
   assert.ok(history[0].time >= 1.5 - 1e-9 && history.length > 3);
 });
+
+test('unloading (no stems) frees the audio and still renders silence', () => {
+  const m = new MixStretcher(44100);
+  m.setStems([[new Float32Array(1000).fill(0.5)]]);
+  m.setStems([]);
+  assert.equal(m.stems.length, 0);
+  const l = new Float32Array(128).fill(1);
+  const r = new Float32Array(128).fill(1);
+  m.render(l, r, 128);
+  assert.ok(l.every((x) => x === 0) && r.every((x) => x === 0));
+});

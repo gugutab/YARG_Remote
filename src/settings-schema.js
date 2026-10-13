@@ -117,6 +117,13 @@ export const SECTIONS = [
     ],
   },
   {
+    id: 'shortcuts', title: 'Shortcuts', icon: 'keyboard',
+    description: 'Every keyboard shortcut of the player. Click a key to change it.',
+    items: [
+      { id: 'shortcuts.bindings', type: 'custom', ids: ['shortcuts.bindings'], label: 'Keyboard shortcuts', keywords: 'keys keyboard hotkeys bindings keybinds play pause loop section' },
+    ],
+  },
+  {
     id: 'data', title: 'Data and backup', icon: 'database',
     description: 'Export your settings, move them to another browser, or start over.',
     items: [
@@ -130,6 +137,7 @@ const CUSTOM_DEFAULTS = {
   'theme.preset': 'dark',
   'theme.overrides': {},
   'theme.saved': [],
+  'shortcuts.bindings': {},
 };
 
 export function buildDefaults(sections = SECTIONS) {
