@@ -541,12 +541,16 @@ function setStatus(text) {
 function fitTitleWidth() {
   const t = els.title;
   t.style.width = '';
+  t.closest('.now')?.style.removeProperty('--info-offset');
   if (getComputedStyle(t).whiteSpace === 'nowrap') return; // single-line modes need nothing
   const range = document.createRange();
   range.selectNodeContents(t);
   const rects = [...range.getClientRects()];
-  if (rects.length < 2) return;
-  t.style.width = `${Math.ceil(Math.max(...rects.map((r) => r.width))) + 2}px`;
+  if (rects.length < 2) { t.parentElement?.closest('.now')?.style.removeProperty('--info-offset'); return; }
+  const widest = rects.reduce((best, r) => (r.width > best.width ? r : best), rects[0]);
+  t.style.width = `${Math.ceil(widest.width) + 2}px`;
+  // the info icon goes beside the longest line of a two-line title
+  t.closest('.now')?.style.setProperty('--info-offset', `${Math.round(widest.top - t.getBoundingClientRect().top)}px`);
 }
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => requestAnimationFrame(fitTitleWidth)).observe(document.querySelector('.main'));
 

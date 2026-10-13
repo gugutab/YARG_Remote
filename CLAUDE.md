@@ -310,3 +310,4 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - Compact bar priority: the buttons never shrink or overflow (`.tb-bottom` is `flex: 1 0 auto`, `.tools` / `#barHide` are `flex: none`); when the row is too narrow the title block (`min-width: 0`, ellipsis) gives way, so the expand button stays on screen. The current time (`#timeNow`) is `var(--text)` and semibold, the total stays muted.
 - The compact bar uses the same maximum content width (`--bar-content-max`, 1400 px, centred through the horizontal padding) as the open bar.
 - The open bar of a wide main area (≥ 800 px) shows a third line under the artist: `Pack - Charter` (`#tertiary`, from `packOf(song)` and `song.ini.charter`, empty parts left out).
+- Wide open bar: the title/artist/pack block is bottom-aligned with the album art (`align-self: end`), and for a two-line title `fitTitleWidth` sets `--info-offset` so the info icon sits beside the longest line.
