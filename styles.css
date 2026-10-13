@@ -1409,3 +1409,11 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 @media (max-width: 700px) {
   .app.bar-hidden .topbar { padding-right: 4px; }
 }
+
+/* ---------- The block from prev to the section selector is centred in whatever horizontal room is left ---------- */
+.tb-bottom { justify-content: flex-start; }
+.tb-bottom > .transport { margin-inline: auto; }
+@media (max-width: 700px) {
+  .app.bar-hidden .tb-top { flex: 0 1 auto; }
+  .app.bar-hidden .tb-bottom { flex: 1 1 auto; justify-content: flex-start; margin-left: 0; }
+}
