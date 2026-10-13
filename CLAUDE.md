@@ -304,3 +304,4 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - Compact bar: the play button is 36 px (the other compact buttons stay 30 px).
 - Compact bar vertical alignment: the info icon has negative block margins so the title/artist block is as tall as its text and sits on the same centre line as the play block and the tools.
 - Compact bar type: the title is 14 / 15 / 16 px and the artist 11 / 12 / 12.5 px for a main area of ≤ 420 / 421-560 / > 560 px; the info icon is a flex box centred on the title line, 2 px closer to the text; the expand button has 12 px of air on its left (6 px in a 421-520 px area, 2 px below that).
+- Compact bar: 3 px between the title and the artist (`.now` row gap).

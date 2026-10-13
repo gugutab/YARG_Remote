@@ -1520,3 +1520,6 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .app.bar-hidden .tools #barHide { margin-left: 12px; }
 @container song (max-width: 420px) { .app.bar-hidden .tools #barHide { margin-left: 2px; } }
 @container song (min-width: 421px) and (max-width: 520px) { .app.bar-hidden .tools #barHide { margin-left: 6px; } }
+
+/* Compact bar: 3 px more between the title and the artist */
+.app.bar-hidden .now { row-gap: 3px; }
