@@ -31,6 +31,7 @@ import {
   PAD_RING_ALPHA,
   noteShape,
   fillHalo,
+  spansOfKind,
   fillTailHalo,
   noteScale,
   noteColor,
@@ -44,6 +45,7 @@ import { waitCountdowns, countdownAt } from './countdown.js';
 
 const RECT_WIDEN_2D = 1.18;
 const VOCAL_LEAD = '#5b8def'; // lead vocal notes
+const PERC_RINGS = [[0, 1.9, 3.5], [0.18, 1.4, 2]]; // percussion hit: [delay, growth, width] of the two rings
 
 // Speed of the vocal chart in pixels per second at the default neck speed: a 1000 px wide window shows 2.5 s ahead, a wider one more.
 const VOCAL_PX_PER_SEC = (1000 * 0.85) / BASE_LOOKAHEAD_SEC;
@@ -81,16 +83,24 @@ export class Highway {
     this.vocalView = 'track'; // 'track' (notes + lyrics) or 'karaoke' (the lyrics alone)
     this.trackOpacity = 0.75; // how opaque the board of a fretboard is (setting highway.trackOpacity)
     this.visualizer = null; // (g, w, h, t, bgRgb) => draws the shared background behind every pane, or null (src/visualizers.js)
+    this.dirtyAt = 0; // performance.now() of the last change to what is drawn (see invalidate); the page skips idle redraws until it is old
+  }
+
+  // Marks the picture as stale: the page keeps redrawing every frame for a while after this (it skips frames only when paused and idle).
+  invalidate() {
+    this.dirtyAt = performance.now();
   }
 
   // The background visualizer: one drawing for the whole canvas, under all the panes. null removes it.
   setVisualizer(fn) {
     this.visualizer = typeof fn === 'function' ? fn : null;
+    this.invalidate();
   }
 
   setBackground(hex) {
     const n = parseInt(hex.slice(1), 16);
     this.bg = hex;
+    this.invalidate();
     if (this.bgCanvas?.parentElement) this.bgCanvas.parentElement.style.background = hex;
     this.bgRgb = `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
   }
@@ -98,23 +108,28 @@ export class Highway {
   // '2d' (flat) or '3d' (perspective). Vocals have no highway and always use the flat view.
   setView(view) {
     this.view = view === '3d' ? '3d' : '2d';
+    this.invalidate();
   }
 
   setNoteStyle(style) {
     this.noteStyle = style === 'rect' ? 'rect' : 'round';
+    this.invalidate();
   }
 
   setNeckSpeed(value) {
     this.neck = value;
+    this.invalidate();
   }
 
   // Options of one window (a fretboard or the vocal chart) that override the global ones: view, noteStyle, neck, delay (seconds the
   // notes arrive later). `paneOpt` answers with the override or the global value; clearPaneOpt(null, name) clears it for every window.
   setPaneOpt(key, name, value) {
     (this.paneOpts[key] ??= {})[name] = value;
+    this.invalidate();
   }
 
   clearPaneOpt(key, name) {
+    this.invalidate();
     for (const k of key === null ? Object.keys(this.paneOpts) : [key]) if (this.paneOpts[k]) delete this.paneOpts[k][name];
   }
 
@@ -137,14 +152,17 @@ export class Highway {
     });
     this.chart = this.panes.find((p) => p.chart)?.chart ?? null;
     this.focus = 0;
+    this.invalidate();
   }
 
   setPaneMin(px) {
     this.paneMin = Math.max(120, px);
+    this.invalidate();
   }
 
   setVocalView(view) {
     this.vocalView = view === 'karaoke' ? 'karaoke' : 'track';
+    this.invalidate();
   }
 
   laneCount() {
@@ -157,6 +175,7 @@ export class Highway {
     const next = Math.max(0, Math.min(Math.max(0, total - this.perScreen), this.focus + delta));
     const moved = next !== this.focus;
     this.focus = next;
+    this.invalidate();
     return moved;
   }
 
@@ -386,6 +405,7 @@ export class Highway {
     const na = Math.max(min, Math.min(wa + wb - min, wa + dx));
     this.weights[d.a] = na / perWeight;
     this.weights[d.b] = (wa + wb - na) / perWeight;
+    this.invalidate();
   }
 
   // Back to the default sizes (double click on a divider: just that one; no argument: all).
@@ -435,7 +455,7 @@ export class Highway {
       } else { // the fade at the edges erases the board (it never paints a colour over what is behind: the stage colour or a visualizer)
         const main = g;
         const dpr = this.canvas.width / (this.canvas.clientWidth || 1);
-        const layer = this.layerFor(pw, ph, dpr);
+        const layer = this.layerFor(pw, ph, dpr, `layer:${pane.key}`); // one per pane: panes of different sizes would otherwise resize a shared canvas every frame
         const lg = layer.getContext('2d');
         lg.setTransform(1, 0, 0, 1, 0, 0);
         lg.clearRect(0, 0, layer.width, layer.height);
@@ -1036,12 +1056,14 @@ export class Highway {
     this.fillSpans(chart.starPower, t, ahead, yOf, x0, laneW * chart.lanes, h, 'rgba(60,160,255,0.12)');
     this.fillSpans(chart.solos, t, ahead, yOf, x0, laneW * chart.lanes, h, 'rgba(255,190,60,0.10)');
     // drum fills / big rock endings (YARG activation phrases and BRE), a faint band under the notes
-    for (const [kind, color] of Object.entries(FILL_COLORS)) {
-      this.fillSpans((chart.fills || []).filter((f) => f.kind === kind), t, ahead, yOf, x0, laneW * chart.lanes, h, color);
+    for (const kind in FILL_COLORS) {
+      const color = FILL_COLORS[kind];
+      this.fillSpans(spansOfKind(chart, chart.fills, 'kind', kind), t, ahead, yOf, x0, laneW * chart.lanes, h, color);
     }
     // drum rolls: one band per roll type (kick roll, tremolo lane, trill lane)
-    for (const [type, color] of Object.entries(ROLL_COLORS)) {
-      this.fillSpans((chart.rolls || []).filter((r) => r.type === type), t, ahead, yOf, x0, laneW * chart.lanes, h, color);
+    for (const type in ROLL_COLORS) {
+      const color = ROLL_COLORS[type];
+      this.fillSpans(spansOfKind(chart, chart.rolls, 'type', type), t, ahead, yOf, x0, laneW * chart.lanes, h, color);
     }
 
     // beat lines
@@ -1262,9 +1284,9 @@ export class Highway {
     // harmonies first, so the lead is drawn on top
     for (const harmony of chart.harmonies || []) {
       const base = HARMONY_COLORS[harmony.part] || HARMONY_COLORS[1];
-      this.vocalNotes(harmony.notes, t, ahead, behind, xOf, yOfPitch, [top, bottom], harmHalf, [tintWhite(base, 0.7), base], hitX); // the part past the hit line is lit, like the lead's
+      this.vocalNotes(harmony.notes, t, ahead, behind, xOf, yOfPitch, [top, bottom], harmHalf, this.harmonyColors(harmony.part, base), hitX); // the part past the hit line is lit, like the lead's
     }
-    this.vocalNotes(chart.notes, t, ahead, behind, xOf, yOfPitch, [top, bottom], leadHalf, [tintWhite(VOCAL_LEAD, 0.6), VOCAL_LEAD], hitX); // lit: a lighter shade of the note's own colour
+    this.vocalNotes(chart.notes, t, ahead, behind, xOf, yOfPitch, [top, bottom], leadHalf, (this.leadColors ??= [tintWhite(VOCAL_LEAD, 0.6), VOCAL_LEAD]), hitX); // lit: a lighter shade of the note's own colour
 
     // percussion: a drum-head marker per hit, in the vertical middle of the chart; a hit flashes when it crosses the line and
     // then dims as it scrolls off.
@@ -1285,7 +1307,7 @@ export class Highway {
         g.beginPath();
         g.arc(x, percussionY, r * (2.2 + k), 0, Math.PI * 2);
         g.fill();
-        for (const [delay, grow, width] of [[0, 1.9, 3.5], [0.18, 1.4, 2]]) { // two rings going out, one after the other
+        for (const [delay, grow, width] of PERC_RINGS) { // two rings going out, one after the other
           const q = Math.max(0, Math.min(1, (k - delay) / (1 - delay)));
           if (q <= 0) continue;
           g.beginPath();
@@ -1350,6 +1372,48 @@ export class Highway {
     g.textBaseline = 'alphabetic';
   }
 
+  // One vocal note in `color` (a talkie box, or a pitched bar with the ribbon from the note it continues).
+  vocalShape(n, prev, x1, bw, y, half, area, xOf, yOfPitch, color) {
+    const g = this.g;
+    g.fillStyle = color;
+    g.strokeStyle = color;
+    if (n.talkie) {
+      g.save();
+      g.globalAlpha *= 0.35;
+      const ty = area[0] + 10; // a little room above the box
+      g.fillRect(x1, ty, bw, area[1] - ty); // a free note fills the chart area above the lyrics
+      g.restore();
+      g.setLineDash([4, 3]);
+      g.lineWidth = 2;
+      g.strokeRect(x1, ty, bw, area[1] - ty);
+      g.setLineDash([]);
+      return;
+    }
+    if (n.slide && prev && !prev.talkie) { // continues the previous note: a smooth ribbon from its end to this note's start
+      const xa = xOf(prev.end);
+      const ya = yOfPitch(prev.pitch);
+      const lead = Math.min(10, half * 1.5); // tucks under both bars so no seam shows
+      const xs = xa - lead;
+      const xe = x1 + lead;
+      const tw = xe - xs; // the pitch glides over the whole gap, a smooth S, instead of jumping
+      const xc = xe - tw;
+      const cx = xc + tw / 2;
+      g.beginPath();
+      g.moveTo(xs, ya - half);
+      g.lineTo(xc, ya - half);
+      g.bezierCurveTo(cx, ya - half, cx, y - half, xe, y - half);
+      g.lineTo(xe, y + half);
+      g.bezierCurveTo(cx, y + half, cx, ya + half, xc, ya + half);
+      g.lineTo(xs, ya + half);
+      g.closePath();
+      g.fill();
+    }
+    g.beginPath();
+    if (g.roundRect) g.roundRect(x1, y - half, bw, half * 2, Math.min(half, bw / 2));
+    else g.rect(x1, y - half, bw, half * 2);
+    g.fill();
+  }
+
   // Notes of a vocal part: rounded pitched bars, a ribbon joining a pitch slide to the note before it (same colour as the
   // notes), and talkies (unpitched notes, '#', '^', '*') as a dashed box in the middle of the pitch area.
   // colors = [passed, idle]: the part of a note that is past the hit line is painted `passed`. null keeps the current fill.
@@ -1365,58 +1429,24 @@ export class Highway {
       const x2 = Math.max(x1 + 6, xOf(n.end));
       const bw = x2 - x1;
       const y = yOfPitch(n.pitch);
-      const shape = (color) => {
-        g.fillStyle = color;
-        g.strokeStyle = color;
-        if (n.talkie) {
-          g.save();
-          g.globalAlpha *= 0.35;
-          const ty = area[0] + 10; // a little room above the box
-          g.fillRect(x1, ty, bw, area[1] - ty); // a free note fills the chart area above the lyrics
-          g.restore();
-          g.setLineDash([4, 3]);
-          g.lineWidth = 2;
-          g.strokeRect(x1, ty, bw, area[1] - ty);
-          g.setLineDash([]);
-          return;
-        }
-        if (n.slide && prev && !prev.talkie) { // continues the previous note: a smooth ribbon from its end to this note's start
-          const xa = xOf(prev.end);
-          const ya = yOfPitch(prev.pitch);
-          const lead = Math.min(10, half * 1.5); // tucks under both bars so no seam shows
-          const xs = xa - lead;
-          const xe = x1 + lead;
-          const tw = xe - xs; // the pitch glides over the whole gap, a smooth S, instead of jumping
-          const xc = xe - tw;
-          const cx = xc + tw / 2;
-          g.beginPath();
-          g.moveTo(xs, ya - half);
-          g.lineTo(xc, ya - half);
-          g.bezierCurveTo(cx, ya - half, cx, y - half, xe, y - half);
-          g.lineTo(xe, y + half);
-          g.bezierCurveTo(cx, y + half, cx, ya + half, xc, ya + half);
-          g.lineTo(xs, ya + half);
-          g.closePath();
-          g.fill();
-        }
-        g.beginPath();
-        if (g.roundRect) g.roundRect(x1, y - half, bw, half * 2, Math.min(half, bw / 2));
-        else g.rect(x1, y - half, bw, half * 2);
-        g.fill();
-      };
-      shape(colors ? colors[1] : keep);
+      this.vocalShape(n, prev, x1, bw, y, half, area, xOf, yOfPitch, colors ? colors[1] : keep);
       if (colors && (joined ? xOf(prev.end) : x1) < hitX) { // (the ribbon of a continuation starts at the previous note's end) // only the part that has crossed the hit line changes colour
         g.save();
         g.beginPath();
         g.rect(-1e4, -1e4, hitX + 1e4, 2e4);
         g.clip();
-        shape(colors[0]);
+        this.vocalShape(n, prev, x1, bw, y, half, area, xOf, yOfPitch, colors[0]);
         g.restore();
       }
     }
   }
 
   // Lowest and highest pitched note of the whole chart (and its harmonies), cached per chart.
+  harmonyColors(part, base) {
+    const cache = (this.harmonyColorCache ??= {});
+    return (cache[part] ??= [tintWhite(base, 0.7), base]);
+  }
+
   vocalFullRange() {
     const chart = this.chart;
     if (!chart.fullRange) {

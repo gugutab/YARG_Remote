@@ -9,7 +9,8 @@ Visualization only: no hit/miss detection.
 ```bash
 npm run start:static  # python3 -m http.server 8080 --bind 127.0.0.1 — then open http://localhost:8080 (folder picker only)
 npm start             # node server.mjs [songs folder]: the app plus your songs, no folder picker (see "Server with the library")
-npm test             # tests for the MIDI parser / song.ini / chart
+npm test             # unit tests (MIDI / chart / song.ini / settings / server hardening ...), no browser
+npm run smoke        # starts server.mjs on a free port over a tiny synthetic song and checks the app, library and path-traversal refusals
 ```
 
 - Use **Chrome or Edge** (folder selection uses the File System Access API). In other browsers the
@@ -120,3 +121,9 @@ HOST=0.0.0.0 npm start         # explicit opt-in: also serve other devices on th
 ```
 
 The server delivers the app, the index (`/api/library`, stored in `.cache/library.json`) and the files (`/songs/<path>`, with Range support). The app detects the server and opens the library on its own, in any browser (Firefox included) and, when started with `HOST=0.0.0.0`, on other devices on the LAN (`http://<PC-IP>:8080`), with no folder picker. By default the server binds `127.0.0.1` only and, while bound to loopback, refuses requests whose `Host` header is not an IP, `localhost` or the machine name (DNS-rebinding guard). `/songs` only serves song-pack file types (audio, images, charts, ini/txt/json), never html/js/css/svg. The refresh button (⟳) redoes the scan. Without the server (`npm run start:static`, or static hosting) the app goes back to the browser's folder picker, described above: in Chrome/Edge on `localhost` the folder is remembered; otherwise only the list is stored.
+
+## License
+
+- `vendor/soundtouch.js` is SoundTouchJS 0.1.30, licensed LGPL-2.1 (see `vendor/SOUNDTOUCH-LICENSE.txt`).
+- The instrument icons in `index.html` are traced from YARG's icon sheet (LGPL-3.0, see `vendor/README.md`).
+- The project's own licence has not been chosen yet. TODO (owner): pick a licence and add a `LICENSE` file.

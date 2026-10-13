@@ -1,2 +1,30 @@
-.cache/
+# dependencies and tooling
+node_modules/
 .playwright-mcp/
+.claude/
+# server song-index cache (rebuilt by server.mjs)
+.cache/
+# screenshots and scratch images at the repo root (verification shots: info.png, shot1.png, top.png ...)
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
+# the user's songs are copyrighted and never go in the repository
+*.mid
+!test/**/*.mid
+*.sng
+*.ogg
+*.opus
+*.mp3
+*.wav
+*.flac
+*.m4a
+song.ini
+notes.chart
+/songs/
+/Songs/
+# logs and OS files
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini

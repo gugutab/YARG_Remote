@@ -100,16 +100,27 @@ export function heldAmount(n, t) {
 // Radial halo: fills a circle of radius `outer` around (0, 0) that is strongest near `inner` and fades to nothing at the
 // edge. `color` is a #rrggbb string. The caller positions/scales the context (an ellipse is a scaled circle).
 export function fillHalo(g, color, inner, outer, strength) {
-  const n = parseInt(color.slice(1), 16);
-  const rgb = `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
-  const grad = g.createRadialGradient(0, 0, inner, 0, 0, outer);
-  // eased falloff (smoothstep, see haloProfile): strongest at `inner`, zero slope at both ends, nothing at the edge
-  for (let i = 0; i <= 12; i++) grad.addColorStop(i / 12, `rgba(${rgb},${strength * haloProfile(i / 12)})`);
+  // The gradient does not depend on the strength (that is the global alpha), so it is built once per colour and size, not per note per frame.
+  const key = `${color}|${inner}|${outer}`;
+  let grad = haloGradients.get(key);
+  if (!grad) {
+    const n = parseInt(color.slice(1), 16);
+    const rgb = `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+    grad = g.createRadialGradient(0, 0, inner, 0, 0, outer);
+    // eased falloff (smoothstep, see haloProfile): strongest at `inner`, zero slope at both ends, nothing at the edge
+    for (let i = 0; i <= 12; i++) grad.addColorStop(i / 12, `rgba(${rgb},${haloProfile(i / 12)})`);
+    if (haloGradients.size >= 96) haloGradients.clear(); // (3D sizes change with the distance: do not grow without bound)
+    haloGradients.set(key, grad);
+  }
+  const alpha = g.globalAlpha;
+  g.globalAlpha = alpha * strength;
   g.fillStyle = grad;
   g.beginPath();
   g.arc(0, 0, outer, 0, Math.PI * 2);
   g.fill();
+  g.globalAlpha = alpha;
 }
+const haloGradients = new Map();
 
 // Soft falloff of the halo around a held tail: [distance from the strip's edge as a fraction of the reach, strength].
 // Smoothstep falloff: it starts and ends with zero slope, so the glow dies out gently instead of ending abruptly.
@@ -124,31 +135,44 @@ function hexRgb(color) {
 // Halo beside a tail (2D): a horizontal gradient, strongest at the strip's edges and fading out over `reach` px.
 // Draws from yTop to yBot, plus a rounded cap above yTop (the same falloff, as a half circle).
 export function fillTailHalo(g, color, cx, half, reach, yTop, yBot, strength, withCap) {
-  const rgb = hexRgb(color);
-  const total = 2 * (half + reach);
-  const lin = g.createLinearGradient(cx - half - reach, 0, cx + half + reach, 0);
-  for (let i = TAIL_HALO_PROFILE.length - 1; i >= 0; i--) {
-    const [f, a] = TAIL_HALO_PROFILE[i];
-    lin.addColorStop((reach * (1 - f)) / total, `rgba(${rgb},${a * strength})`);
-  }
-  for (const [f, a] of TAIL_HALO_PROFILE) lin.addColorStop(1 - (reach * (1 - f)) / total, `rgba(${rgb},${a * strength})`);
-  g.fillStyle = lin;
-  g.fillRect(cx - half - reach, yTop, total, Math.max(0, yBot - yTop));
-  if (withCap) { // the rounded end: the half of a radial gradient that lies beyond the tail's end
-    g.save();
-    g.beginPath();
-    g.rect(cx - half - reach, yTop - half - reach, total, half + reach);
-    g.clip();
-    g.translate(cx, yTop);
+  // The gradients are built around x = 0 with the strength left to the global alpha, then cached per colour and size: a tail's halo
+  // is the same shape every frame, only its position (a translate) and strength change.
+  const key = `${color}|${half}|${reach}`;
+  let pair = tailHaloGradients.get(key);
+  if (!pair) {
+    const rgb = hexRgb(color);
+    const total = 2 * (half + reach);
+    const lin = g.createLinearGradient(-half - reach, 0, half + reach, 0);
+    for (let i = TAIL_HALO_PROFILE.length - 1; i >= 0; i--) {
+      const [f, a] = TAIL_HALO_PROFILE[i];
+      lin.addColorStop((reach * (1 - f)) / total, `rgba(${rgb},${a})`);
+    }
+    for (const [f, a] of TAIL_HALO_PROFILE) lin.addColorStop(1 - (reach * (1 - f)) / total, `rgba(${rgb},${a})`);
     const rad = g.createRadialGradient(0, 0, half, 0, 0, half + reach);
-    for (const [f, a] of TAIL_HALO_PROFILE) rad.addColorStop(f, `rgba(${rgb},${a * strength})`);
-    g.fillStyle = rad;
+    for (const [f, a] of TAIL_HALO_PROFILE) rad.addColorStop(f, `rgba(${rgb},${a})`);
+    pair = { lin, rad };
+    if (tailHaloGradients.size >= 96) tailHaloGradients.clear();
+    tailHaloGradients.set(key, pair);
+  }
+  const total = 2 * (half + reach);
+  g.save();
+  g.translate(cx, 0);
+  g.globalAlpha *= strength;
+  g.fillStyle = pair.lin;
+  g.fillRect(-half - reach, yTop, total, Math.max(0, yBot - yTop));
+  if (withCap) { // the rounded end: the half of a radial gradient that lies beyond the tail's end
+    g.beginPath();
+    g.rect(-half - reach, yTop - half - reach, total, half + reach);
+    g.clip();
+    g.translate(0, yTop);
+    g.fillStyle = pair.rad;
     g.beginPath();
     g.arc(0, 0, half + reach, 0, Math.PI * 2);
     g.fill();
-    g.restore();
   }
+  g.restore();
 }
+const tailHaloGradients = new Map();
 
 export const HIT_FLASH_SEC = 0.14; // how long a hit pad stays lit after a note hit
 export const BAR_FLASH_SEC = 0.24; // ... after a pedal or open hit (it lights every pad)
@@ -287,3 +311,12 @@ export function starPowerColor(hex) {
   return `#${mix((n >> 16) & 255)}${mix((n >> 8) & 255)}${mix(n & 255)}`;
 }
 export const noteColor = (n, colors) => (n.sp ? starPowerColor(colors[n.lane]) : colors[n.lane]);
+
+// The spans of `list` (chart.fills, chart.rolls) whose `key` is `value`, filtered once per chart instead of on every frame.
+export function spansOfKind(chart, list, key, value) {
+  const cache = (chart.spanKinds ??= new Map());
+  const id = `${key}:${value}`;
+  let hit = cache.get(id);
+  if (!hit || hit.src !== list) { hit = { src: list, spans: (list || []).filter((x) => x[key] === value) }; cache.set(id, hit); }
+  return hit.spans;
+}

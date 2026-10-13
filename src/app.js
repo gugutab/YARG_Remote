@@ -2352,6 +2352,28 @@ function visualChartTime(ct) {
   return vis.shown;
 }
 
+// Idle redraws: when the music is paused and nothing moves (no seek animation, no visualizer, no pointer or key activity for a few
+// seconds, no change to the highway), the picture would be identical, so most frames skip the whole draw. Anything that can change it
+// wakes the loop: user input (any event below), a change to the highway's state (`highway.dirtyAt`), a new time, or a new canvas size.
+// A slow refresh (IDLE_REFRESH_MS) still runs, to catch what no event announces (a hover tooltip delay, lyric sheet easing).
+const IDLE_AFTER_MS = 3000;
+const IDLE_REFRESH_MS = 250;
+let lastInputAt = performance.now();
+const wakeUp = () => { lastInputAt = performance.now(); };
+for (const type of ['pointermove', 'pointerdown', 'pointerup', 'wheel', 'keydown', 'keyup', 'input', 'change', 'click', 'touchstart', 'dragover', 'drop']) document.addEventListener(type, wakeUp, { capture: true, passive: true });
+for (const type of ['resize', 'hashchange', 'popstate', 'focus', 'visibilitychange']) window.addEventListener(type, wakeUp);
+let lastDraw = { at: -Infinity, t: NaN, w: 0, h: 0, dpr: 0, panes: null, chart: null };
+function canSkipDraw(now, t) {
+  if (player.playing || vis.anim || seeking || highway.visualizer || prefs.get('perf.overlay') !== 'off') return false;
+  if (now - Math.max(lastInputAt, highway.dirtyAt) < IDLE_AFTER_MS || now - lastDraw.at >= IDLE_REFRESH_MS) return false;
+  const c = els.highway;
+  return lastDraw.t === t && lastDraw.w === c.clientWidth && lastDraw.h === c.clientHeight && lastDraw.dpr === window.devicePixelRatio && lastDraw.panes === highway.panes && lastDraw.chart === chart;
+}
+function noteDraw(now, t) {
+  const c = els.highway;
+  lastDraw = { at: now, t, w: c.clientWidth, h: c.clientHeight, dpr: window.devicePixelRatio, panes: highway.panes, chart };
+}
+
 let lastClock = null; // the previous frame's music time and timestamp, for the clock jitter meter
 
 // Errors in the frame loop must not stop it: the next frame is scheduled first, every part runs under `guarded`, and a
@@ -2393,8 +2415,8 @@ function frame(frameTs) {
         // right when the old end would have been heard.
         const ahead = ((player.outputLatency || 0) + 0.01) * player.rate;
         if (shouldWrap(loop, loopPrev, t, ahead)) {
-          player.seek(loop.start);
-          instantJump = true;
+          player.seek(loop.start); // the audio restarts at once (no scrub)...
+          pendingSeekDur = 450; // ...and the fretboards rewind with the usual seek animation, a little quicker
           t = loop.start;
         }
       }
@@ -2418,7 +2440,10 @@ function frame(frameTs) {
       if (vis.anim && Math.abs(vis.step) > MOTION_BLUR_MIN_STEP && prefs.get('highway.motionBlur')) { // a fast jump: blur the motion
         const span = Math.max(-0.6, Math.min(0.6, vis.step * 0.85)); // the exposure: most of the frame, within limits
         draw(() => highway.renderBlur(Array.from({ length: 8 }, (_, k) => shownTime - span * (1 - k / 7))));
-      } else draw(() => highway.render(shownTime));
+      } else if (canSkipDraw(frameStart, shownTime)) { /* idle: the picture is unchanged */ } else {
+        draw(() => highway.render(shownTime));
+        noteDraw(frameStart, shownTime);
+      }
       guarded('pane tags', syncPaneTags);
       guarded('seek bar', () => { // (a failed render still lets the bar, the time and the section update)
         const index = chart.sections.length ? sectionIndexAt(chart.sections, chartTime) : -1;
@@ -2438,7 +2463,10 @@ function frame(frameTs) {
       });
     }
   } else {
-    draw(() => highway.render(0));
+    if (!canSkipDraw(frameStart, 0)) {
+      draw(() => highway.render(0));
+      noteDraw(frameStart, 0);
+    }
     guarded('pane tags', syncPaneTags);
   }
   guarded('perf', () => { perf.frame(frameStart, drawMs); perfOverlay.tick(frameStart); });
@@ -2511,7 +2539,7 @@ const EFFECTS = {
   'ui.animations': (v) => { document.documentElement.dataset.motion = v ? 'on' : 'off'; },
 };
 for (const [id, fn] of Object.entries(EFFECTS)) fn(prefs.get(id));
-prefs.subscribe((id, value) => EFFECTS[id]?.(value));
+prefs.subscribe((id, value) => { wakeUp(); EFFECTS[id]?.(value); });
 
 const settingsPage = mountSettings({
   root: document.getElementById('settingsPage'), settings: prefs, sections: SECTIONS,
