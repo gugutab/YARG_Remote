@@ -287,3 +287,4 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - Mobile top bar (≤ 700 px): extended shows the cover again (40 px) with the title row centred (the info icon stays right after the title text); compact aligns all buttons to the right.
 - Mobile top bar, second pass (≤ 700 px): extended = the cover and the title/artist are one centred group; compact = icons centred vertically above the seek line, the title and artist are shown (small, left) and the prev/next section buttons are hidden to make room.
 - Mobile compact bar, third pass: the title starts at the left edge (only the button group is pushed right) and the info icon (22 px) sits on the title line, with the artist below (`.now` as a 2x2 grid with `.now-text` as `display: contents`).
+- Compact bar on wider screens (> 700 px): same title/info/artist arrangement as on mobile (info icon on the title line, artist below).
