@@ -1588,3 +1588,10 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 @container song (min-width: 800px) {
   .app.bar-bottom:not(.bar-hidden) .transport { flex-direction: column-reverse; align-self: start; margin: 2px 0 0; }
 }
+
+/* Bar at the bottom: the expand/compact arrow is inverted (down = compact, up = expand) and the controls get more room above the window edge */
+.app.bar-bottom .bar-hide svg { transform: none; }
+.app.bar-bottom.bar-hidden .bar-hide svg { transform: rotate(180deg); }
+.app.bar-bottom .topbar { padding-bottom: 16px; height: calc(var(--bar-h) + 8px); }
+@media (min-width: 701px) { .app.bar-bottom.bar-hidden .topbar { padding-bottom: 12px; } }
+@container song (max-width: 700px) { .app.bar-bottom.bar-hidden .topbar { padding-bottom: 12px; } }
