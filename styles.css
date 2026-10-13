@@ -1276,7 +1276,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .app.bar-hidden .brand { display: none; }
 .app.bar-hidden .bar-hide svg { transform: none; } /* points down: expand */
 @container song (max-width: 600px) { /* compact bar in a narrow window: only what fits */
-  .app.bar-hidden .topbar .time, .app.bar-hidden #sectionText { display: none; }
+  .app.bar-hidden #sectionText { display: none; }
   .app.bar-hidden .tb-top { flex: 0 0 auto; }
   .app.bar-hidden .tools { gap: 0; }
 }
@@ -1374,4 +1374,17 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   /* compact: with room to spare the album art is shown left of the title and artist */
   .app.bar-hidden .tb-cover:not([hidden]) { display: block; grid-column: 1; grid-row: 1; width: 40px; height: 40px; align-self: center; border-radius: 6px; }
   .app.bar-hidden .topbar > .tb-main { grid-column: 2 / -1; }
+}
+
+/* ---------- Mobile bar, fifth pass: the time is back ---------- */
+@media (max-width: 700px) {
+  /* extended: the time text next to the transport */
+  .app:not(.bar-hidden) .transport .time { display: inline; margin-left: 4px; font-size: 11px; white-space: nowrap; }
+  /* compact: the time wraps onto two lines ("0:00 /" over "6:09") */
+  .app.bar-hidden .topbar .transport .time { display: block; width: 3.4em; margin-left: 2px; font-size: 11px; line-height: 1.2; white-space: normal; text-align: left; }
+}
+@container song (max-width: 520px) {
+  /* not enough room: the section selector shows only its icon, or nothing in the compact bar */
+  .app:not(.bar-hidden) #sectionText { display: none; }
+  .app.bar-hidden .section-wrap { display: none; }
 }
