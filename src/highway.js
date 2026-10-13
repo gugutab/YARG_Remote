@@ -529,13 +529,17 @@ export class Highway {
 
   // The vertical middle of the pitch area of the vocal chart (the same area `renderVocals` lays the notes out in): below the harmony
   // lyric line, if any, and above the lyrics at the bottom.
-  vocalCenterY(chart, h) {
+  // The pitch area is at most this tall, like YARG's vocal track (aspect ratio between 8:1 and 13:1): wide and low, so the notes
+  // sit close to the lyrics. (VocalTrack.cs MIN_ASPECT_RATIO.)
+  vocalMaxArea(w) { return Math.max(150, w / 6); }
+
+  vocalCenterY(chart, h, w = Infinity) {
     const second = (chart.lyrics2 || []).length > 0;
     const secondSize = Math.max(15, Math.min(26, h * 0.08));
-    const top = second ? secondSize * 0.75 + secondSize * 0.75 : 8;
     const fontSize = Math.max(18, Math.min(30, h * 0.095));
     const lyricY = h - fontSize * 0.75;
     const bottom = lyricY - fontSize * 0.5 - 16;
+    const top = Math.max(second ? secondSize * 0.75 + secondSize * 0.75 : 8, bottom - this.vocalMaxArea(w));
     return (top + bottom) / 2;
   }
 
@@ -547,7 +551,7 @@ export class Highway {
     if (pane.chart.mode === 'vocals') {
       const hitX = w * 0.15;
       const r = Math.max(18, Math.min(hitX * 0.4, h * 0.2, 60));
-      this.drawCountdownBadge(hitX / 2, this.vocalCenterY(pane.chart, h), r, c); // same height as the percussion
+      this.drawCountdownBadge(hitX / 2, this.vocalCenterY(pane.chart, h, w), r, c); // same height as the percussion
       return;
     }
     this.drawCountdownBadge(w / 2, h * 0.4, Math.max(26, Math.min(h * 0.2, w * 0.2, 70)), c);
@@ -1212,10 +1216,11 @@ export class Highway {
     const second = (chart.lyrics2 || []).length > 0; // harmony charts: the other voices' own words get a line above the chart
     const secondSize = Math.max(15, Math.min(26, h * 0.08));
     const secondY = secondSize * 0.75; // the harmony line (and its track) sits right at the top edge
-    const top = second ? secondY + secondSize * 0.75 : 8; // pitch area: below the second lyric line, if any, to 76% of the canvas
+    let top = second ? secondY + secondSize * 0.75 : 8; // pitch area: below the second lyric line, if any, down to the lyrics
     const fontSize = Math.max(18, Math.min(30, h * 0.095)); // lyric size, grows with the band
     const lyricY = h - fontSize * 0.75; // the lyrics and their track sit right at the bottom edge of the window
     const bottom = lyricY - fontSize * 0.5 - 16; // and 16 px of air between them and the notes
+    top = Math.max(top, bottom - this.vocalMaxArea(w)); // wide and low, like YARG's track: the notes stay close to the lyrics
     // The track: the note area is nearly see-through (the visualizer shows), the rows of lyrics keep their readable base.
     // The lyric track hugs the words, centred on them, and fades away while a percussion section or a rest with a countdown runs.
     const st = (chart.trackFade ??= { k: 1, at: performance.now() });
@@ -1234,8 +1239,11 @@ export class Highway {
       }
     }
     const yOfPitch = (p) => bottom - ((p - lo) / (hi - lo)) * (bottom - top);
+    const semi = (bottom - top) / (hi - lo); // px per semitone
+    const leadHalf = Math.max(6, semi * 0.75); // a note is 1.5 semitones thick, as in YARG (CurrentNoteWidth)
+    const harmHalf = Math.max(4, leadHalf * 0.67);
     const mid = (top + bottom) / 2; // talkies (unpitched notes) sit in the middle of the pitch area
-    const percussionY = this.vocalCenterY(chart, h); // percussion hits sit in the vertical middle of the chart
+    const percussionY = this.vocalCenterY(chart, h, w); // percussion hits sit in the vertical middle of the chart
     const xOf = (time) => hitX + (time - t) * pxPerSec;
     const ahead = look + ENTRY_MARGIN_SEC;
     const behind = hitX / pxPerSec + 0.5; // how long after the hit line a note is still on the stage (it scrolls off the left edge)
@@ -1254,9 +1262,9 @@ export class Highway {
     // harmonies first, so the lead is drawn on top
     for (const harmony of chart.harmonies || []) {
       const base = HARMONY_COLORS[harmony.part] || HARMONY_COLORS[1];
-      this.vocalNotes(harmony.notes, t, ahead, behind, xOf, yOfPitch, [top, bottom], 4, [tintWhite(base, 0.7), base], hitX); // the part past the hit line is lit, like the lead's
+      this.vocalNotes(harmony.notes, t, ahead, behind, xOf, yOfPitch, [top, bottom], harmHalf, [tintWhite(base, 0.7), base], hitX); // the part past the hit line is lit, like the lead's
     }
-    this.vocalNotes(chart.notes, t, ahead, behind, xOf, yOfPitch, [top, bottom], 6, [tintWhite(VOCAL_LEAD, 0.6), VOCAL_LEAD], hitX); // lit: a lighter shade of the note's own colour
+    this.vocalNotes(chart.notes, t, ahead, behind, xOf, yOfPitch, [top, bottom], leadHalf, [tintWhite(VOCAL_LEAD, 0.6), VOCAL_LEAD], hitX); // lit: a lighter shade of the note's own colour
 
     // percussion: a drum-head marker per hit, in the vertical middle of the chart; a hit flashes when it crosses the line and
     // then dims as it scrolls off.
