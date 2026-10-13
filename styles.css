@@ -1547,3 +1547,8 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 
 /* The current time stands out a little from the total */
 .time #timeNow { color: var(--text); font-weight: 600; }
+
+/* The compact bar has the same maximum content width as the open one (centred) */
+@media (min-width: 701px) {
+  .app.bar-hidden .topbar { --bar-content-max: 1400px; padding: 4px max(10px, calc((100% - var(--bar-content-max)) / 2)) 10px max(6px, calc((100% - var(--bar-content-max)) / 2 - 10px)); } /* (the 10 px: the empty first grid column and its gap) */
+}
