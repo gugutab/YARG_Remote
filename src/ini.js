@@ -1,3 +1,4 @@
+import { latin1 } from './text.js';
 // Decodes the bytes of a song.ini the way YARG reads text (YARGTextReader.cs, YARGIniReader.cs): a UTF-16 or UTF-32
 // BOM selects that encoding; otherwise the text is UTF-8 (an optional BOM is skipped) and a line that is not valid
 // UTF-8 is read as Latin-1 (ISO-8859-1), YARG's per-string fallback.
@@ -29,7 +30,7 @@ export function decodeIniBytes(input) {
       try {
         lines.push(utf8.decode(line));
       } catch {
-        lines.push(String.fromCharCode(...line));
+        lines.push(latin1(line));
       }
     }
     return lines.join('\n');

@@ -3,6 +3,7 @@ import { parseChart } from './chartfile.js';
 import { DIFFICULTIES, EXTENDED_DRUM_LANES, instrumentOptions, availableDifficulties, buildChart, sectionIndexAt } from './chart.js';
 import { MultiTrackPlayer } from './player.js';
 import { Highway } from './highway.js';
+import { createErrorGate } from './errorgate.js';
 import { PerfMeter } from './perf.js';
 import { createPerfOverlay, PERF_MODES } from './perf-overlay.js';
 import { specialNotes, neighbourTime } from './specials.js';
@@ -658,9 +659,12 @@ function ensureAudio() {
     els.seek.max = player.duration.toFixed(2);
     els.timeTotal.textContent = fmt(player.duration);
     paintSectionTicks(); // the slider range is known now
+    const failedIds = new Set(player.failedStems.map((f) => f.id));
+    for (const st of stemStates) st.failed = failedIds.has(st.stem.id);
     stemStates.forEach(applyStem); // volumes chosen while loading
     ready = true;
-    setLoadState('ready', 'Ready to play', 1);
+    const nFailed = failedIds.size;
+    setLoadState('ready', nFailed ? `Ready to play (${nFailed} ${nFailed === 1 ? 'stem' : 'stems'} could not be decoded)` : 'Ready to play', 1);
     return true;
   })();
   audioLoad = { song, promise };
@@ -1359,6 +1363,12 @@ function applyStem(st) {
     v.reset.disabled = st.value === 1 && !off; // already at the default
     v.mute.setAttribute('aria-label', `${off ? 'Unmute' : 'Mute'} ${st.stem.label}`);
     v.range.setAttribute('aria-label', `${st.stem.label} volume`);
+    if (st.failed) { // never decoded: nothing to control
+      v.row.classList.add('muted');
+      v.row.title = 'Could not be decoded';
+      v.mute.title = `${st.stem.label} — could not be decoded`;
+      for (const el of [v.range, v.mute, v.reset]) el.disabled = true;
+    }
   }
 }
 
@@ -2302,69 +2312,95 @@ function visualChartTime(ct) {
 }
 
 let lastClock = null; // the previous frame's music time and timestamp, for the clock jitter meter
+
+// Errors in the frame loop must not stop it: the next frame is scheduled first, every part runs under `guarded`, and a
+// failure is reported (console + a small toast) once per distinct message, then at most every 5 s.
+const frameErrorGate = createErrorGate(5000);
+let errorToast = null;
+function reportFrameError(part, err) {
+  const message = `${part}: ${err?.message || err}`;
+  if (!frameErrorGate(message, performance.now())) return;
+  console.error(`Frame loop error in ${part}:`, err);
+  try {
+    if (!errorToast) {
+      errorToast = document.createElement('div');
+      errorToast.setAttribute('role', 'status');
+      errorToast.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:9999;max-width:90vw;padding:8px 14px;border-radius:8px;background:rgba(40,10,10,.92);color:#fff;font:13px system-ui,sans-serif;pointer-events:none;transition:opacity .3s';
+      document.body.append(errorToast);
+    }
+    errorToast.textContent = `Something went wrong (${message}). See the console.`;
+    errorToast.style.opacity = '1';
+    clearTimeout(errorToast.hideTimer);
+    errorToast.hideTimer = setTimeout(() => { errorToast.style.opacity = '0'; }, 5000);
+  } catch { /* the toast is a courtesy */ }
+}
+function guarded(part, fn) {
+  try { return fn(); } catch (err) { reportFrameError(part, err); }
+}
+
 function frame(frameTs) {
+  requestAnimationFrame(frame); // first, so nothing below can end the loop
   const frameStart = performance.now();
   if (frameTs) player.frameNow = frameTs; // the clock of this animation frame (vsync aligned)
   let drawMs = 0;
+  const draw = (fn) => { const d0 = performance.now(); guarded('draw', fn); drawMs = performance.now() - d0; };
   if (current && chart) {
-    let t = player.currentTime();
-    if (loop && player.playing) {
-      // Look-ahead: the audio restarts after the output latency, so asking a little early makes the new start audible
-      // right when the old end would have been heard.
-      const ahead = ((player.outputLatency || 0) + 0.01) * player.rate;
-      if (shouldWrap(loop, loopPrev, t, ahead)) {
-        player.seek(loop.start);
-        instantJump = true;
-        t = loop.start;
+    let t = guarded('clock', () => {
+      let t = player.currentTime();
+      if (loop && player.playing) {
+        // Look-ahead: the audio restarts after the output latency, so asking a little early makes the new start audible
+        // right when the old end would have been heard.
+        const ahead = ((player.outputLatency || 0) + 0.01) * player.rate;
+        if (shouldWrap(loop, loopPrev, t, ahead)) {
+          player.seek(loop.start);
+          instantJump = true;
+          t = loop.start;
+        }
       }
-    }
-    loopPrev = t;
-    if (previewStop != null && (!player.playing || t >= previewStop)) {
-      if (player.playing) { player.pause(); syncPlayButton(); }
-      previewStop = null;
-    }
-    if (player.playing && t >= player.duration) {
-      player.pause();
-      syncPlayButton();
-    }
-    if (player.playing && lastClock && !instantJump && Math.abs(t - lastClock.t) < SEEK_JUMP_SEC) perf.clock(((t - lastClock.t) - (((frameTs || frameStart) - lastClock.at) / 1000) * player.rate) * 1000); // steadiness of the music clock
-    lastClock = { t, at: frameTs || frameStart };
-    const chartTime = t - settings.chartDelay;
-    const shownTime = visualChartTime(chartTime);
-    if (vis.anim && Math.abs(vis.step) > MOTION_BLUR_MIN_STEP && prefs.get('highway.motionBlur')) { // a fast jump: blur the motion
-      const span = Math.max(-0.6, Math.min(0.6, vis.step * 0.85)); // the exposure: most of the frame, within limits
-      const d0 = performance.now();
-      highway.renderBlur(Array.from({ length: 8 }, (_, k) => shownTime - span * (1 - k / 7)));
-      drawMs = performance.now() - d0;
-    } else {
-      const d0 = performance.now();
-      highway.render(shownTime);
-      drawMs = performance.now() - d0;
-    }
-    syncPaneTags();
-    const index = chart.sections.length ? sectionIndexAt(chart.sections, chartTime) : -1;
-    if (index >= 0) setActiveSection(index);
-    if (seeking) paintSeek(t); // dragging: the thumb is in the user's hand, the fill goes on with the music
+      loopPrev = t;
+      if (previewStop != null && (!player.playing || t >= previewStop)) {
+        if (player.playing) { player.pause(); syncPlayButton(); }
+        previewStop = null;
+      }
+      if (player.playing && t >= player.duration) {
+        player.pause();
+        syncPlayButton();
+      }
+      if (player.playing && lastClock && !instantJump && Math.abs(t - lastClock.t) < SEEK_JUMP_SEC) perf.clock(((t - lastClock.t) - (((frameTs || frameStart) - lastClock.at) / 1000) * player.rate) * 1000); // steadiness of the music clock
+      lastClock = { t, at: frameTs || frameStart };
+      return t;
+    });
+    if (t === undefined) lastClock = null; // no reliable time this frame: skip the drawing, keep the loop (and the jitter meter) clean
     else {
-      const barT = t; // the bar is always at the real position: the thumb is already where the song went and only the fretboards travel there
-      els.seek.value = barT;
-      els.seekbox.classList.toggle('animating', !!vis.anim);
-      paintSeek(vis.anim ? Math.max(0, Math.min(player.duration, shownTime + settings.chartDelay)) : barT); // the fill travels with the fretboards (the thumb is already at the target)
-      els.timeNow.textContent = fmt(barT);
-    }
-    if (infoOpen) { // the Listen card
-      if (document.activeElement !== els.npSeek) els.npSeek.value = t;
-      els.npTime.textContent = `${fmt(t)} / ${fmt(player.duration)}`;
+      const chartTime = t - settings.chartDelay;
+      const shownTime = guarded('visual time', () => visualChartTime(chartTime)) ?? chartTime;
+      if (vis.anim && Math.abs(vis.step) > MOTION_BLUR_MIN_STEP && prefs.get('highway.motionBlur')) { // a fast jump: blur the motion
+        const span = Math.max(-0.6, Math.min(0.6, vis.step * 0.85)); // the exposure: most of the frame, within limits
+        draw(() => highway.renderBlur(Array.from({ length: 8 }, (_, k) => shownTime - span * (1 - k / 7))));
+      } else draw(() => highway.render(shownTime));
+      guarded('pane tags', syncPaneTags);
+      guarded('seek bar', () => { // (a failed render still lets the bar, the time and the section update)
+        const index = chart.sections.length ? sectionIndexAt(chart.sections, chartTime) : -1;
+        if (index >= 0) setActiveSection(index);
+        if (seeking) paintSeek(t); // dragging: the thumb is in the user's hand, the fill goes on with the music
+        else {
+          const barT = t; // the bar is always at the real position: the thumb is already where the song went and only the fretboards travel there
+          els.seek.value = barT;
+          els.seekbox.classList.toggle('animating', !!vis.anim);
+          paintSeek(vis.anim ? Math.max(0, Math.min(player.duration, shownTime + settings.chartDelay)) : barT); // the fill travels with the fretboards (the thumb is already at the target)
+          els.timeNow.textContent = fmt(barT);
+        }
+        if (infoOpen) { // the Listen card
+          if (document.activeElement !== els.npSeek) els.npSeek.value = t;
+          els.npTime.textContent = `${fmt(t)} / ${fmt(player.duration)}`;
+        }
+      });
     }
   } else {
-    const d0 = performance.now();
-    highway.render(0);
-    drawMs = performance.now() - d0;
-    syncPaneTags();
+    draw(() => highway.render(0));
+    guarded('pane tags', syncPaneTags);
   }
-  perf.frame(frameStart, drawMs);
-  perfOverlay.tick(frameStart);
-  requestAnimationFrame(frame);
+  guarded('perf', () => { perf.frame(frameStart, drawMs); perfOverlay.tick(frameStart); });
 }
 requestAnimationFrame(frame);
 

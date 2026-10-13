@@ -52,6 +52,7 @@ export class Highway {
   constructor(canvas) {
     this.canvas = canvas;
     this.g = canvas.getContext('2d');
+    this.mainCtx = this.g; // the context every frame starts from, whatever a failed frame left in this.g
     this.chart = null;
     this.maxLength = 0; // longest sustain in the current chart, in seconds
     this.view = '2d';
@@ -171,9 +172,25 @@ export class Highway {
   }
 
   render(t) {
-    const { w, h } = this.resize();
-    this.drawBackground(t);
-    this.draw(t, w, h);
+    this.g = this.mainCtx;
+    try {
+      const { w, h } = this.resize();
+      this.drawBackground(t);
+      this.draw(t, w, h);
+    } catch (err) {
+      this.recover();
+      throw err;
+    }
+  }
+
+  // After a frame threw: put back everything the drawing code swaps (the context, the layer flags, the saved states and clips of
+  // the main canvas) so the next frame starts clean. Assigning the canvas size resets its context state.
+  recover() {
+    this.g = this.mainCtx;
+    this.layered = false;
+    this.vizFrame = null;
+    this.vocalAlone = false;
+    this.canvas.width = this.canvas.width;
   }
 
   // The page's background canvas (behind the top bar and the fretboards, the full width and height of the main area): it holds the
@@ -199,8 +216,9 @@ export class Highway {
   // Motion blur: the chart drawn at several moments of the time that passes during one frame and averaged, so notes that rush
   // by (a seek animation) leave a trail. `times` run from the start of the exposure to the time shown now.
   renderBlur(times) {
+    this.g = this.mainCtx;
     const { w, h } = this.resize();
-    const main = this.g;
+    const main = this.mainCtx;
     const cw = this.canvas.width;
     const ch = this.canvas.height;
     this.blurCanvas ??= document.createElement('canvas');
@@ -234,6 +252,9 @@ export class Highway {
         main.drawImage(this.blurCanvas, 0, 0);
         main.restore();
       });
+    } catch (err) {
+      this.recover();
+      throw err;
     } finally {
       this.g = main;
       this.vizFrame = null;
@@ -268,9 +289,13 @@ export class Highway {
         g.rect(0, vh, w, h - vh);
         g.clip();
         g.translate(0, vh);
-        if ((vocal.chart.lyrics2 || []).length > 0) this.renderSheetsSplit(t, w, h - vh, vocal, 0, vh); // harmony: one sheet per voice
-        else this.renderLyricSheet(t, w, h - vh, this.karaokeLines(vocal, 'main'), this.sheetState(vocal, 'main'), 0, vh, this.lyricCtx(vocal));
-        g.restore();
+        try {
+          if ((vocal.chart.lyrics2 || []).length > 0) this.renderSheetsSplit(t, w, h - vh, vocal, 0, vh); // harmony: one sheet per voice
+          else this.renderLyricSheet(t, w, h - vh, this.karaokeLines(vocal, 'main'), this.sheetState(vocal, 'main'), 0, vh, this.lyricCtx(vocal));
+        } finally {
+          g.restore();
+          this.vocalAlone = false;
+        }
       }
       this.vocalAlone = false;
       return;
@@ -430,8 +455,8 @@ export class Highway {
       this.view = saved.view;
       this.noteStyle = saved.noteStyle;
       this.neck = saved.neck;
+      g.restore();
     }
-    g.restore();
   }
 
   // The wait countdown: while the chart has nothing to play for 9 s or more, the seconds until its next note, in a ring that

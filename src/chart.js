@@ -68,12 +68,14 @@ const VOCAL_RANGE = [36, 84];
 const PHRASE_OPEN = 0x01; // PhaseShift SysEx phrase codes (YARG.Core PhaseShiftSysEx.cs)
 
 // [start, end) tick windows for one phrase code, per difficulty index 0..3.
-// SysEx layout: "PS\0", type, difficulty (0..3, 0xFF = all), code, value (1 start, 0 end), F7.
+// SysEx layout: "PS\0", type (0), difficulty (0..3, 0xFF = all), code, value (1 start, 0 end), F7. Anything else (short
+// data, other header or type, a difficulty byte outside 0..3/0xFF) is ignored: files are untrusted.
 export function phraseWindows(track, code) {
   const windows = [[], [], [], []];
   const starts = [undefined, undefined, undefined, undefined];
   const events = track.sysex
-    .filter((e) => e.data[0] === 0x50 && e.data[1] === 0x53 && e.data[2] === 0 && e.data[5] === code)
+    .filter((e) => e.data.length >= 7 && e.data[0] === 0x50 && e.data[1] === 0x53 && e.data[2] === 0 && e.data[3] === 0
+      && (e.data[4] <= 3 || e.data[4] === 0xff) && e.data[5] === code)
     .sort((a, b) => a.tick - b.tick);
   for (const e of events) {
     const diffs = e.data[4] === 0xff ? [0, 1, 2, 3] : [e.data[4]];

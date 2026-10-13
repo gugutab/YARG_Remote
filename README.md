@@ -7,7 +7,8 @@ Visualization only: no hit/miss detection.
 ## How to run
 
 ```bash
-npm start            # python3 -m http.server 8080 — then open http://localhost:8080
+npm run start:static  # python3 -m http.server 8080 --bind 127.0.0.1 — then open http://localhost:8080 (folder picker only)
+npm start             # node server.mjs [songs folder]: the app plus your songs, no folder picker (see "Server with the library")
 npm test             # tests for the MIDI parser / song.ini / chart
 ```
 
@@ -113,8 +114,9 @@ At the end, a summary with the total of each category. Without `--only`, it list
 ## Server with the library (no folder permission prompt)
 
 ```bash
-npm start                      # node server.mjs; songs in A:\music\Songs, port 8080, all interfaces
+npm start                      # node server.mjs; songs in A:\music\Songs, port 8080, this machine only (127.0.0.1)
 node server.mjs D:\Musicas     # another folder (or SONGS_DIR); PORT and HOST also via environment variable
+HOST=0.0.0.0 npm start         # explicit opt-in: also serve other devices on the LAN (anyone on the network can then read the app and the songs folder)
 ```
 
-The server delivers the app, the index (`/api/library`, stored in `.cache/library.json`) and the files (`/songs/<path>`, with Range support). The app detects the server and opens the library on its own, in any browser (Firefox included) and on other devices on the LAN (`http://<PC-IP>:8080`), with no folder picker. The refresh button (⟳) redoes the scan. Without the server (`npm run start:static`, or static hosting) the app goes back to the browser's folder picker, described above: in Chrome/Edge on `localhost` the folder is remembered; otherwise only the list is stored.
+The server delivers the app, the index (`/api/library`, stored in `.cache/library.json`) and the files (`/songs/<path>`, with Range support). The app detects the server and opens the library on its own, in any browser (Firefox included) and, when started with `HOST=0.0.0.0`, on other devices on the LAN (`http://<PC-IP>:8080`), with no folder picker. By default the server binds `127.0.0.1` only and, while bound to loopback, refuses requests whose `Host` header is not an IP, `localhost` or the machine name (DNS-rebinding guard). `/songs` only serves song-pack file types (audio, images, charts, ini/txt/json), never html/js/css/svg. The refresh button (⟳) redoes the scan. Without the server (`npm run start:static`, or static hosting) the app goes back to the browser's folder picker, described above: in Chrome/Edge on `localhost` the folder is remembered; otherwise only the list is stored.

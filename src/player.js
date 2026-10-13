@@ -8,6 +8,7 @@
 // load() shifts each stem by the delay once, so chart time 0 is sample 0 of the aligned stem.
 import { PitchShifter } from '../vendor/soundtouch.js';
 import { positionAt, trimHistory } from './clock.js';
+import { decodeAll } from './stemdecode.js';
 
 const SHIFTER_BUFFER = 2048; // legacy path: samples per ScriptProcessor block (bigger = fewer dropouts)
 
@@ -49,18 +50,18 @@ class LegacyPlayer {
   async load(stems, { delay = 0, onProgress = () => {} } = {}) {
     this.stop();
     const generation = ++this.loadGeneration;
-    const loaded = new Map();
-    let done = 0;
-    for (const s of stems) {
+    const result = await decodeAll(stems, async (s) => {
       const file = await s.getFile();
       const data = await file.arrayBuffer();
-      const decoded = await this.ctx.decodeAudioData(data);
-      if (generation !== this.loadGeneration) return false; // a newer load() took over
-      const buffer = this.alignBuffer(decoded, delay);
+      return this.alignBuffer(await this.ctx.decodeAudioData(data), delay);
+    }, onProgress, () => generation !== this.loadGeneration); // (a newer load() took over: stop)
+    if (!result) return false;
+    this.failedStems = result.failed;
+    const loaded = new Map();
+    for (const { stem: s, value: buffer } of result.ok) {
       const gain = this.ctx.createGain();
       gain.connect(this.master);
       loaded.set(s.id, { label: s.label, buffer, gain, volume: 1 });
-      onProgress(++done / stems.length);
     }
     this.stems = loaded;
     this.duration = Math.max(0, ...[...loaded.values()].map((s) => s.buffer.duration));
@@ -195,23 +196,22 @@ class WorkletPlayer {
     await this.setup();
     this.stop();
     const generation = (this.generation = (this.generation || 0) + 1);
-    const aligned = [];
-    const ids = [];
-    let done = 0;
-    for (const s of stems) {
+    const result = await decodeAll(stems, async (s) => {
       const file = await s.getFile();
       const data = await file.arrayBuffer();
       const decoded = await this.ctx.decodeAudioData(data);
-      if (generation !== this.generation) return false; // a newer load() took over
       const channels = [];
       for (let ch = 0; ch < Math.min(2, decoded.numberOfChannels); ch++) {
         channels.push(alignChannel(decoded.getChannelData(ch), decoded.sampleRate, delay));
       }
-      aligned.push(channels);
-      ids.push(s.id);
-      onProgress(++done / stems.length);
-    }
-    if (generation !== this.generation) return false;
+      if (!channels.length) throw new Error('No audio channels');
+      return channels;
+    }, onProgress, () => generation !== this.generation); // (a newer load() took over: stop)
+    if (!result || generation !== this.generation) return false;
+    this.failedStems = result.failed;
+    // only the stems that decoded reach the worklet, in this order
+    const aligned = result.ok.map((o) => o.value);
+    const ids = result.ok.map((o) => o.stem.id);
     this.ids = ids;
     this.stems = new Map(ids.map((id) => [id, true]));
     this.volumes = new Map(ids.map((id) => [id, 1]));
@@ -365,6 +365,7 @@ export class MultiTrackPlayer {
   get duration() { return this.impl.duration; }
   get playing() { return this.impl.playing; }
   get stems() { return this.impl.stems; }
+  get failedStems() { return this.impl.failedStems || []; } // [{ id, label, error }] of the last load()
   get rate() { return this.speed; }
   get outputLatency() { return this.impl.outputLatency || 0; } // seconds until the sound is heard (worklet engine)
   setMaster(value) { this.master.gain.value = value; }
