@@ -1595,3 +1595,9 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .app.bar-bottom .topbar { padding-bottom: 16px; height: calc(var(--bar-h) + 8px); }
 @media (min-width: 701px) { .app.bar-bottom.bar-hidden .topbar { padding-bottom: 12px; } }
 @container song (max-width: 700px) { .app.bar-bottom.bar-hidden .topbar { padding-bottom: 12px; } }
+
+/* Wide open bar: back to vertically centred (text block and the play/time rows), also with the bar at the bottom */
+@container song (min-width: 800px) {
+  .app:not(.bar-hidden) .tb-top { align-self: center; }
+  .app.bar-bottom:not(.bar-hidden) .transport { flex-direction: column; align-self: center; margin: 0; }
+}

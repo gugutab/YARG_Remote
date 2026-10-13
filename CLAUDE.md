@@ -314,3 +314,4 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - Wide open bar: `--info-offset` now centres the 24 px info icon on the longest title line (the icon hugs the text, no flex gap); title → artist 5 px, artist → pack/charter 4 px.
 - Bar position: `ui.barPosition` (default `bottom`) toggles `.app.bar-bottom`: the top bar element is ordered under the stage (`order`) with its seek bar on the top edge; the bar's popovers open upwards (`placePopover`), the seek tooltip above the bar, the compact bar's padding is mirrored and the wide bar's time row stays next to the seek bar. `index.html` starts with the class so there is no jump on load.
 - Bar at the bottom: the expand/compact arrow is inverted (down = compact) and the bar is 8 px taller with more bottom padding.
+- Wide open bar: the text block and the transport rows are vertically centred again (no bottom alignment with the album art; no reversed rows when the bar is at the bottom).
