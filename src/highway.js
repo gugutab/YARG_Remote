@@ -57,6 +57,7 @@ export class Highway {
     this.maxLength = 0; // longest sustain in the current chart, in seconds
     this.view = '2d';
     this.noteStyle = 'round'; // 'round' or 'rect' (rounded rectangles)
+    this.vizScale = () => 1; // the resolution of the background canvas, 0..1 (set by the app from the visualizer quality)
     this.paneOpts = {}; // per window overrides, see setPaneOpt
     this.neck = 1.2; // neck speed (the app default): scales distance between notes only; timing is unchanged
     this.bg = '#0d1117'; // chart background and the colour its fades dissolve into (the theme's "stage" colour)
@@ -203,7 +204,8 @@ export class Highway {
   drawBackground(t) {
     const c = this.bgCanvas;
     if (!c) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const sc = this.visualizer ? this.vizScale() : 1; // the background is drawn at a fraction of the resolution and stretched by the compositor: far fewer pixels to fill
+    const dpr = Math.min(window.devicePixelRatio || 1, 2) * sc;
     const w = c.clientWidth;
     const h = c.clientHeight;
     if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }

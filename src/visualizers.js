@@ -1177,6 +1177,8 @@ export function createDriver({ getSource }) {
   };
   const driver = {
     blur: 0, // px of blur on the visualizer (not on the notes); 0 costs nothing
+    quality: 0.6, // resolution of the background canvas (fraction of full); the album art always keeps the full resolution
+    get scale() { return id === 'cover' || id === 'none' ? 1 : driver.quality; },
     get id() { return id; },
     select(next) {
       id = VISUALIZER_IDS.includes(next) ? next : 'none';
