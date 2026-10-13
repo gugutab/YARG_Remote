@@ -782,17 +782,14 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
    together instead of spreading them to both edges, and the 2D lanes grow with the stage height (highway.js). */
 @media (min-width: 1800px) {
   :root { --lib-w: 360px; }
-  .tb-main { max-width: 1400px; }
   .info-scroll { padding: 24px; }
   .info-grid { max-width: 1400px; gap: 16px; }
 }
 @media (min-width: 2300px) {
   :root { --lib-w: 420px; }
-  .tb-main { max-width: 1700px; }
 }
 @media (min-width: 3000px) {
   :root { --lib-w: 480px; }
-  .tb-main { max-width: 2000px; }
 }
 
 /* Round 57: in the wide "Stem volume" card each row also shows the instrument name (hidden in the narrow card and in the popover) */
@@ -1345,4 +1342,10 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .app.bar-hidden .now-artist { grid-area: 2 / 1 / 3 / 3; max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .app.bar-hidden .now #infoBtn { width: 24px; height: 24px; }
   .app.bar-hidden .now #infoBtn svg { width: 15px; height: 15px; }
+}
+
+/* The content of the top bar (cover, title, controls) has one maximum width and stays centred in the bar; the old widths that
+   grew with the screen (1400 / 1700 / 2000 px, left aligned) are gone. */
+@media (min-width: 701px) {
+  .topbar { --bar-content-max: 1400px; padding-left: max(6px, calc((100% - var(--bar-content-max)) / 2)); padding-right: max(10px, calc((100% - var(--bar-content-max)) / 2)); }
 }
