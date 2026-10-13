@@ -1287,3 +1287,17 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 /* The blur of the glass top bar lives on a pseudo-element: a backdrop-filter on the bar itself makes it the containing block of the
    position: fixed popovers inside it (they were placed relative to the bar and pushed the page sideways). */
 .topbar::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+
+/* ---------- Mobile top bar ---------- */
+@media (max-width: 700px) {
+  /* extended: the cover comes back, and the top row (title with its info icon, artist) is centred */
+  .app:not(.bar-hidden) .topbar { grid-template-columns: auto minmax(0, 1fr); }
+  .app:not(.bar-hidden) .tb-cover:not([hidden]) { display: block; grid-column: 1; grid-row: 1; width: 40px; height: 40px; align-self: center; border-radius: 8px; }
+  .app:not(.bar-hidden) .tb-top { justify-content: center; text-align: center; }
+  .app:not(.bar-hidden) .now { justify-content: center; }
+  .app:not(.bar-hidden) .now-text { text-align: center; }
+  /* compact: every button sits at the right edge */
+  .app.bar-hidden .topbar > .tb-main { grid-column: 1 / -1; justify-content: flex-end; } /* the whole width, so the buttons can reach the right edge */
+  .app.bar-hidden .tb-top { flex: 0 0 auto; margin-left: auto; }
+  .app.bar-hidden .tb-bottom { flex: 0 1 auto; justify-content: flex-end; }
+}
