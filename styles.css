@@ -1279,7 +1279,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .app.bar-hidden .brand { display: none; }
 .app.bar-hidden .bar-hide svg { transform: none; } /* points down: expand */
 @container song (max-width: 600px) { /* compact bar in a narrow window: only what fits */
-  .app.bar-hidden .now-text, .app.bar-hidden .topbar .time, .app.bar-hidden #sectionText { display: none; }
+  .app.bar-hidden .topbar .time, .app.bar-hidden #sectionText { display: none; }
   .app.bar-hidden .tb-top { flex: 0 0 auto; }
   .app.bar-hidden .tools { gap: 0; }
 }
@@ -1300,4 +1300,23 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .app.bar-hidden .topbar > .tb-main { grid-column: 1 / -1; justify-content: flex-end; } /* the whole width, so the buttons can reach the right edge */
   .app.bar-hidden .tb-top { flex: 0 0 auto; margin-left: auto; }
   .app.bar-hidden .tb-bottom { flex: 0 1 auto; justify-content: flex-end; }
+}
+
+/* ---------- Mobile top bar, second pass ---------- */
+@media (max-width: 700px) {
+  /* extended: the cover and the title/artist form one group, centred in the bar */
+  .app:not(.bar-hidden) .topbar { grid-template-columns: 1fr auto auto 1fr; }
+  .app:not(.bar-hidden) .tb-cover:not([hidden]) { grid-column: 2; }
+  .app:not(.bar-hidden) .topbar > .tb-main { grid-column: auto; }
+  .app:not(.bar-hidden) .tb-top { grid-column: 3; justify-content: flex-start; text-align: left; }
+  .app:not(.bar-hidden) .now { justify-content: flex-start; }
+  .app:not(.bar-hidden) .now-text { text-align: left; }
+  .app:not(.bar-hidden) .tb-bottom { grid-column: 1 / -1; }
+  /* compact: icons centred vertically between the top edge and the seek line, title and artist shown, prev/next hidden to make room */
+  .app.bar-hidden .topbar { padding: 6px 10px 14px 6px; align-items: center; }
+  .app.bar-hidden .tb-main, .app.bar-hidden .tb-top, .app.bar-hidden .tb-bottom { align-items: center; }
+  .app.bar-hidden .now-text { display: block; max-width: 110px; text-align: left; }
+  .app.bar-hidden .now-title { font-size: 12px; line-height: 1.2; }
+  .app.bar-hidden .now-artist { display: block; font-size: 10px; line-height: 1.2; }
+  .app.bar-hidden #back, .app.bar-hidden #forward { display: none; }
 }
