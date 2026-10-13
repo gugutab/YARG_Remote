@@ -750,10 +750,6 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .active-filters .chip svg.x { width: 12px; height: 12px; color: var(--muted); }
 
 /* Round 52: the top bar can be hidden; the stage then takes the whole height and a small tab brings the bar back */
-.app.bar-hidden .topbar { margin-top: calc(4px - var(--bar-h)); } /* collapsed: the bar slides up out of the screen as one piece, like the library to the left; only its seek line (4 px) and the section ticks stay */
-.app.bar-hidden .topbar > *, .app.bar-hidden .tb-main > * { visibility: hidden; } /* hidden but laid out, so the buttons keep the same horizontal limit */
-.app.bar-hidden .tb-main > .seekbox { visibility: visible; }
-.app.bar-hidden .topbar > .tb-main { visibility: visible; }
 .app.bar-hidden.info-open #barShow { display: none; }
 .bar-hide svg { transform: rotate(180deg); }
 .bar-hide { align-self: center; opacity: .7; }
@@ -891,8 +887,6 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 
 
 /* Round 66: with the top bar collapsed its (invisible) boxes must not catch clicks meant for the stage buttons; only the seek bar does */
-.app.bar-hidden .topbar, .app.bar-hidden .tb-main { pointer-events: none; }
-.app.bar-hidden .tb-main > .seekbox { pointer-events: auto; }
 
 /* Multi-column list: separator lines between and around the cards */
 #songs.multi li.row { border-right: 1px solid var(--line); } /* every card closes its own right side (also a lone card in the last row) */
@@ -1186,8 +1180,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 
 /* ---------- the top bar hides and shows like the library: it slides (0.2 s) and a small chevron tab brings it back ---------- */
 .topbar { transition: margin-top .2s ease; } /* the same kind of motion as the library's margin-left: nothing is squeezed while it moves */
-.app.bar-hidden .topbar > *, .app.bar-hidden .tb-main > * { transition: visibility 0s .2s; } /* its content stays visible while it slides away */
-.app.bar-hidden .tb-main > .seekbox, .app.bar-hidden .topbar > .tb-main { transition: none; }
 .app.bar-hidden button.icon.stage-btn.bar-show.edge-top, button.icon.stage-btn.bar-show.edge-top { position: absolute; left: 50%; right: auto; top: 12px; transform: translateX(-50%); width: 56px; height: 26px; min-width: 0; padding: 0; border-radius: 10px; z-index: 40; background: var(--panel); border: 1px solid var(--line); color: var(--muted); backdrop-filter: none; }
 .app.bar-hidden button.icon.stage-btn.bar-show.edge-top:hover { color: var(--accent); background: var(--panel-2); }
 button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transform: none; } /* points down: where the bar comes back from */
@@ -1260,10 +1252,34 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .pane-tag { gap: 5px; padding: 0 8px; }
 
 /* The top bar is a glass window over the background of the fretboards (the visualizer shows through) */
-.topbar { background: color-mix(in srgb, var(--panel) 62%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(10px); border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }
+.topbar { background: color-mix(in srgb, var(--panel) 52%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(10px); border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }
 
 /* In the glass top bar the section selector and the button hovers are see-through too */
 .topbar .chip-btn, .topbar .chip-select { background: transparent; border-color: color-mix(in srgb, var(--line) 60%, transparent); }
 .topbar .chip-btn:hover, .topbar .chip-select:hover { background: color-mix(in srgb, var(--panel-2) 30%, transparent); border-color: var(--muted); }
 .topbar button.icon:hover { background: color-mix(in srgb, var(--panel-2) 30%, transparent); }
 .topbar button.icon.primary:hover { background: var(--accent); filter: brightness(1.12); }
+
+/* ---------- The "hide the top bar" button now makes the bar compact: half the height, one row ---------- */
+#barShow { display: none !important; } /* (the old tab that brought the collapsed bar back) */
+.topbar { transition: height .2s ease; }
+.app.bar-hidden { --bar-h: 56px; }
+.app.bar-hidden .topbar { padding: 4px 10px 4px 6px; }
+.app.bar-hidden .tb-cover { width: 44px; height: 44px; border-radius: 7px; }
+.app.bar-hidden .tb-main { display: flex; align-items: center; gap: 10px; grid-template-rows: none; }
+.app.bar-hidden .tb-top { flex: 0 1 230px; min-width: 0; }
+.app.bar-hidden .tb-bottom { flex: 1 1 auto; min-width: 0; }
+.app.bar-hidden .now-artist { display: none; }
+.app.bar-hidden .now-title { font-size: 13px; }
+.app.bar-hidden .topbar button.icon, .app.bar-hidden .topbar button.icon.primary { width: 30px; height: 30px; }
+.app.bar-hidden .topbar button.icon svg { width: 17px; height: 17px; }
+.app.bar-hidden .topbar button.icon.primary svg { width: 16px; height: 16px; }
+.app.bar-hidden .topbar .chip-btn { min-height: 28px; height: 28px; font-size: 12px; }
+.app.bar-hidden .topbar .time { font-size: 12px; margin-left: 4px; }
+.app.bar-hidden .brand { display: none; }
+.app.bar-hidden .bar-hide svg { transform: none; } /* points down: expand */
+@container song (max-width: 600px) { /* compact bar in a narrow window: only what fits */
+  .app.bar-hidden .now-text, .app.bar-hidden .topbar .time, .app.bar-hidden #sectionText { display: none; }
+  .app.bar-hidden .tb-top { flex: 0 0 auto; }
+  .app.bar-hidden .tools { gap: 0; }
+}

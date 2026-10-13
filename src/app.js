@@ -25,7 +25,7 @@ import { VISUALIZERS, createDriver as createVisualizerDriver } from './visualize
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
-  'app', 'library', 'closeLibrary', 'splitter', 'libTab', 'songTab', 'closeSong', 'closeSongInfo', 'npPlay', 'npPreview', 'npSeek', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
+  'app', 'library', 'closeLibrary', 'splitter', 'libTab', 'songTab', 'closeSongInfo', 'npPlay', 'npPreview', 'npSeek', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
@@ -199,9 +199,7 @@ function setupPeek(handle, panel, { isOpen, open, close }) {
 }
 setupPeek(els.libTab, els.library, { isOpen: libraryOpen, open: () => setLibraryOpen(true, false), close: () => setLibraryOpen(false, false) });
 setupPeek(els.songTab, document.querySelector('.main'), { isOpen: songPanelOpen, open: () => setSongPanelOpen(true, false), close: () => setSongPanelOpen(false, false) });
-setupPeek(els.barShow, document.querySelector('.topbar'), { isOpen: () => !els.app.classList.contains('bar-hidden'), open: () => setBarHidden(false, false), close: () => setBarHidden(true, false) });
 els.songTab.addEventListener('click', () => setSongPanelOpen(true));
-els.closeSong.addEventListener('click', () => setSongPanelOpen(false));
 els.closeSongInfo.addEventListener('click', () => setSongPanelOpen(false));
 els.npPlay.addEventListener('click', async () => { // the Listen card: play here, without leaving the details
   previewStop = null;
@@ -2119,14 +2117,16 @@ window.addEventListener('resize', alignStageButtons);
 els.app.addEventListener('transitionend', alignStageButtons); // the library slides in and out
 function setBarHidden(hidden, persist = true) {
   els.app.classList.toggle('bar-hidden', hidden);
-  els.barShow.hidden = !hidden;
+  els.barShow.hidden = true; // (the old tab is gone)
+  els.barHide.title = hidden ? 'Expand the top bar (B)' : 'Make the top bar compact (B)';
+  els.barHide.setAttribute('aria-label', hidden ? 'Expand the top bar' : 'Make the top bar compact');
   if (persist) store.set('barHidden', hidden ? '1' : '0');
   closePopovers();
   alignStageButtons();
 }
 setBarHidden(prefs.get('highway.barHidden') === 'hidden' || (prefs.get('highway.barHidden') === 'last' && store.get('barHidden') === '1'));
 if (prefs.get('highway.neck') !== SETTING_DEFAULTS.neck) setSetting('neck', prefs.get('highway.neck')); // the starting neck speed
-els.barHide.addEventListener('click', () => setBarHidden(true));
+els.barHide.addEventListener('click', () => setBarHidden(!els.app.classList.contains('bar-hidden'))); // compact <-> full
 els.barShow.addEventListener('click', () => setBarHidden(false));
 
 // ---------- Background visualizer ----------
