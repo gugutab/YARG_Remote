@@ -1404,3 +1404,8 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .app.bar-hidden .now-title { max-width: none; min-width: 0; }
   .app.bar-hidden .now-artist { max-width: none; min-width: 0; }
 }
+
+/* Mobile compact bar: 4 px between the last button and the right edge */
+@media (max-width: 700px) {
+  .app.bar-hidden .topbar { padding-right: 4px; }
+}

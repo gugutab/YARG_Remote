@@ -294,3 +294,4 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - Mobile bar, fifth pass: the time text is shown in the extended bar and, wrapped onto two lines, in the compact one; when the main area is ≤ 520 px the section selector is icon-only (extended) or hidden (compact).
 - Mobile compact bar, sixth pass: the time is two stacked lines without the slash (`.time-sep` is hidden; `#timeNow` and `#timeTotal` are blocks), 8 px from the play button, and the title is 14 px.
 - Play and pause icons are solid everywhere: the document stylesheet's `svg path.fill` rule does not reach the elements inside a `<symbol>` used through `<use>`, so `#i-play` / `#i-pause` carry an inline `style="fill:currentColor;stroke:none"`. Mobile compact bar: the title is no longer capped (it only ellipsizes when the buttons need the room).
+- Mobile compact bar: the right padding is 4 px (the expand button is 4 px from the edge).
