@@ -1482,3 +1482,11 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .app:not(.bar-hidden) .transport .tp-row1 .icon.primary { width: 46px; height: 46px; }
   .app:not(.bar-hidden) .transport .tp-row1 .icon.primary svg { width: 24px; height: 24px; }
 }
+
+/* ---------- Compact bar, any width: the buttons and the time never shrink; the title block takes only what it needs ---------- */
+.app.bar-hidden .tb-top { flex: 0 1 auto; }
+.app.bar-hidden .transport { flex: 0 0 auto; }
+.app.bar-hidden .transport .icon, .app.bar-hidden .tools .icon { flex: none; }
+.app.bar-hidden .transport .time { flex: none; }
+.app.bar-hidden .transport .section-wrap { flex: 0 1 auto; min-width: 0; }
+@media (min-width: 701px) { .app.bar-hidden .transport .time { white-space: nowrap; } }
