@@ -1523,3 +1523,15 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 
 /* Compact bar: 3 px more between the title and the artist */
 .app.bar-hidden .now { row-gap: 3px; }
+
+/* Extended bar, wide main area: a bigger artist line, and the two lines of a long title are balanced */
+@container song (min-width: 800px) {
+  .app:not(.bar-hidden) .now-artist { font-size: 15px; margin-top: 2px; }
+  .app:not(.bar-hidden) .now-title { text-wrap: balance; }
+}
+
+/* Extended bar, wide main area: the info icon sits on the first line of the title, close to its text */
+@container song (min-width: 800px) {
+  .app:not(.bar-hidden) .now { align-items: flex-start; }
+  .app:not(.bar-hidden) .now .pop-wrap { margin-top: -2px; }
+}

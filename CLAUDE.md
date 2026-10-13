@@ -305,3 +305,5 @@ appears in `5875318f` and `34e01570`. Rolls in `5395826e`. To test accent/ghost,
 - Compact bar vertical alignment: the info icon has negative block margins so the title/artist block is as tall as its text and sits on the same centre line as the play block and the tools.
 - Compact bar type: the title is 14 / 15 / 16 px and the artist 11 / 12 / 12.5 px for a main area of ≤ 420 / 421-560 / > 560 px; the info icon is a flex box centred on the title line, 2 px closer to the text; the expand button has 12 px of air on its left (6 px in a 421-520 px area, 2 px below that).
 - Compact bar: 3 px between the title and the artist (`.now` row gap).
+- Extended bar in a wide main area: the artist is 15 px and a title that takes two lines is balanced (`text-wrap: balance`).
+- A two-line title in the wide extended bar is shrink-wrapped to its longest line by `fitTitleWidth()` (app.js, on song change and when the main area is resized), so the info icon sits right after the text, aligned to the first line.

@@ -536,6 +536,20 @@ function setStatus(text) {
   els.status.textContent = text;
 }
 
+// A title that takes two lines (extended bar in a wide area) is shrink-wrapped to its longest line, so the info icon sits right
+// after the text instead of at the end of the box.
+function fitTitleWidth() {
+  const t = els.title;
+  t.style.width = '';
+  if (getComputedStyle(t).whiteSpace === 'nowrap') return; // single-line modes need nothing
+  const range = document.createRange();
+  range.selectNodeContents(t);
+  const rects = [...range.getClientRects()];
+  if (rects.length < 2) return;
+  t.style.width = `${Math.ceil(Math.max(...rects.map((r) => r.width))) + 2}px`;
+}
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => requestAnimationFrame(fitTitleWidth)).observe(document.querySelector('.main'));
+
 // ---------- Song and chart selection ----------
 let pendingInstruments = null; // the instruments of a link, applied once the chart is read
 let loadAudioWithSong = false; // a #/song/<id>/play link: the audio loads with the song, like a Play press would
@@ -566,6 +580,7 @@ async function selectSong(song) {
   els.welcome.hidden = true;
   showPlayInfo(true);
   els.title.textContent = plainText(song.title);
+  requestAnimationFrame(fitTitleWidth);
   els.artist.textContent = plainText(song.artist);
   els.cover.hidden = true;
   els.infoCover.hidden = true;
