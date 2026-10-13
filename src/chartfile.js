@@ -17,6 +17,7 @@ import { createTickToSeconds } from './midi.js';
 
 const DEFAULT_RESOLUTION = 192; // ChartReader.DEFAULT_RESOLUTION
 const DIFFICULTY_BASE = { Easy: 60, Medium: 72, Hard: 84, Expert: 96 }; // ChartIOHelper.TrackNameToTrackDifficultyLookup
+const DIFFICULTY_INDEX = { Easy: 0, Medium: 1, Hard: 2, Expert: 3 }; // index into DIFFICULTIES (chart.js)
 // ChartIOHelper.InstrumentStrToEnumLookup, limited to what the app plays.
 const INSTRUMENT_TRACKS = {
   Single: { name: 'PART GUITAR', kind: 'fret' },
@@ -130,18 +131,22 @@ function parseSync(lines) {
 // One instrument track from all its difficulty sections: [{ difficulty, base, lines }].
 function buildInstrument(def, sections) {
   const track = { name: def.name, notes: [], texts: [], lyrics: [], sysex: [], tempos: [], timeSignatures: [] };
-  const seen = new Set(); // phrases shared by every difficulty are added once
-  const addPhrase = (pitch, tick, length) => {
-    const key = `${pitch}:${tick}:${length}`;
+  const seen = new Set();
+  // Phrases (star power, solo, fills, rolls) and tom markers live inside a difficulty section, so YARG keeps them per
+  // difficulty (ChartReader.ReadNotes fills one MoonChart each). A .mid shares them, so they carry `difficulty` and
+  // buildChart (chart.js) only reads the ones of the difficulty it is building.
+  const addPhrase = (pitch, tick, length, difficulty) => {
+    const key = `${difficulty}:${pitch}:${tick}:${length}`;
     if (seen.has(key)) return;
     seen.add(key);
-    track.notes.push({ tick, endTick: tick + length, pitch, velocity: VELOCITY_NORMAL, channel: 0 });
+    track.notes.push({ tick, endTick: tick + length, pitch, velocity: VELOCITY_NORMAL, channel: 0, difficulty });
   };
   const drums = def.kind === 'drums';
   const hasCymbalFlags = drums && sections.some((s) => s.events.some((e) => e.type === 'N' && Number(e.args[0]) >= 66 && Number(e.args[0]) <= 68));
   let usesOpen = false;
 
-  for (const { base, events } of sections) {
+  for (const { difficulty, base, events } of sections) {
+    const diff = DIFFICULTY_INDEX[difficulty];
     // Flags are chord flags / pad toggles applied once all notes are in (ProcessNoteOnEventAsChordFlagPostDelay).
     const notes = [];
     const forcedTicks = new Set();
@@ -169,14 +174,14 @@ function buildInstrument(def, sections) {
       } else if (e.type === 'S') {
         const type = Number(e.args[0]);
         const length = Math.max(0, Number(e.args[1]) || 0);
-        if (type === 2) addPhrase(STAR_POWER_NOTE, e.tick, length);
-        else if (drums && DRUM_PHRASES[type] !== undefined) addPhrase(DRUM_PHRASES[type], e.tick, length);
+        if (type === 2) addPhrase(STAR_POWER_NOTE, e.tick, length, diff);
+        else if (drums && DRUM_PHRASES[type] !== undefined) addPhrase(DRUM_PHRASES[type], e.tick, length, diff);
       } else if (e.type === 'E') { // ConvertSoloEvents: solo ... soloend pairs (a stack)
         const text = eventText(e.body);
         if (text === 'solo') solos.push(e.tick);
         else if (text === 'soloend' && solos.length) {
           const start = solos.pop();
-          addPhrase(SOLO_NOTE, start, e.tick - start);
+          addPhrase(SOLO_NOTE, start, e.tick - start, diff);
         }
       }
     }
@@ -188,11 +193,10 @@ function buildInstrument(def, sections) {
         else if (n.pad >= 1 && flagOf.ghost.has(`${n.pad}:${n.tick}`)) note.velocity = VELOCITY_GHOST;
         // .chart pads are toms unless flagged; the .mid convention is the opposite (cymbal unless a tom marker covers
         // the note), so a tom marker is written for every unflagged yellow/blue/orange-green pad. Only when the chart
-        // has cymbal flags at all: otherwise it is plain 4-lane (DisambiguateDrumsType). Markers are shared by all
-        // difficulties and written once per tick, since two covering markers would cancel out (XOR).
+        // has cymbal flags at all: otherwise it is plain 4-lane (DisambiguateDrumsType). Markers are tagged with their
+        // difficulty and written once per tick, since two covering markers would cancel out (XOR).
         if (hasCymbalFlags && TOM_MARKERS[n.pad] !== undefined && !flagOf.cymbal.has(`${n.pad}:${n.tick}`)) {
-          const key = `tom:${n.pad}:${n.tick}`;
-          if (!seen.has(key)) { seen.add(key); track.notes.push({ tick: n.tick, endTick: n.tick + 1, pitch: TOM_MARKERS[n.pad], velocity: VELOCITY_NORMAL, channel: 0 }); }
+          addPhrase(TOM_MARKERS[n.pad], n.tick, 1, diff);
         }
       } else {
         // Tap beats forced (NoteFlagPriority: Forced is blocked by Tap). Both flag every note of the chord.

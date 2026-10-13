@@ -211,8 +211,13 @@ export function drumKind(track, ini = {}) {
 }
 
 export function buildChart(midi, instrument, difficulty, ini = {}) {
-  const track = findTrack(midi, instrument);
-  if (!track) return null;
+  const found = findTrack(midi, instrument);
+  if (!found) return null;
+  // notes.chart phrases / tom markers belong to one difficulty (`difficulty` index, src/chartfile.js): drop the others'.
+  const diffIndex = DIFFICULTIES.indexOf(difficulty);
+  const track = found.notes.some((n) => n.difficulty !== undefined)
+    ? { ...found, notes: found.notes.filter((n) => n.difficulty === undefined || n.difficulty === diffIndex) }
+    : found;
   const toSec = midi.toSeconds;
   const settings = chartSettings(ini, midi.division, midi.source);
   const sustainCutoff = settings.sustainCutoff; // YARG.Core MidReader.cs: shorter notes have no sustain (SustainCutoffThreshold)

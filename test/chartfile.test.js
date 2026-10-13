@@ -153,3 +153,39 @@ test('GHL, co-op and unknown sections are skipped; a missing [Song] is an error'
   assert.deepEqual(instrumentOptions(midi), []);
   assert.throws(() => parseChart('[SyncTrack]\n{\n}\n'), /\[Song\]/);
 });
+
+test('per difficulty: star power, solo and forced/tap/open flags stay in their own difficulty', () => {
+  const midi = parseChart(chartText({
+    extra: section('ExpertSingle', ['  0 = N 0 0', '  65 = N 1 0', '  65 = N 5 0', '  400 = N 2 0', '  400 = N 6 0', '  800 = N 7 0', '  0 = S 2 100', '  0 = E solo', '  100 = E soloend'])
+      + section('HardSingle', ['  0 = N 0 0', '  65 = N 1 0', '  400 = N 2 0', '  800 = N 0 0', '  300 = S 2 50', '  300 = E solo', '  350 = E soloend']),
+  }));
+  const expert = buildChart(midi, ins('guitar'), EXPERT);
+  const hard = buildChart(midi, ins('guitar'), DIFFICULTIES[2]);
+  assert.deepEqual(expert.starPower.map((s) => s.start), [0]);
+  assert.deepEqual(hard.starPower.map((s) => s.start), [midi.toSeconds(300)]);
+  assert.deepEqual(expert.solos.map((s) => s.end), [midi.toSeconds(100)]);
+  assert.deepEqual(hard.solos.map((s) => s.end), [midi.toSeconds(350)]);
+  assert.equal(expert.notes[1].hopo, false); // natural, forced to strum
+  assert.equal(hard.notes[1].hopo, true); // same notes without the force
+  assert.equal(expert.notes[2].tap, true);
+  assert.equal(hard.notes[2].tap, false);
+  assert.equal(expert.notes[3].open, true);
+  assert.equal(hard.notes[3].open, false);
+});
+
+test('per difficulty: drum fills, rolls and cymbal flags do not leak', () => {
+  const midi = parseChart(chartText({
+    extra: section('ExpertDrums', ['  0 = N 2 0', '  0 = N 66 0', '  0 = S 65 96', '  500 = S 64 100'])
+      + section('HardDrums', ['  0 = N 2 0', '  192 = S 66 96']),
+  }));
+  const pro = instrumentOptions(midi).find((o) => o.id === 'drums-pro');
+  const expert = buildChart(midi, pro, EXPERT);
+  const hard = buildChart(midi, pro, DIFFICULTIES[2]);
+  assert.deepEqual(expert.rolls.map((r) => r.type), ['tremolo']);
+  assert.deepEqual(hard.rolls.map((r) => r.type), ['trill']);
+  assert.equal(expert.fills.length, 1);
+  assert.equal(hard.fills.length, 0);
+  // The same tick: Expert flags the yellow as a cymbal, Hard leaves it a tom, and neither marker affects the other.
+  assert.equal(expert.notes[0].cymbal, true);
+  assert.equal(hard.notes[0].cymbal, false);
+});
