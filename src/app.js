@@ -1751,6 +1751,7 @@ async function togglePlay() {
   previewStop = null;
   if (player.playing) player.pause();
   else {
+    if ((infoOpen || !ready) && libraryOpen()) setLibraryOpen(false, false); // Play from the details (or the first Play of a song) gets the library out of the chart's way
     if (infoOpen) setInfoOpen(false); // starting from the details goes to the chart
     if (!(await ensureAudio())) return; // the first Play loads the audio behind the loading screen
     await player.play();

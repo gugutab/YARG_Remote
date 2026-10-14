@@ -1871,3 +1871,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 
 /* Until a song is played (or opened with /play) there is no player bar: nothing is playing, and opening a song's details must not touch the player */
 .app.stage-unborn #topbar { display: none; }
+
+/* Details: half the margin on the left, top and bottom of the card list (the right side keeps room for the scroll thumb) */
+.info-scroll.thumb-scroll { padding-left: 8px; padding-top: 8px; padding-bottom: 12px; }
+#info.compact .info-scroll.thumb-scroll { padding-left: 5px; padding-top: 5px; padding-bottom: 6px; }
