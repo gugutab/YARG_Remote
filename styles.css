@@ -1754,3 +1754,17 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .end-list { grid-template-columns: minmax(0, 1fr); }
 }
 @media (pointer: coarse) { .end-row { min-height: 52px; } .end-btn, .end-actions .cta { min-height: 44px; } }
+
+/* ---------- Settings as a glass window (same look as the player bar, the library and the end window) ---------- */
+.settings-page {
+  inset: 16px max(16px, calc((100% - 1120px) / 2)); border-radius: 14px; overflow: hidden; background: transparent;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .5), 0 18px 60px rgba(0, 0, 0, .5), inset 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent);
+}
+.settings-page::before { content: ""; position: absolute; inset: 0; z-index: -1; background: color-mix(in srgb, var(--panel) 80%, transparent); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+.settings-page .sp-head, .settings-page .sp-nav { background: color-mix(in srgb, var(--panel) 30%, transparent); }
+.settings-page .sp-head { border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }
+.settings-page .sp-nav { border-right-color: color-mix(in srgb, var(--line) 70%, transparent); }
+.settings-page .sp-row { background: color-mix(in srgb, var(--panel-2) 55%, transparent); }
+:root[data-motion="on"] .settings-page:not([hidden]) { animation: settings-in .2s ease backwards; /* (no fill-forwards: a lingering animation would make the window a backdrop root and kill the blur) */ }
+@keyframes settings-in { from { opacity: 0; transform: scale(.985); } to { opacity: 1; transform: none; } }
+@media (max-width: 700px) { .settings-page { inset: 0; border-radius: 0; box-shadow: none; } }

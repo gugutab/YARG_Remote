@@ -192,5 +192,10 @@ export function mountSettings({ root, settings, sections, renderers = {}, onClos
   root.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
 
   refresh();
+  // a click outside the window closes it (the dimmed stage around it); menus that live in <body> (custom selects, popovers) are not "outside"
+  document.addEventListener('pointerdown', (e) => {
+    if (root.hidden || root.contains(e.target) || e.target.closest?.('.sel-pop, .popover, #settingsTab, #openSettings')) return;
+    close();
+  });
   return { open, close, isOpen: () => !root.hidden, refresh };
 }

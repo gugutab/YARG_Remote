@@ -314,3 +314,4 @@ Only checked by synthetic test or code reading:
 - the worklet start hang (cause unknown).
 - Immersive (F): the bar overlays the stage with `z-index: 14`, above the library window (12); the window itself stays open until closed.
 - End window fixes: `.end-list` rows can shrink (`minmax(0, 1fr)`, `li {min-width:0}`: long titles ellipsise instead of widening the track); `recommend` shows each title + artist once and never a twin of the current song; `factRows(facts, {base})` hides HOPOs for keys.
+- Settings window: `#settingsPage` is a glass window (inset 16 px, max 1120 px wide, blur on `::before`, the dimming around it is a huge `box-shadow` spread; fade/scale-in with `data-motion="on"`); full screen at ≤ 700 px. A pointerdown outside it closes it (menus in `<body>` — `.sel-pop`, `.popover` — and the two opener buttons do not count as outside).
