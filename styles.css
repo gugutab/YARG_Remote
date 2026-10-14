@@ -1938,3 +1938,12 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .tools button.icon { width: auto; min-width: 0; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
   .tools button.icon:has(.tool-val) { padding: 0 8px; }
 }
+
+/* Wide screens, snug tools: 6 px of padding around each button's content, 12 px between buttons (an even 24 px between the visible items) */
+@container song (min-width: 800px) {
+  .tools { gap: 12px; }
+  .tools button.icon, .tools button.icon:has(.tool-val) { padding: 0 6px; gap: 5px; }
+  /* compact bar: its buttons are a fixed 30 px square by default; here they follow their content like the expanded bar's */
+  .app.bar-hidden .topbar .tools { gap: 8px; }
+  .app.bar-hidden .topbar .tools button.icon { width: auto; min-width: 30px; height: 30px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+}
