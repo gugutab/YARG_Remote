@@ -871,10 +871,11 @@ function setInfoOpen(open, { grow = true } = {}) {
 els.infoClose.addEventListener('click', () => setInfoOpen(false));
 // The bar's info button toggles the window while it is open (otherwise it opens its small popup).
 els.infoBtn.addEventListener('click', (e) => { if (infoOpen) { e.stopImmediatePropagation(); e.stopPropagation(); setInfoOpen(false); } }, true);
-// A click outside the window (the list pane included: the window is one) closes the details. Menus that live in <body> (custom selects,
-// popovers) and the buttons that toggle it are not "outside".
+// A click outside the window closes the details only when they are alone: with the list next to them the window is a working
+// space (the chart behind keeps being used) and stays as it is. Menus that live in <body> (custom selects, popovers) and the buttons
+// that toggle it are not "outside".
 document.addEventListener('pointerdown', (e) => {
-  if (!infoOpen || els.library.contains(e.target) || e.target.closest?.('.sel-pop, .popover, #infoBtn, #libTab, #scrim, #topbar')) return;
+  if (!infoOpen || libraryOpen() || els.library.contains(e.target) || e.target.closest?.('.sel-pop, .popover, #infoBtn, #libTab, #scrim, #topbar')) return;
   setInfoOpen(false);
 });
 
