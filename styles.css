@@ -1707,7 +1707,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 }
 .end-card::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
 .end-scroll { overflow: auto; min-height: 0; padding: 18px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 16px; }
-:root[data-motion="on"] .end-card { animation: end-in .28s ease both; }
+:root[data-motion="on"] .end-card { animation: end-in .28s ease backwards; }
 @keyframes end-in { from { opacity: 0; } to { opacity: 1; } }
 
 .end-head { display: flex; gap: 16px; align-items: center; }
@@ -1768,3 +1768,15 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 :root[data-motion="on"] .settings-page:not([hidden]) { animation: settings-in .2s ease backwards; /* (no fill-forwards: a lingering animation would make the window a backdrop root and kill the blur) */ }
 @keyframes settings-in { from { opacity: 0; transform: scale(.985); } to { opacity: 1; transform: none; } }
 @media (max-width: 700px) { .settings-page { inset: 0; border-radius: 0; box-shadow: none; } }
+
+/* ---------- Song details in the glass style of the rest of the UI ---------- */
+/* the screen is see-through (the background visualizer / stage colour shows) and its cards and action bar are glass */
+.info { background: transparent; }
+.app.info-open #highway, .app.info-open #paneTags { visibility: hidden; } /* the chart is not behind the cards */
+.info-card { position: relative; isolation: auto; background: transparent; border-color: color-mix(in srgb, var(--line) 70%, transparent); }
+.info-card::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: color-mix(in srgb, var(--panel) 78%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); pointer-events: none; }
+.info-grid { position: relative; z-index: 0; } /* the cards' ::before sit above the screen, below their content */
+.info-actions { position: relative; background: transparent; border-top-color: color-mix(in srgb, var(--line) 70%, transparent); }
+.info-actions::before { content: ""; position: absolute; inset: 0; z-index: -1; background: color-mix(in srgb, var(--panel) 70%, transparent); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); pointer-events: none; }
+.info { z-index: 5; }
+:root[data-motion="on"] .info:not([hidden]) .info-card { animation: end-in .24s ease backwards; }
