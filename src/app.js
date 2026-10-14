@@ -27,7 +27,7 @@ import { VISUALIZERS, createDriver as createVisualizerDriver } from './visualize
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
-  'app', 'library', 'closeLibrary', 'splitter', 'libTab', 'songTab', 'closeSongInfo', 'npPlay', 'npPreview', 'npSeek', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
+  'app', 'library', 'closeLibrary', 'splitter', 'libTab', 'settingsTab', 'npPlay', 'npPreview', 'npSeek', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
@@ -111,60 +111,50 @@ const store = {
   set(key, value) { try { localStorage.setItem(`yargremote.${key}`, value); } catch { /* storage unavailable */ } },
 };
 
-// ---------- Library panel ----------
-// `persist` is false for the automatic closes on narrow screens, so they do not become the saved preference.
-// Panels: the library (left) and the song (right) can each be closed and reopened. On a desktop screen one of them is
-// always open: closing the last open one opens the other. On a phone the song is always there and the library is a drawer.
+// ---------- Library window ----------
+// The library is a glass window floating over the stage (left). It never takes room from the chart: the stage always spans the whole
+// screen, so opening and closing it resizes nothing. `persist` is false for the automatic closes (a phone, "hide when I pick a song"),
+// so they do not become the saved preference. On a phone it is a full-height drawer with a scrim.
 const narrow = () => window.matchMedia('(max-width: 700px)').matches;
 const libraryOpen = () => !els.app.classList.contains('lib-closed');
-const songPanelOpen = () => !els.app.classList.contains('song-closed');
 function savePanelState() {
   if (narrow()) return;
-  try { localStorage.setItem('yargremote.panelState', JSON.stringify({ library: libraryOpen(), song: songPanelOpen() })); } catch { /* optional */ }
-}
-function setSongPanelOpen(open, persist = true) {
-  if (narrow()) return; // a phone shows one thing at a time
-  if (!open && !libraryOpen()) setLibraryOpen(true); // never both closed
-  if (!open) els.app.style.setProperty('--main-w', `${Math.round(document.querySelector('.main').getBoundingClientRect().width)}px`); // it slides out by its own width
-  els.app.classList.toggle('song-closed', !open);
-  syncPanelUi();
-  if (persist) savePanelState();
+  try { localStorage.setItem('yargremote.panelState', JSON.stringify({ library: libraryOpen() })); } catch { /* optional */ }
 }
 function setLibraryOpen(open, persist = true) {
-  if (!open && !narrow() && !songPanelOpen()) setSongPanelOpen(true); // never both closed
   els.app.classList.toggle('lib-closed', !open);
+  els.library.inert = !open; // closed: nothing in it takes focus or clicks (it is only moved and faded out, not removed)
   syncPanelUi();
   if (persist) savePanelState();
 }
-// Edge tabs reopen a closed panel.
+// The edge tabs bring a closed library back (the settings tab keeps Settings one click away while the library header, which holds the gear, is hidden).
 function syncPanelUi() {
-  els.libTab.hidden = libraryOpen(); // like the top bar's show button: it is always there while the library is hidden (also on a phone, where the library is a drawer)
-  els.songTab.hidden = narrow() || songPanelOpen(); // the song panel's is the same, mirrored
+  els.libTab.hidden = libraryOpen();
+  els.settingsTab.hidden = libraryOpen();
 }
-(() => { // the panels at startup: open, closed, or as they were last time (the "Panels" settings)
-  if (narrow()) { setLibraryOpen(false, false); return; }
+(() => { // the library at startup: open, closed, or as it was last time (the "Panels" settings). A phone starts with the drawer closed, unless no song is being opened.
   let last = {};
   try { last = JSON.parse(localStorage.getItem('yargremote.panelState')) || {}; } catch { /* none */ }
-  const want = (start, was) => (start === 'last' ? was !== false : start !== 'closed');
-  let lib = want(prefs.get('panels.libraryStart'), last.library);
-  const song = want(prefs.get('panels.songStart'), last.song);
-  if (!lib && !song) lib = true; // never both closed
-  els.app.classList.toggle('lib-closed', !lib);
-  els.app.classList.toggle('song-closed', !song);
+  const start = prefs.get('panels.libraryStart');
+  const opening = parseRoute(location.hash).view !== 'library'; // a deep link names a song: the drawer would only be in the way
+  const open = narrow() ? !opening : (start === 'last' ? last.library !== false : start !== 'closed');
+  els.app.classList.toggle('lib-closed', !open);
+  els.library.inert = !open;
+  syncPanelUi();
 })();
-// The drawer overlay on narrow screens starts closed; entering that layout closes it.
+// Entering the phone layout closes the drawer (it would cover the screen).
 window.matchMedia('(max-width: 700px)').addEventListener('change', (e) => {
-  if (e.matches) { els.app.classList.remove('song-closed'); setLibraryOpen(false, false); } // a phone: the song panel is the screen
-  else { try { const last = JSON.parse(localStorage.getItem('yargremote.panelState')) || {}; els.app.classList.toggle('song-closed', last.song === false && last.library !== false); } catch { /* keep */ } }
+  if (e.matches) setLibraryOpen(false, false);
   syncPanelUi();
 });
 els.closeLibrary.addEventListener('click', () => setLibraryOpen(false, false));
 els.scrim.addEventListener('click', () => setLibraryOpen(false, false));
 els.welcomeOpen.addEventListener('click', () => setLibraryOpen(true));
 els.libTab.addEventListener('click', () => setLibraryOpen(true));
+els.settingsTab.addEventListener('click', () => settingsPage.open());
 
 // ---------- Peeking: resting the pointer on a handle opens its menu for a while ----------
-// Hovering the handle of a hidden menu (the library's tab, the song panel's tab, the top bar's tab) for a moment opens it
+// Hovering the handle of a hidden menu (the library's tab) for a moment opens it
 // temporarily: nothing is saved, and it closes again when the pointer has been out of it for a couple of seconds or has stopped
 // moving for a few. It stays while something in it is being edited or a popover is open.
 const PEEK = { hoverMs: 1000, outsideMs: 2000, idleMs: 3000 };
@@ -211,9 +201,6 @@ function setupPeek(handle, panel, { isOpen, open, close }) {
   panel.addEventListener('pointerdown', () => { if (peeking) arm(); });
 }
 setupPeek(els.libTab, els.library, { isOpen: libraryOpen, open: () => setLibraryOpen(true, false), close: () => setLibraryOpen(false, false) });
-setupPeek(els.songTab, document.querySelector('.main'), { isOpen: songPanelOpen, open: () => setSongPanelOpen(true, false), close: () => setSongPanelOpen(false, false) });
-els.songTab.addEventListener('click', () => setSongPanelOpen(true));
-els.closeSongInfo.addEventListener('click', () => setSongPanelOpen(false));
 els.npPlay.addEventListener('click', async () => { // the Listen card: play here, without leaving the details
   previewStop = null;
   if (!player.playing && !(await ensureAudio())) return; // loads the audio the first time
@@ -235,17 +222,18 @@ els.npPreview.addEventListener('click', async () => {
   syncPlayButton();
 });
 
-// The divider between the two panels: drag to resize the library panel (remembered); double-click restores the default.
+// The handle on the library window's right edge: drag to resize the window (remembered); double-click restores the default width.
+// The stage keeps its size either way. The window leaves the same margin on the right as it has on the left.
 const MIN_LIB_W = 300;
-const MIN_SONG_W = 420; // the song panel keeps at least this: one column of details at its minimum size
-const maxLibWidth = () => Math.max(MIN_LIB_W, window.innerWidth - MIN_SONG_W);
+const LIB_MARGIN = 12; // keep in step with --lib-gap in styles.css
+const maxLibWidth = () => Math.max(MIN_LIB_W, window.innerWidth - 2 * LIB_MARGIN);
 function setLibWidth(px) {
   if (px == null) document.documentElement.style.removeProperty('--lib-w');
   else document.documentElement.style.setProperty('--lib-w', `${Math.round(px)}px`);
 }
 const savedLibW = Number(store.get('libWidth'));
 if (savedLibW >= MIN_LIB_W && !narrow()) setLibWidth(Math.min(savedLibW, maxLibWidth()));
-window.addEventListener('resize', () => { // a smaller window must not squeeze the song panel below its minimum
+window.addEventListener('resize', () => { // a smaller browser window must not leave the library wider than the screen
   const w = els.library.getBoundingClientRect().width;
   if (!narrow() && w > maxLibWidth()) setLibWidth(maxLibWidth());
 });
@@ -257,7 +245,7 @@ els.splitter.addEventListener('pointerdown', (e) => {
 });
 els.splitter.addEventListener('pointermove', (e) => {
   if (!els.splitter.classList.contains('dragging')) return;
-  setLibWidth(Math.min(Math.max(e.clientX, MIN_LIB_W), maxLibWidth())); // as wide as it gets while the song panel keeps its minimum
+  setLibWidth(Math.min(Math.max(e.clientX - els.library.getBoundingClientRect().left, MIN_LIB_W), maxLibWidth()));
 });
 const endDrag = () => {
   if (!els.splitter.classList.contains('dragging')) return;
@@ -591,8 +579,7 @@ async function selectSong(song) {
   chart = null;
   highway.setCharts([]);
   renderList({ keepScroll: true });
-  if (narrow()) setLibraryOpen(false, false);
-  else if (!songPanelOpen() && prefs.get('panels.openSongOnSelect')) setSongPanelOpen(true); // picking a song shows it
+  if (narrow() || prefs.get('panels.libraryAutoHide')) setLibraryOpen(false, false); // the window gets out of the way of the chart
 
   els.welcome.hidden = true;
   showPlayInfo(true);
@@ -666,7 +653,7 @@ async function selectSong(song) {
   else if (chart && wantAudio) ensureAudio(); // (playing needs a click: browsers block sound before one)
 }
 
-// The audio (the heavy part) loads on demand: Play, the Listen card or Space. A loading screen covers the song panel meanwhile.
+// The audio (the heavy part) loads on demand: Play, the Listen card or Space. A loading screen covers the stage meanwhile.
 let audioLoad = null; // { song, promise } while a load runs
 function ensureAudio() {
   if (ready) return Promise.resolve(true);
@@ -2166,7 +2153,6 @@ if (typeof ResizeObserver !== 'undefined') {
   ro.observe(document.querySelector('.tb-main'));
 }
 window.addEventListener('resize', alignStageButtons);
-els.app.addEventListener('transitionend', alignStageButtons); // the library slides in and out
 function setBarHidden(hidden, persist = true) {
   els.app.classList.toggle('bar-hidden', hidden);
   els.barShow.hidden = true; // (the old tab is gone)
@@ -2288,7 +2274,6 @@ const SHORTCUT_HANDLERS = {
   playPause: () => { if (chart) togglePlay(); },
   details: () => { if (current || loadInfo.state !== 'idle') setInfoOpen(!infoOpen); },
   library: () => setLibraryOpen(!libraryOpen()),
-  songPanel: () => setSongPanelOpen(!songPanelOpen()),
   topBar: () => setBarHidden(!els.app.classList.contains('bar-hidden')),
   fullscreen: () => toggleFullscreen(),
   view3d: () => setView(highway.view === '3d' ? '2d' : '3d'),

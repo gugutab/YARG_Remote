@@ -77,11 +77,10 @@ export const SECTIONS = [
   },
   {
     id: 'panels', title: 'Panels', icon: 'panels',
-    description: 'The library (left) and the song (right) can each be closed and reopened. Keys: L library, D song panel.',
+    description: 'The library is a window floating over the chart, on the left. Key: L shows or hides it.',
     items: [
-      { id: 'panels.libraryStart', group: 'At startup', type: 'choice', label: 'Library panel', options: [{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }, { value: 'last', label: 'As I left it' }], default: 'open' },
-      { id: 'panels.songStart', group: 'At startup', type: 'choice', label: 'Song panel', options: [{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }, { value: 'last', label: 'As I left it' }], default: 'open' },
-      { id: 'panels.openSongOnSelect', group: 'Behaviour', type: 'toggle', label: 'Open the song panel when I pick a song', help: 'Only matters when the song panel is closed.', default: true },
+      { id: 'panels.libraryStart', group: 'At startup', type: 'choice', label: 'Library window', options: [{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }, { value: 'last', label: 'As I left it' }], default: 'open' },
+      { id: 'panels.libraryAutoHide', group: 'Behaviour', type: 'toggle', label: 'Hide the library when I pick a song', help: 'The library window closes once a song is chosen; reopen it with L. Always on for a phone.', default: false },
     ],
   },
   {

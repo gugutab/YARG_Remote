@@ -83,92 +83,7 @@
   </svg>
 
   <div class="app bar-bottom" id="app">
-    <!-- Left collapsible library -->
-    <aside class="library" id="library" aria-label="Library">
-      <div class="lib-head">
-        <strong>Library</strong>
-        <span class="lib-tools">
-          <button id="openSettings" class="icon" type="button" title="Settings (,)" aria-label="Settings"><svg><use href="#i-gear"/></svg></button>
-          <button id="pick" class="icon" type="button" title="Choose songs folder" aria-label="Choose songs folder"><svg><use href="#i-folder"/></svg></button>
-          <button id="rescan" class="icon" type="button" title="Refresh list" aria-label="Refresh list" hidden><svg><use href="#i-refresh"/></svg></button>
-          <button id="closeLibrary" class="icon small-icon lib-hide" type="button" title="Hide the library (L)" aria-label="Hide the library"><svg><use href="#i-chevron"/></svg></button>
-        </span>
-        <input id="folderInput" type="file" webkitdirectory hidden>
-      </div>
-      <button id="resume" class="resume" type="button" hidden><svg><use href="#i-folder"/></svg><span></span></button>
-
-      <div class="search">
-        <svg><use href="#i-search"/></svg>
-        <input id="search" type="search" placeholder="Search songs" aria-label="Search" title="Search title, artist or album. Fields: artist:  album:  genre:  charter:  year:1990-1999  len:&lt;4 (minutes)  inst:drums  no:vocals. A leading - excludes (-artist:queen).">
-        <button id="filterBtn" class="icon filter-btn" type="button" title="Filters" aria-label="Filters" aria-expanded="false" aria-controls="filterPanel"><svg><use href="#i-filter"/></svg><span id="filterBadge" class="badge" hidden></span></button>
-      </div>
-      <div id="filterPanel" class="filter-panel" hidden>
-        <div class="fp-group">
-          <span class="fp-label">Instruments</span>
-          <div id="instChips" class="chips">
-            <button type="button" class="chip" data-inst="guitar" aria-pressed="false"><svg><use href="#i-guitar"/></svg>Guitar</button>
-            <button type="button" class="chip" data-inst="bass" aria-pressed="false"><svg><use href="#i-bass"/></svg>Bass</button>
-            <button type="button" class="chip" data-inst="rhythm" aria-pressed="false"><svg><use href="#i-rhythm"/></svg>Rhythm</button>
-            <button type="button" class="chip" data-inst="keys" aria-pressed="false"><svg><use href="#i-keys"/></svg>Keys</button>
-            <button type="button" class="chip" data-inst="drums" aria-pressed="false"><svg><use href="#i-drum"/></svg>Drums</button>
-            <button type="button" class="chip" data-inst="vocals" aria-pressed="false"><svg><use href="#i-mic"/></svg>Vocals</button>
-          </div>
-        </div>
-        <div class="fp-group">
-          <span class="fp-label">Minimum level</span>
-          <div id="levelSeg" class="seg compact">
-            <button type="button" data-level="0" aria-pressed="true">Any</button>
-            <button type="button" data-level="1" aria-pressed="false">1</button>
-            <button type="button" data-level="2" aria-pressed="false">2</button>
-            <button type="button" data-level="3" aria-pressed="false">3</button>
-            <button type="button" data-level="4" aria-pressed="false">4</button>
-            <button type="button" data-level="5" aria-pressed="false">5</button>
-            <button type="button" data-level="6" aria-pressed="false">6</button>
-          </div>
-        </div>
-        <div class="fp-row">
-          <label class="chip-select" title="Pack (game or DLC the song comes from)"><svg><use href="#i-package"/></svg>
-            <select id="filterPack" aria-label="Filter by pack"></select>
-          </label>
-          <label class="chip-select" title="Genre"><svg><use href="#i-list"/></svg>
-            <select id="filterGenre" aria-label="Filter by genre"></select>
-          </label>
-          <label class="chip-select" title="Decade"><svg><use href="#i-calendar"/></svg>
-            <select id="filterDecade" aria-label="Filter by decade"></select>
-          </label>
-          <button id="filterClear" class="chip-btn" type="button" disabled>Clear</button>
-        </div>
-      </div>
-      <div class="lib-bar">
-        <label class="chip-select" title="Sort"><svg><use href="#i-sort"/></svg>
-          <select id="sortBy" aria-label="Sort by">
-            <option value="title">Title</option>
-            <option value="artist">Artist</option>
-            <option value="album">Album</option>
-            <option value="pack">Pack</option>
-            <option value="year">Year</option>
-            <option value="length">Length</option>
-          </select>
-        </label>
-        <button id="sortDir" class="chip-btn sort-dir" type="button" title="Ascending (click to reverse)" aria-label="Reverse order"><svg><use href="#i-arrow-down"/></svg></button>
-        <span class="view-seg seg compact" id="viewSeg" role="group" aria-label="Card style">
-          <button type="button" data-mode="compact" title="Compact: one line" aria-label="Compact cards" aria-pressed="false"><svg><use href="#i-view-compact"/></svg></button>
-          <button type="button" data-mode="normal" title="Normal" aria-label="Normal cards" aria-pressed="true"><svg><use href="#i-view-normal"/></svg></button>
-          <button type="button" data-mode="large" title="Large: cover and instruments" aria-label="Large cards" aria-pressed="false"><svg><use href="#i-view-large"/></svg></button>
-        </span>
-      </div>
-      <div id="activeFilters" class="active-filters" hidden></div>
-      <div id="count" class="count"></div>
-      <div class="songs-wrap">
-        <div id="groupLabel" class="group-label" hidden></div>
-        <ul id="songs" role="listbox" aria-label="Songs"></ul>
-        <div id="rail" class="rail off" aria-hidden="true"><canvas></canvas><div class="rail-thumb"></div><div class="rail-bubble" hidden></div></div>
-      </div>
-      <p id="empty" class="hint">Choose the folder (e.g. A:\music\Songs) to list the songs.<br>Use Chrome or Edge.</p>
-      <div id="status" class="status" role="status"></div>
-    </aside>
     <div class="scrim" id="scrim"></div>
-    <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize the library panel" title="Drag to resize (double-click to reset)"></div>
 
     <div class="main">
       <canvas id="bgCanvas" class="bg-canvas" aria-hidden="true"></canvas>
@@ -299,7 +214,6 @@
           <p id="lsText"></p>
         </div>
         <section id="info" class="info" hidden aria-label="Song info">
-          <button id="closeSongInfo" class="icon close-song-info song-hide" type="button" title="Hide the song panel (D)" aria-label="Hide the song panel"><svg><use href="#i-chevron"/></svg></button>
           <div class="info-scroll">
             <div class="info-grid">
               <header class="info-card info-head">
@@ -362,12 +276,97 @@
           <p>Choose a song in the list.</p>
           <button id="welcomeOpen" type="button">Open library</button>
         </div>
+        <!-- Library: a glass window floating over the stage (left); it does not take room from the chart -->
+        <aside class="library" id="library" aria-label="Library">
+          <div class="lib-head">
+            <strong>Library</strong>
+            <span class="lib-tools">
+              <button id="openSettings" class="icon" type="button" title="Settings (,)" aria-label="Settings"><svg><use href="#i-gear"/></svg></button>
+              <button id="pick" class="icon" type="button" title="Choose songs folder" aria-label="Choose songs folder"><svg><use href="#i-folder"/></svg></button>
+              <button id="rescan" class="icon" type="button" title="Refresh list" aria-label="Refresh list" hidden><svg><use href="#i-refresh"/></svg></button>
+              <button id="closeLibrary" class="icon small-icon lib-hide" type="button" title="Hide the library (L)" aria-label="Hide the library"><svg><use href="#i-chevron"/></svg></button>
+            </span>
+            <input id="folderInput" type="file" webkitdirectory hidden>
+          </div>
+          <button id="resume" class="resume" type="button" hidden><svg><use href="#i-folder"/></svg><span></span></button>
+
+          <div class="search">
+            <svg><use href="#i-search"/></svg>
+            <input id="search" type="search" placeholder="Search songs" aria-label="Search" title="Search title, artist or album. Fields: artist:  album:  genre:  charter:  year:1990-1999  len:&lt;4 (minutes)  inst:drums  no:vocals. A leading - excludes (-artist:queen).">
+            <button id="filterBtn" class="icon filter-btn" type="button" title="Filters" aria-label="Filters" aria-expanded="false" aria-controls="filterPanel"><svg><use href="#i-filter"/></svg><span id="filterBadge" class="badge" hidden></span></button>
+          </div>
+          <div id="filterPanel" class="filter-panel" hidden>
+            <div class="fp-group">
+              <span class="fp-label">Instruments</span>
+              <div id="instChips" class="chips">
+                <button type="button" class="chip" data-inst="guitar" aria-pressed="false"><svg><use href="#i-guitar"/></svg>Guitar</button>
+                <button type="button" class="chip" data-inst="bass" aria-pressed="false"><svg><use href="#i-bass"/></svg>Bass</button>
+                <button type="button" class="chip" data-inst="rhythm" aria-pressed="false"><svg><use href="#i-rhythm"/></svg>Rhythm</button>
+                <button type="button" class="chip" data-inst="keys" aria-pressed="false"><svg><use href="#i-keys"/></svg>Keys</button>
+                <button type="button" class="chip" data-inst="drums" aria-pressed="false"><svg><use href="#i-drum"/></svg>Drums</button>
+                <button type="button" class="chip" data-inst="vocals" aria-pressed="false"><svg><use href="#i-mic"/></svg>Vocals</button>
+              </div>
+            </div>
+            <div class="fp-group">
+              <span class="fp-label">Minimum level</span>
+              <div id="levelSeg" class="seg compact">
+                <button type="button" data-level="0" aria-pressed="true">Any</button>
+                <button type="button" data-level="1" aria-pressed="false">1</button>
+                <button type="button" data-level="2" aria-pressed="false">2</button>
+                <button type="button" data-level="3" aria-pressed="false">3</button>
+                <button type="button" data-level="4" aria-pressed="false">4</button>
+                <button type="button" data-level="5" aria-pressed="false">5</button>
+                <button type="button" data-level="6" aria-pressed="false">6</button>
+              </div>
+            </div>
+            <div class="fp-row">
+              <label class="chip-select" title="Pack (game or DLC the song comes from)"><svg><use href="#i-package"/></svg>
+                <select id="filterPack" aria-label="Filter by pack"></select>
+              </label>
+              <label class="chip-select" title="Genre"><svg><use href="#i-list"/></svg>
+                <select id="filterGenre" aria-label="Filter by genre"></select>
+              </label>
+              <label class="chip-select" title="Decade"><svg><use href="#i-calendar"/></svg>
+                <select id="filterDecade" aria-label="Filter by decade"></select>
+              </label>
+              <button id="filterClear" class="chip-btn" type="button" disabled>Clear</button>
+            </div>
+          </div>
+          <div class="lib-bar">
+            <label class="chip-select" title="Sort"><svg><use href="#i-sort"/></svg>
+              <select id="sortBy" aria-label="Sort by">
+                <option value="title">Title</option>
+                <option value="artist">Artist</option>
+                <option value="album">Album</option>
+                <option value="pack">Pack</option>
+                <option value="year">Year</option>
+                <option value="length">Length</option>
+              </select>
+            </label>
+            <button id="sortDir" class="chip-btn sort-dir" type="button" title="Ascending (click to reverse)" aria-label="Reverse order"><svg><use href="#i-arrow-down"/></svg></button>
+            <span class="view-seg seg compact" id="viewSeg" role="group" aria-label="Card style">
+              <button type="button" data-mode="compact" title="Compact: one line" aria-label="Compact cards" aria-pressed="false"><svg><use href="#i-view-compact"/></svg></button>
+              <button type="button" data-mode="normal" title="Normal" aria-label="Normal cards" aria-pressed="true"><svg><use href="#i-view-normal"/></svg></button>
+              <button type="button" data-mode="large" title="Large: cover and instruments" aria-label="Large cards" aria-pressed="false"><svg><use href="#i-view-large"/></svg></button>
+            </span>
+          </div>
+          <div id="activeFilters" class="active-filters" hidden></div>
+          <div id="count" class="count"></div>
+          <div class="songs-wrap">
+            <div id="groupLabel" class="group-label" hidden></div>
+            <ul id="songs" role="listbox" aria-label="Songs"></ul>
+            <div id="rail" class="rail off" aria-hidden="true"><canvas></canvas><div class="rail-thumb"></div><div class="rail-bubble" hidden></div></div>
+          </div>
+          <p id="empty" class="hint">Choose the folder (e.g. A:\music\Songs) to list the songs.<br>Use Chrome or Edge.</p>
+          <div id="status" class="status" role="status"></div>
+          <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize the library window" title="Drag to resize (double-click to reset)"></div>
+        </aside>
       </main>
     </div>
   </div>
 
+  <button id="settingsTab" class="edge-tab edge-left settings-show" type="button" title="Settings (,)" aria-label="Settings" hidden><svg><use href="#i-gear"/></svg></button>
   <button id="libTab" class="edge-tab edge-left lib-show" type="button" title="Show the library (L)" aria-label="Show the library" hidden><svg><use href="#i-chevron"/></svg></button>
-  <button id="songTab" class="edge-tab edge-right song-show" type="button" title="Show the song panel (D)" aria-label="Show the song panel" hidden><svg><use href="#i-chevron"/></svg></button>
   <div id="settingsPage" class="settings-page" hidden role="dialog" aria-modal="true" aria-label="Settings"></div>
 
   <div class="seek-tip" id="seekTip" hidden></div>

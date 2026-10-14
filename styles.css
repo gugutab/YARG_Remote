@@ -63,19 +63,6 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 
 /* ---------- Layout ---------- */
 .app { display: flex; height: 100vh; height: 100dvh; } /* dvh follows the visible area on phones; vh is the fallback */
-.library {
-  width: var(--lib-w);
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  background: var(--panel);
-  border-right: 1px solid var(--line);
-  transition: margin-left .2s ease, width .2s ease;
-  min-height: 0;
-}
-.app.lib-closed .library { margin-left: calc(var(--lib-w) * -1); }
 .main { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--stage, #0d1117); }
 .bg-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 0; }
 .scrim { display: none; }
@@ -177,14 +164,6 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 
 /* ---------- Narrow screens ---------- */
 @media (max-width: 700px) {
-  .library {
-    position: fixed; inset: 0 auto 0 0; z-index: 30; width: min(88vw, 340px);
-    box-shadow: 0 0 30px rgba(0, 0, 0, .5);
-  }
-  .app.lib-closed .library { margin-left: 0; transform: translateX(-105%); box-shadow: none; }
-  .library { transition: transform .2s ease; }
-  .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); z-index: 25; }
-  .app:not(.lib-closed) .scrim { display: block; }
   .only-narrow { display: inline-grid !important; }
 }
 
@@ -654,9 +633,6 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .prow .modes-line { flex: 1 0 100%; display: flex; justify-content: flex-end; }
 .prow .seg.compact button { width: 34px; min-width: 0; padding: 3px 0; text-align: center; } /* mode and difficulty buttons share one size */
 
-/* The library's own close button replaces the hamburger while the library is open */
-.app:not(.lib-closed) #toggleLibrary, .app:not(.lib-closed) #infoMenu { display: none; }
-
 /* Library list: the native scrollbar is hidden; the rail on the right is the scrollbar (thumb), the group index (ticks
    and short labels) and a quick-navigation strip (press or drag). --rail-w also sets the right edge of the rows and
    of the sticky group label, so they always line up. */
@@ -891,12 +867,6 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 
 
 
-/* Round 68: two panels. The library is a panel next to the song panel (details or player), with a draggable divider */
-.splitter { flex: none; width: 9px; margin: 0 -5px 0 -4px; position: relative; z-index: 6; cursor: col-resize; touch-action: none; }
-.splitter::after { content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; background: transparent; transition: background .15s; }
-.splitter:hover::after, .splitter.dragging::after { background: var(--accent); }
-.app.lib-closed .splitter { display: none; }
-@media (max-width: 700px) { .splitter { display: none; } }
 .app:not(.lib-closed) #welcomeOpen { display: none; } /* the list is already on screen */
 body.resizing { cursor: col-resize; user-select: none; }
 
@@ -1030,23 +1000,13 @@ body.settings-open { overflow: hidden; }
 #info[data-names="always"] .card-volume .mix-row { grid-template-columns: 36px 84px 1fr 40px 28px; }
 #info[data-names="always"] .card-volume .mix-row.has-expand { grid-template-columns: 36px auto 84px 1fr 40px 28px; }
 
-/* ---------- Round 72: panels that close and reopen ---------- */
-.app { --main-w: 600px; }
-.main { transition: margin-right .2s ease, visibility 0s; } /* the song panel slides out to the right like the library to the left */
-.app.song-closed .main { flex: none; width: var(--main-w); margin-right: calc(var(--main-w) * -1); visibility: hidden; pointer-events: none; transition: margin-right .2s ease, visibility 0s .2s; }
-.app.song-closed .library, .app.song-closed.lib-closed .library { flex: none; width: 100%; margin-left: 0; } /* the library takes the whole screen: its width animates like the song panel's margin, so the two slide together */
-.app.song-closed .splitter { display: none; }
-.app.song-closed .songs-wrap { margin-right: 0; }
-.close-song, .close-song-info { opacity: .8; }
-.close-song:hover, .close-song-info:hover { opacity: 1; }
-button.icon.close-song-info { position: absolute; top: 10px; right: 14px; z-index: 3; background: var(--panel); border-color: var(--line); }
 .edge-tab { position: fixed; top: 50%; transform: translateY(-50%); z-index: 40; width: 26px; height: 76px; padding: 0; display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); color: var(--muted); cursor: pointer; }
 .edge-tab[hidden] { display: none; }
 .edge-tab:hover { color: var(--accent); background: var(--panel-2); }
 .edge-tab svg { width: 18px; height: 18px; }
 .edge-left { left: 0; border-left: 0; border-radius: 0 10px 10px 0; }
 .edge-right { right: 0; border-right: 0; border-radius: 10px 0 0 10px; }
-@media (max-width: 700px) { .edge-tab, .close-song, .close-song-info { display: none !important; } }
+@media (max-width: 700px) { .edge-tab { display: none !important; } }
 .now-playing { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-top: 1px solid var(--line); background: var(--panel-2); margin: 0 -10px; }
 .now-playing[hidden] { display: none; }
 .now-playing img { width: 38px; height: 38px; border-radius: 6px; object-fit: cover; flex: none; }
@@ -1066,7 +1026,7 @@ button.icon.close-song-info { position: absolute; top: 10px; right: 14px; z-inde
 .card-listen { grid-column: 1 / -1; }
 
 /* loading screen: shown over the song panel while the audio loads after Play */
-.load-screen { position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; background: var(--bg); }
+.load-screen { position: absolute; inset: 0; z-index: 11; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; background: var(--bg); }
 .load-screen[hidden] { display: none; }
 .load-screen img { width: min(220px, 40%); aspect-ratio: 1; object-fit: cover; border-radius: var(--radius, 10px); box-shadow: 0 10px 40px rgba(0, 0, 0, .45); }
 .load-screen h2 { margin: 0; font-size: 20px; }
@@ -1169,11 +1129,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .edge-tab.lib-show { height: 56px; }
 @media (max-width: 700px) { .edge-tab.lib-show:not([hidden]) { display: grid !important; } }
 
-.song-hide svg { transform: rotate(-90deg); } /* points right: where the song panel goes */
-.song-hide { opacity: .7; }
-.song-hide:hover { opacity: 1; }
-.edge-tab.song-show svg { transform: rotate(90deg); } /* points left: where it comes back */
-.edge-tab.song-show { height: 56px; }
 
 /* ---------- the top bar hides and shows like the library: it slides (0.2 s) and a small chevron tab brings it back ---------- */
 .topbar { transition: margin-top .2s ease; } /* the same kind of motion as the library's margin-left: nothing is squeezed while it moves */
@@ -1647,10 +1602,6 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .app:not(.bar-bottom) .seekbox .loop-handle { top: -2px; bottom: -16px; }
   .app:not(.bar-bottom) .seekbox .loop-handle::before { top: 0; bottom: 14px; }
 
-  /* divider between the panels */
-  .splitter { width: 24px; margin: 0 -13px 0 -11px; }
-  .splitter::after { left: 11px; }
-
   /* library, details, popovers and settings: the controls grow */
   .library button, .library select, .info button:not(.icard-head), .popover button, .popover select, .settings-page button, .settings-page select,
   .chip, .chip-btn, .chip-select, .seg button, .view-seg button { min-height: 44px; }
@@ -1680,3 +1631,62 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   }
   .chip-btn.sort-dir { min-width: 44px; }
 }
+
+/* ================= Library window: a glass panel floating over the stage =================
+   The aside lives inside .stage, so it sits between the top edge and the player bar (bar at the bottom or at the top) and never
+   takes room from the chart: the stage always spans the whole screen, opening or closing the library resizes nothing.
+   Same glass as the player bar: translucent --panel, the blur on ::before. A backdrop-filter / filter on the aside itself would make it
+   the containing block of position: fixed descendants (see the top bar). It moves with transform only while it slides (that is also a
+   containing block, but nothing fixed is open then); once open, transform is none. */
+.app { --lib-gap: 12px; }
+.library {
+  position: absolute; z-index: 12;
+  top: var(--lib-gap); bottom: var(--lib-gap); left: var(--lib-gap);
+  width: min(var(--lib-w), calc(100% - 2 * var(--lib-gap)));
+  display: flex; flex-direction: column; gap: 8px; padding: 10px; min-height: 0;
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, .4);
+  transition: transform .22s ease, opacity .22s ease, visibility 0s;
+}
+.library::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.app.lib-closed .library { transform: translateX(calc(-100% - 2 * var(--lib-gap))); opacity: 0; visibility: hidden; pointer-events: none; box-shadow: none; transition: transform .22s ease, opacity .22s ease, visibility 0s .22s; }
+.library .group-label, #songs li.divider { background: color-mix(in srgb, var(--bg) 88%, transparent); }
+.sel-pop { z-index: 50; } /* above the library window and the phone drawer */
+
+/* the drag handle straddles the window's right edge; it does not change the stage */
+.splitter { position: absolute; top: 14px; bottom: 14px; right: -6px; width: 12px; z-index: 6; cursor: col-resize; touch-action: none; }
+.splitter::after { content: ""; position: absolute; top: 0; bottom: 0; left: 5px; width: 2px; border-radius: 1px; background: transparent; transition: background .15s; }
+.splitter:hover::after, .splitter.dragging::after { background: var(--accent); }
+@media (pointer: coarse) {
+  .splitter { width: 24px; right: -12px; }
+  .splitter::after { left: 11px; }
+}
+
+/* what is centred on the stage (empty state, details, loading) keeps to the part the window leaves free; the chart canvas itself is untouched */
+@media (min-width: 701px) {
+  .app:not(.lib-closed) { --lib-inset: calc(var(--lib-w) + 2 * var(--lib-gap)); }
+  .welcome, .info-scroll, .info-actions, .load-screen { transition: padding-left .22s ease; }
+}
+.welcome { padding-left: var(--lib-inset, 0px); }
+.info-scroll { padding-left: calc(var(--lib-inset, 0px) + 16px); }
+#info.compact .info-scroll { padding-left: calc(var(--lib-inset, 0px) + 10px); }
+.info-actions { padding-left: calc(var(--lib-inset, 0px) + 16px); }
+.load-screen { padding-left: calc(var(--lib-inset, 0px) + 24px); }
+@media (min-width: 1800px) { .info-scroll { padding-left: calc(var(--lib-inset, 0px) + 24px); } }
+
+/* settings stays one click away while the library header (which holds the gear) is hidden */
+.edge-tab.settings-show { top: calc(50% + 34px); transform: none; height: 40px; }
+
+/* phone: a full-height drawer over everything (the bar included) with a scrim */
+@media (max-width: 700px) {
+  .library { position: fixed; top: 0; bottom: 0; left: 0; z-index: 30; width: min(88vw, 340px); border-radius: 0 14px 14px 0; border-left: 0; background: color-mix(in srgb, var(--panel) 94%, transparent); }
+  .app.lib-closed .library { transform: translateX(-105%); }
+  .splitter { display: none; }
+  .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); z-index: 25; }
+  .app:not(.lib-closed) .scrim { display: block; }
+}
+
+/* Immersive: the player bar is an overlay over the stage; it stays above the library window */
+.app.immersive .topbar { z-index: 14; }

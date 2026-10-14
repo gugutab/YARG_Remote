@@ -18,7 +18,6 @@ export const ACTIONS = [
   { id: 'visualizerNext', group: 'Windows', label: 'Next visualizer', key: 'KeyG' },
   { id: 'visualizerPrev', group: 'Windows', label: 'Previous visualizer', key: 'Shift+KeyG' },
   { id: 'library', group: 'Panels', label: 'Show / hide the library', key: 'KeyL' },
-  { id: 'songPanel', group: 'Panels', label: 'Show / hide the song panel', key: 'KeyD' },
   { id: 'details', group: 'Panels', label: 'Song details / chart', key: 'KeyI' },
   { id: 'topBar', group: 'Panels', label: 'Expand / compact the player bar', key: 'KeyB' },
   { id: 'fullscreen', group: 'Panels', label: 'Full screen', key: 'KeyF' },
