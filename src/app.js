@@ -696,8 +696,15 @@ async function selectSong(song) {
   els.instrumentCards.replaceChildren();
   els.mixerInfo.replaceChildren();
   els.mixer.replaceChildren();
+  const swapping = infoOpen; // the details of another song were showing: the new ones slide in
   renderSongInfo(song);
   infoScroll.scrollTop = 0; // a new song starts at the top
+  if (swapping) {
+    els.info.classList.remove('info-swap');
+    void els.info.offsetWidth; // restart the animation when songs are picked in a row
+    els.info.classList.add('info-swap');
+    setTimeout(() => els.info.classList.remove('info-swap'), 450);
+  }
   setInfoOpen(true); // the info screen opens right away and the load runs behind it
   setLoadState('loading', 'Reading the chart…', 0.02);
 
