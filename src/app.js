@@ -569,8 +569,11 @@ let loadAudioWithSong = false; // a #/song/<id>/play link: the audio loads with 
 // song) until the audio starts to load (or the details close): then the new song fades in. The chart itself loads in the background.
 let holdStage = false;
 let barGhost = null; // a still copy of the player bar, laid over the real one while the stage is held
+let stageEverLive = false; // a song has been played (or opened with /play) since the page loaded: until then the player bar is not shown
 function holdStageNow() {
-  if (holdStage || !current || !chart) return; // nothing on screen yet: nothing to keep
+  if (holdStage) return;
+  if (!stageEverLive) { holdStage = true; els.app.classList.add('stage-held'); return; } // nothing was ever shown: hold with no picture to keep (the bar stays away)
+  if (!current || !chart) return; // nothing on screen: nothing to keep
   holdStage = true;
   const bar = document.getElementById('topbar');
   const main = bar.parentElement;
@@ -590,7 +593,8 @@ function holdStageNow() {
 function releaseStage() {
   if (!holdStage) return;
   holdStage = false;
-  els.app.classList.remove('stage-held');
+  stageEverLive = true;
+  els.app.classList.remove('stage-held', 'stage-unborn');
   els.app.classList.add('stage-reveal');
   highway.invalidate();
   const g = barGhost;
