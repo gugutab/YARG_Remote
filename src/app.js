@@ -632,8 +632,10 @@ function holdStageNow() {
   els.app.classList.add('stage-held');
 }
 // The audio of the held song starts loading: the loading screen gets the plain background (the old bar copy and the frozen fretboards go)
+let loadingBackdrop = 0; // while the held song's audio loads: when it started (the background visualizer keeps animating behind the loading screen)
 function stageLoading() {
   if (!holdStage) return;
+  loadingBackdrop = performance.now();
   els.app.classList.add('stage-loading');
   barGhost?.remove();
   barGhost = null;
@@ -641,6 +643,7 @@ function stageLoading() {
 function releaseStage() {
   if (!holdStage) return;
   holdStage = false;
+  loadingBackdrop = 0;
   els.app.classList.remove('stage-held', 'stage-loading');
   if (stageEverLive) els.app.classList.remove('stage-unborn'); // (closing the details of a song that was never played shows its chart but still no bar)
   els.app.classList.add('stage-reveal');
@@ -2662,7 +2665,7 @@ function frame(frameTs) {
   const frameStart = performance.now();
   if (frameTs) player.frameNow = frameTs; // the clock of this animation frame (vsync aligned)
   let drawMs = 0;
-  const draw = (fn) => { if (holdStage) return; const d0 = performance.now(); guarded('draw', fn); drawMs = performance.now() - d0; }; // (held: the fretboards keep the last picture)
+  const draw = (fn) => { if (holdStage) { if (loadingBackdrop) guarded('loading background', () => highway.drawBackground((performance.now() - loadingBackdrop) / 1000)); return; } const d0 = performance.now(); guarded('draw', fn); drawMs = performance.now() - d0; }; // (held: the fretboards keep the last picture)
   if (current && chart) {
     let t = guarded('clock', () => {
       let t = player.currentTime();

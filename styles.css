@@ -1868,7 +1868,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 #info.compact .info-scroll.thumb-scroll { padding-left: 5px; padding-top: 5px; padding-bottom: 6px; }
 
 /* While the held song's audio loads: plain background for the loading screen (no frozen fretboards, no visualizer picture) */
-.app.stage-loading #highway, .app.stage-loading .bg-canvas { visibility: hidden; }
+.app.stage-loading #highway { visibility: hidden; } /* (the background canvas stays: the visualizer shows behind the loading screen) */
 
 /* End window: the instrument tables have a maximum width; each recommendation shows the instruments the song has */
 .end-cards { grid-template-columns: repeat(auto-fit, minmax(230px, 320px)); justify-content: center; }
@@ -1900,3 +1900,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 
 /* phone: while the details cover the drawer its edge tab stays away (the details-only case, where the list tab rule is !important) */
 @media (max-width: 700px) { body.details-open .edge-tab.lib-show:not([hidden]) { display: none !important; } } /* (the edge tabs live outside .app, so the state is on <body>) */
+
+/* The loading screen has no background of its own: the stage (the plain stage colour while the bar and tracks are held back) shows through */
+.load-screen { background: transparent; }
+.load-screen h2, .load-screen p { text-shadow: 0 1px 8px rgba(0, 0, 0, .85), 0 0 2px rgba(0, 0, 0, .6); } /* readable over the visualizer */
