@@ -22,6 +22,8 @@ import { saveLibrary, loadLibrary, loadThumb, saveThumb, clearThumbs } from './s
 import { filterSongs, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, anchorLabel } from './songlist.js';
 import { createVirtualList, DEFAULT_CARDS } from './virtuallist.js';
 import { createThumbs, renderCoverThumb } from './thumbs.js';
+import { chartFacts, factRows } from './songstats.js';
+import { recommend } from './recommend.js';
 import { snapPoints, snapTime, clampLoop, currentSectionRange, sectionRange, loopForSection, shouldWrap, MIN_LOOP } from './looprange.js';
 import { VISUALIZERS, createDriver as createVisualizerDriver } from './visualizers.js';
 
@@ -35,9 +37,10 @@ const els = Object.fromEntries([
   'barHide', 'barShow', 'specialCard', 'specialList', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
+  'endScreen', 'endCover', 'endTitle', 'endArtist', 'endAgain', 'endSearch', 'endCards', 'endNextBox', 'endNext',
 ].map((id) => [id, $(id)]));
 
-for (const img of [els.cover, els.infoCover, els.infoPopCover]) img.addEventListener('error', () => { img.hidden = true; });
+for (const img of [els.cover, els.infoCover, els.infoPopCover, els.endCover]) img.addEventListener('error', () => { img.hidden = true; });
 const player = new MultiTrackPlayer();
 const highway = new Highway(els.highway);
 highway.setBackgroundCanvas(document.getElementById('bgCanvas'));
@@ -204,6 +207,7 @@ setupPeek(els.libTab, els.library, { isOpen: libraryOpen, open: () => setLibrary
 els.npPlay.addEventListener('click', async () => { // the Listen card: play here, without leaving the details
   previewStop = null;
   if (!player.playing && !(await ensureAudio())) return; // loads the audio the first time
+  setEnded(false); // (play() starts over from the end by itself)
   if (player.playing) player.pause(); else await player.play();
   syncPlayButton();
 });
@@ -569,6 +573,7 @@ async function selectSong(song) {
   }
   const token = ++loadToken;
   player.pause();
+  setEnded(false);
   player.unload(); // the old song's decoded audio is freed as soon as another song is picked
   syncPlayButton();
   ready = false;
@@ -734,6 +739,7 @@ function setInfoOpen(open) {
   closePopovers();
   renderLoadState();
   syncUrl();
+  syncEndScreen(); // the details cover the end window
 }
 
 const kv = (rows) => rows.flatMap((r) => {
@@ -1078,10 +1084,16 @@ function updateChart() {
     const shown = group.active && current.hiddenActive ? null : group.active ? chart : group.pinned ? (() => { const o = group.chosen; const d = diffFor(o).chosen; return d ? buildChart(current.midi, o, d, current.song.ini) : null; })() : null;
     if (!shown) continue;
     const d = group.active ? diff : diffFor(group.chosen).chosen;
-    items.push({ chart: shown, key: group.key, icon: INSTRUMENT_ICON[group.chosen.base] || 'music', label: shown.mode === 'vocals' ? group.label : `${group.label} · ${d.short}` });
+    items.push({
+      chart: shown, key: group.key, icon: INSTRUMENT_ICON[group.chosen.base] || 'music', label: shown.mode === 'vocals' ? group.label : `${group.label} · ${d.short}`,
+      // for the end-of-song window
+      name: group.chosen.label, base: group.chosen.base, optionId: group.chosen.id, diffId: d?.id, diffLabel: shown.mode === 'vocals' ? '' : d?.label ?? '', active: group.active,
+    });
   }
   for (const c of current.choosers) if (c.at === null) items.push({ chooser: true, key: `choose:${c.id}` }); // an added one goes last
   highway.setCharts(items);
+  current.screen = items.filter((x) => !x.chooser); // what is on screen, for the end-of-song window
+  if (endShown) buildEndScreen();
   renderSpecials();
   fillSectionOptions();
   const hasLanes = items.some((x) => x.chooser || x.chart.mode !== 'vocals');
@@ -1696,6 +1708,7 @@ function seekTo(t) {
 
 async function togglePlay() {
   if (!chart) return;
+  if (ended && !player.playing) return restartSong(); // the button reads Restart
   previewStop = null;
   if (player.playing) player.pause();
   else {
@@ -1706,13 +1719,135 @@ async function togglePlay() {
   syncPlayButton();
 }
 
+const PLAY_TITLES = { play: els.play.title, npPlay: els.npPlay.title };
 function syncPlayButton() {
   const playing = player.playing;
-  els.play.querySelector('use').setAttribute('href', playing ? '#i-pause' : '#i-play');
-  els.play.setAttribute('aria-label', playing ? 'Pause' : 'Play');
-  els.npPlay.querySelector('use').setAttribute('href', playing ? '#i-pause' : '#i-play');
+  const restart = ended && !playing; // at the end of the song the play button restarts it
+  const icon = playing ? '#i-pause' : restart ? '#i-restart' : '#i-play';
+  els.play.querySelector('use').setAttribute('href', icon);
+  els.play.setAttribute('aria-label', playing ? 'Pause' : restart ? 'Restart' : 'Play');
+  els.play.title = restart ? 'Restart (Space)' : PLAY_TITLES.play;
+  els.npPlay.querySelector('use').setAttribute('href', icon);
+  els.npPlay.title = restart ? 'Restart' : PLAY_TITLES.npPlay;
+  els.infoPlay.querySelector('use').setAttribute('href', restart ? '#i-restart' : '#i-play');
+  els.infoPlay.querySelector('span').textContent = restart ? 'Restart' : 'Play';
   setImmersive();
 }
+
+// ---------- End of song ----------
+// When playback reaches the end by itself the song is "ended": the play buttons turn into Restart and, with the setting
+// general.endScreen, a glass window (#endScreen) replaces the fretboards: facts about each instrument on screen (songstats.js) and a few
+// songs to play next (recommend.js). Any seek (the player's onSeek hook), a restart, Play or a song change clears the state; Esc only
+// hides the window (the buttons stay Restart). The canvas is hidden by CSS (.song-ended), so the background visualizer keeps running.
+let ended = false;
+let endDismissed = false;
+let endShown = false;
+const NEXT_COUNT = 7;
+player.onSeek = () => setEnded(false);
+
+function setEnded(on) {
+  if (ended === on) return;
+  ended = on;
+  endDismissed = false;
+  syncEndScreen();
+  syncPlayButton();
+}
+
+// Restarts from the beginning, or from the start of the loop, and plays.
+async function restartSong() {
+  if (!chart) return;
+  previewStop = null;
+  if (infoOpen) setInfoOpen(false);
+  if (!(await ensureAudio())) return;
+  setEnded(false);
+  player.seek(loop ? loop.start : 0);
+  await player.play();
+  syncPlayButton();
+}
+
+function syncEndScreen() {
+  const show = ended && !endDismissed && !!chart && !!current && !infoOpen && prefs.get('general.endScreen');
+  if (show === endShown) return;
+  endShown = show;
+  els.endScreen.hidden = !show;
+  els.app.classList.toggle('song-ended', show);
+  highway.invalidate();
+  wakeUp();
+  if (!show) return;
+  closePopovers();
+  els.paneMenu.hidden = true;
+  buildEndScreen();
+  els.endScreen.querySelector('.end-scroll').scrollTop = 0;
+  if (!/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName || '')) els.endAgain.focus({ preventScroll: true });
+}
+
+function endCard(it) {
+  const card = document.createElement('div');
+  card.className = 'end-inst';
+  const head = document.createElement('div');
+  head.className = 'end-inst-head';
+  head.innerHTML = `<svg><use href="#i-${it.icon}"/></svg><strong></strong><span class="end-diff"></span>`;
+  head.querySelector('strong').textContent = it.name;
+  const diff = head.querySelector('.end-diff');
+  diff.textContent = it.diffLabel;
+  diff.hidden = !it.diffLabel;
+  const dl = document.createElement('dl');
+  dl.className = 'end-facts';
+  dl.append(...kv(factRows(chartFacts(it.chart), { base: it.base })));
+  card.append(head, dl);
+  return card;
+}
+
+function endRow(song, reason) {
+  const li = document.createElement('li');
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'end-row';
+  b.innerHTML = '<span class="end-thumb"></span><span class="end-row-text"><strong></strong><span class="end-row-artist"></span></span><span class="end-reason"></span>';
+  b.querySelector('strong').textContent = plainText(song.title);
+  b.querySelector('.end-row-artist').textContent = plainText(song.artist);
+  b.querySelector('.end-reason').textContent = reason;
+  b.title = `${plainText(song.title)} - ${plainText(song.artist)}`;
+  const thumb = b.querySelector('.end-thumb');
+  const put = (url) => { if (!url) return; const img = new Image(); img.alt = ''; img.src = url; thumb.replaceChildren(img); };
+  const cached = thumbs.peek(song);
+  if (cached) put(cached); else thumbs.get(song).then(put);
+  b.addEventListener('click', () => playNext(song));
+  li.append(b);
+  return li;
+}
+
+function buildEndScreen() {
+  const song = current.song;
+  els.endTitle.textContent = plainText(song.title);
+  els.endArtist.textContent = [plainText(song.artist), plainText(song.album)].filter(Boolean).join(' · ');
+  els.endCover.src = current.coverUrl || '';
+  els.endCover.hidden = !current.coverUrl;
+  const screen = [...(current.screen || [])].sort((a, b) => Number(!!b.active) - Number(!!a.active));
+  els.endCards.replaceChildren(...screen.map(endCard));
+  els.endCards.hidden = screen.length === 0;
+  const parts = [...new Set(screen.map((it) => (it.base === 'harmony' ? 'vocals' : it.base)))];
+  const picks = recommend(song, songs, { count: NEXT_COUNT, instruments: parts });
+  els.endNext.replaceChildren(...picks.map((r) => endRow(r.song, r.reason)));
+  els.endNextBox.hidden = picks.length === 0;
+}
+
+// A recommended song: opened with the same instruments and difficulties where it has them, and played.
+async function playNext(song) {
+  pendingInstruments = [...(current.screen || [])].sort((a, b) => Number(!!b.active) - Number(!!a.active)).map((it) => ({ id: it.optionId, diff: it.diffId, base: it.base }));
+  loadAudioWithSong = false;
+  await selectSong(song);
+  if (chart && current?.song === song && !prefs.get('general.autoplay')) togglePlay(); // (that setting already starts it)
+}
+
+function backToSearch() {
+  endDismissed = true;
+  syncEndScreen();
+  setLibraryOpen(true);
+  setTimeout(() => { els.search.focus(); els.search.select(); }, 0); // (after the click handler that drops focus from clicked buttons)
+}
+els.endAgain.addEventListener('click', () => restartSong());
+els.endSearch.addEventListener('click', () => backToSearch());
 
 // ---------- 2D / 3D view ----------
 function setView(view) {
@@ -2301,6 +2436,7 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (e.code === 'Escape') {
+    if (endShown && popovers.every(([, pop]) => pop.hidden)) { endDismissed = true; syncEndScreen(); els.play.focus({ preventScroll: true }); return; } // the end window goes, the fretboards come back
     if (popovers.every(([, pop]) => pop.hidden) && infoOpen && loadInfo.state !== 'idle') setInfoOpen(false); // details -> chart
     const open = popovers.find(([, pop]) => !pop.hidden);
     const owner = open && (open[1] === els.paneMenu ? document.querySelector('.pane-tag[aria-expanded="true"]') : open[0]);
@@ -2425,8 +2561,9 @@ function frame(frameTs) {
         if (player.playing) { player.pause(); syncPlayButton(); }
         previewStop = null;
       }
-      if (player.playing && t >= player.duration) {
+      if (player.playing && t >= player.duration) { // the song ran out by itself
         player.pause();
+        setEnded(true);
         syncPlayButton();
       }
       if (player.playing && lastClock && !instantJump && Math.abs(t - lastClock.t) < SEEK_JUMP_SEC) perf.clock(((t - lastClock.t) - (((frameTs || frameStart) - lastClock.at) / 1000) * player.rate) * 1000); // steadiness of the music clock
@@ -2536,6 +2673,7 @@ const EFFECTS = {
   'highway.stageColorOn': () => { applyStage(); syncVizPop(); },
   'highway.stageColor': () => { applyStage(); syncVizPop(); },
   'ui.barPosition': (v) => { els.app.classList.toggle('bar-bottom', v !== 'top'); closePopovers(); },
+  'general.endScreen': () => syncEndScreen(),
   'ui.animations': () => { document.documentElement.dataset.motion = motionPref('ui.animations') ? 'on' : 'off'; },
 };
 for (const [id, fn] of Object.entries(EFFECTS)) fn(prefs.get(id));
@@ -2578,7 +2716,12 @@ function instrumentsOnScreen() {
 }
 // Puts the instruments of a link on screen: the first is the active one, the others are pinned. Unknown ones are ignored.
 function applyInstruments(list) {
-  const known = (list || []).filter((x) => current.options.some((o) => o.id === x.id));
+  // (a link names ids; the pick of another song may only share the kind of instrument: drums in another mode, vocals for harmony)
+  const seen = new Set();
+  const known = (list || []).map((x) => {
+    const o = current.options.find((c) => c.id === x.id) ?? (x.base ? current.options.find((c) => c.base === x.base) ?? (x.base === 'harmony' ? current.options.find((c) => c.mode === 'vocals') : null) : null);
+    return o && !seen.has(o.id) && seen.add(o.id) ? { ...x, id: o.id } : null;
+  }).filter(Boolean);
   if (!known.length) return false;
   const [first, ...rest] = known;
   els.instrument.value = first.id;

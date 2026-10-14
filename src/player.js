@@ -401,8 +401,8 @@ export class MultiTrackPlayer {
   currentTime() { return this.impl.currentTime(); }
   play() { return this.impl.play(); }
   pause() { this.impl.pause(); }
-  seek(seconds) { this.impl.seek(seconds); }
-  scrubTo(seconds, ms) { if (this.impl.scrubTo) this.impl.scrubTo(seconds, ms); else this.impl.seek(seconds); } // (the legacy engine just cuts)
+  seek(seconds) { this.onSeek?.(); this.impl.seek(seconds); } // onSeek: set by the app (any seek leaves the "ended" state)
+  scrubTo(seconds, ms) { this.onSeek?.(); if (this.impl.scrubTo) this.impl.scrubTo(seconds, ms); else this.impl.seek(seconds); } // (the legacy engine just cuts)
   stop() { this.impl.stop(); }
   unload() { this.impl.unload(); } // frees the decoded audio (a song change, before its audio loads)
 }

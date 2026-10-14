@@ -1690,3 +1690,67 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 
 /* Immersive: the player bar is an overlay over the stage; it stays above the library window */
 .app.immersive .topbar { z-index: 14; }
+
+/* ================= End of song: a glass window that replaces the fretboards =================
+   Inside .stage like the library window and the details, centred in the part the library leaves free (--lib-inset). The canvas and
+   the pane tags are hidden (visibility), the background canvas (visualizer) keeps running behind the glass. It scrolls inside when the
+   screen is small. Same glass as the library: translucent --panel, the blur on ::before (never on the element that scrolls). */
+.end-screen { position: absolute; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center; padding: var(--lib-gap, 12px) var(--lib-gap, 12px) var(--lib-gap, 12px) var(--lib-inset, var(--lib-gap, 12px)); pointer-events: none; }
+.end-screen[hidden] { display: none; }
+@media (min-width: 701px) { .end-screen { transition: padding-left .22s ease; } }
+.app.song-ended #highway, .app.song-ended #paneTags { visibility: hidden; }
+.app.immersive .end-screen { padding-block: calc(var(--bar-h, 64px) + var(--lib-gap, 12px)); }
+.end-card {
+  position: relative; width: min(1100px, 100%); max-height: 100%; min-height: 0; display: flex; flex-direction: column; pointer-events: auto;
+  background: color-mix(in srgb, var(--panel) 78%, transparent); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: 14px; box-shadow: 0 10px 34px rgba(0, 0, 0, .4); color: var(--text);
+}
+.end-card::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.end-scroll { overflow: auto; min-height: 0; padding: 18px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 16px; }
+:root[data-motion="on"] .end-card { animation: end-in .28s ease both; }
+@keyframes end-in { from { opacity: 0; } to { opacity: 1; } }
+
+.end-head { display: flex; gap: 16px; align-items: center; }
+.end-head img { width: 132px; height: 132px; object-fit: cover; border-radius: 10px; flex: none; box-shadow: 0 6px 22px rgba(0, 0, 0, .4); }
+.end-head-text { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.end-kicker { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.end-head h2 { margin: 0; font-size: 26px; line-height: 1.15; overflow-wrap: anywhere; }
+.end-artist { color: var(--muted); font-size: 15px; overflow-wrap: anywhere; }
+.end-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.end-btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; font-weight: 600; }
+.end-actions .cta svg, .end-btn svg { width: 18px; height: 18px; }
+
+.end-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.end-cards[hidden], .end-next[hidden] { display: none; }
+.end-inst { background: color-mix(in srgb, var(--panel-2, var(--panel)) 70%, transparent); border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+.end-inst-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.end-inst-head svg { width: 20px; height: 20px; color: var(--accent); }
+.end-inst-head strong { font-size: 14px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.end-diff { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); }
+.end-diff[hidden] { display: none; }
+.end-facts { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; font-size: 13px; }
+.end-facts dt { color: var(--muted); }
+.end-facts dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.end-next h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.end-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 8px; }
+.end-list > li { min-width: 0; }
+.end-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 6px; text-align: left; border-radius: 10px; background: color-mix(in srgb, var(--panel-2, var(--panel)) 60%, transparent); border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); }
+.end-row:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.end-thumb { width: 44px; height: 44px; flex: none; border-radius: 6px; background: color-mix(in srgb, var(--line) 60%, transparent); overflow: hidden; }
+.end-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.end-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.end-row-text strong, .end-row-artist { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.end-row-text strong { font-size: 14px; }
+.end-row-artist { font-size: 12px; color: var(--muted); }
+.end-reason { flex: none; max-width: 42%; font-size: 11px; color: var(--muted); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 700px) {
+  .end-screen { padding: 8px; }
+  .end-scroll { padding: 14px; gap: 14px; }
+  .end-head { gap: 12px; }
+  .end-head img { width: 76px; height: 76px; }
+  .end-head h2 { font-size: 20px; }
+  .end-list { grid-template-columns: minmax(0, 1fr); }
+}
+@media (pointer: coarse) { .end-row { min-height: 52px; } .end-btn, .end-actions .cta { min-height: 44px; } }
