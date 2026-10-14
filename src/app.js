@@ -34,7 +34,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'barHide', 'barShow', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'barHide', 'barShow', 'mixerVal', 'speedVal', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
   'endScreen', 'endCover', 'endTitle', 'endArtist', 'endAgain', 'endSearch', 'endCards', 'endNextBox', 'endNext',
@@ -1299,6 +1299,7 @@ function stepSection(dir) {
 const LONG_PRESS_MS = 500;
 // Master volume: one more mixer row (kept across songs) that scales every stem.
 const masterState = { stem: { id: 'master', label: 'Master' }, master: true, value: savedMaster(), muted: store.get('masterMuted') === '1', views: [] };
+els.mixerVal.textContent = masterState.muted ? 'Muted' : `${Math.round(masterState.value * 100)}%`;
 player.setMaster(masterState.muted ? 0 : masterState.value); // from the first sound on, not only after a mixer is built
 
 function savedMaster() {
@@ -1489,6 +1490,7 @@ function applyEverything() {
 // The slider keeps its value while a stem is muted; every view of the stem is updated together.
 function applyStem(st) {
   if (st.master) {
+    els.mixerVal.textContent = st.muted ? 'Muted' : `${Math.round(st.value * 100)}%`; // (shown beside the volume icon on wide screens)
     player.setMaster(st.muted ? 0 : st.value);
     store.set('master', String(st.value)); // the master level and its mute are kept between visits
     store.set('masterMuted', st.muted ? '1' : '0');
@@ -1530,7 +1532,7 @@ function setSetting(name, value) {
   for (const out of document.querySelectorAll(`[data-out="${name}"]`)) out.textContent = SETTING_FORMAT[name](value);
   for (const btn of document.querySelectorAll(`[data-reset="${name}"]`)) btn.disabled = value === SETTING_DEFAULTS[name];
   if (name === 'chartDelay') { paintSectionTicks(); highway.delay = value; }
-  if (name === 'speed') player.setRate(value);
+  if (name === 'speed') { player.setRate(value); els.speedVal.textContent = `${Number(value.toFixed(2))}×`; }
   if (name === 'neck') highway.setNeckSpeed(value);
 }
 document.addEventListener('input', (e) => {

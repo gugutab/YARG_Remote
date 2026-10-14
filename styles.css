@@ -1915,3 +1915,12 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 /* Bigger instrument icons on the fretboard and vocal windows' tags */
 .pane-tag { height: 34px; border-radius: 17px; padding: 0 11px 0 10px; gap: 7px; }
 .pane-tag svg { width: 22px; height: 22px; }
+
+/* Wide screens: the volume button shows the master level and the speed button the speed; the tools breathe */
+.tool-val { display: none; }
+@container song (min-width: 800px) {
+  .tools { gap: 14px; }
+  .tools button.icon:has(.tool-val) { width: auto; min-width: 36px; padding: 0 10px; gap: 7px; display: inline-flex; align-items: center; justify-content: center; }
+  .tool-val { display: inline; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .tools button.icon:hover .tool-val, .tools button.icon[aria-expanded="true"] .tool-val { color: var(--text); }
+}
