@@ -215,66 +215,6 @@
           <div class="ls-bar"><i id="lsBar"></i></div>
           <p id="lsText"></p>
         </div>
-        <!-- Song details: a glass window floating over the stage (like the library and the settings); the chart keeps running behind it -->
-        <section id="info" class="info" hidden>
-          <div class="info-window" id="infoWindow" role="dialog" aria-modal="false" aria-label="Song details" tabindex="-1">
-          <div class="info-top">
-            <div class="info-top-text"><strong id="infoWinTitle"></strong><span id="infoWinArtist"></span></div>
-            <button id="infoClose" class="icon" type="button" title="Close (I)" aria-label="Close song details"><svg><use href="#i-x"/></svg></button>
-          </div>
-          <div class="info-scroll">
-            <div class="info-grid">
-              <header class="info-card info-head">
-                <img id="infoCover" alt="" hidden>
-                <div class="info-head-text">
-                  <h2 id="infoTitle"></h2>
-                  <div id="infoArtist" class="info-artist"></div>
-                  <p id="infoQuote" class="info-quote" hidden></p>
-                  <ul id="infoMeta" class="chips-v"></ul>
-                </div>
-              </header>
-
-              <div class="info-card card-listen">
-                <h3>Listen</h3>
-                <div class="listen">
-                  <button id="npPlay" class="icon primary" type="button" title="Listen here, without opening the chart" aria-label="Play or pause" disabled><svg><use href="#i-play"/></svg></button>
-                  <button id="npPreview" class="listen-preview" type="button" title="Play the preview section defined in song.ini" hidden>Preview</button>
-                  <input id="npSeek" type="range" min="0" max="1" step="0.01" value="0" aria-label="Position" disabled>
-                  <span id="npTime" class="listen-time">0:00 / 0:00</span>
-                </div>
-              </div>
-
-              <div class="info-card info-wide">
-                <h3>Instrument and difficulty</h3>
-                <div id="instrumentCards" class="icards"></div>
-              </div>
-
-              <div class="info-cols">
-              <div class="info-card card-adjust">
-                <h3>Settings</h3>
-                <label class="row">Speed <input data-setting="speed" type="range" min="0.2" max="2" step="0.1" value="1"><output data-out="speed">1.0×</output><button class="icon small-icon reset" type="button" data-reset="speed" title="Reset" aria-label="Reset speed"><svg><use href="#i-reset"/></svg></button></label>
-              </div>
-
-              <div class="info-card card-volume">
-                <h3>Stem volume</h3>
-                <div id="mixerInfo" class="mixer"></div>
-              </div>
-
-              <div class="info-card card-extra" id="infoExtraCard">
-                <details class="extra">
-                  <summary>Other song.ini properties</summary>
-                  <dl id="infoExtra" class="kv kv-pairs"></dl>
-                </details>
-              </div>
-              </div>
-            </div>
-          </div>
-          <div class="info-actions">
-            <div class="progress" id="infoProgress"><div class="bar"><span id="infoBar"></span></div><span id="infoState">Loading…</span></div>
-            <button id="infoPlay" class="cta" type="button" disabled><svg><use href="#i-play"/></svg><span>Play</span></button>
-          </div>
-          </div>
-        </section>
         <!-- End of song: a glass window that replaces the fretboards when the song reaches its end (src/songstats.js, src/recommend.js) -->
         <section id="endScreen" class="end-screen" hidden role="region" aria-label="End of song" tabindex="-1">
           <div class="end-card">
@@ -304,8 +244,9 @@
           <p>Choose a song in the list.</p>
           <button id="welcomeOpen" type="button">Open library</button>
         </div>
-        <!-- Library: a glass window floating over the stage (left); it does not take room from the chart -->
+        <!-- Library: a glass window floating over the stage (left); it does not take room from the chart. Two panes: the list (#libList) and the song details (#info) -->
         <aside class="library" id="library" aria-label="Library">
+        <div class="lib-list" id="libList">
           <div class="lib-head">
             <strong>Library</strong>
             <span class="lib-tools">
@@ -388,6 +329,67 @@
           <p id="empty" class="hint">Choose the folder (e.g. A:\music\Songs) to list the songs.<br>Use Chrome or Edge.</p>
           <div id="status" class="status" role="status"></div>
           <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize the library window" title="Drag to resize (double-click to reset)"></div>
+        </div>
+        <!-- Song details: the second pane of the library window (one glass window, a thin divider between the panes); the chart keeps running behind it -->
+        <section id="info" class="info" hidden inert>
+          <div class="info-window" id="infoWindow" role="dialog" aria-modal="false" aria-label="Song details" tabindex="-1">
+          <div class="info-top">
+            <div class="info-top-text"><strong id="infoWinTitle"></strong><span id="infoWinArtist"></span></div>
+            <button id="infoClose" class="icon" type="button" title="Close (I)" aria-label="Close song details"><svg><use href="#i-x"/></svg></button>
+          </div>
+          <div class="info-scroll">
+            <div class="info-grid">
+              <header class="info-card info-head">
+                <img id="infoCover" alt="" hidden>
+                <div class="info-head-text">
+                  <h2 id="infoTitle"></h2>
+                  <div id="infoArtist" class="info-artist"></div>
+                  <p id="infoQuote" class="info-quote" hidden></p>
+                  <ul id="infoMeta" class="chips-v"></ul>
+                </div>
+              </header>
+
+              <div class="info-card card-listen">
+                <h3>Listen</h3>
+                <div class="listen">
+                  <button id="npPlay" class="icon primary" type="button" title="Listen here, without opening the chart" aria-label="Play or pause" disabled><svg><use href="#i-play"/></svg></button>
+                  <button id="npPreview" class="listen-preview" type="button" title="Play the preview section defined in song.ini" hidden>Preview</button>
+                  <input id="npSeek" type="range" min="0" max="1" step="0.01" value="0" aria-label="Position" disabled>
+                  <span id="npTime" class="listen-time">0:00 / 0:00</span>
+                </div>
+              </div>
+
+              <div class="info-card info-wide">
+                <h3>Instrument and difficulty</h3>
+                <div id="instrumentCards" class="icards"></div>
+              </div>
+
+              <div class="info-cols">
+              <div class="info-card card-adjust">
+                <h3>Settings</h3>
+                <label class="row">Speed <input data-setting="speed" type="range" min="0.2" max="2" step="0.1" value="1"><output data-out="speed">1.0×</output><button class="icon small-icon reset" type="button" data-reset="speed" title="Reset" aria-label="Reset speed"><svg><use href="#i-reset"/></svg></button></label>
+              </div>
+
+              <div class="info-card card-volume">
+                <h3>Stem volume</h3>
+                <div id="mixerInfo" class="mixer"></div>
+              </div>
+
+              <div class="info-card card-extra" id="infoExtraCard">
+                <details class="extra">
+                  <summary>Other song.ini properties</summary>
+                  <dl id="infoExtra" class="kv kv-pairs"></dl>
+                </details>
+              </div>
+              </div>
+            </div>
+          </div>
+          <div class="info-actions">
+            <div class="progress" id="infoProgress"><div class="bar"><span id="infoBar"></span></div><span id="infoState">Loading…</span></div>
+            <button id="infoPlay" class="cta" type="button" disabled><svg><use href="#i-play"/></svg><span>Play</span></button>
+          </div>
+          </div>
+        </section>
         </aside>
       </main>
     </div>

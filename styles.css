@@ -1614,8 +1614,8 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .library {
   position: absolute; z-index: 12;
   top: var(--lib-gap); bottom: var(--lib-gap); left: var(--lib-gap);
-  width: min(var(--lib-w), calc(100% - 2 * var(--lib-gap)));
-  display: flex; flex-direction: column; gap: 8px; padding: 10px; min-height: 0;
+  width: min(var(--win-w, var(--lib-w)), calc(100% - 2 * var(--lib-gap)));
+  display: flex; flex-direction: row; padding: 0; min-height: 0; overflow: hidden; /* two panes side by side: the list and the song details */
   background: color-mix(in srgb, var(--panel) 78%, transparent);
   border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   border-radius: 14px;
@@ -1623,22 +1623,29 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   transition: transform .22s ease, opacity .22s ease, visibility 0s;
 }
 .library::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-.app.lib-closed .library { transform: translateX(calc(-100% - 2 * var(--lib-gap))); opacity: 0; visibility: hidden; pointer-events: none; box-shadow: none; transition: transform .22s ease, opacity .22s ease, visibility 0s .22s; }
+/* closed = neither pane is shown: the list is closed and so are the details (the details alone keep the window up: .details-only) */
+.app.lib-closed:not(.details-only) .library { transform: translateX(calc(-100% - 2 * var(--lib-gap))); opacity: 0; visibility: hidden; pointer-events: none; box-shadow: none; transition: transform .22s ease, opacity .22s ease, visibility 0s .22s; }
+/* the list pane: the old library column */
+.lib-list { position: relative; flex: none; width: var(--list-w, var(--lib-w)); min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+.app.lib-closed .lib-list { display: none; }
 .library .group-label, #songs li.divider { background: color-mix(in srgb, var(--bg) 88%, transparent); }
 .sel-pop { z-index: 50; } /* above the library window and the phone drawer */
 
-/* the drag handle straddles the window's right edge; it does not change the stage */
-.splitter { position: absolute; top: 14px; bottom: 14px; right: -6px; width: 12px; z-index: 6; cursor: col-resize; touch-action: none; }
-.splitter::after { content: ""; position: absolute; top: 0; bottom: 0; left: 5px; width: 2px; border-radius: 1px; background: transparent; transition: background .15s; }
+/* the drag handle sits on the list pane's right edge: the window's right edge, or the divider while the details are open; it does not change the stage */
+.splitter { position: absolute; top: 14px; bottom: 14px; right: 0; width: 12px; z-index: 6; cursor: col-resize; touch-action: none; }
+.splitter::after { content: ""; position: absolute; top: 0; bottom: 0; left: 8px; width: 2px; border-radius: 1px; background: transparent; transition: background .15s; }
 .splitter:hover::after, .splitter.dragging::after { background: var(--accent); }
+.app.info-open .splitter { right: -6px; }
+.app.info-open .splitter::after { left: 5px; }
 @media (pointer: coarse) {
-  .splitter { width: 24px; right: -12px; }
-  .splitter::after { left: 11px; }
+  .splitter { width: 24px; right: 0; }
+  .splitter::after { left: 18px; }
+  .app.info-open .splitter { right: -12px; }
+  .app.info-open .splitter::after { left: 11px; }
 }
 
 /* what is centred on the stage (empty state, details, loading) keeps to the part the window leaves free; the chart canvas itself is untouched */
 @media (min-width: 701px) {
-  .app:not(.lib-closed) { --lib-inset: calc(var(--lib-w) + 2 * var(--lib-gap)); }
   .welcome, .load-screen { transition: padding-left .22s ease; }
 }
 .welcome { padding-left: var(--lib-inset, 0px); }
@@ -1650,10 +1657,15 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 /* phone: a full-height drawer over everything (the bar included) with a scrim */
 @media (max-width: 700px) {
   .library { position: fixed; top: 0; bottom: 0; left: 0; z-index: 30; width: min(88vw, 340px); border-radius: 0 14px 14px 0; border-left: 0; background: color-mix(in srgb, var(--panel) 94%, transparent); }
-  .app.lib-closed .library { transform: translateX(-105%); }
+  .app.lib-closed:not(.details-only) .library { transform: translateX(-105%); }
+  .lib-list { width: 100%; }
+  /* the details take the whole drawer (the list is hidden) until they close */
+  .app.info-open .library { width: 100vw; border-radius: 0; }
+  .app.info-open .lib-list { display: none; }
   .splitter { display: none; }
   .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); z-index: 25; }
-  .app:not(.lib-closed) .scrim { display: block; }
+  .app:not(.lib-closed) .scrim, .app.details-only .scrim { display: block; }
+  .app.info-open .edge-tab { display: none; } /* the details fill the screen: no tab over them */
 }
 
 /* Immersive: the player bar is an overlay over the stage; it stays above the library window */
@@ -1737,25 +1749,12 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 @keyframes settings-in { from { opacity: 0; transform: scale(.985); } to { opacity: 1; transform: none; } }
 @media (max-width: 700px) { .settings-page { inset: 0; border-radius: 0; box-shadow: none; } }
 
-/* ---------- Song details: a glass window floating over the stage (like the library and the settings) ----------
-   #info is only the positioning layer (it does not take clicks, and carries the light dimming); the dialog is .info-window. It sits in the
-   part the library leaves free, centred, at most 1120 px wide (--info-max) and as tall as the stage minus the gaps, over the live chart.
-   Same glass as the other windows: translucent --panel, the blur on ::before (never on the window or on an ancestor of fixed popovers).
-   In immersive mode the bar overlays the stage, so the window keeps out from under it (bar at the top or the bottom). */
-.info {
-  position: absolute; inset: 0; z-index: 7; display: flex; align-items: center; justify-content: center; pointer-events: none;
-  background: rgba(0, 0, 0, .35);
-  padding: var(--lib-gap, 12px) var(--lib-left, var(--lib-gap, 12px)) var(--lib-gap, 12px) var(--lib-inset, var(--lib-left, var(--lib-gap, 12px)));
-}
-@media (min-width: 701px) { .info { transition: padding-left .22s ease; } }
-.app.immersive .info { padding-top: calc(var(--bar-h, 64px) + var(--lib-gap, 12px)); }
-.app.immersive.bar-bottom .info { padding-top: var(--lib-gap, 12px); padding-bottom: calc(var(--bar-h, 64px) + 8px + var(--lib-gap, 12px)); }
-.info-window {
-  position: relative; pointer-events: auto; width: min(var(--info-max, 1120px), 100%); height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
-  background: transparent; color: var(--text); outline: none;
-  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius: 14px; box-shadow: 0 18px 60px rgba(0, 0, 0, .5);
-}
-.info-window::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: color-mix(in srgb, var(--panel) 78%, transparent); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); pointer-events: none; }
+/* ---------- Song details: the second pane of the library window ----------
+   One glass window (#library: border, shadow and the blur on its ::before) holds the list pane and, when open, this pane to its right,
+   split by a thin divider. app.js (layoutWindow) sets --list-w and --info-w and the window's --win-w; the pane keeps its width while the
+   window animates (the window clips it). Never put a backdrop-filter/filter/transform on the pane: fixed popovers live in <body>, but keep it so. */
+.info { position: relative; flex: none; width: var(--info-w, 380px); min-width: 0; min-height: 0; display: flex; border-left: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.info-window { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; color: var(--text); outline: none; }
 .info-top { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 16px; background: color-mix(in srgb, var(--panel) 30%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
 .info-top-text { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
 .info-top-text strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
@@ -1766,11 +1765,10 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .info-card { position: relative; background: color-mix(in srgb, var(--panel-2) 45%, transparent); border-color: color-mix(in srgb, var(--line) 70%, transparent); }
 .info-grid { position: relative; z-index: 0; }
 .info-actions { position: relative; background: color-mix(in srgb, var(--panel) 30%, transparent); border-top-color: color-mix(in srgb, var(--line) 70%, transparent); }
-:root[data-motion="on"] .info:not([hidden]) .info-window { animation: settings-in .2s ease backwards; /* (backwards only: a lingering animation would make the window a backdrop root and kill the blur) */ }
+:root[data-motion="on"] .info:not([hidden]) .info-window { animation: info-in .2s ease backwards; /* (backwards only: a lingering animation would make the window a backdrop root and kill the blur) */ }
+@keyframes info-in { from { opacity: 0; } to { opacity: 1; } }
 @media (max-width: 700px) {
-  .info { padding: 0; background: transparent; }
-  .info-window { width: 100%; border: 0; border-radius: 0; box-shadow: none; }
-  .info-window::before { background: color-mix(in srgb, var(--panel) 92%, transparent); }
+  .info { flex: 1; width: auto; border-left: 0; }
 }
 
 /* The visualizer's blur: a glass layer between the background canvas and the chart (the notes stay sharp) */
@@ -1781,17 +1779,11 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 :root { --content-max: 1400px; } /* (on :root: the settings page lives outside .app) */
 .app { --lib-left: max(var(--lib-gap), calc((100% - var(--content-max)) / 2)); }
 @media (min-width: 701px) {
-  .library { left: var(--lib-left); max-width: calc(var(--content-max) - 2 * var(--lib-gap)); }
-  .app:not(.lib-closed) { --lib-inset: calc(var(--lib-left) + var(--lib-w) + var(--lib-gap)); }
+  .library { left: var(--lib-left); max-width: calc(100% - 2 * var(--lib-left)); }
   .settings-page { inset: 16px max(16px, calc((100% - min(1120px, var(--content-max))) / 2)); }
 }
 
-/* ---------- Details window: never narrower than one column, one-column header, bigger title block ---------- */
-@media (min-width: 701px) {
-  .info-window { min-width: 380px; } /* one column of cards (320 px) + the padding of the scroll area */
-  /* with the library open the window may cover the library's edge before it gets narrower than that */
-  .info { padding-left: max(var(--lib-gap, 12px), min(var(--lib-inset, var(--lib-left, 12px)), calc(100% - 380px - var(--lib-left, 12px)))); }
-}
+/* ---------- Details pane: never narrower than one column (layoutWindow in app.js), one-column header, bigger title block ---------- */
 .info-top { align-items: center; padding-block: 10px; }
 .info-top-text { flex-direction: column; align-items: flex-start; gap: 2px; }
 .info-top-text strong { font-size: 18px; line-height: 1.2; }
@@ -1809,13 +1801,12 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 /* The player bar (and the popovers inside it: mixer, sections, speed, visualizer) stays above the library (12) and details (7) windows */
 .topbar { z-index: 13; }
 
-/* The library never goes over the details window: while the details are open it is at most as wide as leaves them one column (380 px) */
+/* The window's width: the list pane + the details pane (layoutWindow sets --list-w, --info-w and --win-w); it animates, and --lib-inset (what
+   the centred stage content keeps clear of) is the window's right edge plus a gap. Not while it is closed. */
 @media (min-width: 701px) {
-  .app { --lib-w-eff: var(--lib-w); }
-  .app.info-open { --lib-w-eff: min(var(--lib-w), calc(100% - 2 * var(--lib-left) - var(--lib-gap) - 380px)); }
-  .library { width: min(var(--lib-w-eff), calc(100% - 2 * var(--lib-gap))); transition: transform .22s ease, opacity .22s ease, width .22s ease; }
+  .library { transition: transform .22s ease, opacity .22s ease, width .22s ease; }
   body.resizing .library { transition: none; }
-  .app:not(.lib-closed) { --lib-inset: calc(var(--lib-left) + var(--lib-w-eff) + var(--lib-gap)); }
+  .app:not(.lib-closed), .app.details-only { --lib-inset: calc(var(--lib-left) + var(--win-w, var(--lib-w)) + var(--lib-gap)); }
 }
 
 /* ---------- Held stage: the bar and the fretboards keep the last song until the new one's audio loads, then cross-fade ---------- */
@@ -1875,3 +1866,30 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 /* Details: half the margin on the left, top and bottom of the card list (the right side keeps room for the scroll thumb) */
 .info-scroll.thumb-scroll { padding-left: 8px; padding-top: 8px; padding-bottom: 12px; }
 #info.compact .info-scroll.thumb-scroll { padding-left: 5px; padding-top: 5px; padding-bottom: 6px; }
+
+/* While the held song's audio loads: plain background for the loading screen (no frozen fretboards, no visualizer picture) */
+.app.stage-loading #highway, .app.stage-loading .bg-canvas { visibility: hidden; }
+
+/* End window: the instrument tables have a maximum width; each recommendation shows the instruments the song has */
+.end-cards { grid-template-columns: repeat(auto-fit, minmax(230px, 320px)); justify-content: center; }
+.end-insts { flex: none; display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.end-insts svg { width: 16px; height: 16px; }
+
+/* ---------- Player bar: the standard glass of the windows, and balanced spacing in the expanded bar ---------- */
+.topbar { background: transparent; }
+.topbar::before { background: color-mix(in srgb, var(--panel) 78%, transparent); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+.app.bar-bottom:not(.bar-hidden) .topbar, .app:not(.bar-bottom):not(.bar-hidden) .topbar { padding-top: 12px; padding-bottom: 12px; } /* equal air above and below the controls (the cover is the tallest item) */
+@media (max-width: 700px) { .app:not(.bar-hidden) .topbar { padding-top: 10px; padding-bottom: 10px; } }
+
+/* ---------- Selector windows (popovers, dropdown lists, pane menus): the standard window glass ---------- */
+.popover, .sel-pop, .pane-menu { background: color-mix(in srgb, var(--panel) 78%, transparent); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border-color: color-mix(in srgb, var(--line) 70%, transparent); }
+
+/* ---------- The slim thumb scrollbar (as in the details) everywhere else ---------- */
+.sp-body { position: relative; }
+.end-scroll { scrollbar-width: none; }
+.popover, .sel-pop, .pane-menu, .filter-panel, .end-scroll { scrollbar-width: thin; scrollbar-color: rgba(120, 150, 255, .35) transparent; }
+.popover::-webkit-scrollbar, .sel-pop::-webkit-scrollbar, .pane-menu::-webkit-scrollbar, .filter-panel::-webkit-scrollbar { width: 7px; }
+.popover::-webkit-scrollbar-track, .sel-pop::-webkit-scrollbar-track, .pane-menu::-webkit-scrollbar-track, .filter-panel::-webkit-scrollbar-track { background: transparent; }
+.popover::-webkit-scrollbar-thumb, .sel-pop::-webkit-scrollbar-thumb, .pane-menu::-webkit-scrollbar-thumb, .filter-panel::-webkit-scrollbar-thumb { background: rgba(120, 150, 255, .16); border: 1px solid rgba(120, 150, 255, .28); border-radius: 6px; }
+.popover::-webkit-scrollbar-thumb:hover, .sel-pop::-webkit-scrollbar-thumb:hover, .pane-menu::-webkit-scrollbar-thumb:hover, .filter-panel::-webkit-scrollbar-thumb:hover { background: rgba(120, 150, 255, .3); }
+.popover::-webkit-scrollbar-button, .sel-pop::-webkit-scrollbar-button { display: none; width: 0; height: 0; }

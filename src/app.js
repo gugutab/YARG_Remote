@@ -19,7 +19,7 @@ import { resolveTheme, applyTheme } from './themes.js';
 import { mountSettings } from './settings-ui.js';
 import { renderThemeStudio, renderDataTools, renderShortcuts } from './settings-custom.js';
 import { saveLibrary, loadLibrary, loadThumb, saveThumb, clearThumbs } from './store.js';
-import { filterSongs, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, anchorLabel } from './songlist.js';
+import { filterSongs, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, anchorLabel, INSTRUMENTS, hasInstrument } from './songlist.js';
 import { createVirtualList, DEFAULT_CARDS } from './virtuallist.js';
 import { createThumbs, renderCoverThumb } from './thumbs.js';
 import { chartFacts, factRows } from './songstats.js';
@@ -34,7 +34,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'barHide', 'barShow', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'barHide', 'barShow', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
   'endScreen', 'endCover', 'endTitle', 'endArtist', 'endAgain', 'endSearch', 'endCards', 'endNextBox', 'endNext',
@@ -127,9 +127,19 @@ function savePanelState() {
 function setLibraryOpen(open, persist = true) {
   if (open && typeof settingsPage !== 'undefined' && settingsPage.isOpen()) settingsPage.close(); // one window at a time: the library and the settings never share the screen
   els.app.classList.toggle('lib-closed', !open);
-  els.library.inert = !open; // closed: nothing in it takes focus or clicks (it is only moved and faded out, not removed)
+  syncWindow();
+  layoutWindow();
   syncPanelUi();
   if (persist) savePanelState();
+}
+// The library window holds two panes: the list (open unless `lib-closed`) and the song details (`infoOpen`). With the list closed and the
+// details open only the details pane shows (`details-only`: the window stays up); with neither the window is out of the way. Whatever is not
+// shown is `inert` (it is only moved and faded out, not removed), so nothing in it takes focus or clicks.
+function syncWindow() {
+  const list = libraryOpen();
+  els.app.classList.toggle('details-only', infoOpen && !list);
+  els.library.inert = !list && !infoOpen;
+  els.libList.inert = !list;
 }
 // The edge tabs bring a closed library back (the settings tab keeps Settings one click away while the library header, which holds the gear, is hidden).
 function syncPanelUi() {
@@ -143,7 +153,7 @@ function syncPanelUi() {
   const opening = parseRoute(location.hash).view !== 'library'; // a deep link names a song: the drawer would only be in the way
   const open = narrow() ? !opening : (start === 'last' ? last.library !== false : start !== 'closed');
   els.app.classList.toggle('lib-closed', !open);
-  els.library.inert = !open;
+  syncWindow();
   syncPanelUi();
 })();
 // Entering the phone layout closes the drawer (it would cover the screen).
@@ -152,7 +162,7 @@ window.matchMedia('(max-width: 700px)').addEventListener('change', (e) => {
   syncPanelUi();
 });
 els.closeLibrary.addEventListener('click', () => setLibraryOpen(false, false));
-els.scrim.addEventListener('click', () => setLibraryOpen(false, false));
+els.scrim.addEventListener('click', () => { if (infoOpen) setInfoOpen(false); setLibraryOpen(false, false); }); // (phone) everything out of the way
 els.welcomeOpen.addEventListener('click', () => setLibraryOpen(true));
 els.libTab.addEventListener('click', () => setLibraryOpen(true));
 els.settingsTab.addEventListener('click', () => settingsPage.open());
@@ -227,24 +237,55 @@ els.npPreview.addEventListener('click', async () => {
   syncPlayButton();
 });
 
-// The handle on the library window's right edge: drag to resize the window (remembered); double-click restores the default width.
-// The stage keeps its size either way. The window leaves the same margin on the right as it has on the left.
-const MIN_LIB_W = 300;
+// The handle on the list pane's right edge (the window's right edge, or the divider while the details are open): drag to resize the LIST pane
+// (remembered; the window grows with it while the details are open); double-click restores the default width. The stage keeps its size either way. The window leaves the same margin on the right as on the left.
+const MIN_LIB_W = 300; // the list pane's minimum
 const CONTENT_MAX = 1400; // keep in step with --content-max in styles.css
 const LIB_MARGIN = 12; // keep in step with --lib-gap in styles.css
-const INFO_MIN_W = 380; // the details window never gets narrower than one column (styles.css)
-// never wider than the content area (--content-max), and with the details window open it leaves that window its one column
-const maxLibWidth = () => Math.max(MIN_LIB_W, Math.min(window.innerWidth, CONTENT_MAX) - 2 * LIB_MARGIN - (infoOpen ? INFO_MIN_W + LIB_MARGIN : 0));
+const INFO_MIN_W = 380; // the details pane never gets narrower than one column of cards
+const stageEl = document.getElementById('stage');
+const WIN_BORDER = 2; // the window's own 1 px border, left and right: the panes share the width inside it
+// the room the panes may take: the content area (--content-max, centred) between its two margins (the window starts at --lib-left), minus the border
+const contentWidth = () => {
+  const w = stageEl.clientWidth || window.innerWidth;
+  return Math.max(0, w - 2 * Math.max(LIB_MARGIN, (w - CONTENT_MAX) / 2) - WIN_BORDER);
+};
+// the list pane's widest width: all the room, or all but one column for the details while they are open
+const maxLibWidth = () => Math.max(MIN_LIB_W, contentWidth() - (infoOpen ? INFO_MIN_W : 0));
+const libPref = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lib-w')) || MIN_LIB_W; // the list width the user chose (or the default)
+let winTotal = 0; // the panes' total width as last laid out (the window is WIN_BORDER wider)
+// Sizes the two panes (--list-w, --info-w) and the window (--win-w = list + details). The details get the room the list leaves, between one
+// column and the "Max width" setting; if both do not fit the list shrinks (down to MIN_LIB_W) and then the details, never overlapping. With
+// the list closed the window is the details pane alone. Phone: the drawer's own CSS sizes everything.
+function layoutWindow() {
+  const style = els.app.style;
+  if (narrow()) { for (const v of ['--list-w', '--info-w', '--win-w']) style.removeProperty(v); return; }
+  const listOn = libraryOpen();
+  if (!listOn && !infoOpen) return; // closed: keep the size it slides out with
+  const room = contentWidth();
+  let list = 0;
+  let info = 0;
+  if (infoOpen) {
+    const infoMax = prefs.get('details.maxWidth');
+    if (listOn) {
+      list = Math.min(Math.max(libPref(), MIN_LIB_W), Math.max(MIN_LIB_W, room - INFO_MIN_W));
+      info = Math.max(0, Math.min(infoMax, room - list));
+    } else info = Math.min(infoMax, room);
+  } else list = Math.min(Math.max(libPref(), MIN_LIB_W), room);
+  winTotal = Math.round(list) + Math.round(info);
+  if (listOn) style.setProperty('--list-w', `${Math.round(list)}px`);
+  if (infoOpen) style.setProperty('--info-w', `${Math.round(info)}px`);
+  style.setProperty('--win-w', `${winTotal + WIN_BORDER}px`);
+}
 function setLibWidth(px) {
   if (px == null) document.documentElement.style.removeProperty('--lib-w');
   else document.documentElement.style.setProperty('--lib-w', `${Math.round(px)}px`);
+  layoutWindow();
 }
 const savedLibW = Number(store.get('libWidth'));
 if (savedLibW >= MIN_LIB_W && !narrow()) setLibWidth(Math.min(savedLibW, maxLibWidth()));
-window.addEventListener('resize', () => { // a smaller browser window must not leave the library wider than the screen
-  const w = els.library.getBoundingClientRect().width;
-  if (!narrow() && w > maxLibWidth()) setLibWidth(maxLibWidth());
-});
+layoutWindow();
+window.addEventListener('resize', layoutWindow); // a smaller browser window must not leave the window wider than the screen
 els.splitter.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   els.splitter.setPointerCapture(e.pointerId);
@@ -259,7 +300,7 @@ const endDrag = () => {
   if (!els.splitter.classList.contains('dragging')) return;
   els.splitter.classList.remove('dragging');
   document.body.classList.remove('resizing');
-  store.set('libWidth', String(Math.round(els.library.getBoundingClientRect().width)));
+  store.set('libWidth', String(Math.round(libPref())));
 };
 els.splitter.addEventListener('pointerup', endDrag);
 els.splitter.addEventListener('pointercancel', endDrag);
@@ -590,11 +631,18 @@ function holdStageNow() {
   barGhost = ghost;
   els.app.classList.add('stage-held');
 }
+// The audio of the held song starts loading: the loading screen gets the plain background (the old bar copy and the frozen fretboards go)
+function stageLoading() {
+  if (!holdStage) return;
+  els.app.classList.add('stage-loading');
+  barGhost?.remove();
+  barGhost = null;
+}
 function releaseStage() {
   if (!holdStage) return;
   holdStage = false;
   stageEverLive = true;
-  els.app.classList.remove('stage-held', 'stage-unborn');
+  els.app.classList.remove('stage-held', 'stage-unborn', 'stage-loading');
   els.app.classList.add('stage-reveal');
   highway.invalidate();
   const g = barGhost;
@@ -627,7 +675,7 @@ async function selectSong(song) {
   chart = null;
   highway.setCharts([]);
   renderList({ keepScroll: true });
-  if (narrow() || prefs.get('panels.libraryAutoHide')) setLibraryOpen(false, false); // the window gets out of the way of the chart
+  if (!narrow() && prefs.get('panels.libraryAutoHide')) setLibraryOpen(false, false); // the list gets out of the way (the details stay; a phone keeps the list behind them)
 
   els.welcome.hidden = true;
   showPlayInfo(true);
@@ -710,7 +758,7 @@ function ensureAudio() {
   const token = loadToken;
   const song = current.song;
   const promise = (async () => {
-    releaseStage();
+    stageLoading(); // the loading screen sits on the plain background: no old bar, no old fretboards
     setLoadState('loading', 'Loading audio…', 0.02);
     let loaded = false;
     try {
@@ -734,6 +782,7 @@ function ensureAudio() {
     ready = true;
     const nFailed = failedIds.size;
     setLoadState('ready', nFailed ? `Ready to play (${nFailed} ${nFailed === 1 ? 'stem' : 'stems'} could not be decoded)` : 'Ready to play', 1);
+    releaseStage(); // loaded: the bar and the tracks of the new song come in now
     return true;
   })();
   audioLoad = { song, promise };
@@ -770,37 +819,42 @@ function renderLoadState() {
   if (overlay) els.loading.textContent = text;
 }
 
-// The details are a glass window over the stage (like the library and the settings). The chart keeps running behind it and the player
-// bar stays visible. Settings and details are exclusive; the library may stay open next to it.
+// The details are the second pane of the library window (one glass window with the list). The chart keeps running behind it and the player
+// bar stays visible. Settings and details are exclusive. Opened with the list closed, the window shows the details alone and closes with them.
 const infoScroll = els.info.querySelector('.info-scroll');
 attachScrollThumb(infoScroll); // the library's rail style instead of the native scrollbar
-let infoOpener = null; // what had the focus when the window opened, so it gets it back when the window closes
+let infoOpener = null; // what had the focus when the pane opened, so it gets it back when the pane closes
+let infoHideTimer = 0;
 
 function setInfoOpen(open) {
   const was = infoOpen;
-  // closing the details next to the library: the library grows over the space the window leaves
-  const freed = was && !open && !narrow() && libraryOpen() ? els.infoWindow.getBoundingClientRect().width : 0;
+  // closing the details next to the list: the list takes the window's whole width (the window does not jump), remembered as its width
+  const keep = was && !open && !narrow() && libraryOpen() ? winTotal : 0;
   if (open && typeof settingsPage !== 'undefined' && settingsPage.isOpen()) settingsPage.close(); // one window at a time
   infoOpen = open;
-  els.info.hidden = !open;
+  clearTimeout(infoHideTimer);
+  els.info.inert = !open;
+  if (open || libraryOpen()) els.info.hidden = !open;
+  else infoHideTimer = setTimeout(() => { els.info.hidden = !infoOpen; }, 260); // the window slides out showing the details
   els.app.classList.toggle('info-open', open);
   els.infoBtn.setAttribute('aria-pressed', String(open));
+  syncWindow();
+  if (keep) {
+    const next = Math.min(maxLibWidth(), keep);
+    setLibWidth(next);
+    store.set('libWidth', String(next));
+  } else layoutWindow();
   closePopovers();
   renderLoadState();
   syncUrl();
   syncEndScreen(); // the details cover the end window
   highway.invalidate();
-  if (freed) {
-    const next = Math.min(maxLibWidth(), Math.round(els.library.getBoundingClientRect().width + LIB_MARGIN + freed));
-    setLibWidth(next);
-    store.set('libWidth', String(next));
-  }
   if (open && !was) {
     const a = document.activeElement;
     infoOpener = a && a !== document.body && !els.info.contains(a) ? a : null;
     els.infoWindow.focus({ preventScroll: true });
   } else if (!open && was) {
-    releaseStage(); // the details are closed: the song they were about is what the stage shows now
+    if (!audioLoad) releaseStage(); // the details are closed: the song they were about is what the stage shows now (while its audio loads the stage waits for the load)
     const a = document.activeElement;
     if (infoOpener?.isConnected && infoOpener.offsetParent !== null && (!a || a === document.body || els.info.contains(a))) infoOpener.focus({ preventScroll: true });
     infoOpener = null;
@@ -809,10 +863,10 @@ function setInfoOpen(open) {
 els.infoClose.addEventListener('click', () => setInfoOpen(false));
 // The bar's info button toggles the window while it is open (otherwise it opens its small popup).
 els.infoBtn.addEventListener('click', (e) => { if (infoOpen) { e.stopImmediatePropagation(); e.stopPropagation(); setInfoOpen(false); } }, true);
-// A click outside the window closes it. Menus that live in <body> (custom selects, popovers), the button that toggles it and the
-// library window (it may stay open next to the details) are not "outside".
+// A click outside the window (the list pane included: the window is one) closes the details. Menus that live in <body> (custom selects,
+// popovers) and the buttons that toggle it are not "outside".
 document.addEventListener('pointerdown', (e) => {
-  if (!infoOpen || els.infoWindow.contains(e.target) || e.target.closest?.('.sel-pop, .popover, #infoBtn, #library, #libTab, #scrim, #topbar')) return;
+  if (!infoOpen || els.library.contains(e.target) || e.target.closest?.('.sel-pop, .popover, #infoBtn, #libTab, #scrim, #topbar')) return;
   setInfoOpen(false);
 });
 
@@ -1752,8 +1806,9 @@ async function togglePlay() {
   if (player.playing) player.pause();
   else {
     if ((infoOpen || !ready) && libraryOpen()) setLibraryOpen(false, false); // Play from the details (or the first Play of a song) gets the library out of the chart's way
+    const loading = ensureAudio(); // (starts the load first: closing the details must not release the held stage before it)
     if (infoOpen) setInfoOpen(false); // starting from the details goes to the chart
-    if (!(await ensureAudio())) return; // the first Play loads the audio behind the loading screen
+    if (!(await loading)) return; // the first Play loads the audio behind the loading screen
     await player.play();
   }
   syncPlayButton();
@@ -1843,11 +1898,18 @@ function endRow(song, reason) {
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'end-row';
-  b.innerHTML = '<span class="end-thumb"></span><span class="end-row-text"><strong></strong><span class="end-row-artist"></span></span><span class="end-reason"></span>';
+  b.innerHTML = '<span class="end-thumb"></span><span class="end-row-text"><strong></strong><span class="end-row-artist"></span></span><span class="end-insts"></span>';
   b.querySelector('strong').textContent = plainText(song.title);
   b.querySelector('.end-row-artist').textContent = plainText(song.artist);
-  b.querySelector('.end-reason').textContent = reason;
-  b.title = `${plainText(song.title)} - ${plainText(song.artist)}`;
+  // the instruments the song has (instead of the reason text, which stays in the tooltip)
+  const insts = b.querySelector('.end-insts');
+  for (const id of INSTRUMENTS.filter((i) => hasInstrument(song, i))) {
+    const ic = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    ic.innerHTML = `<use href="#i-${FILTER_ICONS[id]}"/>`;
+    ic.setAttribute('aria-label', INSTRUMENT_NAMES[id]);
+    insts.append(ic);
+  }
+  b.title = `${plainText(song.title)} - ${plainText(song.artist)}${reason ? ` (${reason})` : ''}`;
   const thumb = b.querySelector('.end-thumb');
   const put = (url) => { if (!url) return; const img = new Image(); img.alt = ''; img.src = url; thumb.replaceChildren(img); };
   const cached = thumbs.peek(song);
@@ -2688,7 +2750,7 @@ function applyDetails() {
   info.dataset.quote = prefs.get('details.quote') ? 'on' : 'off';
   info.dataset.names = prefs.get('details.stemNames');
   info.classList.toggle('compact', prefs.get('details.compact'));
-  info.style.setProperty('--info-max', `${prefs.get('details.maxWidth')}px`);
+  layoutWindow(); // ("Max width" caps the details pane)
   if (current) renderMeta(current.song, current.midi); // the chips
 }
 const EFFECTS = {
@@ -2737,7 +2799,7 @@ reduceQuery.addEventListener?.('change', (e) => { osReduceMotion = e.matches; EF
 
 const settingsPage = mountSettings({
   root: document.getElementById('settingsPage'), settings: prefs, sections: SECTIONS,
-  onOpen: () => { if (infoOpen) setInfoOpen(false); if (libraryOpen()) setLibraryOpen(false, false); }, // (not remembered: the library comes back as it was at the next start)
+  onOpen: () => { if (libraryOpen()) setLibraryOpen(false, false); if (infoOpen) setInfoOpen(false); }, // (the list first, so it does not grow into the details' room; not remembered: the library comes back as it was at the next start)
   renderers: {
     'shortcuts.bindings': (host, ctx) => renderShortcuts(host, { ...ctx, notify: setStatus }),
     theme: (host, ctx) => renderThemeStudio(host, { ...ctx, prefersDark: () => darkQuery.matches, notify: setStatus }),
@@ -2748,6 +2810,7 @@ const settingsPage = mountSettings({
   },
 });
 document.getElementById('openSettings').addEventListener('click', () => settingsPage.open());
+attachScrollThumb(document.querySelector('#settingsPage .sp-content')); // the same slim thumb as the details
 
 // ---------- Deep links: the URL hash names the open song ----------
 // The hash is only replaced (no history entries): a reload or a shared link opens the same song, and the two panels

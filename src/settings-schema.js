@@ -71,7 +71,7 @@ export const SECTIONS = [
       { id: 'details.sections', group: 'Sections', type: 'multi', label: 'Sections shown', options: [{ value: 'listen', label: 'Listen' }, { value: 'instruments', label: 'Instrument and difficulty' }, { value: 'adjust', label: 'Settings' }, { value: 'volume', label: 'Stem volume' }, { value: 'extra', label: 'Other song.ini properties' }], default: ['listen', 'instruments', 'adjust', 'volume', 'extra'], keywords: 'cards hide show' },
       { id: 'details.layout', group: 'Sections', type: 'choice', label: 'Lower cards', help: 'Settings, stem volume and properties: side by side, or one under the other.', options: [{ value: 'columns', label: 'Two columns' }, { value: 'stacked', label: 'One column' }], default: 'columns' },
       { id: 'details.stemNames', group: 'Sections', type: 'choice', label: 'Instrument names in Stem volume', options: [{ value: 'auto', label: 'When wide' }, { value: 'always', label: 'Always' }, { value: 'never', label: 'Never' }], default: 'auto' },
-      { id: 'details.maxWidth', group: 'Size', type: 'range', label: 'Maximum width', help: 'The details window stops growing at this width on big screens.', min: 600, max: 1120, step: 40, unit: 'px', default: 1120 },
+      { id: 'details.maxWidth', group: 'Size', type: 'range', label: 'Maximum width', help: 'The details pane of the library window stops growing at this width on big screens.', min: 600, max: 1120, step: 40, unit: 'px', default: 1120 },
       { id: 'details.compact', group: 'Size', type: 'toggle', label: 'Compact spacing', help: 'Tighter cards, so more fits on the screen.', default: false },
     ],
   },
