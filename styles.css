@@ -1924,3 +1924,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .tool-val { display: inline; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
   .tools button.icon:hover .tool-val, .tools button.icon[aria-expanded="true"] .tool-val { color: var(--text); }
 }
+@container song (min-width: 800px) {
+  .tools button.icon:has(.tool-val) { min-width: 92px; padding: 0 16px; gap: 9px; } /* room for "150%", "Muted" and "0.25×" without the button changing size */
+  .tool-val { min-width: 3.4ch; text-align: left; }
+}
