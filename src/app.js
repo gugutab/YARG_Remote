@@ -641,8 +641,8 @@ function stageLoading() {
 function releaseStage() {
   if (!holdStage) return;
   holdStage = false;
-  stageEverLive = true;
-  els.app.classList.remove('stage-held', 'stage-unborn', 'stage-loading');
+  els.app.classList.remove('stage-held', 'stage-loading');
+  if (stageEverLive) els.app.classList.remove('stage-unborn'); // (closing the details of a song that was never played shows its chart but still no bar)
   els.app.classList.add('stage-reveal');
   highway.invalidate();
   const g = barGhost;
@@ -789,6 +789,7 @@ function ensureAudio() {
     ready = true;
     const nFailed = failedIds.size;
     setLoadState('ready', nFailed ? `Ready to play (${nFailed} ${nFailed === 1 ? 'stem' : 'stems'} could not be decoded)` : 'Ready to play', 1);
+    stageEverLive = true; // a song has played: from now on the player bar belongs to the screen
     releaseStage(); // loaded: the bar and the tracks of the new song come in now
     return true;
   })();
@@ -833,10 +834,11 @@ attachScrollThumb(infoScroll); // the library's rail style instead of the native
 let infoOpener = null; // what had the focus when the pane opened, so it gets it back when the pane closes
 let infoHideTimer = 0;
 
-function setInfoOpen(open) {
+const LIST_GROW_MAX = 640; // closing the details: the list takes the freed room, but never grows beyond this (or its own preferred width)
+function setInfoOpen(open, { grow = true } = {}) {
   const was = infoOpen;
-  // closing the details next to the list: the list takes the window's whole width (the window does not jump), remembered as its width
-  const keep = was && !open && !narrow() && libraryOpen() ? winTotal : 0;
+  // closing the details next to the list: the list takes the window's width (the window does not jump); the grown width is not remembered
+  const keep = grow && was && !open && !narrow() && libraryOpen() ? Math.min(winTotal, Math.max(LIST_GROW_MAX, libPref())) : 0;
   if (open && typeof settingsPage !== 'undefined' && settingsPage.isOpen()) settingsPage.close(); // one window at a time
   infoOpen = open;
   clearTimeout(infoHideTimer);
@@ -844,12 +846,11 @@ function setInfoOpen(open) {
   if (open || libraryOpen()) els.info.hidden = !open;
   else infoHideTimer = setTimeout(() => { els.info.hidden = !infoOpen; }, 260); // the window slides out showing the details
   els.app.classList.toggle('info-open', open);
+  document.body.classList.toggle('details-open', open); // (the edge tabs are outside .app)
   els.infoBtn.setAttribute('aria-pressed', String(open));
   syncWindow();
   if (keep) {
-    const next = Math.min(maxLibWidth(), keep);
-    setLibWidth(next);
-    store.set('libWidth', String(next));
+    setLibWidth(Math.min(maxLibWidth(), keep));
   } else layoutWindow();
   closePopovers();
   renderLoadState();
@@ -2555,7 +2556,7 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.code === 'Escape') {
     if (endShown && popovers.every(([, pop]) => pop.hidden)) { endDismissed = true; syncEndScreen(); els.play.focus({ preventScroll: true }); return; } // the end window goes, the fretboards come back
-    if (popovers.every(([, pop]) => pop.hidden) && infoOpen && loadInfo.state !== 'idle') setInfoOpen(false); // details -> chart
+    if (popovers.every(([, pop]) => pop.hidden) && infoOpen) setInfoOpen(false); // details -> chart
     const open = popovers.find(([, pop]) => !pop.hidden);
     const owner = open && (open[1] === els.paneMenu ? document.querySelector('.pane-tag[aria-expanded="true"]') : open[0]);
     closePopovers();
@@ -2878,6 +2879,6 @@ function openFromHash() {
   loadAudioWithSong = route.view === 'play';
   pendingInstruments = route.instruments || null;
   selectSong(song);
-  if (route.view === 'play') setInfoOpen(false);
+  if (route.view === 'play') { stageEverLive = true; setInfoOpen(false, { grow: false }); } // a /play link is the player: the bar shows, the library keeps its width
 }
 window.addEventListener('hashchange', openFromHash);

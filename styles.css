@@ -1897,3 +1897,6 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 /* Switching to another song's details: header and cards fade and slide in (with motion on) */
 :root[data-motion="on"] .info.info-swap .info-top-text, :root[data-motion="on"] .info.info-swap .info-scroll > * { animation: info-swap-in .32s cubic-bezier(.2, .7, .2, 1) backwards; }
 @keyframes info-swap-in { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+
+/* phone: while the details cover the drawer its edge tab stays away (the details-only case, where the list tab rule is !important) */
+@media (max-width: 700px) { body.details-open .edge-tab.lib-show:not([hidden]) { display: none !important; } } /* (the edge tabs live outside .app, so the state is on <body>) */
