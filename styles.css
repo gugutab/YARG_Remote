@@ -1928,3 +1928,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .tools button.icon:has(.tool-val) { min-width: 92px; padding: 0 16px; gap: 9px; } /* room for "150%", "Muted" and "0.25×" without the button changing size */
   .tool-val { min-width: 3.4ch; text-align: left; }
 }
+@container song (min-width: 800px) {
+  .tools button.icon:has(.tool-val) { min-width: 0; width: auto; padding: 0 12px; gap: 7px; } /* as wide as icon + text need */
+  .tool-val { min-width: 0; }
+}
