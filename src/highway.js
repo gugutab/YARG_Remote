@@ -45,6 +45,7 @@ import { waitCountdowns, countdownAt } from './countdown.js';
 
 const RECT_WIDEN_2D = 1.18;
 const VOCAL_LEAD = '#5b8def'; // lead vocal notes
+const TRACK_BACK_SEC = 5; // the lyric track fades back in this long before the next lyric, after a rest
 const PERC_RINGS = [[0, 1.9, 3.5], [0.18, 1.4, 2]]; // percussion hit: [delay, growth, width] of the two rings
 
 // Speed of the vocal chart in pixels per second at the default neck speed: a 1000 px wide window shows 2.5 s ahead, a wider one more.
@@ -1247,7 +1248,9 @@ export class Highway {
     // The lyric track hugs the words, centred on them, and fades away while a percussion section or a rest with a countdown runs.
     const st = (chart.trackFade ??= { k: 1, at: performance.now() });
     const nowMs = performance.now();
-    const counting = this.curPane && this.countdownState(this.curPane, t) ? 0 : 1;
+    // the lyric track goes away during a percussion section or a rest with a countdown, and comes back 5 s before the next words arrive
+    const wait = this.curPane && this.countdownState(this.curPane, t);
+    const counting = wait && wait.remaining > TRACK_BACK_SEC ? 0 : 1;
     st.k += (counting - st.k) * (1 - Math.exp(-Math.min(0.1, (nowMs - st.at) / 1000) / 0.2));
     st.at = nowMs;
     const trackA = 0.3 * st.k; // (the 0.15 layer under it is not drawn while it is hidden either)
