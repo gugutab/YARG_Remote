@@ -1535,6 +1535,40 @@ function setSetting(name, value) {
   if (name === 'speed') { player.setRate(value); els.speedVal.textContent = `${Number(value.toFixed(2))}×`; }
   if (name === 'neck') highway.setNeckSpeed(value);
 }
+// The mouse wheel over any slider moves it (up = more, 5 notches... one step per notch; a slider with many steps moves 2% of its range per
+// notch); touchpads give fractions, which add up. The seek bar keeps its own wheel (5 s per notch). Listeners elsewhere hear a normal `input`.
+let wheelAcc = new WeakMap();
+document.addEventListener('wheel', (e) => {
+  const el = e.target;
+  if (!(el instanceof HTMLInputElement) || el.type !== 'range' || el.disabled || el.closest('#seekbox')) return;
+  e.preventDefault();
+  const delta = e.deltaY || e.deltaX;
+  const acc = (wheelAcc.get(el) || 0) + -delta / (e.deltaMode === 1 ? 3 : 100);
+  const notches = Math.trunc(acc);
+  wheelAcc.set(el, acc - notches);
+  if (!notches) return;
+  const min = Number(el.min || 0);
+  const max = Number(el.max || 100);
+  const step = Number(el.step) > 0 ? Number(el.step) : 1;
+  const move = (max - min) / step > 100 ? (max - min) * 0.02 : step; // fine-grained sliders: 2% of the range
+  const next = Math.min(max, Math.max(min, Number(el.value) + notches * move));
+  const rounded = Math.round((next - min) / step) * step + min;
+  el.value = String(Math.min(max, Math.max(min, +rounded.toFixed(6))));
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+}, { passive: false });
+// ...and over the volume button of the bar it moves the master volume (5% per notch; it also un-mutes)
+let masterWheelAcc = 0;
+els.mixerBtn.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  masterWheelAcc += -(e.deltaY || e.deltaX) / (e.deltaMode === 1 ? 3 : 100);
+  const notches = Math.trunc(masterWheelAcc);
+  masterWheelAcc -= notches;
+  if (!notches) return;
+  masterState.value = Math.min(1.5, Math.max(0, Math.round((masterState.value + notches * 0.05) * 100) / 100));
+  masterState.muted = false;
+  applyStem(masterState);
+}, { passive: false });
 document.addEventListener('input', (e) => {
   const name = e.target.dataset?.setting;
   if (name) setSetting(name, Number(e.target.value));
