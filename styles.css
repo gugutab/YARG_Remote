@@ -1864,3 +1864,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .sthumb { position: absolute; right: 0; top: 0; width: 7px; border-radius: 6px; background: rgba(120, 150, 255, .16); border: 1px solid rgba(120, 150, 255, .28); box-sizing: border-box; transition: background .15s; }
 .sthumb-track:hover .sthumb, .sthumb-track.dragging .sthumb { background: rgba(120, 150, 255, .3); }
 .info-scroll.thumb-scroll { padding-right: 18px; } /* the thumb sits over the right edge: keep the cards clear of it */
+
+/* Details footer: the Play button runs edge to edge, with no divider above it */
+.info-window .info-actions { padding: 0 !important; gap: 0; border-top: 0; }
+.info-window .info-actions .cta { border-radius: 0; margin: 0; }
