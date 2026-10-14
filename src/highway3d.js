@@ -77,6 +77,9 @@ export function renderLanes3D(hw, t, w, h) {
     }
   };
 
+  // In a long rest the whole board turns more transparent together (see Highway.restBoard)
+  const boardK = hw.restBoard(t, windowSec);
+  g.globalAlpha = boardK;
   // road (its dark base is added at the very end, behind everything, so the edge fades do not thin it)
   g.fillStyle = 'rgba(255,255,255,0.045)';
   quad(ROAD_NEAR, ROAD_END, -half, half);
@@ -118,6 +121,8 @@ export function renderLanes3D(hw, t, w, h) {
     g.fillStyle = b.measure ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.14)';
     g.fillRect(xAt(-half, d), yAt(d) - (b.measure ? 1.5 : 0.5) * p, roadW * p, (b.measure ? 3 : 1) * p);
   }
+
+  g.globalAlpha = 1;
 
   // notes that can still be seen
   const from = firstVisibleIndex(chart.notes, t, hw.maxLength);
@@ -317,7 +322,7 @@ export function renderLanes3D(hw, t, w, h) {
 
   // the board's neutral dark base, as opaque as the setting says: behind the notes and the guides, and not faded at the edges
   g.globalCompositeOperation = 'destination-over';
-  g.fillStyle = `rgba(0,0,0,${hw.trackOpacity * hw.restBoard(t, windowSec)})`; // (more transparent in a long rest)
+  g.fillStyle = `rgba(0,0,0,${hw.trackOpacity * boardK})`; // (more transparent in a long rest)
   quad(ROAD_NEAR, ROAD_END, -half, half);
   g.fill();
   g.globalCompositeOperation = 'source-over';

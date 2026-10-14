@@ -1072,6 +1072,10 @@ export class Highway {
     // Notes are drawn from this far ahead, so the ones past the top edge are already walking in.
     const ahead = hitY / pxPerSec + ENTRY_MARGIN_SEC;
 
+    // In a long rest the whole board (base, tint, bands, guides) turns more transparent together, so the background shows through
+    // instead of the light tint taking over the thinner dark base.
+    const boardK = this.restBoard(t, ahead - ENTRY_MARGIN_SEC);
+    g.globalAlpha = boardK;
     // star power / solo bands
     this.fillSpans(chart.starPower, t, ahead, yOf, x0, laneW * chart.lanes, h, 'rgba(60,160,255,0.12)');
     this.fillSpans(chart.solos, t, ahead, yOf, x0, laneW * chart.lanes, h, 'rgba(255,190,60,0.10)');
@@ -1100,6 +1104,7 @@ export class Highway {
     for (let i = 0; i < chart.lanes; i++) {
       if (i % 2 === 0) g.fillRect(x0 + i * laneW, 0, laneW, h); // down to the bottom edge, where it fades out
     }
+    g.globalAlpha = 1;
     // (there is no hit line: the pads mark the spot)
 
     // sustains first, then heads
@@ -1233,7 +1238,7 @@ export class Highway {
 
     // the board's neutral dark base, as opaque as the setting says: behind the notes and the guides, and not faded at the edges
     g.globalCompositeOperation = 'destination-over';
-    g.fillStyle = `rgba(0,0,0,${this.trackOpacity * this.restBoard(t, ahead - ENTRY_MARGIN_SEC)})`; // (more transparent in a long rest)
+    g.fillStyle = `rgba(0,0,0,${this.trackOpacity * boardK})`; // (more transparent in a long rest)
     g.fillRect(x0, 0, laneW * chart.lanes, h);
     g.globalCompositeOperation = 'source-over';
     // the board and the notes entering from the top dissolve into the background (an eased fade)
