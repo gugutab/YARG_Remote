@@ -1837,3 +1837,9 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 @container (min-width: 652px) {
   #info .info-head img, #info[data-cover] .info-head img { height: auto; align-self: stretch; min-height: 100%; object-fit: cover; }
 }
+
+/* The art's corners that face the text (not the ones on the card's edge, which the card clips) are rounded */
+#info .info-head img, #info[data-cover] .info-head img { border-radius: 0 var(--radius, 10px) var(--radius, 10px) 0; } /* side by side: the right corners */
+@container (max-width: 651px) {
+  #info .info-head img, #info[data-cover] .info-head img { border-radius: 0 0 var(--radius, 10px) var(--radius, 10px); } /* one column: the bottom corners */
+}
