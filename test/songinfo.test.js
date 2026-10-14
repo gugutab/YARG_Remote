@@ -64,3 +64,18 @@ test('stems of one instrument share a group', () => {
   assert.equal(stemGroupLabel('drums'), 'Drums');
   assert.equal(stemGroupLabel('weird'), 'weird');
 });
+
+test('rhythm.ogg is the bass stem when the song has bass but no rhythm part', async () => {
+  const { relabelStems, stemKind, stemGroupLabel, stemGroup } = await import('../src/songinfo.js');
+  const stems = [{ id: 'guitar', label: 'guitar' }, { id: 'rhythm', label: 'rhythm' }, { id: 'song', label: 'song' }];
+  const parts = (...p) => (i) => p.includes(i);
+  const out = relabelStems(stems, parts('guitar', 'bass', 'drums'));
+  assert.equal(out[1].label, 'bass');
+  assert.equal(out[1].id, 'rhythm'); // (the file name stays)
+  assert.equal(stemKind(out[1].label), 'bass');
+  assert.equal(stemGroupLabel(stemGroup(out[1].label)), 'Bass');
+  assert.equal(relabelStems(stems, parts('guitar', 'bass', 'rhythm')), stems); // a real rhythm part: unchanged
+  assert.equal(relabelStems(stems, parts('guitar')), stems); // no bass part: unchanged
+  const withBass = [...stems, { id: 'bass', label: 'bass' }];
+  assert.equal(relabelStems(withBass, parts('guitar', 'bass')), withBass); // a bass stem of its own: unchanged
+});

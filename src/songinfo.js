@@ -186,6 +186,15 @@ export function stemKind(label) {
   return 'music';
 }
 
+// In Rock Band / Clone Hero audio the bass is often stored as `rhythm.ogg`. When the song has no rhythm part but has a bass part (and no
+// `bass` stem of its own), that stem is the bass: it gets the Bass label (and so the bass icon and name) in the mixer.
+// stems: [{ id, label, ... }]; hasPart(instrument) -> boolean. Returns new stem objects (the ids stay, they are file names).
+export function relabelStems(stems, hasPart) {
+  const labels = new Set(stems.map((s) => String(s.label).toLowerCase()));
+  if (!labels.has('rhythm') || labels.has('bass') || hasPart('rhythm') || !hasPart('bass')) return stems;
+  return stems.map((s) => (String(s.label).toLowerCase() === 'rhythm' ? { ...s, label: 'bass' } : s));
+}
+
 // The instrument a stem belongs to: drums_1, drums_2, drums_kick ... are all "drums"; guitar_2 is "guitar".
 export function stemGroup(label) {
   const n = String(label).toLowerCase().trim();

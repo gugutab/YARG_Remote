@@ -11,7 +11,7 @@ import { songDelaySeconds, plainText, packOf } from './ini.js';
 import { actionFor, comboOf } from './shortcuts.js';
 import { attachScrollThumb } from './scrollthumb.js';
 import { previewWindow } from './preview.js';
-import { metaRows, extraRows, chartStats, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel } from './songinfo.js';
+import { metaRows, extraRows, chartStats, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel, relabelStems } from './songinfo.js';
 import { parseRoute, formatRoute } from './route.js';
 import { createSettings } from './settings.js';
 import { SECTIONS, buildDefaults, buildValidator, FONT_OPTIONS } from './settings-schema.js';
@@ -753,7 +753,7 @@ async function selectSong(song) {
   fillInstrumentOptions();
   if (pendingInstruments) { applyInstruments(pendingInstruments); pendingInstruments = null; }
   updateChart(); // the chart exists as soon as the MIDI is read; only playback waits for the audio
-  const stems = audioStemsOf(song, { censor: prefs.get('audio.censor') }); // read per load: a change applies to the next song load
+  const stems = relabelStems(audioStemsOf(song, { censor: prefs.get('audio.censor') }), (inst) => hasInstrument(song, inst)); // read per load: a change applies to the next song load
   els.npPreview.hidden = !previewWindow(song.ini);
   previewStop = null;
   buildMixer(stems);
