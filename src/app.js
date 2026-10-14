@@ -835,7 +835,7 @@ let infoOpener = null; // what had the focus when the pane opened, so it gets it
 let infoHideTimer = 0;
 
 const LIST_GROW_MAX = 640; // closing the details: the list takes the freed room, but never grows beyond this (or its own preferred width)
-function setInfoOpen(open, { grow = true } = {}) {
+function setInfoOpen(open, { grow = true, release = true } = {}) {
   const was = infoOpen;
   // closing the details next to the list: the list takes the window's width (the window does not jump); the grown width is not remembered
   const keep = grow && was && !open && !narrow() && libraryOpen() ? Math.min(winTotal, Math.max(LIST_GROW_MAX, libPref())) : 0;
@@ -862,7 +862,7 @@ function setInfoOpen(open, { grow = true } = {}) {
     infoOpener = a && a !== document.body && !els.info.contains(a) ? a : null;
     els.infoWindow.focus({ preventScroll: true });
   } else if (!open && was) {
-    if (!audioLoad) releaseStage(); // the details are closed: the song they were about is what the stage shows now (while its audio loads the stage waits for the load)
+    if (release && !audioLoad) releaseStage(); // the details are closed: the song they were about is what the stage shows now (while its audio loads the stage waits for the load)
     const a = document.activeElement;
     if (infoOpener?.isConnected && infoOpener.offsetParent !== null && (!a || a === document.body || els.info.contains(a))) infoOpener.focus({ preventScroll: true });
     infoOpener = null;
@@ -2880,6 +2880,6 @@ function openFromHash() {
   loadAudioWithSong = route.view === 'play';
   pendingInstruments = route.instruments || null;
   selectSong(song);
-  if (route.view === 'play') { stageEverLive = true; setInfoOpen(false, { grow: false }); } // a /play link is the player: the bar shows, the library keeps its width
+  if (route.view === 'play') { stageEverLive = true; setInfoOpen(false, { grow: false, release: false }); } // (the stage stays held until the audio of the link has loaded) // a /play link is the player: the bar shows, the library keeps its width
 }
 window.addEventListener('hashchange', openFromHash);
