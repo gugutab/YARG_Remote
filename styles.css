@@ -1904,3 +1904,6 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 /* The loading screen has no background of its own: the stage (the plain stage colour while the bar and tracks are held back) shows through */
 .load-screen { background: transparent; }
 .load-screen h2, .load-screen p { text-shadow: 0 1px 8px rgba(0, 0, 0, .85), 0 0 2px rgba(0, 0, 0, .6); } /* readable over the visualizer */
+
+/* End window: the instrument tables use the row's width (up to 320 px each), left to right, not centred */
+.end-cards { justify-content: space-between; }

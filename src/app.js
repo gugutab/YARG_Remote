@@ -1954,14 +1954,42 @@ async function playNext(song) {
   if (chart && current?.song === song && !prefs.get('general.autoplay')) togglePlay(); // (that setting already starts it)
 }
 
-function backToSearch() {
-  endDismissed = true;
+// "View my library": the song is closed (audio unloaded, chart and player UI gone) and the library window is what is left
+function closeSong() {
+  if (infoOpen) setInfoOpen(false, { grow: false, release: false });
+  loadToken++; // a load in flight is dropped
+  player.pause();
+  setEnded(false);
+  endDismissed = false;
+  player.unload();
+  ready = false;
+  setLoop(null);
+  audioLoad = null;
+  current = null;
+  chart = null;
+  highway.paneOpts = {};
+  highway.setCharts([]);
+  // the stage is "never played" again: no bar until the next song plays
+  holdStage = false;
+  loadingBackdrop = 0;
+  stageEverLive = false;
+  barGhost?.remove();
+  barGhost = null;
+  els.app.classList.remove('stage-held', 'stage-loading', 'stage-reveal');
+  els.app.classList.add('stage-unborn');
+  showPlayInfo(false);
+  els.welcome.hidden = false;
+  setLoadState('idle', '', 0);
+  syncPlayButton();
   syncEndScreen();
+  history.replaceState(null, '', '#/');
+  document.title = 'YARG Remote';
+  renderList({ keepScroll: true }); // (the loaded song is no longer highlighted)
   setLibraryOpen(true);
   setTimeout(() => { els.search.focus(); els.search.select(); }, 0); // (after the click handler that drops focus from clicked buttons)
 }
 els.endAgain.addEventListener('click', () => restartSong());
-els.endSearch.addEventListener('click', () => backToSearch());
+els.endSearch.addEventListener('click', () => closeSong());
 
 // ---------- 2D / 3D view ----------
 function setView(view) {
