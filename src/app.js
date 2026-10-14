@@ -6,7 +6,6 @@ import { Highway } from './highway.js';
 import { createErrorGate } from './errorgate.js';
 import { PerfMeter } from './perf.js';
 import { createPerfOverlay, PERF_MODES } from './perf-overlay.js';
-import { specialNotes, neighbourTime } from './specials.js';
 import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, readBytes, serializeSongs, restoreSongs, restoreRemoteSongs } from './library.js';
 import { songDelaySeconds, plainText, packOf } from './ini.js';
 import { actionFor, comboOf } from './shortcuts.js';
@@ -34,7 +33,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'barHide', 'barShow', 'specialCard', 'specialList', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'barHide', 'barShow', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
   'endScreen', 'endCover', 'endTitle', 'endArtist', 'endAgain', 'endSearch', 'endCards', 'endNextBox', 'endNext',
@@ -1105,42 +1104,6 @@ function currentInstrument() {
   return current?.options.find((i) => i.id === els.instrument.value) || null;
 }
 
-// Special notes of the active chart: what kinds there are, how many, and buttons to jump to the previous / next one.
-function renderSpecials() {
-  const list = specialNotes(chart);
-  for (const host of [els.specialList]) {
-    host.replaceChildren(...list.map((item) => {
-      const row = document.createElement('div');
-      row.className = 'spc-row';
-      row.innerHTML = '<i class="spc-dot"></i><span class="spc-name"></span><span class="spc-count"></span>';
-      row.querySelector('.spc-dot').style.background = item.color;
-      row.querySelector('.spc-name').textContent = item.label;
-      row.querySelector('.spc-count').textContent = String(item.count);
-      for (const [dir, label, path] of [[-1, 'Previous', 'M15 6l-6 6 6 6'], [1, 'Next', 'M9 6l6 6-6 6']]) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'icon small-icon';
-        b.title = `${label} ${item.label.toLowerCase()}`;
-        b.setAttribute('aria-label', b.title);
-        b.innerHTML = `<svg viewBox="0 0 24 24"><path d="${path}"/></svg>`;
-        b.addEventListener('click', () => jumpToSpecial(item, dir));
-        row.append(b);
-      }
-      return row;
-    }));
-  }
-  els.specialCard.hidden = list.length === 0;
-}
-
-// Seeks to the next / previous occurrence (a little before it, so it arrives on the chart) and shows the chart.
-async function jumpToSpecial(item, dir) {
-  if (!(await ensureAudio())) return;
-  const target = neighbourTime(item.times, player.currentTime() - settings.chartDelay, dir);
-  if (target === null) return;
-  seekTo(Math.max(0, target - 1.5 + settings.chartDelay));
-  if (infoOpen) setInfoOpen(false);
-}
-
 function updateChart() {
   if (!current) return;
   const ins = currentInstrument();
@@ -1165,7 +1128,6 @@ function updateChart() {
   highway.setCharts(items);
   current.screen = items.filter((x) => !x.chooser); // what is on screen, for the end-of-song window
   if (endShown) buildEndScreen();
-  renderSpecials();
   fillSectionOptions();
   const hasLanes = items.some((x) => x.chooser || x.chart.mode !== 'vocals');
   const hasVocals = items.some((x) => !x.chooser && x.chart.mode === 'vocals');
@@ -2712,7 +2674,7 @@ const applyColumns = () => {
 const COVER_SIZES = { small: 96, medium: 160, large: 240 };
 function applyDetails() {
   const info = els.info;
-  const hidden = ['listen', 'specials', 'instruments', 'adjust', 'volume', 'extra'].filter((s) => !prefs.get('details.sections').includes(s));
+  const hidden = ['listen', 'instruments', 'adjust', 'volume', 'extra'].filter((s) => !prefs.get('details.sections').includes(s));
   info.dataset.hide = hidden.join(' ');
   info.dataset.layout = prefs.get('details.layout');
   info.dataset.cover = prefs.get('details.cover');

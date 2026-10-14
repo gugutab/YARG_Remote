@@ -1843,3 +1843,9 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 @container (max-width: 651px) {
   #info .info-head img, #info[data-cover] .info-head img { border-radius: 0 0 var(--radius, 10px) var(--radius, 10px); } /* one column: the bottom corners */
 }
+
+/* the one-column header: the text block keeps its padding (the small-layout rules make it display: contents, which would drop it) */
+@container (max-width: 651px) {
+  #info .info-head-text { display: block; padding: 14px; }
+  #info.compact .info-head-text { padding: 10px 12px; }
+}
