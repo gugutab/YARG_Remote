@@ -1808,3 +1808,12 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 
 /* The player bar (and the popovers inside it: mixer, sections, speed, visualizer) stays above the library (12) and details (7) windows */
 .topbar { z-index: 13; }
+
+/* The library never goes over the details window: while the details are open it is at most as wide as leaves them one column (380 px) */
+@media (min-width: 701px) {
+  .app { --lib-w-eff: var(--lib-w); }
+  .app.info-open { --lib-w-eff: min(var(--lib-w), calc(100% - 2 * var(--lib-left) - var(--lib-gap) - 380px)); }
+  .library { width: min(var(--lib-w-eff), calc(100% - 2 * var(--lib-gap))); transition: transform .22s ease, opacity .22s ease, width .22s ease; }
+  body.resizing .library { transition: none; }
+  .app:not(.lib-closed) { --lib-inset: calc(var(--lib-left) + var(--lib-w-eff) + var(--lib-gap)); }
+}

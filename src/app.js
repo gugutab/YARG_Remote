@@ -232,7 +232,9 @@ els.npPreview.addEventListener('click', async () => {
 const MIN_LIB_W = 300;
 const CONTENT_MAX = 1400; // keep in step with --content-max in styles.css
 const LIB_MARGIN = 12; // keep in step with --lib-gap in styles.css
-const maxLibWidth = () => Math.max(MIN_LIB_W, Math.min(window.innerWidth, CONTENT_MAX) - 2 * LIB_MARGIN); // never wider than the content area (--content-max)
+const INFO_MIN_W = 380; // the details window never gets narrower than one column (styles.css)
+// never wider than the content area (--content-max), and with the details window open it leaves that window its one column
+const maxLibWidth = () => Math.max(MIN_LIB_W, Math.min(window.innerWidth, CONTENT_MAX) - 2 * LIB_MARGIN - (infoOpen ? INFO_MIN_W + LIB_MARGIN : 0));
 function setLibWidth(px) {
   if (px == null) document.documentElement.style.removeProperty('--lib-w');
   else document.documentElement.style.setProperty('--lib-w', `${Math.round(px)}px`);
@@ -734,6 +736,8 @@ let infoOpener = null; // what had the focus when the window opened, so it gets 
 
 function setInfoOpen(open) {
   const was = infoOpen;
+  // closing the details next to the library: the library grows over the space the window leaves
+  const freed = was && !open && !narrow() && libraryOpen() ? els.infoWindow.getBoundingClientRect().width : 0;
   if (open && typeof settingsPage !== 'undefined' && settingsPage.isOpen()) settingsPage.close(); // one window at a time
   infoOpen = open;
   els.info.hidden = !open;
@@ -744,6 +748,11 @@ function setInfoOpen(open) {
   syncUrl();
   syncEndScreen(); // the details cover the end window
   highway.invalidate();
+  if (freed) {
+    const next = Math.min(maxLibWidth(), Math.round(els.library.getBoundingClientRect().width + LIB_MARGIN + freed));
+    setLibWidth(next);
+    store.set('libWidth', String(next));
+  }
   if (open && !was) {
     const a = document.activeElement;
     infoOpener = a && a !== document.body && !els.info.contains(a) ? a : null;
