@@ -215,7 +215,13 @@
           <div class="ls-bar"><i id="lsBar"></i></div>
           <p id="lsText"></p>
         </div>
-        <section id="info" class="info" hidden aria-label="Song info">
+        <!-- Song details: a glass window floating over the stage (like the library and the settings); the chart keeps running behind it -->
+        <section id="info" class="info" hidden>
+          <div class="info-window" id="infoWindow" role="dialog" aria-modal="false" aria-label="Song details" tabindex="-1">
+          <div class="info-top">
+            <div class="info-top-text"><strong id="infoWinTitle"></strong><span id="infoWinArtist"></span></div>
+            <button id="infoClose" class="icon" type="button" title="Close (I)" aria-label="Close song details"><svg><use href="#i-x"/></svg></button>
+          </div>
           <div class="info-scroll">
             <div class="info-grid">
               <header class="info-card info-head">
@@ -271,6 +277,7 @@
           <div class="info-actions">
             <div class="progress" id="infoProgress"><div class="bar"><span id="infoBar"></span></div><span id="infoState">Loading…</span></div>
             <button id="infoPlay" class="cta" type="button" disabled><svg><use href="#i-play"/></svg><span>Play</span></button>
+          </div>
           </div>
         </section>
         <!-- End of song: a glass window that replaces the fretboards when the song reaches its end (src/songstats.js, src/recommend.js) -->

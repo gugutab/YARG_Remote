@@ -173,9 +173,8 @@ button.icon.small-icon svg { width: 16px; height: 16px; }
 .mix-row .mute[aria-pressed="true"] { color: #e5392b; }
 
 /* ---------- Song info screen ---------- */
-.info { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; background: var(--bg); }
 .info-scroll { flex: 1; min-height: 0; overflow: auto; padding: 16px; }
-.info-grid { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; align-items: start; }
+.info-grid { margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; align-items: start; }
 .info-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
 .info-card h3 { margin: 14px 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .info-card h3:first-child { margin-top: 0; }
@@ -222,9 +221,6 @@ button.icon.small-icon svg { width: 16px; height: 16px; }
 }
 
 /* ---------- Info screen without the top bar, stem icons ---------- */
-.app.info-open .topbar { display: none; }
-.info-menu { position: absolute; top: 8px; left: 8px; z-index: 2; background: var(--panel); border-color: var(--line); }
-.info-scroll { padding-top: 52px; }
 .mix-row { grid-template-columns: 36px 1fr 40px 28px; }
 .stem-btn { position: relative; width: 36px; height: 32px; display: inline-grid; place-items: center; padding: 0; background: var(--panel-2); border-radius: 8px; }
 .stem-btn svg { width: 18px; height: 18px; }
@@ -493,31 +489,9 @@ button.icon.primary svg { width: 18px; height: 18px; }
 .icard-top .pips i { width: 10px; }
 
 /* Round 15: floating buttons keep a background (button.icon is transparent and was winning on specificity) */
-button.icon.info-menu {
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  border: 1px solid var(--line);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-}
-button.icon.info-menu:hover { background: var(--panel-2); }
 button.icon.stage-btn { background: rgba(13, 17, 23, 0.55); border: 1px solid var(--line); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 button.icon.stage-btn:hover { background: rgba(13, 17, 23, 0.8); }
 button.icon.stage-btn[aria-pressed="true"] { border-color: var(--accent); }
-
-/* Round 16: the floating menu button shows its background only while content scrolls under it */
-button.icon.info-menu {
-  background: transparent; border-color: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
-  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
-}
-.info.scrolled button.icon.info-menu {
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  border-color: var(--line);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-}
-button.icon.info-menu:hover { background: var(--panel-2); }
 
 /* ---------- Round 17: grouped stems ---------- */
 .mix-row { grid-template-columns: 36px 1fr 40px 28px 28px; } /* the last column is for the expand button of groups */
@@ -726,7 +700,6 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .active-filters .chip svg.x { width: 12px; height: 12px; color: var(--muted); }
 
 /* Round 52: the top bar can be hidden; the stage then takes the whole height and a small tab brings the bar back */
-.app.bar-hidden.info-open #barShow { display: none; }
 .bar-hide svg { transform: rotate(180deg); }
 .bar-hide { align-self: center; opacity: .7; }
 .bar-hide:hover { opacity: 1; }
@@ -759,7 +732,7 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 @media (min-width: 1800px) {
   :root { --lib-w: 360px; }
   .info-scroll { padding: 24px; }
-  .info-grid { max-width: 1400px; gap: 16px; }
+  .info-grid { gap: 16px; }
 }
 @media (min-width: 2300px) {
   :root { --lib-w: 420px; }
@@ -978,7 +951,6 @@ body.settings-open { overflow: hidden; }
 .sp-multi { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 
 /* ---------- Round 71: the details screen follows the settings (data attributes on #info) ---------- */
-.info-grid { max-width: var(--info-max, 1400px) !important; }
 #info[data-hide~="instruments"] .info-wide { display: none; }
 #info[data-hide~="adjust"] .card-adjust, #info[data-hide~="volume"] .card-volume, #info[data-hide~="extra"] .card-extra { display: none; }
 #info[data-hide~="volume"] .info-cols, #info[data-layout="stacked"] .info-cols { grid-template-columns: 1fr; grid-template-rows: none; }
@@ -1667,14 +1639,10 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 /* what is centred on the stage (empty state, details, loading) keeps to the part the window leaves free; the chart canvas itself is untouched */
 @media (min-width: 701px) {
   .app:not(.lib-closed) { --lib-inset: calc(var(--lib-w) + 2 * var(--lib-gap)); }
-  .welcome, .info-scroll, .info-actions, .load-screen { transition: padding-left .22s ease; }
+  .welcome, .load-screen { transition: padding-left .22s ease; }
 }
 .welcome { padding-left: var(--lib-inset, 0px); }
-.info-scroll { padding-left: calc(var(--lib-inset, 0px) + 16px); }
-#info.compact .info-scroll { padding-left: calc(var(--lib-inset, 0px) + 10px); }
-.info-actions { padding-left: calc(var(--lib-inset, 0px) + 16px); }
 .load-screen { padding-left: calc(var(--lib-inset, 0px) + 24px); }
-@media (min-width: 1800px) { .info-scroll { padding-left: calc(var(--lib-inset, 0px) + 24px); } }
 
 /* settings stays one click away while the library header (which holds the gear) is hidden */
 .edge-tab.settings-show { top: calc(50% + 34px); transform: none; height: 40px; }
@@ -1769,17 +1737,41 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 @keyframes settings-in { from { opacity: 0; transform: scale(.985); } to { opacity: 1; transform: none; } }
 @media (max-width: 700px) { .settings-page { inset: 0; border-radius: 0; box-shadow: none; } }
 
-/* ---------- Song details in the glass style of the rest of the UI ---------- */
-/* the screen is see-through (the background visualizer / stage colour shows) and its cards and action bar are glass */
-.info { background: transparent; }
-.app.info-open #highway, .app.info-open #paneTags { visibility: hidden; } /* the chart is not behind the cards */
-.info-card { position: relative; isolation: auto; background: transparent; border-color: color-mix(in srgb, var(--line) 70%, transparent); }
-.info-card::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: color-mix(in srgb, var(--panel) 78%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); pointer-events: none; }
-.info-grid { position: relative; z-index: 0; } /* the cards' ::before sit above the screen, below their content */
-.info-actions { position: relative; background: transparent; border-top-color: color-mix(in srgb, var(--line) 70%, transparent); }
-.info-actions::before { content: ""; position: absolute; inset: 0; z-index: -1; background: color-mix(in srgb, var(--panel) 70%, transparent); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); pointer-events: none; }
-.info { z-index: 5; }
-:root[data-motion="on"] .info:not([hidden]) .info-card { animation: end-in .24s ease backwards; }
+/* ---------- Song details: a glass window floating over the stage (like the library and the settings) ----------
+   #info is only the positioning layer (it does not take clicks, and carries the light dimming); the dialog is .info-window. It sits in the
+   part the library leaves free, centred, at most 1120 px wide (--info-max) and as tall as the stage minus the gaps, over the live chart.
+   Same glass as the other windows: translucent --panel, the blur on ::before (never on the window or on an ancestor of fixed popovers).
+   In immersive mode the bar overlays the stage, so the window keeps out from under it (bar at the top or the bottom). */
+.info {
+  position: absolute; inset: 0; z-index: 7; display: flex; align-items: center; justify-content: center; pointer-events: none;
+  background: rgba(0, 0, 0, .35);
+  padding: var(--lib-gap, 12px) var(--lib-left, var(--lib-gap, 12px)) var(--lib-gap, 12px) var(--lib-inset, var(--lib-left, var(--lib-gap, 12px)));
+}
+@media (min-width: 701px) { .info { transition: padding-left .22s ease; } }
+.app.immersive .info { padding-top: calc(var(--bar-h, 64px) + var(--lib-gap, 12px)); }
+.app.immersive.bar-bottom .info { padding-top: var(--lib-gap, 12px); padding-bottom: calc(var(--bar-h, 64px) + 8px + var(--lib-gap, 12px)); }
+.info-window {
+  position: relative; pointer-events: auto; width: min(var(--info-max, 1120px), 100%); height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+  background: transparent; color: var(--text); outline: none;
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius: 14px; box-shadow: 0 18px 60px rgba(0, 0, 0, .5);
+}
+.info-window::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: color-mix(in srgb, var(--panel) 78%, transparent); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); pointer-events: none; }
+.info-top { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 16px; background: color-mix(in srgb, var(--panel) 30%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.info-top-text { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.info-top-text strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.info-top-text span { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; min-width: 0; }
+.info-top-text span:empty { display: none; }
+.info-top .icon { flex: none; }
+/* the cards sit on the window's glass: a light tint, no blur of their own */
+.info-card { position: relative; background: color-mix(in srgb, var(--panel-2) 45%, transparent); border-color: color-mix(in srgb, var(--line) 70%, transparent); }
+.info-grid { position: relative; z-index: 0; }
+.info-actions { position: relative; background: color-mix(in srgb, var(--panel) 30%, transparent); border-top-color: color-mix(in srgb, var(--line) 70%, transparent); }
+:root[data-motion="on"] .info:not([hidden]) .info-window { animation: settings-in .2s ease backwards; /* (backwards only: a lingering animation would make the window a backdrop root and kill the blur) */ }
+@media (max-width: 700px) {
+  .info { padding: 0; background: transparent; }
+  .info-window { width: 100%; border: 0; border-radius: 0; box-shadow: none; }
+  .info-window::before { background: color-mix(in srgb, var(--panel) 92%, transparent); }
+}
 
 /* The visualizer's blur: a glass layer between the background canvas and the chart (the notes stay sharp) */
 .bg-glass { display: none; position: absolute; inset: 0; z-index: 0; pointer-events: none; -webkit-backdrop-filter: blur(var(--viz-blur, 0px)); backdrop-filter: blur(var(--viz-blur, 0px)); }
@@ -1793,3 +1785,26 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   .app:not(.lib-closed) { --lib-inset: calc(var(--lib-left) + var(--lib-w) + var(--lib-gap)); }
   .settings-page { inset: 16px max(16px, calc((100% - min(1120px, var(--content-max))) / 2)); }
 }
+
+/* ---------- Details window: never narrower than one column, one-column header, bigger title block ---------- */
+@media (min-width: 701px) {
+  .info-window { min-width: 380px; } /* one column of cards (320 px) + the padding of the scroll area */
+  /* with the library open the window may cover the library's edge before it gets narrower than that */
+  .info { padding-left: max(var(--lib-gap, 12px), min(var(--lib-inset, var(--lib-left, 12px)), calc(100% - 380px - var(--lib-left, 12px)))); }
+}
+.info-top { align-items: center; padding-block: 10px; }
+.info-top-text { flex-direction: column; align-items: flex-start; gap: 2px; }
+.info-top-text strong { font-size: 18px; line-height: 1.2; }
+.info-top-text span { font-size: 14px; line-height: 1.2; }
+/* one column of cards: the cover spans the whole window width and the title/artist beside it are dropped (the window header has them) */
+@container (max-width: 651px) {
+  .info-head { grid-template-columns: 1fr; }
+  .info-head-text { grid-column: 1; }
+  .info-head img, #info[data-cover] .info-head img { grid-row: auto; width: 100%; height: auto; aspect-ratio: 1; max-height: 70vh; object-fit: cover; }
+  .info-head #infoTitle, .info-head #infoArtist { display: none; }
+  .info-head img[hidden] ~ .info-head-text #infoTitle { display: block; }
+  .info-head img[hidden] ~ .info-head-text #infoArtist { display: block; }
+}
+
+/* The player bar (and the popovers inside it: mixer, sections, speed, visualizer) stays above the library (12) and details (7) windows */
+.topbar { z-index: 13; }

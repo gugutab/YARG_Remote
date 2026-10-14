@@ -34,7 +34,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'barHide', 'barShow', 'specialCard', 'specialList', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'info', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'barHide', 'barShow', 'specialCard', 'specialList', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
   'endScreen', 'endCover', 'endTitle', 'endArtist', 'endAgain', 'endSearch', 'endCards', 'endNextBox', 'endNext',
@@ -727,22 +727,42 @@ function renderLoadState() {
   if (overlay) els.loading.textContent = text;
 }
 
-// The floating menu button only gets a background once content scrolls under it.
+// The details are a glass window over the stage (like the library and the settings). The chart keeps running behind it and the player
+// bar stays visible. Settings and details are exclusive; the library may stay open next to it.
 const infoScroll = els.info.querySelector('.info-scroll');
-function syncInfoScrolled() { els.info.classList.toggle('scrolled', infoScroll.scrollTop > 4); }
-infoScroll.addEventListener('scroll', syncInfoScrolled, { passive: true });
+let infoOpener = null; // what had the focus when the window opened, so it gets it back when the window closes
 
 function setInfoOpen(open) {
+  const was = infoOpen;
+  if (open && typeof settingsPage !== 'undefined' && settingsPage.isOpen()) settingsPage.close(); // one window at a time
   infoOpen = open;
   els.info.hidden = !open;
-  els.app.classList.toggle('info-open', open); // the top bar is redundant while the info screen shows everything
+  els.app.classList.toggle('info-open', open);
   els.infoBtn.setAttribute('aria-pressed', String(open));
-  syncInfoScrolled();
   closePopovers();
   renderLoadState();
   syncUrl();
   syncEndScreen(); // the details cover the end window
+  highway.invalidate();
+  if (open && !was) {
+    const a = document.activeElement;
+    infoOpener = a && a !== document.body && !els.info.contains(a) ? a : null;
+    els.infoWindow.focus({ preventScroll: true });
+  } else if (!open && was) {
+    const a = document.activeElement;
+    if (infoOpener?.isConnected && infoOpener.offsetParent !== null && (!a || a === document.body || els.info.contains(a))) infoOpener.focus({ preventScroll: true });
+    infoOpener = null;
+  }
 }
+els.infoClose.addEventListener('click', () => setInfoOpen(false));
+// The bar's info button toggles the window while it is open (otherwise it opens its small popup).
+els.infoBtn.addEventListener('click', (e) => { if (infoOpen) { e.stopImmediatePropagation(); e.stopPropagation(); setInfoOpen(false); } }, true);
+// A click outside the window closes it. Menus that live in <body> (custom selects, popovers), the button that toggles it and the
+// library window (it may stay open next to the details) are not "outside".
+document.addEventListener('pointerdown', (e) => {
+  if (!infoOpen || els.infoWindow.contains(e.target) || e.target.closest?.('.sel-pop, .popover, #infoBtn, #library, #libTab, #scrim, #topbar')) return;
+  setInfoOpen(false);
+});
 
 const kv = (rows) => rows.flatMap((r) => {
   const dt = document.createElement('dt');
@@ -791,11 +811,13 @@ function balanceChips() {
   }
   list.style.maxWidth = `${hi}px`;
 }
-new ResizeObserver(() => balanceChips()).observe(els.info);
+new ResizeObserver(() => balanceChips()).observe(els.infoWindow);
 
 // The parts of the screen that depend only on the song (song.ini), shown before anything is loaded.
 function renderSongInfo(song) {
   els.infoTitle.textContent = plainText(song.title);
+  els.infoWinTitle.textContent = plainText(song.title);
+  els.infoWinArtist.textContent = plainText(song.artist);
   els.infoArtist.textContent = plainText(song.artist);
   els.infoPopTitle.textContent = plainText(song.title);
   els.infoPopArtist.textContent = plainText(song.artist);
@@ -2699,7 +2721,7 @@ reduceQuery.addEventListener?.('change', (e) => { osReduceMotion = e.matches; EF
 
 const settingsPage = mountSettings({
   root: document.getElementById('settingsPage'), settings: prefs, sections: SECTIONS,
-  onOpen: () => { if (libraryOpen()) setLibraryOpen(false, false); }, // (not remembered: the library comes back as it was at the next start)
+  onOpen: () => { if (infoOpen) setInfoOpen(false); if (libraryOpen()) setLibraryOpen(false, false); }, // (not remembered: the library comes back as it was at the next start)
   renderers: {
     'shortcuts.bindings': (host, ctx) => renderShortcuts(host, { ...ctx, notify: setStatus }),
     theme: (host, ctx) => renderThemeStudio(host, { ...ctx, prefersDark: () => darkQuery.matches, notify: setStatus }),
