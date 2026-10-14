@@ -565,6 +565,40 @@ if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => requestAnima
 // ---------- Song and chart selection ----------
 let pendingInstruments = null; // the instruments of a link, applied once the chart is read
 let loadAudioWithSong = false; // a #/song/<id>/play link: the audio loads with the song, like a Play press would
+// Picking a song opens its details, and the player bar and the fretboards keep showing what they showed (a frozen picture of the last
+// song) until the audio starts to load (or the details close): then the new song fades in. The chart itself loads in the background.
+let holdStage = false;
+let barGhost = null; // a still copy of the player bar, laid over the real one while the stage is held
+function holdStageNow() {
+  if (holdStage || !current || !chart) return; // nothing on screen yet: nothing to keep
+  holdStage = true;
+  const bar = document.getElementById('topbar');
+  const main = bar.parentElement;
+  const r = bar.getBoundingClientRect();
+  const m = main.getBoundingClientRect();
+  const ghost = bar.cloneNode(true);
+  ghost.removeAttribute('id');
+  for (const e of ghost.querySelectorAll('[id]')) e.removeAttribute('id');
+  ghost.classList.add('bar-ghost');
+  ghost.inert = true;
+  ghost.setAttribute('aria-hidden', 'true');
+  ghost.style.cssText = `left:${r.left - m.left}px;top:${r.top - m.top}px;width:${r.width}px;height:${r.height}px;`;
+  main.append(ghost);
+  barGhost = ghost;
+  els.app.classList.add('stage-held');
+}
+function releaseStage() {
+  if (!holdStage) return;
+  holdStage = false;
+  els.app.classList.remove('stage-held');
+  els.app.classList.add('stage-reveal');
+  highway.invalidate();
+  const g = barGhost;
+  barGhost = null;
+  if (g) { g.classList.add('leaving'); setTimeout(() => g.remove(), 450); }
+  setTimeout(() => els.app.classList.remove('stage-reveal'), 500);
+}
+
 async function selectSong(song) {
   const wantAudio = loadAudioWithSong;
   loadAudioWithSong = false;
@@ -575,6 +609,7 @@ async function selectSong(song) {
     els.folderInput.click();
     return;
   }
+  holdStageNow(); // the bar and the fretboards stay as they are until the audio loads
   const token = ++loadToken;
   player.pause();
   setEnded(false);
@@ -671,6 +706,7 @@ function ensureAudio() {
   const token = loadToken;
   const song = current.song;
   const promise = (async () => {
+    releaseStage();
     setLoadState('loading', 'Loading audio…', 0.02);
     let loaded = false;
     try {
@@ -704,6 +740,7 @@ function ensureAudio() {
 // ---------- Info screen ----------
 function setLoadState(state, text, fraction = 0) {
   loadInfo = { state, text, fraction };
+  if (state === 'error') releaseStage();
   renderLoadState();
 }
 
@@ -758,6 +795,7 @@ function setInfoOpen(open) {
     infoOpener = a && a !== document.body && !els.info.contains(a) ? a : null;
     els.infoWindow.focus({ preventScroll: true });
   } else if (!open && was) {
+    releaseStage(); // the details are closed: the song they were about is what the stage shows now
     const a = document.activeElement;
     if (infoOpener?.isConnected && infoOpener.offsetParent !== null && (!a || a === document.body || els.info.contains(a))) infoOpener.focus({ preventScroll: true });
     infoOpener = null;
@@ -2584,7 +2622,7 @@ function frame(frameTs) {
   const frameStart = performance.now();
   if (frameTs) player.frameNow = frameTs; // the clock of this animation frame (vsync aligned)
   let drawMs = 0;
-  const draw = (fn) => { const d0 = performance.now(); guarded('draw', fn); drawMs = performance.now() - d0; };
+  const draw = (fn) => { if (holdStage) return; const d0 = performance.now(); guarded('draw', fn); drawMs = performance.now() - d0; }; // (held: the fretboards keep the last picture)
   if (current && chart) {
     let t = guarded('clock', () => {
       let t = player.currentTime();

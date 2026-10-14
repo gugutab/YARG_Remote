@@ -1817,3 +1817,13 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   body.resizing .library { transition: none; }
   .app:not(.lib-closed) { --lib-inset: calc(var(--lib-left) + var(--lib-w-eff) + var(--lib-gap)); }
 }
+
+/* ---------- Held stage: the bar and the fretboards keep the last song until the new one's audio loads, then cross-fade ---------- */
+.app.stage-held #topbar { visibility: hidden; }
+.app.stage-held #paneTags { visibility: hidden; }
+.bar-ghost { position: absolute !important; z-index: 13; margin: 0 !important; pointer-events: none; transition: opacity .35s ease; }
+.bar-ghost.leaving { opacity: 0; }
+:root[data-motion="on"] .app.stage-reveal #topbar, :root[data-motion="on"] .app.stage-reveal #highway, :root[data-motion="on"] .app.stage-reveal #paneTags { animation: stage-in .35s ease backwards; }
+@keyframes stage-in { from { opacity: 0; } to { opacity: 1; } }
+.info-top-text { overflow: hidden; }
+.info-top-text strong, .info-top-text span { max-width: 100%; }
