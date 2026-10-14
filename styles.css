@@ -1849,3 +1849,9 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
   #info .info-head-text { display: block; padding: 14px; }
   #info.compact .info-head-text { padding: 10px 12px; }
 }
+
+/* Details: balanced two-line title; the footer is only the (extended) Play button - the loading screen already shows the progress, an error still shows its text */
+.info-top-text strong { text-wrap: balance; }
+#infoProgress:not([data-state="error"]) { display: none; }
+.info-actions { justify-content: stretch; }
+.info-actions .cta { flex: 1; justify-content: center; min-height: 44px; }
