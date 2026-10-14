@@ -378,11 +378,22 @@ export class Highway {
   }
 
   // A divider between two panes: a thin line, brighter while the pointer is over it or it is being dragged.
+  // The theme's accent colour (hex), re-read now and then so a theme change shows up.
+  themeAccent() {
+    const now = performance.now();
+    if (!this.accentAt || now - this.accentAt > 500) {
+      this.accentAt = now;
+      const v = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+      this.accentHex = /^#[0-9a-f]{6}$/i.test(v) ? v : this.accentHex || '#2f81ed';
+    }
+    return this.accentHex;
+  }
+
   drawDivider(d) {
     const g = this.g;
     const hot = this.hover && this.hover.type === d.type && this.hover.a === d.a && this.hover.b === d.b;
     this.dividers.push(d);
-    g.fillStyle = hot ? 'rgba(108,182,255,0.9)' : 'rgba(0,0,0,0.25)';
+    g.fillStyle = hot ? withAlpha(this.themeAccent(), 0.9) : 'rgba(0,0,0,0.25)'; // (the highlight of a divider under the pointer is the theme's accent)
     if (d.type === 'row') g.fillRect(0, d.y, d.w, hot ? 3 : 1);
     else g.fillRect(d.x - (hot ? 1 : 0), d.y, hot ? 3 : 1, d.h);
   }
