@@ -45,7 +45,8 @@ import { waitCountdowns, countdownAt } from './countdown.js';
 
 const RECT_WIDEN_2D = 1.18;
 const VOCAL_LEAD = '#5b8def'; // lead vocal notes
-const TRACK_BACK_SEC = 5; // the lyric track fades back in this long before the next lyric, after a rest
+const REST_BACK_SEC = 1; // after a long rest the track is back this long before the next note appears at the far edge
+const REST_BOARD_MIN = 0.2; // a fretboard's dark base keeps this fraction of its opacity at the deepest part of a rest
 const PERC_RINGS = [[0, 1.9, 3.5], [0.18, 1.4, 2]]; // percussion hit: [delay, growth, width] of the two rings
 
 // Speed of the vocal chart in pixels per second at the default neck speed: a 1000 px wide window shows 2.5 s ahead, a wider one more.
@@ -510,6 +511,24 @@ export class Highway {
   }
 
   // The countdown running for a pane at `t`: { remaining, total } or null.
+  // How present the track of a pane is, 0..1: it dissolves in a long rest (the length a countdown would run for, whatever the countdown setting says)
+  // and is back 1 s before the next note appears at the far edge (`appearIn` = seconds ahead of the hit line at which a note becomes visible).
+  restFade(pane, t, appearIn) {
+    pane.restWaits ??= waitCountdowns(pane.chart);
+    const c = countdownAt(pane.restWaits, t);
+    const target = c && c.remaining > appearIn + REST_BACK_SEC ? 0 : 1;
+    const st = (pane.restFade ??= { k: 1, at: performance.now() });
+    const now = performance.now();
+    st.k += (target - st.k) * (1 - Math.exp(-Math.min(0.1, (now - st.at) / 1000) / 0.3));
+    st.at = now;
+    return st.k;
+  }
+
+  // The opacity factor of a fretboard's dark base: REST_BOARD_MIN deep inside a long rest, 1 while there is music.
+  restBoard(t, appearIn) {
+    return REST_BOARD_MIN + (1 - REST_BOARD_MIN) * (this.curPane ? this.restFade(this.curPane, t, appearIn) : 1);
+  }
+
   countdownState(pane, t, lyrics = false) {
     if (!this.countdowns) return null;
     if (lyrics) pane.countdownsLyrics ??= waitCountdowns(pane.chart, { percussion: false }); // karaoke: percussion hits are no singing
@@ -1214,7 +1233,7 @@ export class Highway {
 
     // the board's neutral dark base, as opaque as the setting says: behind the notes and the guides, and not faded at the edges
     g.globalCompositeOperation = 'destination-over';
-    g.fillStyle = `rgba(0,0,0,${this.trackOpacity})`;
+    g.fillStyle = `rgba(0,0,0,${this.trackOpacity * this.restBoard(t, ahead - ENTRY_MARGIN_SEC)})`; // (more transparent in a long rest)
     g.fillRect(x0, 0, laneW * chart.lanes, h);
     g.globalCompositeOperation = 'source-over';
     // the board and the notes entering from the top dissolve into the background (an eased fade)
@@ -1246,13 +1265,8 @@ export class Highway {
     top = Math.max(top, bottom - this.vocalMaxArea(w)); // wide and low, like YARG's track: the notes stay close to the lyrics
     // The track: the note area is nearly see-through (the visualizer shows), the rows of lyrics keep their readable base.
     // The lyric track hugs the words, centred on them, and fades away while a percussion section or a rest with a countdown runs.
-    const st = (chart.trackFade ??= { k: 1, at: performance.now() });
-    const nowMs = performance.now();
-    // the lyric track goes away during a percussion section or a rest with a countdown, and comes back 5 s before the next words arrive
-    const wait = this.curPane && this.countdownState(this.curPane, t);
-    const counting = wait && wait.remaining > TRACK_BACK_SEC ? 0 : 1;
-    st.k += (counting - st.k) * (1 - Math.exp(-Math.min(0.1, (nowMs - st.at) / 1000) / 0.2));
-    st.at = nowMs;
+    // the lyric track goes away during a percussion section or a rest with a countdown, and comes back 1 s before the next words appear at the right edge
+    const st = { k: this.curPane ? this.restFade(this.curPane, t, look) : 1 };
     const trackA = 0.3 * st.k; // (the 0.15 layer under it is not drawn while it is hidden either)
     this.trackBase(0, 0, w, h, 0.15 * st.k);
     if (trackA > 0.004) {

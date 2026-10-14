@@ -317,7 +317,7 @@ export function renderLanes3D(hw, t, w, h) {
 
   // the board's neutral dark base, as opaque as the setting says: behind the notes and the guides, and not faded at the edges
   g.globalCompositeOperation = 'destination-over';
-  g.fillStyle = `rgba(0,0,0,${hw.trackOpacity})`;
+  g.fillStyle = `rgba(0,0,0,${hw.trackOpacity * hw.restBoard(t, windowSec)})`; // (more transparent in a long rest)
   quad(ROAD_NEAR, ROAD_END, -half, half);
   g.fill();
   g.globalCompositeOperation = 'source-over';
