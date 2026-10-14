@@ -2359,6 +2359,15 @@ const vizFoot = document.createElement('div');
 vizFoot.className = 'viz-foot';
 vizFoot.append(vizBlur.row, vizColor);
 vizPop.replaceChildren(vizList, vizFoot);
+// The visualizer's blur is a glass layer over the background canvas (CSS backdrop-filter, composited on the GPU) instead of
+// a blur drawn into the canvas every frame; the chart canvas is above it, so the notes stay sharp.
+function applyVizGlass() {
+  const px = prefs.get('highway.visualizerBlur');
+  const on = px > 0 && prefs.get('highway.visualizer') !== 'none';
+  document.documentElement.style.setProperty('--viz-blur', `${px}px`);
+  els.app.classList.toggle('viz-glass', on);
+  highway.invalidate?.();
+}
 function syncVizPop() {
   const id = prefs.get('highway.visualizer');
   for (const row of vizPop.querySelectorAll('.prow')) {
@@ -2666,9 +2675,9 @@ const EFFECTS = {
   'theme.saved': applyThemeSetting,
   'ui.radius': (v) => document.documentElement.style.setProperty('--radius', `${v}px`),
   'ui.font': (v) => document.documentElement.style.setProperty('--font', fontCss(v)),
-  'highway.visualizer': (v) => { vizDriver.select(v); highway.setVisualizer(vizDriver.fn); syncVizPop(); },
+  'highway.visualizer': (v) => { vizDriver.select(v); highway.setVisualizer(vizDriver.fn); applyVizGlass(); syncVizPop(); },
   'highway.visualizerQuality': (v) => { vizDriver.quality = { high: 1, medium: 0.6, low: 0.4 }[v] ?? 0.6; },
-  'highway.visualizerBlur': (v) => { vizDriver.blur = v; syncVizPop(); },
+  'highway.visualizerBlur': () => { applyVizGlass(); syncVizPop(); },
   'highway.trackOpacity': (v) => { highway.trackOpacity = v / 100; },
   'highway.stageColorOn': () => { applyStage(); syncVizPop(); },
   'highway.stageColor': () => { applyStage(); syncVizPop(); },

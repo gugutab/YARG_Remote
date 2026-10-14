@@ -1230,7 +1230,7 @@ export function createDriver({ getSource }) {
       s.section = sectionAt(data.sections, t);
       g.save();
       try {
-        if (driver.blur > 0) drawBlurred(g, s, bgRgb); else viz.draw(g, s);
+        if (driver.blur > 0) drawBlurred(g, s, bgRgb); else viz.draw(g, s); // (the app blurs with a CSS glass layer now and leaves driver.blur at 0)
       } catch (err) {
         failed = true; // never take the whole chart down with a background
         console.error('Visualizer failed:', err);

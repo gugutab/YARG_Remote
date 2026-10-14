@@ -1780,3 +1780,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .info-actions::before { content: ""; position: absolute; inset: 0; z-index: -1; background: color-mix(in srgb, var(--panel) 70%, transparent); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); pointer-events: none; }
 .info { z-index: 5; }
 :root[data-motion="on"] .info:not([hidden]) .info-card { animation: end-in .24s ease backwards; }
+
+/* The visualizer's blur: a glass layer between the background canvas and the chart (the notes stay sharp) */
+.bg-glass { display: none; position: absolute; inset: 0; z-index: 0; pointer-events: none; -webkit-backdrop-filter: blur(var(--viz-blur, 0px)); backdrop-filter: blur(var(--viz-blur, 0px)); }
+.app.viz-glass .bg-glass { display: block; }
