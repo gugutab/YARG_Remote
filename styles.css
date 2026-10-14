@@ -1907,3 +1907,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 
 /* End window: the instrument tables use the row's width (up to 320 px each), left to right, not centred */
 .end-cards { justify-content: space-between; }
+.end-cards { grid-template-columns: repeat(auto-fit, minmax(230px, 380px)); justify-content: start; } /* each card between 230 and 380 px: they share the row and wrap, left to right, no spreading gaps */
+.end-cards { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start; }
+.end-cards[hidden] { display: none; }
+.end-inst { flex: 1 1 230px; min-width: 230px; max-width: 380px; } /* grow from 230 to 380 px to fill the row, wrap when there is no room */
