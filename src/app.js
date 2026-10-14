@@ -151,7 +151,8 @@ function syncPanelUi() {
   try { last = JSON.parse(localStorage.getItem('yargremote.panelState')) || {}; } catch { /* none */ }
   const start = prefs.get('panels.libraryStart');
   const opening = parseRoute(location.hash).view !== 'library'; // a deep link names a song: the drawer would only be in the way
-  const open = narrow() ? !opening : (start === 'last' ? last.library !== false : start !== 'closed');
+  const playLink = parseRoute(location.hash).view === 'play'; // a link that goes straight to the player: no library window
+  const open = playLink ? false : narrow() ? !opening : (start === 'last' ? last.library !== false : start !== 'closed');
   els.app.classList.toggle('lib-closed', !open);
   syncWindow();
   syncPanelUi();
