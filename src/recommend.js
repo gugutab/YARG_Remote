@@ -28,7 +28,7 @@ function unitHash(text) {
 
 // -> [{ song, score, reason }] best first, at most `count`. `instruments` are the parts on screen ('guitar', 'bass', 'rhythm',
 // 'keys', 'drums', 'vocals'); the first is the active one, which a candidate must have.
-export function recommend(current, songs, { count = 7, instruments = [] } = {}) {
+export function recommend(current, songs, { count = 20, instruments = [] } = {}) {
   if (!current) return [];
   const active = instruments[0];
   const artist = groupKey(current.artist, 'artist');

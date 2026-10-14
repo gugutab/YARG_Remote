@@ -1742,7 +1742,7 @@ function syncPlayButton() {
 let ended = false;
 let endDismissed = false;
 let endShown = false;
-const NEXT_COUNT = 7;
+const NEXT_COUNT = 20;
 player.onSeek = () => setEnded(false);
 
 function setEnded(on) {
