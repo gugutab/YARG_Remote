@@ -557,7 +557,7 @@ export class Highway {
   vocalCenterY(chart, h, w = Infinity) {
     const second = (chart.lyrics2 || []).length > 0;
     const secondSize = Math.max(15, Math.min(26, h * 0.08));
-    const fontSize = Math.max(18, Math.min(30, h * 0.095));
+    const fontSize = Math.max(24, Math.min(36, h * 0.095));
     const lyricY = h - fontSize * 0.75;
     const bottom = lyricY - fontSize * 0.5 - 16;
     const top = Math.max(second ? secondSize * 0.75 + secondSize * 0.75 : 8, bottom - this.vocalMaxArea(w));
@@ -1240,7 +1240,7 @@ export class Highway {
     const secondSize = Math.max(15, Math.min(26, h * 0.08));
     const secondY = secondSize * 0.75; // the harmony line (and its track) sits right at the top edge
     let top = second ? secondY + secondSize * 0.75 : 8; // pitch area: below the second lyric line, if any, down to the lyrics
-    const fontSize = Math.max(18, Math.min(30, h * 0.095)); // lyric size, grows with the band
+    const fontSize = Math.max(24, Math.min(36, h * 0.095)); // lyric size, grows with the band
     const lyricY = h - fontSize * 0.75; // the lyrics and their track sit right at the bottom edge of the window
     const bottom = lyricY - fontSize * 0.5 - 16; // and 16 px of air between them and the notes
     top = Math.max(top, bottom - this.vocalMaxArea(w)); // wide and low, like YARG's track: the notes stay close to the lyrics

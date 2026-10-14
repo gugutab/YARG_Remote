@@ -240,18 +240,21 @@ els.npPreview.addEventListener('click', async () => {
 // The handle on the list pane's right edge (the window's right edge, or the divider while the details are open): drag to resize the LIST pane
 // (remembered; the window grows with it while the details are open); double-click restores the default width. The stage keeps its size either way. The window leaves the same margin on the right as on the left.
 const MIN_LIB_W = 300; // the list pane's minimum
-const CONTENT_MAX = 1400; // keep in step with --content-max in styles.css
+const CONTENT_MAX = 1400; // the content area never gets narrower than this (--content-max is set from contentMax(), see layoutWindow)
 const LIB_MARGIN = 12; // keep in step with --lib-gap in styles.css
 const INFO_MIN_W = 380; // the details pane never gets narrower than one column of cards
 const stageEl = document.getElementById('stage');
 const WIN_BORDER = 2; // the window's own 1 px border, left and right: the panes share the width inside it
 // the room the panes may take: the content area (--content-max, centred) between its two margins (the window starts at --lib-left), minus the border
+// The content area is 1400 px, and grows (up to 4K, 3840 px) when the "Maximum width" of the details asks for more than the list and the details fit in 1400.
+const contentMax = () => Math.min(3840, Math.max(CONTENT_MAX, Math.round(libPrefRaw()) + prefs.get('details.maxWidth') + 2 * LIB_MARGIN + WIN_BORDER));
 const contentWidth = () => {
   const w = stageEl.clientWidth || window.innerWidth;
-  return Math.max(0, w - 2 * Math.max(LIB_MARGIN, (w - CONTENT_MAX) / 2) - WIN_BORDER);
+  return Math.max(0, w - 2 * Math.max(LIB_MARGIN, (w - contentMax()) / 2) - WIN_BORDER);
 };
 // the list pane's widest width: all the room, or all but one column for the details while they are open
 const maxLibWidth = () => Math.max(MIN_LIB_W, contentWidth() - (infoOpen ? INFO_MIN_W : 0));
+const libPrefRaw = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lib-w')) || MIN_LIB_W;
 const libPref = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lib-w')) || MIN_LIB_W; // the list width the user chose (or the default)
 let winTotal = 0; // the panes' total width as last laid out (the window is WIN_BORDER wider)
 // Sizes the two panes (--list-w, --info-w) and the window (--win-w = list + details). The details get the room the list leaves, between one
@@ -259,6 +262,7 @@ let winTotal = 0; // the panes' total width as last laid out (the window is WIN_
 // the list closed the window is the details pane alone. Phone: the drawer's own CSS sizes everything.
 function layoutWindow() {
   const style = els.app.style;
+  document.documentElement.style.setProperty('--content-max', `${contentMax()}px`); // (the CSS side of the content area: where the window starts, how wide the settings may be)
   if (narrow()) { for (const v of ['--list-w', '--info-w', '--win-w']) style.removeProperty(v); return; }
   const listOn = libraryOpen();
   if (!listOn && !infoOpen) return; // closed: keep the size it slides out with

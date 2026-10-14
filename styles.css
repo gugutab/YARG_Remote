@@ -1911,3 +1911,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .end-cards { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start; }
 .end-cards[hidden] { display: none; }
 .end-inst { flex: 1 1 230px; min-width: 230px; max-width: 380px; } /* grow from 230 to 380 px to fill the row, wrap when there is no room */
+
+/* Bigger instrument icons on the fretboard and vocal windows' tags */
+.pane-tag { height: 34px; border-radius: 17px; padding: 0 11px 0 10px; gap: 7px; }
+.pane-tag svg { width: 22px; height: 22px; }
