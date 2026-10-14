@@ -1827,3 +1827,13 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 @keyframes stage-in { from { opacity: 0; } to { opacity: 1; } }
 .info-top-text { overflow: hidden; }
 .info-top-text strong, .info-top-text span { max-width: 100%; }
+
+/* ---------- Details: two-line title in the window header; the album art fills its card edge to edge ---------- */
+.info-top-text strong { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; text-overflow: ellipsis; overflow-wrap: anywhere; }
+#info .info-head { padding: 0; overflow: hidden; align-items: stretch; gap: 0; }
+#info .info-head img, #info[data-cover] .info-head img { border-radius: 0; margin: 0; }
+#info .info-head-text { padding: 14px; min-width: 0; }
+#info.compact .info-head-text { padding: 10px 12px; }
+@container (min-width: 652px) {
+  #info .info-head img, #info[data-cover] .info-head img { height: auto; align-self: stretch; min-height: 100%; object-fit: cover; }
+}
