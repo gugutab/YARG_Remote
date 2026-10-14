@@ -19,7 +19,7 @@ const icon = (name) => {
   return s;
 };
 
-export function mountSettings({ root, settings, sections, renderers = {}, onClose = () => {} }) {
+export function mountSettings({ root, settings, sections, renderers = {}, onOpen = () => {}, onClose = () => {} }) {
   const refreshers = []; // called whenever a setting changes, to bring the controls up to date
   const visibility = []; // { row, item } for `when`
   let query = '';
@@ -173,6 +173,7 @@ export function mountSettings({ root, settings, sections, renderers = {}, onClos
   }, { passive: true });
 
   function open(sectionId) {
+    onOpen();
     root.hidden = false;
     document.body.classList.add('settings-open');
     refresh();

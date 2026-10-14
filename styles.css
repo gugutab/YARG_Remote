@@ -1784,3 +1784,12 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 /* The visualizer's blur: a glass layer between the background canvas and the chart (the notes stay sharp) */
 .bg-glass { display: none; position: absolute; inset: 0; z-index: 0; pointer-events: none; -webkit-backdrop-filter: blur(var(--viz-blur, 0px)); backdrop-filter: blur(var(--viz-blur, 0px)); }
 .app.viz-glass .bg-glass { display: block; }
+
+/* ---------- One maximum size for the floating windows: the content area, 1400 px centred (like the player bar) ---------- */
+:root { --content-max: 1400px; } /* (on :root: the settings page lives outside .app) */
+.app { --lib-left: max(var(--lib-gap), calc((100% - var(--content-max)) / 2)); }
+@media (min-width: 701px) {
+  .library { left: var(--lib-left); max-width: calc(var(--content-max) - 2 * var(--lib-gap)); }
+  .app:not(.lib-closed) { --lib-inset: calc(var(--lib-left) + var(--lib-w) + var(--lib-gap)); }
+  .settings-page { inset: 16px max(16px, calc((100% - min(1120px, var(--content-max))) / 2)); }
+}

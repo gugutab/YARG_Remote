@@ -125,6 +125,7 @@ function savePanelState() {
   try { localStorage.setItem('yargremote.panelState', JSON.stringify({ library: libraryOpen() })); } catch { /* optional */ }
 }
 function setLibraryOpen(open, persist = true) {
+  if (open && typeof settingsPage !== 'undefined' && settingsPage.isOpen()) settingsPage.close(); // one window at a time: the library and the settings never share the screen
   els.app.classList.toggle('lib-closed', !open);
   els.library.inert = !open; // closed: nothing in it takes focus or clicks (it is only moved and faded out, not removed)
   syncPanelUi();
@@ -229,8 +230,9 @@ els.npPreview.addEventListener('click', async () => {
 // The handle on the library window's right edge: drag to resize the window (remembered); double-click restores the default width.
 // The stage keeps its size either way. The window leaves the same margin on the right as it has on the left.
 const MIN_LIB_W = 300;
+const CONTENT_MAX = 1400; // keep in step with --content-max in styles.css
 const LIB_MARGIN = 12; // keep in step with --lib-gap in styles.css
-const maxLibWidth = () => Math.max(MIN_LIB_W, window.innerWidth - 2 * LIB_MARGIN);
+const maxLibWidth = () => Math.max(MIN_LIB_W, Math.min(window.innerWidth, CONTENT_MAX) - 2 * LIB_MARGIN); // never wider than the content area (--content-max)
 function setLibWidth(px) {
   if (px == null) document.documentElement.style.removeProperty('--lib-w');
   else document.documentElement.style.setProperty('--lib-w', `${Math.round(px)}px`);
@@ -2697,6 +2699,7 @@ reduceQuery.addEventListener?.('change', (e) => { osReduceMotion = e.matches; EF
 
 const settingsPage = mountSettings({
   root: document.getElementById('settingsPage'), settings: prefs, sections: SECTIONS,
+  onOpen: () => { if (libraryOpen()) setLibraryOpen(false, false); }, // (not remembered: the library comes back as it was at the next start)
   renderers: {
     'shortcuts.bindings': (host, ctx) => renderShortcuts(host, { ...ctx, notify: setStatus }),
     theme: (host, ctx) => renderThemeStudio(host, { ...ctx, prefersDark: () => darkQuery.matches, notify: setStatus }),
