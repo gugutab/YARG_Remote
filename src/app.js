@@ -9,6 +9,7 @@ import { createPerfOverlay, PERF_MODES } from './perf-overlay.js';
 import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, readBytes, serializeSongs, restoreSongs, restoreRemoteSongs } from './library.js';
 import { songDelaySeconds, plainText, packOf } from './ini.js';
 import { actionFor, comboOf } from './shortcuts.js';
+import { attachScrollThumb } from './scrollthumb.js';
 import { previewWindow } from './preview.js';
 import { metaRows, extraRows, chartStats, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel } from './songinfo.js';
 import { parseRoute, formatRoute } from './route.js';
@@ -768,6 +769,7 @@ function renderLoadState() {
 // The details are a glass window over the stage (like the library and the settings). The chart keeps running behind it and the player
 // bar stays visible. Settings and details are exclusive; the library may stay open next to it.
 const infoScroll = els.info.querySelector('.info-scroll');
+attachScrollThumb(infoScroll); // the library's rail style instead of the native scrollbar
 let infoOpener = null; // what had the focus when the window opened, so it gets it back when the window closes
 
 function setInfoOpen(open) {

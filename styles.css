@@ -1855,3 +1855,12 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 #infoProgress:not([data-state="error"]) { display: none; }
 .info-actions { justify-content: stretch; }
 .info-actions .cta { flex: 1; justify-content: center; min-height: 44px; }
+
+/* ---------- Overlay scroll thumb (src/scrollthumb.js): the library rail's look, for scrollers like the details window ---------- */
+.thumb-scroll { scrollbar-width: none; }
+.thumb-scroll::-webkit-scrollbar { display: none; }
+.sthumb-track { position: absolute; right: 0; width: 22px; z-index: 3; touch-action: none; cursor: pointer; user-select: none; }
+.sthumb-track.off { visibility: hidden; }
+.sthumb { position: absolute; right: 0; top: 0; width: 14px; border-radius: 6px; background: rgba(120, 150, 255, .16); border: 1px solid rgba(120, 150, 255, .28); box-sizing: border-box; transition: background .15s; }
+.sthumb-track:hover .sthumb, .sthumb-track.dragging .sthumb { background: rgba(120, 150, 255, .3); }
+.info-scroll.thumb-scroll { padding-right: 24px; } /* the thumb sits over the right edge: keep the cards clear of it */
