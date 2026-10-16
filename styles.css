@@ -2213,3 +2213,10 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .songs-wrap, .info-scroll { background: color-mix(in srgb, var(--panel-2) 55%, transparent); }
 .library .group-label { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 #songs { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 26px); mask-image: linear-gradient(to bottom, transparent 0, #000 26px); }
+
+/* Scroll areas (library list and details) and the pinned sub-header share one dark translucent background P. The list paints P everywhere
+   except under the pinned label, which paints P itself (so the two never stack into a darker band). */
+:root { --scroll-bg: color-mix(in srgb, var(--bg) 62%, transparent); }
+.songs-wrap, .info-scroll { background: var(--scroll-bg); }
+.songs-wrap:has(.group-label:not([hidden])) { background: linear-gradient(var(--scroll-bg), var(--scroll-bg)) 0 100% / 100% calc(100% - 26px) no-repeat; }
+.library .group-label { background: var(--scroll-bg); }
