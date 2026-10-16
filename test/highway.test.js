@@ -130,3 +130,53 @@ test('star power notes are the lane colour under an 80% white overlay', async ()
   assert.equal(noteColor({ sp: true, lane: 0 }, ['#79d304']), '#e4f6cd');
   assert.equal(noteColor({ sp: false, lane: 0 }, ['#79d304']), '#79d304');
 });
+
+test('spansOfKind filters once per chart and list, and follows a replaced list', async () => {
+  const { spansOfKind } = await import('../src/gfx.js');
+  const list = [{ kind: 'fill', start: 1, end: 2 }, { kind: 'bre', start: 3, end: 4 }, { kind: 'fill', start: 5, end: 6 }];
+  const chart = { fills: list };
+  const fills = spansOfKind(chart, chart.fills, 'kind', 'fill');
+  assert.deepEqual(fills.map((s) => s.start), [1, 5]);
+  assert.equal(spansOfKind(chart, chart.fills, 'kind', 'fill'), fills); // the same array: not filtered again
+  assert.deepEqual(spansOfKind(chart, chart.fills, 'kind', 'bre').map((s) => s.start), [3]);
+  assert.deepEqual(spansOfKind(chart, chart.fills, 'type', 'fill'), []); // another key is another cache entry
+  chart.fills = [{ kind: 'fill', start: 9, end: 10 }];
+  assert.deepEqual(spansOfKind(chart, chart.fills, 'kind', 'fill').map((s) => s.start), [9]);
+  assert.deepEqual(spansOfKind({}, undefined, 'kind', 'fill'), []);
+});
+
+test('the cached colour strings are the same text as before and are reused', async () => {
+  const { tintWhite, darken, withAlpha, starPowerColor, boardBase } = await import('../src/gfx.js');
+  assert.equal(tintWhite('#ff0000', 0.5), 'rgb(255,128,128)');
+  assert.equal(darken('#ff8000', 0.5), 'rgb(128,64,0)');
+  assert.equal(withAlpha('#0a141e', 0.25), 'rgba(10,20,30,0.25)');
+  assert.equal(starPowerColor('#79d304'), starPowerColor('#79d304'));
+  assert.equal(boardBase(0.75), 'rgba(0,0,0,0.75)');
+  assert.equal(boardBase(0.75), 'rgba(0,0,0,0.75)');
+  assert.equal(boardBase(0.2), 'rgba(0,0,0,0.2)');
+});
+
+test('fadeGradient keeps the gradient of a stop list and range, and builds another for a new range', async () => {
+  const { fadeGradient, BOTTOM_FADE_STOPS } = await import('../src/gfx.js');
+  let made = 0;
+  const g = { createLinearGradient: () => { made++; const stops = []; return { stops, addColorStop: (at, c) => stops.push([at, c]) }; } };
+  const a = fadeGradient(g, 10, 50, BOTTOM_FADE_STOPS);
+  assert.equal(fadeGradient(g, 10, 50, BOTTOM_FADE_STOPS), a);
+  assert.equal(made, 1);
+  assert.deepEqual(a.stops, BOTTOM_FADE_STOPS);
+  assert.notEqual(fadeGradient(g, 10, 60, BOTTOM_FADE_STOPS), a);
+  assert.equal(made, 2);
+});
+
+test('vocalRange eases the shown range in place and starts at the target', async () => {
+  const { Highway } = await import('../src/highway.js');
+  const hw = Object.create(Highway.prototype);
+  hw.chart = { notes: [{ pitch: 50 }, { pitch: 70 }], harmonies: [] };
+  const first = hw.vocalRange(0, 3);
+  assert.equal(first, hw.vRange);
+  const [lo, hi] = [first[0], first[1]];
+  assert.ok(lo < 50 && hi > 70);
+  const again = hw.vocalRange(1, 3);
+  assert.equal(again, first); // (same array: no new one per frame)
+  assert.deepEqual([again[0], again[1]], [lo, hi]); // already at the target: it stays
+});

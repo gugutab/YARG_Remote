@@ -51,28 +51,32 @@ function cachedColor(kind, hex, amount, steps, build) {
   const q = Math.round(Math.min(1, Math.max(0, amount)) * steps);
   return row[q] ?? (row[q] = build(hex, q / steps));
 }
+// (the builders are module functions: an arrow written inside tintWhite/darken/withAlpha was a new closure on every call)
+const buildTint = (h, a) => {
+  const n = parseInt(h.slice(1), 16);
+  const mix = (c) => Math.round(c + (255 - c) * a);
+  return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
+};
+const buildDark = (h, a) => {
+  const n = parseInt(h.slice(1), 16);
+  const mix = (c) => Math.round(c * a);
+  return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
+};
+const buildAlpha = (h, a) => {
+  const n = parseInt(h.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+};
 
 export function tintWhite(hex, amount) {
-  return cachedColor(0, hex, amount, 64, (h, a) => {
-    const n = parseInt(h.slice(1), 16);
-    const mix = (c) => Math.round(c + (255 - c) * a);
-    return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
-  });
+  return cachedColor(0, hex, amount, 64, buildTint);
 }
 
 export function darken(hex, factor) {
-  return cachedColor(1, hex, factor, 100, (h, a) => {
-    const n = parseInt(h.slice(1), 16);
-    const mix = (c) => Math.round(c * a);
-    return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
-  });
+  return cachedColor(1, hex, factor, 100, buildDark);
 }
 
 export function withAlpha(hex, alpha) {
-  return cachedColor(2, hex, alpha, 100, (h, a) => {
-    const n = parseInt(h.slice(1), 16);
-    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
-  });
+  return cachedColor(2, hex, alpha, 100, buildAlpha);
 }
 
 // A long note keeps its head on the hit line while it lasts; the exit animation starts when the tail ends.
@@ -101,16 +105,19 @@ export function heldAmount(n, t) {
 // edge. `color` is a #rrggbb string. The caller positions/scales the context (an ellipse is a scaled circle).
 export function fillHalo(g, color, inner, outer, strength) {
   // The gradient does not depend on the strength (that is the global alpha), so it is built once per colour and size, not per note per frame.
-  const key = `${color}|${inner}|${outer}`;
-  let grad = haloGradients.get(key);
+  // (Looked up by colour, then by size in a short list: a string key built from the numbers was garbage for every halo on every frame.)
+  let entries = haloGradients.get(color);
+  let grad = null;
+  if (entries) for (let i = 0; i < entries.length; i++) if (entries[i].inner === inner && entries[i].outer === outer) { grad = entries[i].grad; break; }
   if (!grad) {
-    const n = parseInt(color.slice(1), 16);
-    const rgb = `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+    const stops = haloStops(color);
     grad = g.createRadialGradient(0, 0, inner, 0, 0, outer);
     // eased falloff (smoothstep, see haloProfile): strongest at `inner`, zero slope at both ends, nothing at the edge
-    for (let i = 0; i <= 12; i++) grad.addColorStop(i / 12, `rgba(${rgb},${haloProfile(i / 12)})`);
-    if (haloGradients.size >= 96) haloGradients.clear(); // (3D sizes change with the distance: do not grow without bound)
-    haloGradients.set(key, grad);
+    for (let i = 0; i <= 12; i++) grad.addColorStop(i / 12, stops[i]);
+    if (haloCount >= 96) { haloGradients.clear(); haloCount = 0; entries = undefined; } // (3D sizes change with the distance: do not grow without bound)
+    if (!entries) haloGradients.set(color, (entries = []));
+    entries.push({ inner, outer, grad });
+    haloCount++;
   }
   const alpha = g.globalAlpha;
   g.globalAlpha = alpha * strength;
@@ -120,7 +127,20 @@ export function fillHalo(g, color, inner, outer, strength) {
   g.fill();
   g.globalAlpha = alpha;
 }
-const haloGradients = new Map();
+const haloGradients = new Map(); // colour -> [{ inner, outer, grad }]
+let haloCount = 0;
+// The 13 colour-stop strings of a halo, per colour (the gradient itself is rebuilt whenever the size moves, but its strings never change).
+const haloStopCache = new Map();
+function haloStops(color) {
+  let list = haloStopCache.get(color);
+  if (!list) {
+    const rgb = hexRgb(color);
+    list = [];
+    for (let i = 0; i <= 12; i++) list.push(`rgba(${rgb},${haloProfile(i / 12)})`);
+    haloStopCache.set(color, list);
+  }
+  return list;
+}
 
 // Soft falloff of the halo around a held tail: [distance from the strip's edge as a fraction of the reach, strength].
 // Smoothstep falloff: it starts and ends with zero slope, so the glow dies out gently instead of ending abruptly.
@@ -137,8 +157,10 @@ function hexRgb(color) {
 export function fillTailHalo(g, color, cx, half, reach, yTop, yBot, strength, withCap) {
   // The gradients are built around x = 0 with the strength left to the global alpha, then cached per colour and size: a tail's halo
   // is the same shape every frame, only its position (a translate) and strength change.
-  const key = `${color}|${half}|${reach}`;
-  let pair = tailHaloGradients.get(key);
+  // (looked up by colour, then by size in a short list: a string key built from the numbers was garbage for every held tail on every frame)
+  let entries = tailHaloGradients.get(color);
+  let pair = null;
+  if (entries) for (let i = 0; i < entries.length; i++) if (entries[i].half === half && entries[i].reach === reach) { pair = entries[i]; break; }
   if (!pair) {
     const rgb = hexRgb(color);
     const total = 2 * (half + reach);
@@ -150,9 +172,11 @@ export function fillTailHalo(g, color, cx, half, reach, yTop, yBot, strength, wi
     for (const [f, a] of TAIL_HALO_PROFILE) lin.addColorStop(1 - (reach * (1 - f)) / total, `rgba(${rgb},${a})`);
     const rad = g.createRadialGradient(0, 0, half, 0, 0, half + reach);
     for (const [f, a] of TAIL_HALO_PROFILE) rad.addColorStop(f, `rgba(${rgb},${a})`);
-    pair = { lin, rad };
-    if (tailHaloGradients.size >= 96) tailHaloGradients.clear();
-    tailHaloGradients.set(key, pair);
+    pair = { half, reach, lin, rad };
+    if (tailHaloCount >= 96) { tailHaloGradients.clear(); tailHaloCount = 0; entries = undefined; }
+    if (!entries) tailHaloGradients.set(color, (entries = []));
+    entries.push(pair);
+    tailHaloCount++;
   }
   const total = 2 * (half + reach);
   g.save();
@@ -172,7 +196,8 @@ export function fillTailHalo(g, color, cx, half, reach, yTop, yBot, strength, wi
   }
   g.restore();
 }
-const tailHaloGradients = new Map();
+const tailHaloGradients = new Map(); // colour -> [{ half, reach, lin, rad }]
+let tailHaloCount = 0;
 
 export const HIT_FLASH_SEC = 0.14; // how long a hit pad stays lit after a note hit
 export const BAR_FLASH_SEC = 0.24; // ... after a pedal or open hit (it lights every pad)
@@ -305,19 +330,27 @@ export const noteScale = (n) => (n.hopo ? HOPO_SCALE : 1);
 
 // Star power notes: a white overlay at 80% over the lane colour (the colour and the centre still show through).
 export const STAR_POWER_OVERLAY = 0.8;
+const starPowerColors = new Map(); // hex -> result (a handful of lane colours: the string was rebuilt for every star power note on every frame)
 export function starPowerColor(hex) {
-  const n = parseInt(hex.slice(1), 16);
-  const mix = (c) => Math.round(c + (255 - c) * STAR_POWER_OVERLAY).toString(16).padStart(2, '0');
-  return `#${mix((n >> 16) & 255)}${mix((n >> 8) & 255)}${mix(n & 255)}`;
+  let out = starPowerColors.get(hex);
+  if (out === undefined) {
+    const n = parseInt(hex.slice(1), 16);
+    const mix = (c) => Math.round(c + (255 - c) * STAR_POWER_OVERLAY).toString(16).padStart(2, '0');
+    out = `#${mix((n >> 16) & 255)}${mix((n >> 8) & 255)}${mix(n & 255)}`;
+    if (starPowerColors.size >= 64) starPowerColors.clear();
+    starPowerColors.set(hex, out);
+  }
+  return out;
 }
 export const noteColor = (n, colors) => (n.sp ? starPowerColor(colors[n.lane]) : colors[n.lane]);
 
 // The spans of `list` (chart.fills, chart.rolls) whose `key` is `value`, filtered once per chart instead of on every frame.
 export function spansOfKind(chart, list, key, value) {
-  const cache = (chart.spanKinds ??= new Map());
-  const id = `${key}:${value}`;
-  let hit = cache.get(id);
-  if (!hit || hit.src !== list) { hit = { src: list, spans: (list || []).filter((x) => x[key] === value) }; cache.set(id, hit); }
+  const byKey = (chart.spanKinds ??= new Map()); // key -> (value -> { src, spans }); no "key:value" string per call
+  let cache = byKey.get(key);
+  if (!cache) byKey.set(key, (cache = new Map()));
+  let hit = cache.get(value);
+  if (!hit || hit.src !== list) { hit = { src: list, spans: (list || []).filter((x) => x[key] === value) }; cache.set(value, hit); }
   return hit.spans;
 }
 
@@ -328,3 +361,22 @@ const smootherstep = (u) => u * u * u * (u * (u * 6 - 15) + 10);
 export const BOTTOM_FADE_STOPS = [[0, 0], [0.3, 0.2], [0.6, 0.6], [0.85, 0.92], [1, 1]].map(([at, a]) => [at, fadeColor(a)]); // just below the pads
 export const EDGE_FADE_STOPS = Array.from({ length: 13 }, (_, n) => { const u = n / 12; return [u, fadeColor((1 - smootherstep(u)).toFixed(3))]; }); // far edge of the board
 export const LYRIC_RAMP_STOPS = Array.from({ length: 17 }, (_, n) => { const pos = n / 16; return [pos, fadeColor(1 - smootherstep(Math.pow(pos, 0.7)))]; }); // lyric sheet edges
+
+// A vertical gradient (x = 0) of one of the stop lists above from y0 to y1, kept for the next frame: panes of the same height share it
+// and it only changes with the window size, so it is not rebuilt (13 colour stops each) for every pane on every frame.
+const fadeGradients = new Map(); // stops -> [{ y0, y1, grad }]
+export function fadeGradient(g, y0, y1, stops) {
+  let list = fadeGradients.get(stops);
+  if (!list) fadeGradients.set(stops, (list = []));
+  for (let i = 0; i < list.length; i++) if (list[i].y0 === y0 && list[i].y1 === y1) return list[i].grad;
+  const grad = g.createLinearGradient(0, y0, 0, y1);
+  for (let i = 0; i < stops.length; i++) grad.addColorStop(stops[i][0], stops[i][1]);
+  if (list.length >= 8) list.shift(); // (a window being resized makes a new one per frame)
+  list.push({ y0, y1, grad });
+  return grad;
+}
+
+// The fillStyle of a fretboard's dark base (black at the given opacity): the same text again while the opacity does not change.
+let baseAlpha = -1;
+let baseStyle = '';
+export const boardBase = (a) => (a === baseAlpha ? baseStyle : (baseStyle = `rgba(0,0,0,${(baseAlpha = a)})`));

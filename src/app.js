@@ -2160,7 +2160,9 @@ const seenTags = new Set(); // (reused: one Set per frame was garbage)
 function syncPaneTags() {
   const seen = seenTags;
   seen.clear();
-  for (const r of highway.paneRects) {
+  const rects = highway.paneRects;
+  for (let i = 0; i < rects.length; i++) {
+    const r = rects[i];
     seen.add(r.key);
     if (r.chooser) { // a slot for choosing an instrument: the cards fill the rectangle
       let box = chooserEls.get(r.key);
@@ -2171,11 +2173,13 @@ function syncPaneTags() {
         chooserEls.set(r.key, box);
         fillChooser(box, r.key);
       }
-      const st = `${Math.round(r.x + 8)}|${Math.round(r.y + 8)}|${Math.round(r.w - 16)}|${Math.round(r.h - 16)}`;
-      if (box._st !== st) {
-        const [bx, by, bw, bh] = st.split('|');
+      const bx = Math.round(r.x + 8);
+      const by = Math.round(r.y + 8);
+      const bw = Math.round(r.w - 16);
+      const bh = Math.round(r.h - 16);
+      if (box._bx !== bx || box._by !== by || box._bw !== bw || box._bh !== bh) { // (numbers compared, no string per frame)
         Object.assign(box.style, { left: `${bx}px`, top: `${by}px`, width: `${bw}px`, height: `${bh}px` });
-        box._st = st;
+        box._bx = bx; box._by = by; box._bw = bw; box._bh = bh;
       }
       continue;
     }
@@ -2189,18 +2193,21 @@ function syncPaneTags() {
       els.paneTags.append(el);
       paneTags.set(r.key, el);
     }
-    el.dataset.key = r.key;
+    if (el._key !== r.key) { el.dataset.key = r.key; el._key = r.key; }
     if (el._icon !== r.icon) { el.querySelector('use').setAttribute('href', `#i-${r.icon}`); el._icon = r.icon; }
     if (el._label !== r.label) { el.querySelector('span').textContent = r.label; el.title = r.label; el.setAttribute('aria-label', r.label); el._label = r.label; el._w = 0; }
     if (!el._w) el._w = el.offsetWidth; // measured when the label changes, not every frame
-    const tx = `translate(${Math.round(r.x + r.w - 8 - el._w)}px, ${Math.round(r.y + 8)}px)`; // the top right corner of its window
-    if (el._tx !== tx) { el.style.transform = tx; el._tx = tx; }
+    const tx = Math.round(r.x + r.w - 8 - el._w); // the top right corner of its window
+    const ty = Math.round(r.y + 8);
+    if (el._tx !== tx || el._ty !== ty) { el.style.transform = `translate(${tx}px, ${ty}px)`; el._tx = tx; el._ty = ty; }
     const open = menuKey === r.key && !els.paneMenu.hidden;
     if (el._open !== open) { el.setAttribute('aria-expanded', String(open)); el._open = open; }
   }
-  for (const [key, el] of paneTags) if (!seen.has(key)) { el.remove(); paneTags.delete(key); }
-  for (const [key, el] of chooserEls) if (!seen.has(key)) { el.remove(); chooserEls.delete(key); }
+  paneTags.forEach(dropGoneTag); // (forEach with a module function: for-of over a Map made an entry array per tag per frame)
+  chooserEls.forEach(dropGoneChooser);
 }
+function dropGoneTag(el, key) { if (!seenTags.has(key)) { el.remove(); paneTags.delete(key); } }
+function dropGoneChooser(el, key) { if (!seenTags.has(key)) { el.remove(); chooserEls.delete(key); } }
 
 function openPaneMenu(key, anchor) {
   if (!els.paneMenu.hidden && menuKey === key) { els.paneMenu.hidden = true; return; } // the tag again closes it
