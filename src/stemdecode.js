@@ -3,18 +3,20 @@
 //   stems: [{ id, label, ... }]; decode(stem) -> Promise of whatever the caller wants to keep;
 //   onProgress(fraction) reaches 1 even when some stems fail; shouldStop() true abandons the work (returns null).
 // Returns { ok: [{ stem, value }], failed: [{ id, label, error }] }. If nothing decoded, throws the first error.
-const DECODE_PARALLEL = 3;
+const DECODE_PARALLEL = 6; // every stem of a normal song at once (the decoder itself runs off the main thread)
 export async function decodeAll(stems, decode, onProgress = () => {}, shouldStop = () => false) {
   const ok = [];
   const failed = [];
   let done = 0;
   // A few stems decode at once (the load was one by one: the slowest part of starting a song); results keep the stems' order.
   const results = new Array(stems.length);
+  // Start with the stems that matter (the crowd is long and the least needed): the queue is taken in this order, results keep the stems' order.
+  const order = stems.map((_, i) => i).sort((x, y) => (stems[x].id === 'crowd') - (stems[y].id === 'crowd') || x - y);
   let next = 0;
   let stopped = false;
   const worker = async () => {
     while (!stopped && next < stems.length) {
-      const i = next++;
+      const i = order[next++];
       const stem = stems[i];
       try {
         const value = await decode(stem);
