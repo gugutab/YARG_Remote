@@ -147,9 +147,21 @@ function syncWindow() {
 }
 // The edge tabs bring a closed library back (the settings tab keeps Settings one click away while the library header, which holds the gear, is hidden).
 let dockTimer = 0; // (the dock's close timer; declared before syncPanelUi first runs)
+// The dock on the left edge is always there (on a phone it gives way while a window is open: the drawer and the settings fill the screen).
+// It shows which windows are open: the Library button (the list and/or the song details) and the Settings button light up, and the handle
+// takes the accent colour; pressing the button of an open window closes it.
+let settingsFlag = false; // the settings window is open (set by its onOpen / onClose: the page object itself is created further down)
+const settingsIsOpen = () => settingsFlag;
 function syncPanelUi() {
-  els.edgeDock.hidden = libraryOpen(); // the dock (Library and Settings buttons) is only there while the library window is closed
-  if (libraryOpen()) setDockOpen(false);
+  const lib = libraryOpen() || infoOpen;
+  const settingsOn = settingsIsOpen();
+  els.edgeDock.hidden = narrow() && (lib || settingsOn);
+  els.libTab.classList.toggle('on', lib);
+  els.libTab.setAttribute('aria-pressed', String(lib));
+  els.settingsTab.classList.toggle('on', settingsOn);
+  els.settingsTab.setAttribute('aria-pressed', String(settingsOn));
+  els.edgeDock.classList.toggle('has-open', lib || settingsOn);
+  document.body.classList.toggle('settings-open', settingsOn); // (the dock rises above the settings window)
 }
 (() => { // the library at startup: open, closed, or as it was last time (the "Panels" settings). A phone starts with the drawer closed, unless no song is being opened.
   let last = {};
@@ -186,8 +198,10 @@ els.edgeDock.addEventListener('focusin', () => setDockOpen(true));
 els.edgeDock.addEventListener('focusout', (e) => { if (e.relatedTarget && !els.edgeDock.contains(e.relatedTarget)) setDockOpen(false); }); // (a blur with no target is the app dropping the focus of a clicked button: not a reason to fold)
 document.addEventListener('pointerdown', (e) => { if (!els.edgeDock.contains(e.target)) setDockOpen(false); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setDockOpen(false); }, true);
-els.libTab.addEventListener('click', () => setLibraryOpen(true));
-els.settingsTab.addEventListener('click', () => settingsPage.open());
+els.libTab.addEventListener('click', () => {
+  if (libraryOpen() || infoOpen) { setLibraryOpen(false, false); if (infoOpen) setInfoOpen(false); } else setLibraryOpen(true); // an open window is closed by its button
+});
+els.settingsTab.addEventListener('click', () => (settingsIsOpen() ? settingsPage.close() : settingsPage.open()));
 
 // ---------- Peeking: resting the pointer on a handle opens its menu for a while ----------
 // Hovering the handle of a hidden menu (the library's tab) for a moment opens it
@@ -1059,6 +1073,7 @@ function setInfoOpen(open, { grow = true, release = true } = {}) {
   const keep = grow && was && !open && !narrow() && !wideWindow() && libraryOpen() ? Math.min(winTotal, Math.max(LIST_GROW_MAX, libPref())) : 0;
   if (open && typeof settingsPage !== 'undefined' && settingsPage.isOpen()) settingsPage.close(); // one window at a time
   infoOpen = open;
+  syncPanelUi();
   clearTimeout(infoHideTimer);
   els.info.inert = !open;
   if (open || libraryOpen()) els.info.hidden = !open;
@@ -3159,7 +3174,8 @@ reduceQuery.addEventListener?.('change', (e) => { osReduceMotion = e.matches; EF
 
 const settingsPage = mountSettings({
   root: document.getElementById('settingsPage'), settings: prefs, sections: SECTIONS,
-  onOpen: () => { if (libraryOpen()) setLibraryOpen(false, false); if (infoOpen) setInfoOpen(false); }, // (the list first, so it does not grow into the details' room; not remembered: the library comes back as it was at the next start)
+  onClose: () => { settingsFlag = false; syncPanelUi(); },
+  onOpen: () => { settingsFlag = true; if (libraryOpen()) setLibraryOpen(false, false); if (infoOpen) setInfoOpen(false); syncPanelUi(); }, // (the list first, so it does not grow into the details' room; not remembered: the library comes back as it was at the next start)
   renderers: {
     'shortcuts.bindings': (host, ctx) => renderShortcuts(host, { ...ctx, notify: setStatus }),
     theme: (host, ctx) => renderThemeStudio(host, { ...ctx, prefersDark: () => darkQuery.matches, notify: setStatus }),
@@ -3169,7 +3185,6 @@ const settingsPage = mountSettings({
     }),
   },
 });
-document.getElementById('openSettings').addEventListener('click', () => settingsPage.open());
 attachScrollThumb(document.querySelector('#settingsPage .sp-content')); // the same slim thumb as the details
 
 // ---------- Deep links: the URL hash names the open song ----------

@@ -2077,3 +2077,22 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 
 .song-top { gap: 8px; } /* (fitPacks reads this gap) */
 #songs li.row.normal .song-top .song-title { min-width: 0; } /* the title is what gives way (ellipsis) when even the short code leaves it too little */
+
+/* ---------- The dock stays on the left edge; it shows which windows are open ---------- */
+body.details-open .edge-dock { display: flex; } /* (it used to hide while the details were open) */
+.edge-dock { width: 24px; }
+.edge-dock.open { width: 58px; }
+body.settings-open .edge-dock { z-index: 85; } /* above the settings window and its dim layer */
+.edge-dock.has-open { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
+.edge-dock.has-open .dock-handle { color: var(--accent); }
+.edge-dock.has-open::after { content: ""; position: absolute; top: 8px; left: 50%; width: 6px; height: 6px; margin-left: -4px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); pointer-events: none; }
+.edge-dock.open.has-open::after { opacity: 0; }
+.dock-btn.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent); }
+
+/* Wide library header: the search keeps its maximum width and the sort / card-style tools sit right next to it; the folder and refresh tools stay at the far right */
+@media (min-width: 701px) {
+  .lib-header { grid-template-columns: auto auto minmax(160px, 560px) auto 1fr auto; grid-template-areas: "close title search bar . tools"; }
+}
+@container libpane (max-width: 640px) {
+  .lib-header { grid-template-columns: auto 1fr auto !important; grid-template-areas: "close title tools" "search search search" "bar bar bar" !important; }
+}
