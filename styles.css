@@ -2074,3 +2074,6 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 .song-packtag { flex: none; max-width: none; overflow: visible; text-overflow: clip; } /* (virtuallist.js fitPacks decides between the name and its code: no ellipsis) */
 
 .song-meta[hidden] { display: none; }
+
+.song-top { gap: 8px; } /* (fitPacks reads this gap) */
+#songs li.row.normal .song-top .song-title { min-width: 0; } /* the title is what gives way (ellipsis) when even the short code leaves it too little */

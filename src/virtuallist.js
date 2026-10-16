@@ -525,11 +525,16 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     const room = jobs.map((e) => { // (all reads first, then the writes: one layout pass)
       const box = e.parentElement;
       const large = box.classList.contains('song-pack');
-      const avail = large ? box.clientWidth - 18 : box.clientWidth * 0.42;
-      return { e, avail, w: widthOf(e.dataset.pack, getComputedStyle(e).font) };
+      const full = widthOf(e.dataset.pack, getComputedStyle(e).font);
+      if (large) return { e, short: full > box.clientWidth - 18 }; // own line: the name, or its code when the line is too narrow
+      // Medium card: the pack shares the row with the title. Order of preference: the full name; else the code (the title stays whole);
+      // only when even the code does not leave the title all its room does the title end in an ellipsis.
+      const title = box.querySelector('.song-title');
+      const gap = parseFloat(getComputedStyle(box).columnGap) || 0;
+      const t = title ? widthOf(title.textContent, getComputedStyle(title).font) : 0;
+      return { e, short: t + gap + full > box.clientWidth };
     });
-    for (const { e, avail, w } of room) {
-      const short = w > avail;
+    for (const { e, short } of room) {
       e.classList.toggle('short', short);
       e.textContent = short ? packCode(e.dataset.pack) : e.dataset.pack;
       e.title = short ? e.dataset.pack : '';
