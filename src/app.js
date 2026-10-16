@@ -278,8 +278,12 @@ let winTotal = 0; // the panes' total width as last laid out (the window is WIN_
 // Sizes the two panes (--list-w, --info-w) and the window (--win-w = list + details). The details get the room the list leaves, between one
 // column and the "Max width" setting; if both do not fit the list shrinks (down to MIN_LIB_W) and then the details, never overlapping. With
 // the list closed the window is the details pane alone. Phone: the drawer's own CSS sizes everything.
+const LARGE_STAGE_W = 1100; // from this stage width the library window is centred and takes the whole content width
+const wideWindow = () => !narrow() && (stageEl.clientWidth || window.innerWidth) >= LARGE_STAGE_W;
 function layoutWindow() {
   const style = els.app.style;
+  const wide = wideWindow();
+  els.app.classList.toggle('lib-wide', wide);
   document.documentElement.style.setProperty('--content-max', `${contentMax()}px`); // (the CSS side of the content area: where the window starts, how wide the settings may be)
   if (narrow()) { for (const v of ['--list-w', '--info-w', '--win-w']) style.removeProperty(v); return; }
   const listOn = libraryOpen();
@@ -292,8 +296,9 @@ function layoutWindow() {
     if (listOn) {
       list = Math.min(Math.max(libPref(), MIN_LIB_W), Math.max(MIN_LIB_W, room - INFO_MIN_W));
       info = Math.max(0, Math.min(infoMax, room - list));
+      if (wide) list = Math.max(MIN_LIB_W, room - info); // the window takes the whole width: the list gets what the details leave
     } else info = Math.min(infoMax, room);
-  } else list = Math.min(Math.max(libPref(), MIN_LIB_W), room);
+  } else list = wide ? room : Math.min(Math.max(libPref(), MIN_LIB_W), room);
   winTotal = Math.round(list) + Math.round(info);
   if (listOn) style.setProperty('--list-w', `${Math.round(list)}px`);
   if (infoOpen) style.setProperty('--info-w', `${Math.round(info)}px`);
@@ -922,7 +927,7 @@ const LIST_GROW_MAX = 640; // closing the details: the list takes the freed room
 function setInfoOpen(open, { grow = true, release = true } = {}) {
   const was = infoOpen;
   // closing the details next to the list: the list takes the window's width (the window does not jump); the grown width is not remembered
-  const keep = grow && was && !open && !narrow() && libraryOpen() ? Math.min(winTotal, Math.max(LIST_GROW_MAX, libPref())) : 0;
+  const keep = grow && was && !open && !narrow() && !wideWindow() && libraryOpen() ? Math.min(winTotal, Math.max(LIST_GROW_MAX, libPref())) : 0;
   if (open && typeof settingsPage !== 'undefined' && settingsPage.isOpen()) settingsPage.close(); // one window at a time
   infoOpen = open;
   clearTimeout(infoHideTimer);

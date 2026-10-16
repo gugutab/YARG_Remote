@@ -1929,3 +1929,10 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .dock-btn:hover, .dock-btn:focus-visible { color: var(--accent); background: var(--panel-2); }
 .dock-btn svg { width: 20px; height: 20px; }
 body.details-open .edge-dock { display: none; } /* the details fill the window area: no dock over them */
+
+/* Large screens: the library window is centred and takes the whole content width (layoutWindow sets --win-w); nothing is pushed aside, so the
+   welcome, load and end screens keep their own place behind it; its width is not draggable while the details are closed. */
+@media (min-width: 701px) {
+  .app.lib-wide:not(.lib-closed), .app.lib-wide.details-only { --lib-inset: var(--lib-left); }
+  .app.lib-wide:not(.info-open) #splitter { display: none; }
+}
