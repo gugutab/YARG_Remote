@@ -236,7 +236,7 @@ function setupPeek(handle, panel, { isOpen, open, close }) {
 setupPeek(els.libTab, els.library, { isOpen: libraryOpen, open: () => setLibraryOpen(true, false), close: () => setLibraryOpen(false, false) });
 els.npPlay.addEventListener('click', async () => { // the Listen card: play here, without leaving the details
   previewStop = null;
-  if (!player.playing && !(await ensureAudio())) return; // loads the audio the first time
+  if (!player.playing && !(await ensureAudio({ listen: true }))) return; // loads the audio the first time (only the audio: the stage is left alone)
   setEnded(false); // (play() starts over from the end by itself)
   if (player.playing) player.pause(); else await player.play();
   syncPlayButton();
@@ -248,7 +248,7 @@ els.npSeek.addEventListener('input', () => { previewStop = null; player.seek(Num
 let previewStop = null; // chart-clock second where the preview ends, or null when none is running
 els.npPreview.addEventListener('click', async () => {
   const win = current && previewWindow(current.song.ini);
-  if (!win || !(await ensureAudio())) return;
+  if (!win || !(await ensureAudio({ listen: true }))) return;
   const delay = songDelaySeconds(current.song.ini);
   player.seek(Math.max(0, win.start - delay));
   previewStop = Math.min(win.end - delay, player.duration);
@@ -894,14 +894,20 @@ async function selectSong(song) {
 
 // The audio (the heavy part) loads on demand: Play, the Listen card or Space. A loading screen covers the stage meanwhile.
 let audioLoad = null; // { song, promise } while a load runs
-function ensureAudio() {
+// `listen`: the Listen card only wants the sound: no loading screen, the stage (bar, fretboards, background) stays as it is and the progress
+// shows in the card. A later full Play on a load still running upgrades it to the normal one (loading screen).
+function ensureAudio({ listen = false } = {}) {
   if (ready) return Promise.resolve(true);
   if (!current || !chart) return Promise.resolve(false);
-  if (audioLoad?.song === current.song) return audioLoad.promise;
+  if (audioLoad?.song === current.song) {
+    if (audioLoad.listen && !listen) { audioLoad.listen = false; stageLoading(); renderLoadState(); }
+    return audioLoad.promise;
+  }
   const token = loadToken;
   const song = current.song;
+  const rec = { song, promise: null, listen }; // (audioLoad is cleared in the finally below, before the result is used: keep our own record)
   const promise = (async () => {
-    stageLoading(); // the loading screen sits on the plain background: no old bar, no old fretboards
+    if (!listen) stageLoading(); // the loading screen sits on the plain background: no old bar, no old fretboards
     setLoadState('loading', 'Loading audio…', 0.02);
     let loaded = false;
     try {
@@ -910,7 +916,7 @@ function ensureAudio() {
         onProgress: (p) => { if (token === loadToken) setLoadState('loading', `Loading audio… ${Math.round(p * 100)}%`, 0.02 + p * 0.98); },
       });
     } catch (err) {
-      if (token === loadToken) { markStageLive(); setLoadState('error', `${err?.name === 'EncodingError' || /decode/i.test(err?.message || '') ? 'Failed to decode audio' : 'Could not load the audio'}: ${err.message}`); setInfoOpen(true); }
+      if (token === loadToken) { if (!rec.listen) markStageLive(); setLoadState('error', `${err?.name === 'EncodingError' || /decode/i.test(err?.message || '') ? 'Failed to decode audio' : 'Could not load the audio'}: ${err.message}`); setInfoOpen(true); }
       return false;
     } finally {
       if (audioLoad?.song === song) { audioLoad = null; renderLoadState(); } // (the Play buttons come back enabled, so a retry works)
@@ -928,11 +934,11 @@ function ensureAudio() {
     ready = true;
     const nFailed = failedIds.size;
     setLoadState('ready', nFailed ? `Ready to play (${nFailed} ${nFailed === 1 ? 'stem' : 'stems'} could not be decoded)` : 'Ready to play', 1);
-    markStageLive(); // a song has played: from now on the player bar belongs to the screen
-    releaseStage(); // loaded: the bar and the tracks of the new song come in now
+    if (!rec.listen) { markStageLive(); releaseStage(); } // loaded: the bar and the tracks of the new song come in now (a listen-only load leaves the stage held)
     return true;
   })();
-  audioLoad = { song, promise };
+  rec.promise = promise;
+  audioLoad = rec;
   renderLoadState();
   return promise;
 }
@@ -953,7 +959,7 @@ function renderLoadState() {
   els.play.disabled = els.infoPlay.disabled = els.npPlay.disabled = !chart || (!ready && !!audioLoad);
   els.npSeek.disabled = !(ready && chart);
   els.npSeek.max = String(player.duration || 1);
-  const screen = !!audioLoad && state === 'loading';
+  const screen = !!audioLoad && !audioLoad.listen && state === 'loading';
   els.loadScreen.hidden = !screen;
   if (screen) {
     els.lsTitle.textContent = `${plainText(current.song.title)} — ${plainText(current.song.artist)}`;
@@ -2003,12 +2009,22 @@ async function togglePlay() {
   if (!chart) return;
   if (ended && !player.playing) return restartSong(); // the button reads Restart
   previewStop = null;
+  if (player.playing && holdStage && infoOpen) { // listening from the Listen card: Play takes the sound to the chart and keeps it going
+    if (libraryOpen()) setLibraryOpen(false, false);
+    markStageLive();
+    setInfoOpen(false);
+    releaseStage();
+    syncPlayButton();
+    return;
+  }
   if (player.playing) player.pause();
   else {
     if ((infoOpen || !ready) && libraryOpen()) setLibraryOpen(false, false); // Play from the details (or the first Play of a song) gets the library out of the chart's way
     const loading = ensureAudio(); // (starts the load first: closing the details must not release the held stage before it)
     if (infoOpen) setInfoOpen(false); // starting from the details goes to the chart
     if (!(await loading)) return; // the first Play loads the audio behind the loading screen
+    markStageLive(); // (the audio may have been loaded by the Listen card with the stage held: now the chart and the bar come in)
+    releaseStage();
     await player.play();
   }
   syncPlayButton();
