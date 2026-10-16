@@ -4,6 +4,7 @@
 import {
   GUITAR_LANE_COLORS, KICK_COLOR, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
   ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
+  laneLookFactor
 } from './gfx.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the flat view shows 2.5)
@@ -98,7 +99,7 @@ export function renderLanes3D(hw, t, w, h) {
   const padRy = laneW * HEAD_R * 1.05 * HEAD_TILT; // vertical radius of the hit pads
   const hitY = h - (padRy + 26); // hit line (the pads): the 26 px below them hold the bottom fade
   const cx = w / 2;
-  const windowSec = DEPTH_SEC / hw.neck; // neck speed shortens or stretches the visible time
+  const windowSec = (DEPTH_SEC / hw.neck) * laneLookFactor(h); // neck speed shortens or stretches the visible time; a taller window shows more of it (fixed pixel speed)
   const k = 1 / FAR_SCALE - 1;
   PK = k;
   PVY = (h * FAR_TOP - FAR_SCALE * hitY) / (1 - FAR_SCALE); // vanishing point, above the canvas

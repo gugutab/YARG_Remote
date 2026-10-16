@@ -180,3 +180,15 @@ test('vocalRange eases the shown range in place and starts at the target', async
   assert.equal(again, first); // (same array: no new one per frame)
   assert.deepEqual([again[0], again[1]], [lo, hi]); // already at the target: it stays
 });
+
+test('lane scroll speed is fixed in pixels: a taller window shows more lookahead (clamped 0.5-2.5)', async () => {
+  const { laneLookFactor, LANE_REF_H, BASE_LOOKAHEAD_SEC, HIT_Y } = await import('../src/gfx.js');
+  assert.equal(laneLookFactor(LANE_REF_H), 1);
+  assert.equal(laneLookFactor(10), 0.5);
+  assert.equal(laneLookFactor(99999), 2.5);
+  // 2D pixel speed (hitY / lookahead) is the same for every unclamped height
+  const speed = (h) => (h * HIT_Y) / (BASE_LOOKAHEAD_SEC * laneLookFactor(h));
+  for (const h of [360, 500, 700, 1000, 1500, 1740]) assert.ok(Math.abs(speed(h) - speed(700)) < 1e-9);
+  // the visible time grows with the height
+  assert.ok(BASE_LOOKAHEAD_SEC * laneLookFactor(1000) > BASE_LOOKAHEAD_SEC * laneLookFactor(700));
+});

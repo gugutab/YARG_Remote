@@ -17,6 +17,7 @@ import {
   FILL_COLORS,
   FADE_SEC,
   BASE_LOOKAHEAD_SEC,
+  laneLookFactor,
   ENTRY_MARGIN_SEC,
   HIT_Y,
   firstVisibleIndex,
@@ -1172,7 +1173,7 @@ export class Highway {
     const laneW = Math.min(Math.min(190, Math.max(90, h * 0.13)), (w * 0.8) / chart.lanes); // lanes grow with the stage height on big screens
     const x0 = (w - laneW * chart.lanes) / 2;
     const hitY = h * HIT_Y;
-    const pxPerSec = (hitY / BASE_LOOKAHEAD_SEC) * this.neck;
+    const pxPerSec = (hitY / (BASE_LOOKAHEAD_SEC * laneLookFactor(h))) * this.neck; // (fixed pixel speed: a taller window shows more lookahead)
     LY_HIT = hitY;
     LY_T = t;
     LY_PPS = pxPerSec;

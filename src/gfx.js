@@ -22,6 +22,11 @@ export const FILL_COLORS = {
 };
 export const FADE_SEC = 0.25; // how long a note takes to fade out after the hit line
 export const BASE_LOOKAHEAD_SEC = 2.5; // time from the top edge to the hit line at neck speed 1
+// The fretboards scroll at a fixed speed in pixels, like the vocal view: a taller window shows more lookahead instead of stretching the same
+// time. The reference is a 700 px tall window (what BASE_LOOKAHEAD_SEC and the 3D depth were tuned for); the factor is clamped so a very short
+// window (a phone) still shows about a second of music and a very tall one does not show more than 2.5x.
+export const LANE_REF_H = 700;
+export const laneLookFactor = (h) => Math.min(2.5, Math.max(0.5, h / LANE_REF_H));
 export const ENTRY_MARGIN_SEC = 0.3; // extra window above the top edge, so notes are already moving when they enter
 export const HIT_Y = 0.93; // hit line position as a fraction of canvas height
 
