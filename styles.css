@@ -2220,3 +2220,10 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .songs-wrap, .info-scroll { background: var(--scroll-bg); }
 .songs-wrap:has(.group-label:not([hidden])) { background: linear-gradient(var(--scroll-bg), var(--scroll-bg)) 0 100% / 100% calc(100% - 26px) no-repeat; }
 .library .group-label { background: var(--scroll-bg); }
+
+/* The "scroll" is the letter rail at the list's right edge: it gets the pinned sub-header's background (P), and the list/details scroll areas
+   go back to the plain window body (no extra layer), so the library and the details look the same. */
+:root { --pinned-bg: color-mix(in srgb, var(--panel-2) 38%, var(--panel)); }
+.songs-wrap, .info-scroll, .songs-wrap:has(.group-label:not([hidden])) { background: none; }
+.library .group-label { background: var(--pinned-bg); }
+.rail { background: var(--pinned-bg); }
