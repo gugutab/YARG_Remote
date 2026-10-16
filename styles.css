@@ -983,6 +983,10 @@ body.settings-open { overflow: hidden; }
 .listen { display: flex; align-items: center; gap: 12px; }
 .listen .icon.primary { width: 36px; height: 36px; flex: none; }
 .listen input[type="range"] { flex: 1; min-width: 60px; accent-color: var(--accent); }
+.listen-seek { position: relative; flex: 1; min-width: 60px; display: flex; align-items: center; }
+.listen-seek input[type="range"] { width: 100%; position: relative; z-index: 1; }
+.listen-band { position: absolute; z-index: 2; top: 50%; height: 18px; transform: translateY(-50%); background: color-mix(in srgb, var(--accent) 45%, transparent); border: 2px solid var(--accent); border-radius: 4px; pointer-events: none; }
+.listen-band[hidden] { display: none; }
 .listen-time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .card-listen { grid-column: 1 / -1; }
 

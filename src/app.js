@@ -29,7 +29,7 @@ import { VISUALIZERS, createDriver as createVisualizerDriver } from './visualize
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
-  'app', 'library', 'closeLibrary', 'splitter', 'libTab', 'settingsTab', 'edgeDock', 'dockHandle', 'edgeL', 'edgeR', 'npPlay', 'npPreview', 'npSeek', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
+  'app', 'library', 'closeLibrary', 'splitter', 'libTab', 'settingsTab', 'edgeDock', 'dockHandle', 'edgeL', 'edgeR', 'npPlay', 'npPreview', 'npSeek', 'npBand', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
@@ -235,23 +235,39 @@ function setupPeek(handle, panel, { isOpen, open, close }) {
 }
 setupPeek(els.libTab, els.library, { isOpen: libraryOpen, open: () => setLibraryOpen(true, false), close: () => setLibraryOpen(false, false) });
 els.npPlay.addEventListener('click', async () => { // the Listen card: play here, without leaving the details
-  previewStop = null;
+  clearPreview();
   if (!player.playing && !(await ensureAudio({ listen: true }))) return; // loads the audio the first time (only the audio: the stage is left alone)
   setEnded(false); // (play() starts over from the end by itself)
   if (player.playing) player.pause(); else await player.play();
   syncPlayButton();
 });
-els.npSeek.addEventListener('input', () => { previewStop = null; player.seek(Number(els.npSeek.value)); });
+els.npSeek.addEventListener('input', () => {
+  const to = Number(els.npSeek.value);
+  if (previewStop != null && (to < previewStart || to > previewStop)) clearPreview(); // a seek outside the preview section turns the preview off
+  player.seek(to);
+});
 
 // Preview button of the Listen card: plays the window song.ini defines (preview_start_time .. preview_end_time).
 // The times are positions in the audio file; the chart clock is the file position minus the audio delay.
 let previewStop = null; // chart-clock second where the preview ends, or null when none is running
+let previewStart = 0; // ... and where it starts (the band on the Listen slider shows [previewStart, previewStop])
+function paintPreviewBand() {
+  const on = previewStop != null && player.duration > 0;
+  els.npBand.hidden = !on;
+  if (!on) return;
+  const k = (s) => Math.max(0, Math.min(1, s / player.duration));
+  els.npBand.style.left = `calc(8px + ${k(previewStart).toFixed(5)} * (100% - 16px))`;
+  els.npBand.style.width = `calc(${(k(previewStop) - k(previewStart)).toFixed(5)} * (100% - 16px))`;
+}
+function clearPreview() { previewStop = null; if (els.npBand) els.npBand.hidden = true; }
 els.npPreview.addEventListener('click', async () => {
   const win = current && previewWindow(current.song.ini);
   if (!win || !(await ensureAudio({ listen: true }))) return;
   const delay = songDelaySeconds(current.song.ini);
-  player.seek(Math.max(0, win.start - delay));
+  previewStart = Math.max(0, win.start - delay);
+  player.seek(previewStart);
   previewStop = Math.min(win.end - delay, player.duration);
+  paintPreviewBand();
   if (!player.playing) await player.play();
   syncPlayButton();
 });
@@ -879,7 +895,7 @@ async function selectSong(song) {
     updateChart(); // the chart exists as soon as the MIDI is read; only playback waits for the audio
     const stems = relabelStems(audioStemsOf(song, { censor: prefs.get('audio.censor') }), (inst) => hasInstrument(song, inst)); // read per load: a change applies to the next song load
     els.npPreview.hidden = !previewWindow(song.ini);
-    previewStop = null;
+    clearPreview();
     buildMixer(stems);
 
     current.stems = stems;
@@ -1014,7 +1030,7 @@ function setInfoOpen(open, { grow = true, release = true } = {}) {
     els.infoWindow.focus({ preventScroll: true });
   } else if (!open && was) {
     const stopListening = listenMode && player.playing; // closing the details while the Listen card plays only stops the music: the stage is left as it is
-    if (stopListening) { previewStop = null; player.pause(); player.seek(0); syncPlayButton(); }
+    if (stopListening) { clearPreview(); player.pause(); player.seek(0); syncPlayButton(); }
     if (release && !audioLoad && !stopListening) releaseStage(); // the details are closed: the song they were about is what the stage shows now (while its audio loads the stage waits for the load)
     const a = document.activeElement;
     if (infoOpener?.isConnected && infoOpener.offsetParent !== null && (!a || a === document.body || els.info.contains(a))) infoOpener.focus({ preventScroll: true });
@@ -1877,7 +1893,7 @@ els.seek.addEventListener('input', () => {
   seeking = true;
   els.timeNow.textContent = fmt(Number(els.seek.value));
 });
-els.seek.addEventListener('change', () => { previewStop = null; seekTo(Number(els.seek.value)); seeking = false; });
+els.seek.addEventListener('change', () => { clearPreview(); seekTo(Number(els.seek.value)); seeking = false; });
 // The mouse wheel over the seek bar moves the song: up goes forward, down goes back, 5 s per notch (1 s with Shift).
 els.seekbox.addEventListener('wheel', (e) => {
   if (!ready) return;
@@ -1885,7 +1901,7 @@ els.seekbox.addEventListener('wheel', (e) => {
   const delta = e.deltaY || e.deltaX; // with Shift some browsers report the wheel as horizontal
   const notches = -delta / (e.deltaMode === 1 ? 3 : 100); // a notch is 100 px or 3 lines; smooth touchpads give fractions
   const to = Math.max(0, Math.min(player.duration, player.currentTime() + notches * (e.shiftKey ? 1 : 5)));
-  previewStop = null;
+  clearPreview();
   seekTo(to);
 }, { passive: false });
 
@@ -2015,7 +2031,7 @@ function seekTo(t) {
 async function togglePlay() {
   if (!chart) return;
   if (ended && !player.playing) return restartSong(); // the button reads Restart
-  previewStop = null;
+  clearPreview();
   if (player.playing && listenMode) { // listening from the Listen card: Play takes the sound to the chart and keeps it going
     if (libraryOpen()) setLibraryOpen(false, false);
     markStageLive();
@@ -2074,7 +2090,7 @@ function setEnded(on) {
 // Restarts from the beginning, or from the start of the loop, and plays.
 async function restartSong() {
   if (!chart) return;
-  previewStop = null;
+  clearPreview();
   if (infoOpen) setInfoOpen(false);
   if (!(await ensureAudio())) return;
   setEnded(false);
@@ -2945,7 +2961,7 @@ function frame(frameTs) {
       loopPrev = t;
       if (previewStop != null && (!player.playing || t >= previewStop)) {
         if (player.playing) { player.pause(); syncPlayButton(); }
-        previewStop = null;
+        clearPreview();
       }
       if (player.playing && t >= player.duration) { // the song ran out by itself
         player.pause();
