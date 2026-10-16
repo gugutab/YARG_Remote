@@ -9,8 +9,8 @@ Visualization only: no hit/miss detection.
 ```bash
 npm run start:static  # python -m http.server 8080 --bind 127.0.0.1 (python3 where `python` does not exist) — then open http://localhost:8080 (folder picker only)
 npm start             # node server.mjs [songs folder]: the app plus your songs, no folder picker (see "Server with the library")
-npm test             # unit tests (MIDI / chart / song.ini / settings / server hardening ...), no browser
-npm run smoke        # starts server.mjs on a free port over a tiny synthetic song and checks the app, library and path-traversal refusals
+npm test              # unit tests (MIDI / chart / song.ini / settings / server hardening ...), no browser
+npm run smoke         # starts server.mjs on a free port over a tiny synthetic song and checks the app, library and path-traversal refusals
 ```
 
 - Use **Chrome or Edge** (folder selection uses the File System Access API). In other browsers the
@@ -66,7 +66,7 @@ Checked against the YARG.Core code (`github.com/YARC-Official/YARG.Core`, also p
 - **Tempo** — `Chart/Sync/SyncTrack.cs`: tempo changes (meta `0x51`) integrated tick by tick
   (`midi.js` does the same in `createTickToSeconds`).
 - **song.ini** — `IO/Ini/SongIniHandler.cs`: list of keys (`name`, `artist`, `song_length`,
-  `diff_*`, `delay`…). The MVP reads `name`, `artist`, `album`, `delay`/`delay_seconds` and the raw values of `diff_*`.
+  `diff_*`, `delay`…). The app keeps every key as text (`src/ini.js`); the ones it interprets are the title, artist, album, genre, year, charter, `diff_*` levels, `delay`/`delay_seconds` and the preview times.
 - **Delay** — `SongMetadata.cs` and `SongRunner.cs`: the audio position is `chart_time + delay`. The player aligns each
   stem once at load time (`alignChannel`, `src/player.js`): a positive delay discards the start of the file, a negative one
   puts silence in front.
