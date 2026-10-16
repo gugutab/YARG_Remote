@@ -356,7 +356,6 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
   function drawRail() {
     if (!rail) return;
     const H = rail.clientHeight;
-    const W = rail.clientWidth;
     const off = range() <= 0 || H <= 0; // nothing to scroll: the rail is invisible...
     rail.classList.toggle('off', off);
     const wrap = scroller.closest('.songs-wrap');
@@ -366,6 +365,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       if (mode === 'large') { for (const entry of rows.values()) { clearTimeout(entry.timer); entry.el.remove(); } rows.clear(); schedule(); } // the chips per line follow the width
     }
     if (off) return;
+    const W = rail.clientWidth; // (read after the no-scroll class is settled: while it was on the rail had no width and the canvas stayed empty until a resize)
     const dpr = window.devicePixelRatio || 1;
     const cw = Math.round(W * dpr);
     const ch = Math.round(H * dpr);
