@@ -2066,3 +2066,5 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 .song-len { flex: none; color: var(--muted); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 #songs li.row.large .song-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
 #songs li.row.large .song-insts { margin-top: 0; }
+#songs li.row.large { padding-right: 12px; }
+#songs li.row.large .song-text { padding: 3px 0 7px; }
