@@ -1,4 +1,4 @@
-import { evenPerRow, highlightRanges } from './songlist.js';
+import { evenPerRow, highlightRanges, packCode } from './songlist.js';
 
 // A windowed list for the library: only the rows near the viewport exist in the DOM, so ~750 songs with album
 // thumbnails scroll smoothly and stay light on memory. Items are fixed-height song rows and group headers.
@@ -288,7 +288,9 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       if (n.pack && d.pack) { // the pack at the top right, next to the title
         const top = document.createElement('span');
         top.className = 'song-top';
-        top.append(titleEl, Object.assign(mk('song-packtag', d.pack), { title: d.pack }));
+        const tag = Object.assign(mk('song-packtag', d.pack), { title: d.pack });
+        tag.dataset.pack = d.pack;
+        top.append(titleEl, tag);
         textBox.append(top);
       } else textBox.append(titleEl);
       if (n.icons && d.instruments.length) { // the instruments the song has, as small icons to the right of the artist
@@ -313,7 +315,9 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
         const pack = document.createElement('span');
         pack.className = 'song-pack';
         pack.innerHTML = '<svg><use href="#i-package"/></svg><span></span>';
-        pack.querySelector('span').textContent = d.pack;
+        const packName = pack.querySelector('span');
+        packName.textContent = d.pack;
+        packName.dataset.pack = d.pack;
         bottom.append(pack);
       }
       if (l.instruments && d.instruments.length) {
@@ -411,12 +415,18 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
         rows.delete(i);
       }
     }
+    const fresh = [];
     for (let i = first; i < last; i++) {
       if (rows.has(i)) continue;
       const entry = makeRow(i);
       rows.set(i, entry);
       scroller.append(entry.el);
+      fresh.push(entry.el);
     }
+    // A pack name that does not fit shows its short code (RB2+, GH3...) instead of ending in an ellipsis; the full name is the tooltip.
+    // (measured together, after all the new rows are in: one layout pass)
+    const fits = fresh.flatMap((el) => [...el.querySelectorAll('[data-pack]')]).filter((e) => e.scrollWidth > e.clientWidth + 1);
+    for (const e of fits) { e.title = e.dataset.pack; e.textContent = packCode(e.dataset.pack); e.classList.add('short'); }
     if (label) {
       const idx = itemAt(offsets, top);
       let head = '';

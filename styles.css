@@ -2068,3 +2068,5 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 #songs li.row.large .song-insts { margin-top: 0; }
 #songs li.row.large { padding-right: 12px; }
 #songs li.row.large .song-text { padding: 3px 0 7px; }
+
+.song-packtag.short { flex: none; max-width: none; } /* a short pack code is never cut: the title gives way */
