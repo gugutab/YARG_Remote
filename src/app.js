@@ -737,7 +737,7 @@ function stageLoading() {
 // A song that was picked but never played has no player bar yet: while its chart is on screen (details closed, nothing loading) a Play
 // button on the stage is the way to start it (on a phone it was a dead end).
 function syncStagePlay() {
-  const show = !!(current && chart) && els.app.classList.contains('stage-unborn') && !holdStage && !infoOpen && !audioLoad && !endShown;
+  const show = !!(current && chart) && ((els.app.classList.contains('stage-unborn') && !holdStage) || (listenMode && holdStage)) && !infoOpen && !audioLoad && !endShown; // (listenMode + held: the Listen card was stopped by closing the details)
   els.stagePlay.hidden = !show;
 }
 els.stagePlay.addEventListener('click', () => togglePlay());
@@ -1013,7 +1013,9 @@ function setInfoOpen(open, { grow = true, release = true } = {}) {
     infoOpener = a && a !== document.body && !els.info.contains(a) ? a : null;
     els.infoWindow.focus({ preventScroll: true });
   } else if (!open && was) {
-    if (release && !audioLoad) releaseStage(); // the details are closed: the song they were about is what the stage shows now (while its audio loads the stage waits for the load)
+    const stopListening = listenMode && player.playing; // closing the details while the Listen card plays only stops the music: the stage is left as it is
+    if (stopListening) { previewStop = null; player.pause(); player.seek(0); syncPlayButton(); }
+    if (release && !audioLoad && !stopListening) releaseStage(); // the details are closed: the song they were about is what the stage shows now (while its audio loads the stage waits for the load)
     const a = document.activeElement;
     if (infoOpener?.isConnected && infoOpener.offsetParent !== null && (!a || a === document.body || els.info.contains(a))) infoOpener.focus({ preventScroll: true });
     infoOpener = null;
