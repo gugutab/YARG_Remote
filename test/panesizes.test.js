@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sanitizeSizes } from '../src/panesizes.js';
+import { fitWidths, sanitizeSizes } from '../src/panesizes.js';
 
 test('valid sizes pass through', () => {
   assert.deepEqual(sanitizeSizes({ weights: { guitar: 1.5, drums: 0.7 }, vocalH: 200 }), { weights: { guitar: 1.5, drums: 0.7 }, vocalH: 200 });
@@ -22,4 +22,18 @@ test('vocalH below the floor or not finite becomes null', () => {
 
 test('garbage input gives the defaults', () => {
   for (const v of [null, undefined, 5, 'x', [], { weights: [1, 2] }, { weights: 'a' }]) assert.deepEqual(sanitizeSizes(v), { weights: {}, vocalH: null });
+});
+
+test('fitWidths: no pane under the minimum, the rest share what is left by weight', () => {
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  const even = fitWidths([1, 1, 1], 900, 140);
+  assert.deepEqual(even.map(Math.round), [300, 300, 300]);
+  const extreme = fitWidths([20, 0.05], 1300, 140); // a sliver would be 3 px
+  assert.equal(Math.round(extreme[1]), 140);
+  assert.equal(Math.round(sum(extreme)), 1300);
+  const zero = fitWidths([0.05, 0.05, 1], 1000, 140);
+  assert.ok(zero.every((w) => w >= 139.9));
+  assert.equal(Math.round(sum(zero)), 1000);
+  assert.deepEqual(fitWidths([1, 2], 200, 140).map(Math.round), [100, 100]); // the minimums do not fit: even split
+  assert.deepEqual(fitWidths([], 500, 140), []);
 });

@@ -34,7 +34,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'barHide', 'barShow', 'mixerVal', 'speedVal', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'barHide', 'barShow', 'mixerVal', 'speedVal', 'stagePlay', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
   'endScreen', 'endCover', 'endTitle', 'endArtist', 'endAgain', 'endSearch', 'endCards', 'endNextBox', 'endNext',
@@ -660,12 +660,20 @@ function stageLoading() {
   dropGhost();
 }
 // The audio of a song loaded (or failed): the bar belongs to the screen from now on, whether or not the stage was being held.
+// A song that was picked but never played has no player bar yet: while its chart is on screen (details closed, nothing loading) a Play
+// button on the stage is the way to start it (on a phone it was a dead end).
+function syncStagePlay() {
+  const show = !!(current && chart) && els.app.classList.contains('stage-unborn') && !holdStage && !infoOpen && !audioLoad && !endShown;
+  els.stagePlay.hidden = !show;
+}
+els.stagePlay.addEventListener('click', () => togglePlay());
 function markStageLive() {
   stageEverLive = true;
   els.app.classList.remove('stage-unborn');
+  syncStagePlay();
 }
 function releaseStage() {
-  if (!holdStage) return;
+  if (!holdStage) { syncStagePlay(); return; }
   holdStage = false;
   loadingBackdrop = 0;
   els.app.classList.remove('stage-held', 'stage-loading');
@@ -678,6 +686,7 @@ function releaseStage() {
   barGhost = null;
   if (g) { g.classList.add('leaving'); setTimeout(() => g.remove(), 450); }
   setTimeout(() => els.app.classList.remove('stage-reveal'), 500);
+  syncStagePlay();
 }
 
 async function selectSong(song) {
@@ -793,6 +802,7 @@ async function selectSong(song) {
     if (token === loadToken) setLoadState('error', `Could not build the chart: ${err.message}`);
     return;
   }
+  if (!chart) setLoadState('error', 'This song has no playable instrument parts.');
   if (chart && prefs.get('general.autoplay')) togglePlay(); // "Start playing as soon as I pick a song"
   else if (chart && wantAudio) ensureAudio(); // (playing needs a click: browsers block sound before one)
 }
@@ -815,7 +825,7 @@ function ensureAudio() {
         onProgress: (p) => { if (token === loadToken) setLoadState('loading', `Loading audio… ${Math.round(p * 100)}%`, 0.02 + p * 0.98); },
       });
     } catch (err) {
-      if (token === loadToken) { markStageLive(); setLoadState('error', `Failed to decode audio: ${err.message}`); setInfoOpen(true); }
+      if (token === loadToken) { markStageLive(); setLoadState('error', `${err?.name === 'EncodingError' || /decode/i.test(err?.message || '') ? 'Failed to decode audio' : 'Could not load the audio'}: ${err.message}`); setInfoOpen(true); }
       return false;
     } finally {
       if (audioLoad?.song === song) { audioLoad = null; renderLoadState(); } // (the Play buttons come back enabled, so a retry works)
@@ -851,6 +861,7 @@ function setLoadState(state, text, fraction = 0) {
 
 function renderLoadState() {
   const { state, text, fraction } = loadInfo;
+  syncStagePlay();
   els.infoState.textContent = text;
   els.infoBar.style.width = `${Math.round(fraction * 100)}%`;
   els.infoProgress.dataset.state = state;

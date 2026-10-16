@@ -1,7 +1,7 @@
 // Canvas renderer for a chart. Drawing is a pure function of the playback time,
 // so seek/pause just means re-rendering at a different `t`.
 
-import { sanitizeSizes } from './panesizes.js';
+import { sanitizeSizes, fitWidths } from './panesizes.js';
 import {
   GUITAR_LANE_COLORS,
   KICK_COLOR,
@@ -46,6 +46,7 @@ import { waitCountdowns, countdownAt } from './countdown.js';
 
 const RECT_WIDEN_2D = 1.18;
 const VOCAL_LEAD = '#5b8def'; // lead vocal notes
+const MIN_PANE_PX = 140; // no fretboard window is narrower than this (dragDivider keeps the same floor)
 const REST_BACK_SEC = 1; // after a long rest the track is back this long before the next note appears at the far edge
 const REST_BOARD_MIN = 0.2; // a fretboard's dark base keeps this fraction of its opacity at the deepest part of a rest
 const PERC_RINGS = [[0, 1.9, 3.5], [0.18, 1.4, 2]]; // percussion hit: [delay, growth, width] of the two rings
@@ -337,9 +338,10 @@ export class Highway {
     const weightOf = (pane) => this.weights[pane.key] ?? 1;
     const sum = shown.reduce((acc, pane) => acc + weightOf(pane), 0);
     this.layout = { w, sum, keys: shown.map((pane) => pane.key) };
+    const widths = fitWidths(shown.map(weightOf), w, MIN_PANE_PX); // (no window under a floor, whatever the stored weights say)
     let x = 0;
     shown.forEach((pane, i) => {
-      const pw = (w * weightOf(pane)) / sum;
+      const pw = widths[i];
       this.drawPane(pane, t, x, top, pw, h - top);
       if (i > 0) this.drawDivider({ type: 'col', x: Math.round(x), y: top, h: h - top, a: shown[i - 1].key, b: pane.key });
       x += pw;
