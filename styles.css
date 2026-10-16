@@ -2207,3 +2207,9 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
   /* the side groups keep their content width (min = max-content); what is left goes to the search, up to 560 px, so the search is what shrinks */
   .lib-header { grid-template-columns: minmax(max-content, 1fr) minmax(90px, 560px) minmax(max-content, 1fr); }
 }
+
+/* One scroll-area background for the library list and the details (a lighter layer than the headers); the pinned sub-header has none of its own:
+   the cards that scroll under it fade out (a mask on the list), so it is the same surface. */
+.songs-wrap, .info-scroll { background: color-mix(in srgb, var(--panel-2) 55%, transparent); }
+.library .group-label { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+#songs { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 26px); mask-image: linear-gradient(to bottom, transparent 0, #000 26px); }
