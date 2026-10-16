@@ -2286,6 +2286,3 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* The rail's bubble always shows the whole group name (it grows to its text; there is room: left of the rail in a wide list, over the details in a narrow one) */
 .rail-bubble { max-width: none; width: max-content; overflow: visible; text-overflow: clip; }
 
-/* The window-resize handle (list alone: #edgeR) and the splitter (details open) are 12 px strips over the list's right edge: they covered the right half of the
-   letter rail, so hovering or dragging there never reached it. The list keeps a 12 px strip free for them. */
-@media (min-width: 701px) { .songs-wrap { margin-right: 12px; } }

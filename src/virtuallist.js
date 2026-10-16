@@ -461,8 +461,10 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     bubble.textContent = text;
     bubble.hidden = !text;
     bubble.style.top = `${Math.min(height - 12, Math.max(12, y))}px`;
-    // to the right of the rail when the window has room for it there, otherwise to the left (over the list)
-    const room = window.innerWidth - rail.getBoundingClientRect().right - 8;
+    // to the right of the rail when the library window has room for it there (the details are open beside the list), otherwise to the left (over the list):
+    // the window clips what sticks out of it, so the room is measured to its edge, not to the page's
+    const win = rail.closest('.library');
+    const room = (win ? win.getBoundingClientRect().right : window.innerWidth) - rail.getBoundingClientRect().right - 8;
     bubble.classList.toggle('right', bubble.offsetWidth + 6 <= room);
   }
   function scrubTo(clientY) {
