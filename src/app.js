@@ -30,7 +30,7 @@ import { VISUALIZERS, createDriver as createVisualizerDriver } from './visualize
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
-  'app', 'library', 'closeLibrary', 'splitter', 'libTab', 'settingsTab', 'edgeDock', 'dockHandle', 'edgeL', 'edgeR', 'npPlay', 'npPreview', 'npSeek', 'npBand', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
+  'app', 'library', 'closeLibrary', 'splitter', 'libTab', 'settingsTab', 'edgeDock', 'dockHandle', 'edgeL', 'edgeR', 'npPlay', 'npPreview', 'npPreviewBox', 'npSeek', 'npBand', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
@@ -253,11 +253,6 @@ els.npPlay.addEventListener('click', async () => { // the Listen card: play here
   if (player.playing) player.pause(); else await player.play();
   syncPlayButton();
 });
-// Hovering (or focusing) the Listen card starts decoding the audio, so the press finds it ready (or nearly).
-const listenCard = els.npPlay.closest('.card-listen');
-const preloadListen = () => { if (current && chart && !ready && !audioLoad) ensureAudio({ listen: true, at: 0 }); };
-listenCard.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') preloadListen(); });
-listenCard.addEventListener('focusin', preloadListen);
 els.npSeek.addEventListener('input', () => {
   const to = Number(els.npSeek.value);
   if (previewStop != null && (to < previewStart || to > previewStop)) clearPreview(); // a seek outside the preview section turns the preview off
@@ -276,12 +271,14 @@ function paintPreviewBand() {
   els.npBand.style.left = `calc(8px + ${k(previewStart).toFixed(5)} * (100% - 16px))`;
   els.npBand.style.width = `calc(${(k(previewStop) - k(previewStart)).toFixed(5)} * (100% - 16px))`;
 }
-function clearPreview() { previewStop = null; if (els.npBand) els.npBand.hidden = true; }
-els.npPreview.addEventListener('click', async () => {
+function clearPreview() { previewStop = null; if (els.npBand) els.npBand.hidden = true; if (els.npPreview) els.npPreview.checked = false; }
+// The Preview checkbox: on = play only the song.ini preview section (starts there, stops at its end); a seek outside it, or unchecking, turns it off.
+els.npPreview.addEventListener('change', async () => {
+  if (!els.npPreview.checked) { previewStop = null; els.npBand.hidden = true; return; }
   const win = current && previewWindow(current.song.ini);
-  if (!win) return;
+  if (!win) { els.npPreview.checked = false; return; }
   const delay = songDelaySeconds(current.song.ini);
-  if (!(await ensureAudio({ listen: true, at: Math.max(0, win.start - delay) }))) return;
+  if (!(await ensureAudio({ listen: true, at: Math.max(0, win.start - delay) }))) { els.npPreview.checked = false; return; }
   previewStart = Math.max(0, win.start - delay);
   player.seek(previewStart);
   previewStop = Math.min(win.end - delay, player.duration);
@@ -912,7 +909,7 @@ async function selectSong(song) {
     if (pendingInstruments) { applyInstruments(pendingInstruments); pendingInstruments = null; }
     updateChart(); // the chart exists as soon as the MIDI is read; only playback waits for the audio
     const stems = dropStems(relabelStems(audioStemsOf(song, { censor: prefs.get('audio.censor') }), (inst) => hasInstrument(song, inst))); // (the crowd is never loaded) // read per load: a change applies to the next song load
-    els.npPreview.hidden = !previewWindow(song.ini);
+    els.npPreviewBox.hidden = !previewWindow(song.ini);
     clearPreview();
     buildMixer(stems);
 

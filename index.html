@@ -352,10 +352,10 @@
               </header>
 
               <div class="info-card card-listen">
-                <h3>Listen</h3>
+                <div class="card-head"><h3>Listen</h3>
+                  <label id="npPreviewBox" class="listen-preview" title="Play only the preview section defined in song.ini" hidden><input id="npPreview" type="checkbox"> Preview</label></div>
                 <div class="listen">
                   <button id="npPlay" class="icon primary" type="button" title="Listen here, without opening the chart" aria-label="Play or pause" disabled><svg><use href="#i-play"/></svg></button>
-                  <button id="npPreview" class="listen-preview" type="button" title="Play the preview section defined in song.ini" hidden>Preview</button>
                   <div class="listen-seek">
                     <i class="listen-band" id="npBand" hidden></i>
                     <input id="npSeek" type="range" min="0" max="1" step="0.01" value="0" aria-label="Position" disabled>
