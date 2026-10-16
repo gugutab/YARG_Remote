@@ -1950,3 +1950,10 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
   .win-edge:hover::after, .win-edge.dragging::after { background: var(--accent); }
   .app.lib-closed:not(.details-only) .win-edge { display: none; }
 }
+
+/* The Listen card while it loads the audio: a spinner ring on the play button */
+.listen .icon.primary { position: relative; }
+.listen .icon.primary.loading svg { opacity: 0; }
+.listen .icon.primary.loading::after { content: ""; position: absolute; inset: 8px; border-radius: 50%; border: 2px solid color-mix(in srgb, currentColor 30%, transparent); border-top-color: currentColor; animation: listen-spin .8s linear infinite; }
+@keyframes listen-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .listen .icon.primary.loading::after { animation-duration: 2.4s; } }

@@ -687,6 +687,7 @@ let loadAudioWithSong = false; // a #/song/<id>/play link: the audio loads with 
 // Picking a song opens its details, and the player bar and the fretboards keep showing what they showed (a frozen picture of the last
 // song) until the audio starts to load (or the details close): then the new song fades in. The chart itself loads in the background.
 let holdStage = false;
+let listenMode = false; // the audio was loaded by the Listen card and no real Play happened: the fretboards stay at the start (the sound does not drive the visualizer)
 let ghostObserver = null;
 let barGhost = null; // a still copy of the player bar, laid over the real one while the stage is held
 let stageEverLive = false; // a song has been played (or opened with /play) since the page loaded: until then the player bar is not shown
@@ -741,6 +742,7 @@ function syncStagePlay() {
 }
 els.stagePlay.addEventListener('click', () => togglePlay());
 function markStageLive() {
+  listenMode = false;
   stageEverLive = true;
   els.app.classList.remove('stage-unborn');
   syncStagePlay();
@@ -934,7 +936,7 @@ function ensureAudio({ listen = false } = {}) {
     ready = true;
     const nFailed = failedIds.size;
     setLoadState('ready', nFailed ? `Ready to play (${nFailed} ${nFailed === 1 ? 'stem' : 'stems'} could not be decoded)` : 'Ready to play', 1);
-    if (!rec.listen) { markStageLive(); releaseStage(); } // loaded: the bar and the tracks of the new song come in now (a listen-only load leaves the stage held)
+    if (!rec.listen) { markStageLive(); releaseStage(); } else listenMode = true; // loaded: the bar and the tracks of the new song come in now (a listen-only load leaves the stage held)
     return true;
   })();
   rec.promise = promise;
@@ -958,6 +960,9 @@ function renderLoadState() {
   els.infoProgress.dataset.state = state;
   els.play.disabled = els.infoPlay.disabled = els.npPlay.disabled = !chart || (!ready && !!audioLoad);
   els.npSeek.disabled = !(ready && chart);
+  const listenLoading = !!audioLoad?.listen && state === 'loading';
+  els.npPlay.classList.toggle('loading', listenLoading); // a spinner on the button and the progress in the time text while the Listen card loads the audio
+  if (listenLoading) els.npTime.textContent = text;
   els.npSeek.max = String(player.duration || 1);
   const screen = !!audioLoad && !audioLoad.listen && state === 'loading';
   els.loadScreen.hidden = !screen;
@@ -2009,10 +2014,10 @@ async function togglePlay() {
   if (!chart) return;
   if (ended && !player.playing) return restartSong(); // the button reads Restart
   previewStop = null;
-  if (player.playing && holdStage && infoOpen) { // listening from the Listen card: Play takes the sound to the chart and keeps it going
+  if (player.playing && listenMode) { // listening from the Listen card: Play takes the sound to the chart and keeps it going
     if (libraryOpen()) setLibraryOpen(false, false);
     markStageLive();
-    setInfoOpen(false);
+    if (infoOpen) setInfoOpen(false);
     releaseStage();
     syncPlayButton();
     return;
@@ -2951,7 +2956,7 @@ function frame(frameTs) {
     });
     if (t === undefined) lastClock = null; // no reliable time this frame: skip the drawing, keep the loop (and the jitter meter) clean
     else {
-      const chartTime = t - settings.chartDelay;
+      const chartTime = listenMode ? 0 : t - settings.chartDelay; // (listening only: the chart stays at its start)
       const shownTime = guarded('visual time', () => visualChartTime(chartTime)) ?? chartTime;
       if (vis.anim && Math.abs(vis.step) > MOTION_BLUR_MIN_STEP && motionPref('highway.motionBlur')) { // a fast jump: blur the motion
         const span = Math.max(-0.6, Math.min(0.6, vis.step * 0.85)); // the exposure: most of the frame, within limits
@@ -2976,7 +2981,7 @@ function frame(frameTs) {
         }
         if (infoOpen) { // the Listen card
           if (document.activeElement !== els.npSeek) els.npSeek.value = t;
-          setText(els.npTime, `${fmt(t)} / ${fmt(player.duration)}`);
+          if (!audioLoad) setText(els.npTime, `${fmt(t)} / ${fmt(player.duration)}`); // (while loading the card shows the progress)
         }
       });
     }
