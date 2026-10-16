@@ -1936,3 +1936,17 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
   .app.lib-wide:not(.lib-closed), .app.lib-wide.details-only { --lib-inset: var(--lib-left); }
   .app.lib-wide:not(.info-open) #splitter { display: none; }
 }
+
+/* Wide mode: the window is centred whatever its width, and its left and right edges are handles that resize it symmetrically */
+.win-edge { display: none; }
+@media (min-width: 701px) {
+  .app.lib-wide .library { left: max(var(--lib-gap), calc((100% - var(--win-w, 100%)) / 2)); }
+  .app.lib-wide .win-edge { display: block; position: absolute; top: 14px; bottom: 14px; width: 12px; z-index: 7; cursor: ew-resize; touch-action: none; }
+  .win-edge-l { left: 0; }
+  .win-edge-r { right: 0; }
+  .win-edge::after { content: ""; position: absolute; top: 0; bottom: 0; width: 2px; border-radius: 1px; background: transparent; transition: background .15s; }
+  .win-edge-l::after { left: 2px; }
+  .win-edge-r::after { right: 2px; }
+  .win-edge:hover::after, .win-edge.dragging::after { background: var(--accent); }
+  .app.lib-closed:not(.details-only) .win-edge { display: none; }
+}

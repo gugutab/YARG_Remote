@@ -29,7 +29,7 @@ import { VISUALIZERS, createDriver as createVisualizerDriver } from './visualize
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
-  'app', 'library', 'closeLibrary', 'splitter', 'libTab', 'settingsTab', 'edgeDock', 'dockHandle', 'npPlay', 'npPreview', 'npSeek', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
+  'app', 'library', 'closeLibrary', 'splitter', 'libTab', 'settingsTab', 'edgeDock', 'dockHandle', 'edgeL', 'edgeR', 'npPlay', 'npPreview', 'npSeek', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
@@ -278,6 +278,10 @@ let winTotal = 0; // the panes' total width as last laid out (the window is WIN_
 // Sizes the two panes (--list-w, --info-w) and the window (--win-w = list + details). The details get the room the list leaves, between one
 // column and the "Max width" setting; if both do not fit the list shrinks (down to MIN_LIB_W) and then the details, never overlapping. With
 // the list closed the window is the details pane alone. Phone: the drawer's own CSS sizes everything.
+// Wide mode only: the user's window width (null = the full content width, the window stays centred) and the list's share of the window
+// while the details are open (null = the default split); both are remembered.
+let winPref = Number(store.get('winWidth')) > 0 ? Number(store.get('winWidth')) : null;
+let splitFrac = Number(store.get('splitFrac')) > 0 && Number(store.get('splitFrac')) < 1 ? Number(store.get('splitFrac')) : null;
 const LARGE_STAGE_W = 1100; // from this stage width the library window is centred and takes the whole content width
 const wideWindow = () => !narrow() && (stageEl.clientWidth || window.innerWidth) >= LARGE_STAGE_W;
 function layoutWindow() {
@@ -288,16 +292,23 @@ function layoutWindow() {
   if (narrow()) { for (const v of ['--list-w', '--info-w', '--win-w']) style.removeProperty(v); return; }
   const listOn = libraryOpen();
   if (!listOn && !infoOpen) return; // closed: keep the size it slides out with
-  const room = contentWidth();
+  const fullRoom = contentWidth();
+  const minTotal = infoOpen && listOn ? MIN_LIB_W + INFO_MIN_W : infoOpen ? INFO_MIN_W : MIN_LIB_W;
+  const room = wide && winPref ? Math.min(fullRoom, Math.max(minTotal, winPref)) : fullRoom; // (wide: the window is as wide as the user made it, up to the content width)
   let list = 0;
   let info = 0;
   if (infoOpen) {
     const infoMax = prefs.get('details.maxWidth');
     if (listOn) {
-      list = Math.min(Math.max(libPref(), MIN_LIB_W), Math.max(MIN_LIB_W, room - INFO_MIN_W));
-      info = Math.max(0, Math.min(infoMax, room - list));
-      if (wide) list = Math.max(MIN_LIB_W, room - info); // the window takes the whole width: the list gets what the details leave
-    } else info = Math.min(infoMax, room);
+      if (wide && splitFrac) { // the user moved the divider: that proportion rules
+        list = Math.min(Math.max(room * splitFrac, MIN_LIB_W), Math.max(MIN_LIB_W, room - INFO_MIN_W));
+        info = room - list;
+      } else {
+        list = Math.min(Math.max(libPref(), MIN_LIB_W), Math.max(MIN_LIB_W, room - INFO_MIN_W));
+        info = Math.max(0, Math.min(infoMax, room - list));
+        if (wide) list = Math.max(MIN_LIB_W, room - info); // the window takes the whole width: the list gets what the details leave
+      }
+    } else info = wide ? room : Math.min(infoMax, room);
   } else list = wide ? room : Math.min(Math.max(libPref(), MIN_LIB_W), room);
   winTotal = Math.round(list) + Math.round(info);
   if (listOn) style.setProperty('--list-w', `${Math.round(list)}px`);
@@ -321,17 +332,57 @@ els.splitter.addEventListener('pointerdown', (e) => {
 });
 els.splitter.addEventListener('pointermove', (e) => {
   if (!els.splitter.classList.contains('dragging')) return;
+  if (wideWindow() && infoOpen) { // the divider between the list and the details: it moves the proportion, the window keeps its width
+    const r = els.library.getBoundingClientRect();
+    splitFrac = Math.min(0.9, Math.max(0.05, (e.clientX - r.left - 1) / Math.max(1, r.width - WIN_BORDER)));
+    layoutWindow();
+    return;
+  }
   setLibWidth(Math.min(Math.max(e.clientX - els.library.getBoundingClientRect().left, MIN_LIB_W), maxLibWidth()));
 });
 const endDrag = () => {
   if (!els.splitter.classList.contains('dragging')) return;
   els.splitter.classList.remove('dragging');
   document.body.classList.remove('resizing');
-  store.set('libWidth', String(Math.round(libPref())));
+  if (wideWindow() && infoOpen) store.set('splitFrac', String(+splitFrac.toFixed(4)));
+  else store.set('libWidth', String(Math.round(libPref())));
 };
 els.splitter.addEventListener('pointerup', endDrag);
 els.splitter.addEventListener('pointercancel', endDrag);
-els.splitter.addEventListener('dblclick', () => { setLibWidth(null); store.set('libWidth', ''); });
+els.splitter.addEventListener('dblclick', () => {
+  if (wideWindow() && infoOpen) { splitFrac = null; store.set('splitFrac', ''); layoutWindow(); return; }
+  setLibWidth(null);
+  store.set('libWidth', '');
+});
+// The left and right edges of the window (wide mode): drag to make the window narrower or wider, always centred (each pixel dragged moves both
+// edges); double-click goes back to the full content width.
+for (const edge of [els.edgeL, els.edgeR]) {
+  const sign = edge === els.edgeR ? 1 : -1;
+  let drag = null;
+  edge.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    edge.setPointerCapture(e.pointerId);
+    drag = { x: e.clientX, w: els.library.getBoundingClientRect().width - WIN_BORDER };
+    edge.classList.add('dragging');
+    document.body.classList.add('resizing');
+  });
+  edge.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    winPref = Math.round(drag.w + 2 * sign * (e.clientX - drag.x));
+    layoutWindow();
+  });
+  const end = () => {
+    if (!drag) return;
+    drag = null;
+    edge.classList.remove('dragging');
+    document.body.classList.remove('resizing');
+    winPref = Math.round(winTotal);
+    store.set('winWidth', String(winPref));
+  };
+  edge.addEventListener('pointerup', end);
+  edge.addEventListener('pointercancel', end);
+  edge.addEventListener('dblclick', () => { winPref = null; store.set('winWidth', ''); layoutWindow(); });
+}
 
 els.pick.addEventListener('click', pickFolder);
 els.resume.addEventListener('click', reopenFolder);
