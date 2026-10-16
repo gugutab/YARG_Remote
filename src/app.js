@@ -72,6 +72,8 @@ let seeking = false;
 let loadToken = 0; // bumped on every song selection, so a slow load cannot overwrite a newer one
 let sortDesc = false; // the "Reverse the order" setting
 let ready = false; // audio decoded and a chart built: playback is allowed
+let audioSong = null; // the song whose audio is in the player (it can differ from `current`: another song's details may be open while it plays)
+const backgroundAudio = () => player.playing && !!audioSong && audioSong !== current?.song; // sound of a song other than the one on screen
 let infoOpen = false;
 let loadInfo = { state: 'idle', text: '', fraction: 0 };
 const settings = { speed: 1, neck: 1.2, chartDelay: 0 };
@@ -840,9 +842,9 @@ async function selectSong(song) {
   }
   holdStageNow(); // the bar and the fretboards stay as they are until the audio loads
   const token = ++loadToken;
-  player.pause();
   setEnded(false);
-  player.unload(); // the old song's decoded audio is freed as soon as another song is picked
+  // (the sound that is playing is left alone: browsing the details of another song does not stop it; the audio of the new song, when it
+  // loads, replaces it, and the old decoded audio is freed then)
   syncPlayButton();
   ready = false;
   setLoop(null); // a loop belongs to one song
@@ -952,6 +954,7 @@ let audioLoad = null; // { song, promise } while a load runs
 // `listen`: the Listen card only wants the sound: no loading screen, the stage (bar, fretboards, background) stays as it is and the progress
 // shows in the card. A later full Play on a load still running upgrades it to the normal one (loading screen).
 function refreshStemFailures() {
+  if (audioSong !== current?.song) return; // (late stems of a song whose details are not open)
   const failedIds = new Set(player.failedStems.map((f) => f.id));
   for (const st of stemStates) st.failed = failedIds.has(st.stem.id);
   stemStates.forEach(applyStem);
@@ -971,6 +974,7 @@ function ensureAudio({ listen = false, at = 0 } = {}) {
     setLoadState('loading', 'Loading audio…', 0.02);
     let loaded = false;
     try {
+      audioSong = null; // (player.load frees the previous song's audio)
       const { first } = listen ? stemPriority(current.stems, current.midi, at) : { first: [] }; // (Listen: the sound starts when the backing track and the instruments playing around `at` are ready)
       loaded = await player.load(current.stems, {
         first,
@@ -994,6 +998,7 @@ function ensureAudio({ listen = false, at = 0 } = {}) {
     for (const st of stemStates) st.failed = failedIds.has(st.stem.id);
     stemStates.forEach(applyStem); // volumes chosen while loading
     ready = true;
+    audioSong = song;
     player.onLate = refreshStemFailures; // (the stems that were left for later join the mix or fail)
     const nFailed = failedIds.size;
     setLoadState('ready', nFailed ? `Ready to play (${nFailed} ${nFailed === 1 ? 'stem' : 'stems'} could not be decoded)` : 'Ready to play', 1);
@@ -1702,7 +1707,7 @@ function applyStem(st) {
     player.setMaster(st.muted ? 0 : st.value);
     store.set('master', String(st.value)); // the master level and its mute are kept between visits
     store.set('masterMuted', st.muted ? '1' : '0');
-  } else player.setVolume(st.stem.id, effectiveVolume(st));
+  } else if (!backgroundAudio()) player.setVolume(st.stem.id, effectiveVolume(st)); // (the sound of another song is not touched by this song's mixer)
   const off = st.master ? st.muted : silent(st);
   for (const v of st.views) {
     v.range.value = st.value;
@@ -2078,7 +2083,7 @@ async function togglePlay() {
   if (!chart) return;
   if (ended && !player.playing) return restartSong(); // the button reads Restart
   clearPreview();
-  if (player.playing && listenMode) { // listening from the Listen card: Play takes the sound to the chart and keeps it going
+  if (player.playing && listenMode && !backgroundAudio()) { // listening from the Listen card: Play takes the sound to the chart and keeps it going
     if (libraryOpen()) setLibraryOpen(false, false);
     markStageLive();
     if (infoOpen) setInfoOpen(false);
@@ -2086,7 +2091,7 @@ async function togglePlay() {
     syncPlayButton();
     return;
   }
-  if (player.playing) player.pause();
+  if (player.playing && !backgroundAudio()) player.pause();
   else {
     if ((infoOpen || !ready) && libraryOpen()) setLibraryOpen(false, false); // Play from the details (or the first Play of a song) gets the library out of the chart's way
     const loading = ensureAudio(); // (starts the load first: closing the details must not release the held stage before it)
@@ -2998,7 +3003,7 @@ function frame(frameTs) {
   if (frameTs) player.frameNow = frameTs; // the clock of this animation frame (vsync aligned)
   let drawMs = 0;
   const draw = (fn) => { if (holdStage) { if (loadingBackdrop) guarded('loading background', () => highway.drawBackground((performance.now() - loadingBackdrop) / 1000)); return; } const d0 = performance.now(); guarded('draw', fn); drawMs = performance.now() - d0; }; // (held: the fretboards keep the last picture)
-  if (current && chart) {
+  if (current && chart && !backgroundAudio()) {
     let t = guarded('clock', () => {
       let t = player.currentTime();
       if (loop && player.playing) {
@@ -3057,6 +3062,7 @@ function frame(frameTs) {
       });
     }
   } else {
+    if (player.playing && current && player.currentTime() >= player.duration) { player.pause(); syncPlayButton(); } // (a song that plays on in the background reached its end: nothing to show, the sound just stops)
     if (canSkipDraw(frameStart, 0)) {
       if (highway.visualizer) draw(() => highway.drawBackground(0));
     } else {
