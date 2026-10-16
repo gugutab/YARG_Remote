@@ -2250,3 +2250,8 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
   .info-head .card-listen .card-head { margin-bottom: 6px; }
 }
 @container (min-width: 760px) { .info-head .card-listen { padding-left: 14px; } }
+
+/* Loading: a bigger cover in a slightly wider window; the pinned sub-header's background reaches the window's left edge (the label text stays on the cards' edge) */
+.ls-card { width: min(540px, 100%); }
+.ls-card img { width: min(320px, 72%); }
+.library .group-label { left: 0; padding-left: 12px; }
