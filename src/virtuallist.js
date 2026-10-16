@@ -513,6 +513,13 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     measure.font = font;
     return measure.measureText(text).width;
   };
+  // Large card: when the lines do not all fit the card's height (the instrument chips can take two lines), the album/year/genre line goes.
+  function fitMeta(rowEls) {
+    const metas = rowEls.map((el) => el.querySelector('.song-meta')).filter(Boolean);
+    for (const m of metas) m.hidden = false;
+    const over = metas.filter((m) => { const box = m.parentElement; return box.scrollHeight > box.clientHeight + 1; });
+    for (const m of over) m.hidden = true;
+  }
   function fitPacks(rowEls = [...rows.values()].map((r) => r.el)) {
     const jobs = rowEls.flatMap((el) => [...el.querySelectorAll('[data-pack]')]);
     const room = jobs.map((e) => { // (all reads first, then the writes: one layout pass)
@@ -527,6 +534,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       e.textContent = short ? packCode(e.dataset.pack) : e.dataset.pack;
       e.title = short ? e.dataset.pack : '';
     }
+    fitMeta(rowEls);
   }
   function relayout(keepTop = false) {
     const top = keepTop ? itemAt(offsets, scroller.scrollTop) : 0;

@@ -2072,3 +2072,5 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 .song-packtag.short { flex: none; max-width: none; } /* a short pack code is never cut: the title gives way */
 
 .song-packtag { flex: none; max-width: none; overflow: visible; text-overflow: clip; } /* (virtuallist.js fitPacks decides between the name and its code: no ellipsis) */
+
+.song-meta[hidden] { display: none; }
