@@ -2026,3 +2026,16 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 #songs li.row.large, #songs li.row.normal { padding-left: 12px; padding-right: 10px; }
 
 #songs mark.hit { background: color-mix(in srgb, var(--accent) 32%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; margin: 0 -1px; }
+
+/* The Listen player lives inside the first info card (under the cover, title and chips) */
+.info-head .card-listen { grid-column: 1 / -1; margin-top: 0; padding: 12px 14px 14px; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.info-head .card-listen .card-head { margin-bottom: 8px; }
+
+/* Library list: the sub-headers line up with the card edge; the cards have the same gap (6 px) all round */
+#songs li.divider, .library .group-label { padding-left: 4px; padding-right: 4px; }
+.library .group-label { left: 8px; right: var(--rail-w); }
+#songs li.row.normal, #songs li.row.large { padding-left: 10px; padding-right: 10px; }
+#songs li.row.compact { padding-left: 12px; padding-right: 10px; }
+.song-top { align-items: baseline; }
+.song-packtag { margin-top: 0; padding-right: 0; }
+.song-icons { padding-right: 0; }
