@@ -21,7 +21,7 @@ export function cardHeight(mode, cards = DEFAULT_CARDS) {
   if (mode === 'compact') return Math.max(22, Math.round(ROW_HEIGHTS.compact * scale));
   if (mode === 'normal') return Math.max(46, thumbs ? Math.round(50 * scale + 8) : 0); // the art (50 px) fills the card: + 3 px gap and 1 px border on each side
   const l = cards.large;
-  const meta = l.album || l.year || l.length || l.genre || l.charter;
+  const meta = l.album || l.year || l.genre || l.charter; // (the length sits at the title's right)
   const text = 20 + 17 + (meta ? 15 : 0) + (l.pack ? 15 : 0) + (l.instruments ? 45 : 0); // title, artist, meta, pack, chips (2 lines)
   return Math.max(thumbs ? Math.round(92 * scale + 16) : 0, text + 16);
 }
@@ -300,15 +300,21 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       } else if (n.artist) textBox.append(artistEl);
     } else { // large
       const l = cards.large;
-      textBox.append(titleEl, artistEl);
-      const facts = [l.album && d.album, l.year && d.year, l.length && d.length, l.genre && d.genre, l.charter && d.charter && `by ${d.charter}`].filter(Boolean);
+      const top = document.createElement('span'); // the title with the length at the top right corner
+      top.className = 'song-top';
+      top.append(titleEl);
+      if (l.length && d.length) top.append(mk('song-len', d.length));
+      textBox.append(top, artistEl);
+      const facts = [l.album && d.album, l.year && d.year, l.genre && d.genre, l.charter && d.charter && `by ${d.charter}`].filter(Boolean);
       if (facts.length) textBox.append(mk('song-meta', facts.join(' · ')));
+      const bottom = document.createElement('span'); // the pack and the instruments sit at the bottom of the card
+      bottom.className = 'song-bottom';
       if (l.pack && d.pack) {
         const pack = document.createElement('span');
         pack.className = 'song-pack';
         pack.innerHTML = '<svg><use href="#i-package"/></svg><span></span>';
         pack.querySelector('span').textContent = d.pack;
-        textBox.append(pack);
+        bottom.append(pack);
       }
       if (l.instruments && d.instruments.length) {
         const insts = document.createElement('span');
@@ -322,8 +328,9 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
           chip.innerHTML = `<svg><use href="#i-${i.icon}"/></svg>${i.badge ? `<sup>${i.badge}</sup>` : ''}${pips}`;
           insts.append(chip);
         }
-        textBox.append(insts);
+        bottom.append(insts);
       }
+      if (bottom.childElementCount) textBox.append(bottom);
     }
     el.addEventListener('click', () => onSelect(song));
     const entry = { el, timer: 0 };

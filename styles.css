@@ -2055,3 +2055,14 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 #songs li.row.large { padding: 4px 10px 4px 5px; gap: 12px; align-items: stretch; }
 #songs li.row.large .thumb { width: calc(var(--row-h) - 8px); height: calc(var(--row-h) - 8px); border-radius: 11px 6px 6px 11px; }
 #songs li.row.large .song-text { padding: 7px 0; }
+
+/* Medium: bigger instrument icons and more room on the top, bottom and right for everything inside */
+#songs li.row.normal { padding-right: 14px; }
+#songs li.row.normal .song-text { padding: 5px 0; }
+#songs li.row.normal .song-icons .inst svg { width: calc(var(--card-icon, 15px) + 3px); height: calc(var(--card-icon, 15px) + 3px); }
+#songs li.row.normal .song-icons { gap: 7px; }
+/* Large: the length at the title's right corner, the pack and the instruments at the bottom of the card */
+#songs li.row.large .song-top { align-items: baseline; gap: 10px; }
+.song-len { flex: none; color: var(--muted); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+#songs li.row.large .song-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
+#songs li.row.large .song-insts { margin-top: 0; }
