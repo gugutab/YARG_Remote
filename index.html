@@ -395,8 +395,13 @@
     </div>
   </div>
 
-  <button id="settingsTab" class="edge-tab edge-left settings-show" type="button" title="Settings (,)" aria-label="Settings" hidden><svg><use href="#i-gear"/></svg></button>
-  <button id="libTab" class="edge-tab edge-left lib-show" type="button" title="Show the library (L)" aria-label="Show the library" hidden><svg><use href="#i-chevron"/></svg></button>
+  <div id="edgeDock" class="edge-dock" hidden>
+    <button id="dockHandle" class="dock-handle" type="button" title="Library and settings" aria-label="Library and settings" aria-expanded="false"><svg><use href="#i-chevron"/></svg></button>
+    <div class="dock-buttons">
+      <button id="libTab" class="dock-btn" type="button" title="Show the library (L)" aria-label="Show the library"><svg><use href="#i-list"/></svg></button>
+      <button id="settingsTab" class="dock-btn" type="button" title="Settings (,)" aria-label="Settings"><svg><use href="#i-gear"/></svg></button>
+    </div>
+  </div>
   <div id="settingsPage" class="settings-page" hidden role="dialog" aria-modal="true" aria-label="Settings"></div>
 
   <div class="seek-tip" id="seekTip" hidden></div>

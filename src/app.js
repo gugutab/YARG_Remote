@@ -29,7 +29,7 @@ import { VISUALIZERS, createDriver as createVisualizerDriver } from './visualize
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
-  'app', 'library', 'closeLibrary', 'splitter', 'libTab', 'settingsTab', 'npPlay', 'npPreview', 'npSeek', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
+  'app', 'library', 'closeLibrary', 'splitter', 'libTab', 'settingsTab', 'edgeDock', 'dockHandle', 'npPlay', 'npPreview', 'npSeek', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
@@ -143,9 +143,10 @@ function syncWindow() {
   els.libList.inert = !list;
 }
 // The edge tabs bring a closed library back (the settings tab keeps Settings one click away while the library header, which holds the gear, is hidden).
+let dockTimer = 0; // (the dock's close timer; declared before syncPanelUi first runs)
 function syncPanelUi() {
-  els.libTab.hidden = libraryOpen();
-  els.settingsTab.hidden = libraryOpen();
+  els.edgeDock.hidden = libraryOpen(); // the dock (Library and Settings buttons) is only there while the library window is closed
+  if (libraryOpen()) setDockOpen(false);
 }
 (() => { // the library at startup: open, closed, or as it was last time (the "Panels" settings). A phone starts with the drawer closed, unless no song is being opened.
   let last = {};
@@ -166,6 +167,22 @@ window.matchMedia('(max-width: 700px)').addEventListener('change', (e) => {
 els.closeLibrary.addEventListener('click', () => setLibraryOpen(false, false));
 els.scrim.addEventListener('click', () => { if (infoOpen) setInfoOpen(false); setLibraryOpen(false, false); }); // (phone) everything out of the way
 els.welcomeOpen.addEventListener('click', () => setLibraryOpen(true));
+// The dock: a handle on the left edge; hovering it (mouse) or clicking/tapping it opens the Library and Settings buttons, which fold back
+// when the pointer leaves, on Esc or on a tap elsewhere.
+function setDockOpen(open) {
+  clearTimeout(dockTimer);
+  els.edgeDock.classList.toggle('open', open);
+  els.dockHandle.setAttribute('aria-expanded', String(open));
+}
+let dockWasOpen = false; // the state when the pointer went down (focusing the button opens the dock before the click arrives)
+els.dockHandle.addEventListener('pointerdown', () => { dockWasOpen = els.edgeDock.classList.contains('open'); });
+els.dockHandle.addEventListener('click', (e) => setDockOpen(e.pointerType === 'mouse' ? true : !dockWasOpen)); // (a mouse already opened it by hovering: a click keeps it open; a touch toggles)
+els.edgeDock.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') setDockOpen(true); });
+els.edgeDock.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') { clearTimeout(dockTimer); dockTimer = setTimeout(() => setDockOpen(false), 350); } });
+els.edgeDock.addEventListener('focusin', () => setDockOpen(true));
+els.edgeDock.addEventListener('focusout', (e) => { if (e.relatedTarget && !els.edgeDock.contains(e.relatedTarget)) setDockOpen(false); }); // (a blur with no target is the app dropping the focus of a clicked button: not a reason to fold)
+document.addEventListener('pointerdown', (e) => { if (!els.edgeDock.contains(e.target)) setDockOpen(false); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setDockOpen(false); }, true);
 els.libTab.addEventListener('click', () => setLibraryOpen(true));
 els.settingsTab.addEventListener('click', () => settingsPage.open());
 

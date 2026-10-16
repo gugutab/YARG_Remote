@@ -968,13 +968,6 @@ body.settings-open { overflow: hidden; }
 #info[data-names="always"] .card-volume .mix-row { grid-template-columns: 36px 84px 1fr 40px 28px; }
 #info[data-names="always"] .card-volume .mix-row.has-expand { grid-template-columns: 36px auto 84px 1fr 40px 28px; }
 
-.edge-tab { position: fixed; top: 50%; transform: translateY(-50%); z-index: 40; width: 26px; height: 76px; padding: 0; display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); color: var(--muted); cursor: pointer; }
-.edge-tab[hidden] { display: none; }
-.edge-tab:hover { color: var(--accent); background: var(--panel-2); }
-.edge-tab svg { width: 18px; height: 18px; }
-.edge-left { left: 0; border-left: 0; border-radius: 0 10px 10px 0; }
-.edge-right { right: 0; border-right: 0; border-radius: 10px 0 0 10px; }
-@media (max-width: 700px) { .edge-tab { display: none !important; } }
 .now-playing { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-top: 1px solid var(--line); background: var(--panel-2); margin: 0 -10px; }
 .now-playing[hidden] { display: none; }
 .now-playing img { width: 38px; height: 38px; border-radius: 6px; object-fit: cover; flex: none; }
@@ -1083,9 +1076,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .lib-hide svg { transform: rotate(90deg); } /* points left: where the library goes */
 .lib-hide { opacity: .7; }
 .lib-hide:hover { opacity: 1; }
-.edge-tab.lib-show svg { transform: rotate(-90deg); } /* points right: where it comes back */
-.edge-tab.lib-show { height: 56px; }
-@media (max-width: 700px) { .edge-tab.lib-show:not([hidden]) { display: grid !important; } }
 
 
 /* a list that does not scroll has no rail: its rows use that space too */
@@ -1526,11 +1516,10 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
    the pane tags, the edge tabs and the stage buttons (fixed metrics) an invisible ::before reaches out instead, so the look and
    the bar heights do not change. Fine pointers (mouse) are untouched. */
 @media (pointer: coarse) {
-  :where(.topbar button, .pane-tag, .edge-tab, button.stage-btn, .mix-row button:not(.stem-btn)) { position: relative; } /* zero specificity: absolute/fixed rules keep winning */
-  .topbar button::before, .pane-tag::before, .edge-tab::before, button.stage-btn::before, .mix-row button:not(.stem-btn)::before {
+  :where(.topbar button, .pane-tag, button.stage-btn, .mix-row button:not(.stem-btn)) { position: relative; } /* zero specificity: absolute/fixed rules keep winning */
+  .topbar button::before, .pane-tag::before, button.stage-btn::before, .mix-row button:not(.stem-btn)::before {
     content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%);
   }
-  .edge-left::before { left: 0; width: 44px; transform: translateY(-50%); } /* tabs on the screen edge reach inwards only */
   .edge-right::before { left: auto; right: 0; width: 44px; transform: translateY(-50%); }
   input[type="color"], .stem-btn { min-width: 44px; min-height: 44px; }
 
@@ -1626,7 +1615,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .load-screen { padding-left: calc(var(--lib-inset, 0px) + 24px); }
 
 /* settings stays one click away while the library header (which holds the gear) is hidden */
-.edge-tab.settings-show { top: calc(50% + 34px); transform: none; height: 40px; }
 
 /* phone: a full-height drawer over everything (the bar included) with a scrim */
 @media (max-width: 700px) {
@@ -1639,7 +1627,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
   .splitter { display: none; }
   .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); z-index: 25; }
   .app:not(.lib-closed) .scrim, .app.details-only .scrim { display: block; }
-  .app.info-open .edge-tab { display: none; } /* the details fill the screen: no tab over them */
 }
 
 /* Immersive: the player bar is an overlay over the stage; it stays above the library window */
@@ -1873,7 +1860,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 @keyframes info-swap-in { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
 
 /* phone: while the details cover the drawer its edge tab stays away (the details-only case, where the list tab rule is !important) */
-@media (max-width: 700px) { body.details-open .edge-tab.lib-show:not([hidden]) { display: none !important; } } /* (the edge tabs live outside .app, so the state is on <body>) */
 
 /* The loading screen has no background of its own: the stage (the plain stage colour while the bar and tracks are held back) shows through */
 .load-screen { background: transparent; }
@@ -1928,3 +1914,17 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .stage-play svg { width: 18px; height: 18px; }
 /* centred in the part the library window leaves free */
 @media (min-width: 701px) { .stage-play { left: calc(var(--lib-inset, 0px) + (100% - var(--lib-inset, 0px)) / 2); } }
+
+/* ---------- The edge dock: one handle on the left edge; hover or click opens the Library and Settings buttons ---------- */
+.edge-dock { position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 40; display: flex; align-items: center; }
+.edge-dock[hidden] { display: none; }
+.dock-handle { width: 26px; height: 76px; padding: 0; display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); border-left: 0; border-radius: 0 10px 10px 0; color: var(--muted); cursor: pointer; transition: color .15s, background .15s; }
+.dock-handle svg { width: 18px; height: 18px; transform: rotate(-90deg); transition: transform .2s ease; } /* points right: where the buttons come from */
+.edge-dock:hover .dock-handle, .dock-handle:focus-visible { color: var(--accent); background: var(--panel-2); }
+.edge-dock.open .dock-handle svg { transform: rotate(90deg); }
+.dock-buttons { display: flex; flex-direction: column; gap: 6px; max-width: 0; opacity: 0; overflow: hidden; padding-block: 6px; margin-left: 0; transition: max-width .2s ease, opacity .15s ease, margin-left .2s ease; pointer-events: none; }
+.edge-dock.open .dock-buttons { max-width: 56px; opacity: 1; margin-left: 6px; pointer-events: auto; }
+.dock-btn { flex: none; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line); border-radius: 12px; color: var(--text); cursor: pointer; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 6px 20px rgba(0, 0, 0, .35); }
+.dock-btn:hover { color: var(--accent); background: var(--panel-2); }
+.dock-btn svg { width: 20px; height: 20px; }
+body.details-open .edge-dock { display: none; } /* the details fill the window area: no dock over them */
