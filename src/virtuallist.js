@@ -323,10 +323,6 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     return entry;
   }
 
-  function css(name, fallback) {
-    return getComputedStyle(scroller).getPropertyValue(name).trim() || fallback;
-  }
-
   // Ticks for every group header and a short label at the first group of each initial / decade / bucket.
   function drawRail() {
     if (!rail) return;
@@ -342,14 +338,16 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     }
     if (off) return;
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.round(W * dpr);
-    canvas.height = Math.round(H * dpr);
+    const cw = Math.round(W * dpr);
+    const ch = Math.round(H * dpr);
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; } // (assigning a size reallocates and clears the bitmap even when it is the same)
     const g = canvas.getContext('2d');
-    g.scale(dpr, dpr);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, W, H);
     const th = thumbH();
-    const tick = css('--line', '#2a3140');
-    const muted = css('--muted', '#8b95a7');
+    const cs = getComputedStyle(scroller); // (one style object for both colours; read each draw, so a theme change shows at once)
+    const tick = cs.getPropertyValue('--line').trim() || '#2a3140';
+    const muted = cs.getPropertyValue('--muted').trim() || '#8b95a7';
     g.font = `600 ${bounds ? 8 : 9}px system-ui, sans-serif`;
     g.textAlign = 'right'; // the labels end right before the ticks
     g.textBaseline = 'middle';

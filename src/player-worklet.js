@@ -2,7 +2,7 @@
 // It runs on the audio thread, so a busy page can no longer make a stem lose blocks and drift: every stem is
 // read from a single position, and that position is reported back so the chart clock follows what is heard.
 import { MixStretcher } from './mixstretch.js';
-import { grainsAt } from './scrub.js';
+import { grainSrcAt, grainWeightAt } from './scrub.js';
 
 const REPORT_EVERY = 4; // render quanta (128 frames) between position reports, about 12 ms
 
@@ -54,8 +54,10 @@ class MixProcessor extends AudioWorkletProcessor {
       const e = s.e + i;
       let l = 0;
       let r = 0;
-      for (const g of grainsAt(s.from, s.to, s.dur, e)) {
-        const src = Math.floor(g.src);
+      for (let pass = 0; pass < 2; pass++) { // (the two overlapping grains; scalars only, nothing is allocated per frame)
+        const gsrc = grainSrcAt(s.from, s.to, s.dur, e, pass);
+        if (gsrc !== gsrc) continue; // NaN: no such grain
+        const src = Math.floor(gsrc);
         if (src < 0 || src >= len) continue;
         let gl = 0;
         let gr = 0;
@@ -65,8 +67,9 @@ class MixProcessor extends AudioWorkletProcessor {
           gl += stems[k].left[src] * gain;
           gr += stems[k].right[src] * gain;
         }
-        l += gl * g.w;
-        r += gr * g.w;
+        const w = grainWeightAt(e, pass);
+        l += gl * w;
+        r += gr * w;
       }
       const tail = Math.min(1, (s.dur - e) / 512); // the last few ms fade out, so the resumed playback does not click
       left[i] = l * tail;

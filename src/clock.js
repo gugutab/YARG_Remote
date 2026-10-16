@@ -28,3 +28,19 @@ export function trimHistory(history, seconds = 3) {
   while (drop < history.length - 1 && history[drop].time < newest.time - seconds) drop++;
   if (drop) history.splice(0, drop);
 }
+
+// ---- Idle audio device ----
+export const SUSPEND_AFTER_MS = 30000; // paused this long: the AudioContext is suspended (the worklet would render silence at ~345 blocks/s)
+export const RESUME_TIMEOUT_MS = 1500; // ctx.resume() can stay pending forever without a user gesture: play() gives up after this
+
+// Has the player been paused long enough to suspend the audio device? pausedSince: performance.now() of the pause (null: not paused).
+export function suspendDue(playing, pausedSince, now, afterMs = SUSPEND_AFTER_MS) {
+  return !playing && pausedSince != null && now - pausedSince >= afterMs;
+}
+
+// Resolves true when `promise` settled within `ms` (false on a timeout or a rejection).
+export function settlesWithin(promise, ms) {
+  let timer;
+  const late = new Promise((resolve) => { timer = setTimeout(() => resolve(false), ms); });
+  return Promise.race([Promise.resolve(promise).then(() => true, () => false), late]).finally(() => clearTimeout(timer));
+}

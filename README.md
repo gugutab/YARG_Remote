@@ -7,7 +7,7 @@ Visualization only: no hit/miss detection.
 ## How to run
 
 ```bash
-npm run start:static  # python3 -m http.server 8080 --bind 127.0.0.1 — then open http://localhost:8080 (folder picker only)
+npm run start:static  # python -m http.server 8080 --bind 127.0.0.1 (python3 where `python` does not exist) — then open http://localhost:8080 (folder picker only)
 npm start             # node server.mjs [songs folder]: the app plus your songs, no folder picker (see "Server with the library")
 npm test             # unit tests (MIDI / chart / song.ini / settings / server hardening ...), no browser
 npm run smoke        # starts server.mjs on a free port over a tiny synthetic song and checks the app, library and path-traversal refusals
@@ -23,22 +23,28 @@ npm run smoke        # starts server.mjs on a free port over a tiny synthetic so
 
 ## Structure
 
-| File | Responsibility |
-| --- | --- |
-| `src/midi.js` | SMF parser: notes with duration, texts, lyrics (meta 0x05), SysEx, tempo map. |
-| `src/ini.js` | `song.ini` parser and delay reading. |
-| `src/chart.js` | YARG rules: instruments and drum modes, special notes, sections, lyrics, harmonies and percussion. |
-| `src/library.js` | Scans the folder (FSA or `webkitdirectory`), builds the index and resolves files. |
-| `src/store.js` | Keeps the folder and the index in IndexedDB between visits. |
-| `src/player.js` | Multitrack with chart alignment, speed change without changing pitch (SoundTouch), per-stem volume. |
-| `src/highway.js` | Canvas drawing (notes, sustains, pedals, rolls, vocals with lyrics). |
-| `src/songlist.js` | Search, filter (instrument, genre) and sorting of the library. |
-| `src/app.js` | UI, selection, sections, delays and the draw loop. |
-| `vendor/` | SoundTouchJS (LGPL-2.1), no build. |
-| `scripts/find-special-notes.mjs` | Finds special notes in a catalog of MIDIs. |
+The app is plain HTML + ES modules under `src/`, with no build step. `CLAUDE.md` §4 lists every file with its
+role (and the test suites); in short: `midi.js`, `chartfile.js` and `sng.js` parse songs, `chart.js` applies the YARG
+rules, `highway.js` / `highway3d.js` draw, `player.js` plays the stems, `library.js` and `server.mjs` find the songs,
+`settings-*.js` and `themes.js` hold the settings. `vendor/` has SoundTouchJS (LGPL-2.1) and
+`scripts/find-special-notes.mjs` searches a catalog of MIDIs.
 
 For whoever continues the project, `CLAUDE.md` has the current state, the YARG rules with references
 and the working conventions.
+
+## Features and keys
+
+- **Deep links:** `#/song/<id>` opens a song's details and `#/song/<id>/play` its chart. A `play?i=guitar:expert,bass:expert,drums-pro:expert,vocals`
+  suffix (`#/song/<id>/play?i=...`) lists the instruments and difficulties on screen; the first one is the active one.
+- **Settings and themes:** the gear (or `,`) opens Settings: themes (presets and a studio), fonts, the library cards,
+  song details, panels, the highway (background visualizers, fretboard opacity, neck speed, countdowns), a performance overlay
+  and a settings backup (export / import / reset).
+- **Shortcuts:** all of them are editable in Settings -> Shortcuts, which also shows the defaults (play / pause, seek,
+  sections, loop, fretboard windows, 2D / 3D, karaoke, visualizers, library, details, bar, full screen, settings).
+- **A-B loop:** the loop button (key `R`) starts a loop around the current section; drag its two handles on the seek bar
+  (they snap to section starts) to adjust it.
+- **Environment variables** (server): `SONGS_DIR`, `PORT`, `HOST`, `CACHE_DIR` (see "Server with the library").
+- **Tests:** `npm test` (unit tests, no browser) and `npm run smoke` (the server end to end).
 
 ## How the `.mid` is interpreted (references)
 
@@ -50,7 +56,7 @@ Checked against the YARG.Core code (`github.com/YARC-Official/YARG.Core`, also p
 - **Difficulty by pitch** — `Song/MidiPreparsers/MidiInstrumentPreparser.cs` (`NOTES_PER_DIFFICULTY = 12`):
   Easy 60–64, Medium 72–76, Hard 84–88, Expert 96–100. Offset 0..4 = green→orange lane.
 - **Guitar/bass** — `Song/MidiPreparsers/MidiFiveFretPreparser.cs`: `FIVEFRET_MIN = 59`; offset 0 is the
-  green lane. *Open* notes use the `PS` sysex (`ENHANCED_OPENS`), which this MVP does not handle yet.
+  green lane. *Open* notes use the `PS` sysex or the `[ENHANCED_OPENS]` text event (the note below each difficulty's green); both are supported.
 - **Drums** — `Song/MidiPreparsers/MidiDrumsPreparser.cs` and `MidReader.ProcessLists.cs`: 101 = 5-lane
   drums (100 = orange, 101 = green); 110/111/112 = tom markers for yellow/blue/green (pitch 98/99/100): on those lanes the note is a cymbal by default, and an active marker turns it into a tom,
   from the marker's note-on to its note-off, in Pro and 5-lane drums. Without 101 and with 110–112 = Pro; with neither = 4 lanes.
@@ -75,32 +81,11 @@ With the Aerosmith `notes.mid` — "Toys in the Attic" (outside the repository):
 - Expert guitar: 1000 notes, 154 sustains, 2 solos (103), 13 star power (116), 12 sections.
 - No `PART RHYTHM`/`PART KEYS` in the file: those instruments do not appear in the list.
 
-## Reuse the current YARG Remote or start from scratch?
-
-The `gugutab/YARG_Remote` repository **is empty**: the GitHub API answers `409 Git Repository is empty`,
-there are no branches and the local clone has no commits. There is no code to reuse, so the project starts from scratch
-on this branch (`claude/upbeat-knuth-87adga`).
-
-For the requested scope, starting from scratch makes sense even if there were code. YARG itself is a
-Unity/C# client (`Assets/` folder) and the parsing lives in YARG.Core in C#, which does not run in the browser. Porting the chart
-logic (what this project does in `src/chart.js`) is simpler than embedding the whole client.
-YARG.Core serves as a format reference, not as a dependency.
-
 ## Limitations
 
-- `notes.chart` is read too (notes.mid wins when both exist), except GHL (6-fret) tracks and co-op guitar; its lyrics show as non-pitched notes.
-- Pro guitar and bass, Pro keys and Elite Drums are not drawn.
-- Open via the "enhanced opens" mode (text) is not handled; open via SysEx is.
-- Drum fills, BRE and coda are not drawn; venue and lights are not either.
-- Star power and solo appear as a background band, not per note.
-- Audio and delays have not been checked by ear with real stems.
-
-## Suggested next steps
-
-1. Check sync with real stems, and the `song.ini` delay.
-2. Pro guitar and bass (`PART REAL_GUITAR`, `PART REAL_BASS`).
-3. `.chart` files.
-4. Star power and solo per note.
+The current list of what is and is not supported, and what has never been checked by ear, is in `CLAUDE.md` §2 and §10.
+In short: no hit/miss detection; no Pro guitar, bass or keys and no Elite Drums; star power and solo are a background
+band (star power also recolours its notes); audio sync and the delays have not been checked by ear with real stems.
 
 ## Finding examples of special notes in the catalog
 
@@ -122,8 +107,8 @@ HOST=0.0.0.0 npm start         # explicit opt-in: also serve other devices on th
 
 The server delivers the app, the index (`/api/library`, stored in `.cache/library.json`) and the files (`/songs/<path>`, with Range support). The app detects the server and opens the library on its own, in any browser (Firefox included) and, when started with `HOST=0.0.0.0`, on other devices on the LAN (`http://<PC-IP>:8080`), with no folder picker. By default the server binds `127.0.0.1` only and, while bound to loopback, refuses requests whose `Host` header is not an IP, `localhost` or the machine name (DNS-rebinding guard). `/songs` only serves song-pack file types (audio, images, charts, ini/txt/json), never html/js/css/svg. The refresh button (⟳) redoes the scan. Without the server (`npm run start:static`, or static hosting) the app goes back to the browser's folder picker, described above: in Chrome/Edge on `localhost` the folder is remembered; otherwise only the list is stored.
 
-## License
+## Licence
 
 - `vendor/soundtouch.js` is SoundTouchJS 0.1.30, licensed LGPL-2.1 (see `vendor/SOUNDTOUCH-LICENSE.txt`).
 - The instrument icons in `index.html` are traced from YARG's icon sheet (LGPL-3.0, see `vendor/README.md`).
-- The project's own licence has not been chosen yet. TODO (owner): pick a licence and add a `LICENSE` file.
+- No licence has been chosen yet: all rights reserved until the owner adds a LICENSE file.

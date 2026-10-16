@@ -18,16 +18,29 @@ export function hann(x) {
   return s * s;
 }
 
+// The two grains that overlap output frame `e` are numbered pass 0 (the newest, k = floor(e / HOP)) and pass 1 (the one before).
+// Scalar forms, so the audio thread allocates nothing per frame: the source position of the sample in that grain, or NaN when the
+// grain does not exist (before the first one, or already over); and its Hann weight.
+export function grainSrcAt(from, to, dur, e, pass) {
+  const k = Math.floor(e / HOP) - pass;
+  if (k < 0) return NaN;
+  const x = e - k * HOP;
+  if (x >= GRAIN) return NaN;
+  return grainStart(from, to, dur, k) + x;
+}
+
+export function grainWeightAt(e, pass) {
+  return hann(e - (Math.floor(e / HOP) - pass) * HOP);
+}
+
 // One scrubbed sample's source index and weight for the output frame `e` (counted from the start of the scrub), for each of the
 // (up to two) grains that overlap it: [{ src, w }]. Grains are numbered from 0 and the first one starts at e = 0.
+// (Allocates: for tests and tools. The worklet uses grainSrcAt / grainWeightAt.)
 export function grainsAt(from, to, dur, e) {
-  const k1 = Math.floor(e / HOP);
   const out = [];
-  for (const k of [k1, k1 - 1]) {
-    if (k < 0) continue;
-    const x = e - k * HOP;
-    if (x >= GRAIN) continue;
-    out.push({ src: grainStart(from, to, dur, k) + x, w: hann(x) });
+  for (let pass = 0; pass < 2; pass++) {
+    const src = grainSrcAt(from, to, dur, e, pass);
+    if (src === src) out.push({ src, w: grainWeightAt(e, pass) });
   }
   return out;
 }

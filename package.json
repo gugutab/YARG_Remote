@@ -2,6 +2,10 @@
   "name": "yarg-remote",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20"
+  },
   "description": "Web visualizer for Rock Band/YARG songs (notes.mid or notes.chart + song.ini + audio stems)",
   "type": "module",
   "scripts": {

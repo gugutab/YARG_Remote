@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   GUITAR_LANE_COLORS, KICK_COLOR, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS,
 } from './gfx.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the flat view shows 2.5)
@@ -315,7 +315,7 @@ export function renderLanes3D(hw, t, w, h) {
   const padBottom = hitY + padRy;
   if (h - padBottom > 2) {
     const bf = g.createLinearGradient(0, padBottom, 0, h);
-    for (const [at, a] of [[0, 0], [0.3, 0.2], [0.6, 0.6], [0.85, 0.92], [1, 1]]) bf.addColorStop(at, hw.fadeStyle(a));
+    for (const [at, c] of BOTTOM_FADE_STOPS) bf.addColorStop(at, c);
     g.globalCompositeOperation = hw.layered ? 'destination-out' : 'source-over';
     g.fillStyle = bf;
     g.fillRect(0, padBottom, w, h - padBottom);
@@ -332,7 +332,7 @@ export function renderLanes3D(hw, t, w, h) {
   // (an eased fade, so the board dissolves instead of ending in a visible edge)
   const fadeH = h * 0.26;
   const grad = g.createLinearGradient(0, 0, 0, fadeH);
-  for (let n = 0; n <= 12; n++) { const u = n / 12; grad.addColorStop(u, hw.fadeStyle((1 - u * u * u * (u * (u * 6 - 15) + 10)).toFixed(3))); } // smootherstep: eases at both ends
+  for (const [u, c] of EDGE_FADE_STOPS) grad.addColorStop(u, c); // smootherstep: eases at both ends
   g.globalCompositeOperation = hw.layered ? 'destination-out' : 'source-over';
   g.fillStyle = grad;
   g.fillRect(0, 0, w, fadeH);  g.globalCompositeOperation = 'source-over';

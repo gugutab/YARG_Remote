@@ -3,7 +3,7 @@
 
 import { sanitizeSizes, fitWidths } from './panesizes.js';
 import {
-  GUITAR_LANE_COLORS,
+  GUITAR_LANE_COLORS, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, LYRIC_RAMP_STOPS,
   KICK_COLOR,
   OPEN_COLOR,
   HARMONY_COLORS,
@@ -46,6 +46,12 @@ import { waitCountdowns, countdownAt } from './countdown.js';
 
 const RECT_WIDEN_2D = 1.18;
 const VOCAL_LEAD = '#5b8def'; // lead vocal notes
+// (a loop, not Math.max(...spread): a spread of >~120k notes throws a RangeError)
+function longestNote(notes) {
+  let m = 0;
+  for (let i = 0; i < notes.length; i++) { const l = notes[i].length || 0; if (l > m) m = l; }
+  return m;
+}
 const MIN_PANE_PX = 140; // no fretboard window is narrower than this (dragDivider keeps the same floor)
 const REST_BACK_SEC = 1; // after a long rest the track is back this long before the next note appears at the far edge
 const REST_BOARD_MIN = 0.2; // a fretboard's dark base keeps this fraction of its opacity at the deepest part of a rest
@@ -74,21 +80,31 @@ export class Highway {
     this.perScreen = 1;
     this.paneRects = []; // where each chart is drawn this frame: { key, label, icon, x, y, w, h }
     this.sheets = []; // the lyric sheets on screen this frame: { x, y, w, h, step, hits, state } (canvas coordinates)
-    this.countdowns = true; // show the wait countdowns
+    this._countdowns = true; // show the wait countdowns
     this.weights = {}; // relative width of each fretboard, by pane key (dragging the dividers between them changes it)
     this.vocalH = null; // height of the vocal band in px, once the user dragged its divider (null: the default)
     this.dividers = []; // the draggable dividers drawn this frame
     this.hover = null; // the divider under the pointer
-    this.sheetPeek = 0.12; // share of a lyric sheet's height that shows the lines before the one in focus
-    this.delay = 0; // the chart delay, so times shown on the lyrics match the seek bar
+    this._sheetPeek = 0.12; // share of a lyric sheet's height that shows the lines before the one in focus
+    this._delay = 0; // the chart delay, so times shown on the lyrics match the seek bar
     this.pointer = null; // the pointer over the canvas, for the "play from here" button on the lyrics: { x, y, t0, key, shown }
     this.onResize = null; // called when a drag ends, so the page can keep the sizes
     this.layout = { w: 0, sum: 1, keys: [] };
     this.vocalView = 'track'; // 'track' (notes + lyrics) or 'karaoke' (the lyrics alone)
-    this.trackOpacity = 0.75; // how opaque the board of a fretboard is (setting highway.trackOpacity)
+    this._trackOpacity = 0.75; // how opaque the board of a fretboard is (setting highway.trackOpacity)
     this.visualizer = null; // (g, w, h, t, bgRgb) => draws the shared background behind every pane, or null (src/visualizers.js)
     this.dirtyAt = 0; // performance.now() of the last change to what is drawn (see invalidate); the page skips idle redraws until it is old
   }
+
+  // Plain settings the page assigns: each change redraws (the idle skip must not hide it).
+  get countdowns() { return this._countdowns; }
+  set countdowns(v) { this._countdowns = v; this.invalidate(); }
+  get sheetPeek() { return this._sheetPeek; }
+  set sheetPeek(v) { this._sheetPeek = v; this.invalidate(); }
+  get delay() { return this._delay; }
+  set delay(v) { this._delay = v; this.invalidate(); }
+  get trackOpacity() { return this._trackOpacity; }
+  set trackOpacity(v) { this._trackOpacity = v; this.invalidate(); }
 
   // Marks the picture as stale: the page keeps redrawing every frame for a while after this (it skips frames only when paused and idle).
   invalidate() {
@@ -152,9 +168,13 @@ export class Highway {
     this.panes = items.map(({ chart, label, key, icon, chooser }) => {
       if (chooser) return { chooser: true, chart: null, label: '', icon: 'music', key, maxLength: 0, vRange: null }; // a slot the page fills with the instrument cards
       markStarPowerNotes(chart);
-      return { chart, label: label ?? '', icon: icon ?? 'music', key: key ?? label ?? '', maxLength: Math.max(0, ...chart.notes.map((n) => n.length || 0)), vRange: null }; // the vocal range is re-fitted per chart
+      return { chart, label: label ?? '', icon: icon ?? 'music', key: key ?? label ?? '', maxLength: longestNote(chart.notes), vRange: null }; // the vocal range is re-fitted per chart
     });
     this.chart = this.panes.find((p) => p.chart)?.chart ?? null;
+    for (const k of Object.keys(this)) { // release the offscreen layers of panes that are gone
+      if (k.startsWith('layer:') && !this.panes.some((p) => `layer:${p.key}` === k)) delete this[k];
+    }
+    if (!this.panes.length) this.blurCanvas = this.vizCanvas = null;
     this.focus = 0;
     this.invalidate();
   }
@@ -370,7 +390,7 @@ export class Highway {
   }
 
   // Colour stops for an edge fade: while a fretboard is drawn on its own layer the fade erases (alpha), otherwise it paints the stage colour.
-  fadeStyle(a) {
+  fadeStyle(a) { // (the fade loops use the precomputed stop lists of gfx.js)
     return `rgba(0,0,0,${a})`;
   }
 
@@ -411,6 +431,7 @@ export class Highway {
     if (d.type === 'row') {
       const h = this.canvas.clientHeight;
       this.vocalH = Math.round(Math.max(90, Math.min(h - 160, (this.vocalH ?? d.y + 1) + dy)));
+      this.invalidate();
       return;
     }
     const { w, sum } = this.layout;
@@ -426,6 +447,7 @@ export class Highway {
 
   // Back to the default sizes (double click on a divider: just that one; no argument: all).
   resetSizes(d) {
+    this.invalidate();
     if (!d) { this.weights = {}; this.vocalH = null; return; }
     if (d.type === 'row') this.vocalH = null;
     else { delete this.weights[d.a]; delete this.weights[d.b]; }
@@ -437,6 +459,7 @@ export class Highway {
 
   setSizes(sizes) {
     const clean = sanitizeSizes(sizes);
+    this.invalidate();
     this.weights = clean.weights;
     this.vocalH = clean.vocalH;
   }
@@ -456,8 +479,10 @@ export class Highway {
     g.rect(x, y, pw, ph);
     g.clip();
     g.translate(x, y);
-    const saved = { view: this.view, noteStyle: this.noteStyle, neck: this.neck };
-    this.neckGlobal = saved.neck; // the default the vocal chart's speed is measured against
+    const savedView = this.view;
+    const savedNoteStyle = this.noteStyle;
+    const savedNeck = this.neck;
+    this.neckGlobal = savedNeck; // the default the vocal chart's speed is measured against
     this.view = this.paneOpt(pane.key, 'view');
     this.noteStyle = this.paneOpt(pane.key, 'noteStyle');
     this.neck = this.paneOpt(pane.key, 'neck');
@@ -492,9 +517,9 @@ export class Highway {
       pane.vRange = this.vRange;
       if (!(pane.chart.mode === 'vocals' && this.vocalView === 'karaoke')) this.drawCountdown(pane, t, pw, ph);
     } finally {
-      this.view = saved.view;
-      this.noteStyle = saved.noteStyle;
-      this.neck = saved.neck;
+      this.view = savedView;
+      this.noteStyle = savedNoteStyle;
+      this.neck = savedNeck;
       g.restore();
     }
   }
@@ -815,17 +840,10 @@ export class Highway {
       hovered = this.hoverRow(sheet, x0, y0, y, step, lines[i].start, shown.x, shown.x + shown.total, (cur ? big : small) * 0.7) ?? hovered;
     }
     const fade = Math.min(92, h * 0.32); // the lines dissolve into the background at the top and bottom edges: opaque at the very edge, easing out
-    const ramp = []; // [position from the edge, opacity of the background]: opaque at the very edge, then a smootherstep over the whole band, which eases both ends
-    for (let n = 0; n <= 16; n++) {
-      const pos = n / 16;
-      const u = Math.pow(pos, 0.7); // spreads the fade over the whole band: the text is covered at the very edge and fully back where the band ends
-      ramp.push([pos, 1 - u * u * u * (u * (u * 6 - 15) + 10)]);
-    }
     const eg = rowLayer ? this.g : g; // the layer (to erase) or the stage (to paint over)
     const fadeIn = eg.createLinearGradient(0, 0, 0, fade);
     const fadeOut = eg.createLinearGradient(0, h, 0, h - fade);
-    for (const [pos, alpha] of ramp) {
-      const c = `rgba(0,0,0,${alpha})`;
+    for (const [pos, c] of LYRIC_RAMP_STOPS) { // opaque at the very edge, then a smootherstep (position^0.7) over the whole band, which eases both ends
       fadeIn.addColorStop(pos, c);
       fadeOut.addColorStop(pos, c);
     }
@@ -987,6 +1005,7 @@ export class Highway {
 
   // Wheel / drag over a sheet (`lines` = how many lines to move).
   scrollSheet(sheet, lines) {
+    this.invalidate();
     if (this.pointer) { this.pointer.shown = false; this.pointer.key = null; }
     const st = sheet.state;
     if (st.following !== false) { st.following = false; st.hold = st.pos ?? 0; } // scrolling by hand stops the autoscroll
@@ -999,6 +1018,7 @@ export class Highway {
   }
 
   resumeSheet(sheet) {
+    this.invalidate();
     sheet.state.following = true;
   }
 
@@ -1245,7 +1265,7 @@ export class Highway {
     const fadeStart = Math.max(hitY + radius * 1.05, h - bottomFade);
     if (h - fadeStart > 2) {
       const bf = g.createLinearGradient(0, fadeStart, 0, h);
-      for (const [at, a] of [[0, 0], [0.3, 0.2], [0.6, 0.6], [0.85, 0.92], [1, 1]]) bf.addColorStop(at, this.fadeStyle(a));
+      for (const [at, c] of BOTTOM_FADE_STOPS) bf.addColorStop(at, c);
       g.globalCompositeOperation = this.layered ? 'destination-out' : 'source-over';
       g.fillStyle = bf;
       g.fillRect(0, fadeStart, w, h - fadeStart);
@@ -1260,7 +1280,7 @@ export class Highway {
     // the board and the notes entering from the top dissolve into the background (an eased fade)
     const fadeH = h * 0.12;
     const fade = g.createLinearGradient(0, 0, 0, fadeH);
-    for (let n = 0; n <= 12; n++) { const u = n / 12; fade.addColorStop(u, this.fadeStyle((1 - u * u * u * (u * (u * 6 - 15) + 10)).toFixed(3))); } // smootherstep: eases at both ends
+    for (const [u, c] of EDGE_FADE_STOPS) fade.addColorStop(u, c); // smootherstep: eases at both ends
     g.globalCompositeOperation = this.layered ? 'destination-out' : 'source-over';
     g.fillStyle = fade;
     g.fillRect(0, 0, w, fadeH);

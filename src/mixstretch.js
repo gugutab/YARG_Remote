@@ -120,7 +120,8 @@ export class MixStretcher {
         this.pos += FEED;
       }
       const got = Math.min(n, st.outputBuffer.frameCount);
-      const out = new Float32Array(got * 2);
+      if (!this.outScratch || this.outScratch.length < got * 2) this.outScratch = new Float32Array(Math.max(256, got * 2)); // (reused: no allocation per 128-frame block)
+      const out = this.outScratch;
       st.outputBuffer.receiveSamples(out, got);
       this.oldOut = Math.max(0, this.oldOut - got);
       for (let j = 0; j < got; j++) {

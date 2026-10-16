@@ -23,8 +23,13 @@ song.ini
 notes.chart
 /songs/
 /Songs/
-# logs and OS files
+# logs, editor and OS files, local environment
 *.log
+npm-debug.log*
+.env*
+.vscode/
+.idea/
+*.swp
 .DS_Store
 Thumbs.db
 desktop.ini

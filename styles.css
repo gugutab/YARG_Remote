@@ -159,7 +159,7 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 .welcome button { background: var(--accent); border-color: var(--accent); color: var(--accent-text, #fff); }
 
 /* Fullscreen / idle: the bar hides while playing and returns on mouse move */
-.app.immersive .topbar { position: absolute; left: 0; right: 0; top: 0; z-index: 10; opacity: .96; transition: transform .2s ease; }
+.app.immersive .topbar { position: absolute; left: 0; right: 0; top: 0; opacity: .96; transition: transform .2s ease; }
 .app.immersive.idle .topbar { transform: translateY(-100%); }
 
 /* ---------- Narrow screens ---------- */
@@ -314,7 +314,6 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
   align-items: stretch;
   gap: 0 10px;
   padding: 8px 10px 8px 6px;
-  background: var(--panel);
   border-bottom: 1px solid var(--line);
   min-width: 0;
 }
@@ -391,7 +390,7 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
 .mix-row.master { padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
 
 /* ---------- Round 8: seek bar at the bottom edge, section next to the time, corner 3D button ---------- */
-.topbar { position: relative; z-index: 4; border-bottom: 4px solid var(--line); }
+.topbar { position: relative; border-bottom: 4px solid var(--line); }
 .tb-main { grid-template-rows: 1fr 1fr; }
 .seekbox { position: absolute; left: 0; right: 0; bottom: -10px; height: 16px; margin: 0; }
 .seekbox input { height: 16px; }
@@ -615,7 +614,7 @@ button.icon.stage-btn.style-btn { top: 54px; }
 #songs::-webkit-scrollbar { display: none; }
 #songs li { right: var(--rail-w); }
 .group-label { right: var(--rail-w); }
-.rail { position: absolute; top: 0; right: 0; bottom: 0; width: var(--rail-w); z-index: 3; touch-action: none; cursor: pointer; user-select: none; }
+.rail { position: absolute; top: 0; right: 0; bottom: 0; width: var(--rail-w); touch-action: none; cursor: pointer; user-select: none; }
 .rail canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .rail-thumb { position: absolute; width: 14px; right: 0; /* flush with the sidebar edge */ top: 0; border-radius: 6px; background: color-mix(in srgb, var(--accent) 16%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent); pointer-events: none; transition: background .15s; }
 .rail:hover .rail-thumb, .rail.dragging .rail-thumb { background: color-mix(in srgb, var(--accent) 30%, transparent); }
@@ -703,8 +702,6 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .bar-hide svg { transform: rotate(180deg); }
 .bar-hide { align-self: center; opacity: .7; }
 .bar-hide:hover { opacity: 1; }
-button.icon.stage-btn.bar-show { right: 10px; left: auto; top: 10px; width: 28px; height: 28px; min-width: 0; padding: 0; }
-button.icon.stage-btn.bar-show svg { width: 16px; height: 16px; }
 
 /* Round 53: one settings button on the stage (top-left, under the "show bar" tab when that is visible) */
 button.icon.stage-btn.fret-btn { right: 10px; left: auto; top: 10px; width: 28px; height: 28px; min-width: 0; padding: 0; }
@@ -751,8 +748,7 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 }
 
 /* Round 58: the stage buttons keep to the same right limit as the top bar's content (set from app.js) */
-.stage-btn, button.icon.stage-btn.bar-show, button.icon.stage-btn.fret-btn { right: var(--stage-btn-right, 10px); }
-.app.bar-hidden button.icon.stage-btn.bar-show { top: 18px; }
+.stage-btn, button.icon.stage-btn.fret-btn { right: var(--stage-btn-right, 10px); }
 .app.bar-hidden button.icon.stage-btn.fret-btn { top: 54px; }
 
 /* Round 59: the results list bleeds to the left edge of the library panel (the panel's 10 px padding is cancelled on that
@@ -1018,16 +1014,6 @@ body.settings-open { overflow: hidden; }
 .listen-preview { flex: none; padding: 6px 12px; font-size: 12px; }
 .listen-preview[hidden] { display: none; }
 
-/* special notes: a list of kinds with counts and previous / next buttons */
-#info[data-hide~="specials"] .card-specials { display: none; }
-.specials { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 14px; }
-.specials.compact { grid-template-columns: 1fr; gap: 2px; }
-.spc-row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 3px 0; }
-.spc-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; box-shadow: 0 0 0 1px rgba(255, 255, 255, .25); }
-.spc-name { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.spc-count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; }
-.spc-row .icon svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; width: 14px; height: 14px; }
-.fret-pop .spc-name { font-size: 12.5px; }
 
 /* ---------- instrument tags over the charts, and their menu ---------- */
 .pane-tags { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
@@ -1102,15 +1088,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 @media (max-width: 700px) { .edge-tab.lib-show:not([hidden]) { display: grid !important; } }
 
 
-/* ---------- the top bar hides and shows like the library: it slides (0.2 s) and a small chevron tab brings it back ---------- */
-.topbar { transition: margin-top .2s ease; } /* the same kind of motion as the library's margin-left: nothing is squeezed while it moves */
-.app.bar-hidden button.icon.stage-btn.bar-show.edge-top, button.icon.stage-btn.bar-show.edge-top { position: absolute; left: 50%; right: auto; top: 12px; transform: translateX(-50%); width: 56px; height: 26px; min-width: 0; padding: 0; border-radius: 10px; z-index: 40; background: var(--panel); border: 1px solid var(--line); color: var(--muted); backdrop-filter: none; }
-.app.bar-hidden button.icon.stage-btn.bar-show.edge-top:hover { color: var(--accent); background: var(--panel-2); }
-button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transform: none; } /* points down: where the bar comes back from */
-
-/* the top bar's tab is glued to the top edge, as the library's is to the left one, and sits at the right corner */
-.app.bar-hidden button.icon.stage-btn.bar-show.edge-top { left: auto; right: var(--stage-btn-right, 12px); top: 0; transform: none; border-top: 0; border-radius: 0 0 10px 10px; }
-
 /* a list that does not scroll has no rail: its rows use that space too */
 .songs-wrap.no-scroll.no-scroll { --rail-w: 0px; }
 
@@ -1176,7 +1153,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .pane-tag { gap: 5px; padding: 0 8px; }
 
 /* The top bar is a glass window over the background of the fretboards (the visualizer shows through) */
-.topbar { background: color-mix(in srgb, var(--panel) 52%, transparent); border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }
+.topbar { border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }
 
 /* In the glass top bar the section selector and the button hovers are see-through too */
 .topbar .chip-btn, .topbar .chip-select { background: transparent; border-color: color-mix(in srgb, var(--line) 60%, transparent); }
@@ -1185,7 +1162,6 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .topbar button.icon.primary:hover { background: var(--accent); filter: brightness(1.12); }
 
 /* ---------- The "hide the top bar" button now makes the bar compact: half the height, one row ---------- */
-#barShow { display: none !important; } /* (the old tab that brought the collapsed bar back) */
 .topbar { transition: height .2s ease; }
 .app.bar-hidden { --bar-h: 56px; }
 .app.bar-hidden .topbar { padding: 4px 10px 4px 6px; }
@@ -1509,8 +1485,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .app.immersive.bar-bottom .topbar { top: auto; bottom: 0; }
 .app.immersive.idle.bar-bottom .topbar { transform: translateY(100%); }
 /* the compact bar's padding is mirrored (the seek line is above the content now) */
-@media (min-width: 701px) { .app.bar-bottom.bar-hidden .topbar { padding-top: 10px; padding-bottom: 4px; } }
-@container song (max-width: 700px) { .app.bar-bottom.bar-hidden .topbar { padding-top: 10px; padding-bottom: 4px; } }
+.app.bar-bottom.bar-hidden .topbar { padding-top: 10px; }
 /* wide open bar: the time row stays next to the seek bar, which is above the buttons now */
 @container song (min-width: 800px) {
   .app.bar-bottom:not(.bar-hidden) .transport { flex-direction: column-reverse; align-self: start; margin: 2px 0 0; }
@@ -1520,8 +1495,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .app.bar-bottom .bar-hide svg { transform: none; }
 .app.bar-bottom.bar-hidden .bar-hide svg { transform: rotate(180deg); }
 .app.bar-bottom .topbar { padding-bottom: 16px; height: calc(var(--bar-h) + 8px); }
-@media (min-width: 701px) { .app.bar-bottom.bar-hidden .topbar { padding-bottom: 12px; } }
-@container song (max-width: 700px) { .app.bar-bottom.bar-hidden .topbar { padding-bottom: 12px; } }
+.app.bar-bottom.bar-hidden .topbar { padding-bottom: 12px; }
 
 /* Wide open bar: back to vertically centred (text block and the play/time rows), also with the bar at the bottom */
 @container song (min-width: 800px) {
@@ -1610,7 +1584,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
    Same glass as the player bar: translucent --panel, the blur on ::before. A backdrop-filter / filter on the aside itself would make it
    the containing block of position: fixed descendants (see the top bar). It moves with transform only while it slides (that is also a
    containing block, but nothing fixed is open then); once open, transform is none. */
-.app { --lib-gap: 12px; }
+.app { --lib-gap: 12px; } /* = LIB_MARGIN in src/app.js (test/css-js-constants.test.js) */
 .library {
   position: absolute; z-index: 12;
   top: var(--lib-gap); bottom: var(--lib-gap); left: var(--lib-gap);
@@ -1753,7 +1727,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
    One glass window (#library: border, shadow and the blur on its ::before) holds the list pane and, when open, this pane to its right,
    split by a thin divider. app.js (layoutWindow) sets --list-w and --info-w and the window's --win-w; the pane keeps its width while the
    window animates (the window clips it). Never put a backdrop-filter/filter/transform on the pane: fixed popovers live in <body>, but keep it so. */
-.info { position: relative; flex: none; width: var(--info-w, 380px); min-width: 0; min-height: 0; display: flex; border-left: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.info { position: relative; flex: none; width: var(--info-w, 380px) /* = INFO_MIN_W in src/app.js */; min-width: 0; min-height: 0; display: flex; border-left: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
 .info-window { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; color: var(--text); outline: none; }
 .info-top { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 16px; background: color-mix(in srgb, var(--panel) 30%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
 .info-top-text { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
@@ -1776,7 +1750,7 @@ button.icon.stage-btn.bar-show.edge-top svg { width: 18px; height: 18px; transfo
 .app.viz-glass .bg-glass { display: block; }
 
 /* ---------- One maximum size for the floating windows: the content area, 1400 px centred (like the player bar) ---------- */
-:root { --content-max: 1400px; } /* (on :root: the settings page lives outside .app) */
+:root { --content-max: 1400px; } /* (on :root: the settings page lives outside .app) = CONTENT_MAX in src/app.js */
 .app { --lib-left: max(var(--lib-gap), calc((100% - var(--content-max)) / 2)); }
 @media (min-width: 701px) {
   .library { left: var(--lib-left); max-width: calc(100% - 2 * var(--lib-left)); }

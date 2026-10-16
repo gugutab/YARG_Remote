@@ -320,3 +320,11 @@ export function spansOfKind(chart, list, key, value) {
   if (!hit || hit.src !== list) { hit = { src: list, spans: (list || []).filter((x) => x[key] === value) }; cache.set(id, hit); }
   return hit.spans;
 }
+
+// Colour stops of the edge fades, built once (they were rebuilt as strings for every pane on every frame). The fade only uses alpha:
+// it erases a layer or paints over the stage, so the colour is always black (see Highway.fadeStyle).
+const fadeColor = (a) => `rgba(0,0,0,${a})`;
+const smootherstep = (u) => u * u * u * (u * (u * 6 - 15) + 10);
+export const BOTTOM_FADE_STOPS = [[0, 0], [0.3, 0.2], [0.6, 0.6], [0.85, 0.92], [1, 1]].map(([at, a]) => [at, fadeColor(a)]); // just below the pads
+export const EDGE_FADE_STOPS = Array.from({ length: 13 }, (_, n) => { const u = n / 12; return [u, fadeColor((1 - smootherstep(u)).toFixed(3))]; }); // far edge of the board
+export const LYRIC_RAMP_STOPS = Array.from({ length: 17 }, (_, n) => { const pos = n / 16; return [pos, fadeColor(1 - smootherstep(Math.pow(pos, 0.7)))]; }); // lyric sheet edges

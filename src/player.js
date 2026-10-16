@@ -7,7 +7,7 @@
 // (YARG: SongRunner.AudioTime = AudioPlaybackTime + SongOffset, with SongOffset = -delay).
 // load() shifts each stem by the delay once, so chart time 0 is sample 0 of the aligned stem.
 import { PitchShifter } from '../vendor/soundtouch.js';
-import { positionAt, trimHistory } from './clock.js';
+import { positionAt, trimHistory, suspendDue, settlesWithin, SUSPEND_AFTER_MS, RESUME_TIMEOUT_MS } from './clock.js';
 import { decodeAll } from './stemdecode.js';
 
 export const WORKLET_START_MS = 6000; // how long the audio worklet may take to start before the legacy engine is used
@@ -32,6 +32,49 @@ export function alignChannel(src, sampleRate, delay) {
 }
 
 
+// Suspends the AudioContext after the player has been paused for SUSPEND_AFTER_MS (it releases the device and stops the worklet
+// from rendering silence), and brings it back for play(). The chart clock does not depend on the context while paused (it is the
+// stored offset), and every start re-anchors on `ctx.currentTime` after the resume, so nothing drifts.
+export class AudioIdle {
+  constructor(ctx, afterMs = SUSPEND_AFTER_MS) {
+    this.ctx = ctx;
+    this.afterMs = afterMs;
+    this.timer = null;
+    this.pausedSince = null;
+    this.pending = null; // a suspend() in flight
+  }
+
+  arm() { // the player just paused (or has nothing loaded)
+    this.cancel();
+    if (typeof this.ctx.suspend !== 'function') return;
+    this.pausedSince = performance.now();
+    this.timer = setTimeout(() => this.fire(), this.afterMs);
+    this.timer.unref?.();
+  }
+
+  cancel() {
+    clearTimeout(this.timer);
+    this.timer = null;
+    this.pausedSince = null;
+  }
+
+  fire() {
+    const since = this.pausedSince;
+    this.timer = null;
+    if (this.ctx.state === 'running' && suspendDue(false, since, performance.now(), this.afterMs)) {
+      this.pending = Promise.resolve(this.ctx.suspend()).catch(() => {}).then(() => { this.pending = null; });
+    }
+  }
+
+  // The context is running (resumed if it was suspended)? false when the browser would not resume it within the timeout (no user gesture).
+  async ensureRunning() {
+    this.cancel();
+    if (this.pending) await this.pending; // (a suspend in flight must finish first, or it would stop the audio just started)
+    if (this.ctx.state !== 'suspended') return true;
+    return settlesWithin(this.ctx.resume(), RESUME_TIMEOUT_MS);
+  }
+}
+
 // Old engine, kept as a fallback: one PitchShifter (ScriptProcessorNode) per stem.
 export class LegacyPlayer {
   constructor(ctx, master) {
@@ -45,6 +88,7 @@ export class LegacyPlayer {
     this.playing = false;
     this.offset = 0; // chart position (s) when paused / at last start
     this.startedAt = 0; // ctx.currentTime when the current position was set
+    this.idle = new AudioIdle(ctx);
   }
 
   // stems: [{ id, label, getFile }]; delay in seconds (see songDelaySeconds)
@@ -105,7 +149,7 @@ export class LegacyPlayer {
 
   async play() {
     if (this.playing || !this.stems.size) return;
-    if (this.ctx.state === 'suspended') await this.ctx.resume();
+    if (!(await this.idle.ensureRunning()) || this.playing) return; // (not resumed in time: stay paused rather than start much later)
     if (this.offset >= this.duration - 0.05) this.offset = 0; // at (or within 50 ms of) the end: start over
     this.startSources(this.offset);
   }
@@ -114,6 +158,7 @@ export class LegacyPlayer {
     if (!this.playing) return;
     this.offset = this.currentTime();
     this.stopSources();
+    this.idle.arm();
   }
 
   seek(seconds) {
@@ -130,6 +175,7 @@ export class LegacyPlayer {
   stop() {
     this.stopSources();
     this.offset = 0;
+    this.idle.arm();
   }
 
   unload() { // frees the decoded buffers (and drops a load still decoding: it must not install its stems afterwards)
@@ -137,6 +183,7 @@ export class LegacyPlayer {
     this.stems = new Map();
     this.duration = 0;
     this.offset = 0;
+    if (!this.playing) this.idle.arm();
   }
 
   startSources(at) {
@@ -177,6 +224,7 @@ class WorkletPlayer {
     this.epoch = 0; // bumped on load/seek: reports from before are ignored
     this.scrub = null; // { to, end }: a seek that is rushing through the skipped stretch; `end` is the audio time it ends at
     this.stems = new Map(); // id -> true (the app only checks that stems exist)
+    this.idle = new AudioIdle(ctx);
   }
 
   // Loads the worklet module and creates its node once, even if load() is called again meanwhile.
@@ -297,7 +345,7 @@ class WorkletPlayer {
 
   async play() {
     if (this.playing || !this.ids.length) return;
-    if (this.ctx.state === 'suspended') await this.ctx.resume();
+    if (!(await this.idle.ensureRunning()) || this.playing) return; // (not resumed in time: stay paused rather than start much later)
     if (this.offset >= this.duration - 0.05) this.offset = 0; // at (or within 50 ms of) the end: start over
     this.startAt(this.offset);
   }
@@ -319,6 +367,7 @@ class WorkletPlayer {
     this.scrub = null;
     this.node.port.postMessage({ type: 'pause' });
     this.playing = false;
+    this.idle.arm();
   }
 
   // A seek while playing that takes `ms`: the audio rushes through the skipped stretch (see scrub.js), then plays on from the target.
@@ -351,6 +400,7 @@ class WorkletPlayer {
     this.node?.port.postMessage({ type: 'pause' });
     this.playing = false;
     this.offset = 0;
+    this.idle.arm();
   }
 
   // Frees the decoded audio (the worklet holds all the stems as Float32 arrays: tens of MB per song).
@@ -364,6 +414,7 @@ class WorkletPlayer {
     this.offset = 0; // no audio, no position: the next song starts at 0
     this.epoch++;
     this.history = [];
+    if (!this.playing) this.idle.arm();
   }
 }
 

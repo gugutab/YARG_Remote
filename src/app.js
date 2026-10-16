@@ -34,7 +34,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'barHide', 'barShow', 'mixerVal', 'speedVal', 'stagePlay', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'barHide', 'mixerVal', 'speedVal', 'stagePlay', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
   'endScreen', 'endCover', 'endTitle', 'endArtist', 'endAgain', 'endSearch', 'endCards', 'endNextBox', 'endNext',
@@ -45,6 +45,7 @@ const player = new MultiTrackPlayer();
 const highway = new Highway(els.highway);
 highway.setBackgroundCanvas(document.getElementById('bgCanvas'));
 const perf = new PerfMeter();
+let perfMode = 'off'; // the perf.overlay setting, kept here so the frame loop does not read the prefs every frame
 const perfOverlay = createPerfOverlay({
   stage: document.getElementById('stage'), meter: perf, onCycle: () => cyclePerfOverlay(),
   probes: () => {
@@ -241,21 +242,20 @@ els.npPreview.addEventListener('click', async () => {
 // The handle on the list pane's right edge (the window's right edge, or the divider while the details are open): drag to resize the LIST pane
 // (remembered; the window grows with it while the details are open); double-click restores the default width. The stage keeps its size either way. The window leaves the same margin on the right as on the left.
 const MIN_LIB_W = 300; // the list pane's minimum
-const CONTENT_MAX = 1400; // the content area never gets narrower than this (--content-max is set from contentMax(), see layoutWindow)
-const LIB_MARGIN = 12; // keep in step with --lib-gap in styles.css
-const INFO_MIN_W = 380; // the details pane never gets narrower than one column of cards
+const CONTENT_MAX = 1400; // the content area never gets narrower than this (--content-max is set from contentMax(), see layoutWindow); same as the :root default in styles.css (test/css-js-constants.test.js)
+const LIB_MARGIN = 12; // keep in step with --lib-gap in styles.css (guarded by test/css-js-constants.test.js)
+const INFO_MIN_W = 380; // the details pane never gets narrower than one column of cards; same as the .info width fallback in styles.css (test/css-js-constants.test.js)
 const stageEl = document.getElementById('stage');
 const WIN_BORDER = 2; // the window's own 1 px border, left and right: the panes share the width inside it
 // the room the panes may take: the content area (--content-max, centred) between its two margins (the window starts at --lib-left), minus the border
 // The content area is 1400 px, and grows (up to 4K, 3840 px) when the "Maximum width" of the details asks for more than the list and the details fit in 1400.
-const contentMax = () => Math.min(3840, Math.max(CONTENT_MAX, Math.round(libPrefRaw()) + prefs.get('details.maxWidth') + 2 * LIB_MARGIN + WIN_BORDER));
+const contentMax = () => Math.min(3840, Math.max(CONTENT_MAX, Math.round(libPref()) + prefs.get('details.maxWidth') + 2 * LIB_MARGIN + WIN_BORDER));
 const contentWidth = () => {
   const w = stageEl.clientWidth || window.innerWidth;
   return Math.max(0, w - 2 * Math.max(LIB_MARGIN, (w - contentMax()) / 2) - WIN_BORDER);
 };
 // the list pane's widest width: all the room, or all but one column for the details while they are open
 const maxLibWidth = () => Math.max(MIN_LIB_W, contentWidth() - (infoOpen ? INFO_MIN_W : 0));
-const libPrefRaw = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lib-w')) || MIN_LIB_W;
 const libPref = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lib-w')) || MIN_LIB_W; // the list width the user chose (or the default)
 let winTotal = 0; // the panes' total width as last laid out (the window is WIN_BORDER wider)
 // Sizes the two panes (--list-w, --info-w) and the window (--win-w = list + details). The details get the room the list leaves, between one
@@ -672,6 +672,10 @@ function markStageLive() {
   els.app.classList.remove('stage-unborn');
   syncStagePlay();
 }
+let revealTimer = 0;
+let leavingGhost = null;
+let ghostTimer = 0;
+let infoSwapTimer = 0;
 function releaseStage() {
   if (!holdStage) { syncStagePlay(); return; }
   holdStage = false;
@@ -684,8 +688,15 @@ function releaseStage() {
   ghostObserver?.disconnect();
   ghostObserver = null;
   barGhost = null;
-  if (g) { g.classList.add('leaving'); setTimeout(() => g.remove(), 450); }
-  setTimeout(() => els.app.classList.remove('stage-reveal'), 500);
+  if (g) {
+    clearTimeout(ghostTimer);
+    leavingGhost?.remove(); // (a ghost still fading from the release before is gone at once)
+    leavingGhost = g;
+    g.classList.add('leaving');
+    ghostTimer = setTimeout(() => { g.remove(); if (leavingGhost === g) leavingGhost = null; }, 450);
+  }
+  clearTimeout(revealTimer);
+  revealTimer = setTimeout(() => els.app.classList.remove('stage-reveal'), 500);
   syncStagePlay();
 }
 
@@ -747,7 +758,8 @@ async function selectSong(song) {
     els.info.classList.remove('info-swap');
     void els.info.offsetWidth; // restart the animation when songs are picked in a row
     els.info.classList.add('info-swap');
-    setTimeout(() => els.info.classList.remove('info-swap'), 450);
+    clearTimeout(infoSwapTimer);
+    infoSwapTimer = setTimeout(() => els.info.classList.remove('info-swap'), 450);
   }
   setInfoOpen(true); // the info screen opens right away and the load runs behind it
   setLoadState('loading', 'Reading the chart…', 0.02);
@@ -1586,9 +1598,10 @@ function setSetting(name, value) {
 // The mouse wheel over any slider moves it (up = more, 5 notches... one step per notch; a slider with many steps moves 2% of its range per
 // notch); touchpads give fractions, which add up. The seek bar keeps its own wheel (5 s per notch). Listeners elsewhere hear a normal `input`.
 let wheelAcc = new WeakMap();
-document.addEventListener('wheel', (e) => {
-  const el = e.target;
-  if (!(el instanceof HTMLInputElement) || el.type !== 'range' || el.disabled || el.closest('#seekbox')) return;
+// The (non-passive) listener sits on each range input, not on the document, so scrolling lists never waits for the main thread.
+function onRangeWheel(e) {
+  const el = e.currentTarget;
+  if (el.disabled) return;
   e.preventDefault();
   const delta = e.deltaY || e.deltaX;
   const acc = (wheelAcc.get(el) || 0) + -delta / (e.deltaMode === 1 ? 3 : 100);
@@ -1604,7 +1617,21 @@ document.addEventListener('wheel', (e) => {
   el.value = String(Math.min(max, Math.max(min, +rounded.toFixed(6))));
   el.dispatchEvent(new Event('input', { bubbles: true }));
   el.dispatchEvent(new Event('change', { bubbles: true }));
-}, { passive: false });
+}
+const wheelBound = new WeakSet();
+function bindRangeWheel(root) {
+  const list = root.matches?.('input[type=range]') ? [root] : [];
+  if (root.querySelectorAll) list.push(...root.querySelectorAll('input[type=range]'));
+  for (const el of list) {
+    if (wheelBound.has(el) || el.closest('#seekbox')) continue;
+    wheelBound.add(el);
+    el.addEventListener('wheel', onRangeWheel, { passive: false });
+  }
+}
+bindRangeWheel(document.body);
+new MutationObserver((records) => {
+  for (const r of records) for (const n of r.addedNodes) if (n.nodeType === 1) bindRangeWheel(n);
+}).observe(document.body, { childList: true, subtree: true });
 // ...and over the volume button of the bar it moves the master volume (5% per notch; it also un-mutes)
 let masterWheelAcc = 0;
 els.mixerBtn.addEventListener('wheel', (e) => {
@@ -2011,7 +2038,15 @@ function endRow(song, reason) {
   }
   b.title = `${plainText(song.title)} - ${plainText(song.artist)}${reason ? ` (${reason})` : ''}`;
   const thumb = b.querySelector('.end-thumb');
-  const put = (url) => { if (!url) return; const img = new Image(); img.alt = ''; img.src = url; thumb.replaceChildren(img); };
+  const put = (url) => {
+    if (!url) return;
+    const img = new Image();
+    img.alt = '';
+    // (the list's LRU can revoke this URL while the end window stays open: ask for the thumbnail again, once)
+    img.addEventListener('error', () => { thumbs.get(song).then((again) => { if (again && again !== url) img.src = again; }); }, { once: true });
+    img.src = url;
+    thumb.replaceChildren(img);
+  };
   const cached = thumbs.peek(song);
   if (cached) put(cached); else thumbs.get(song).then(put);
   b.addEventListener('click', () => playNext(song));
@@ -2063,8 +2098,13 @@ function closeSong() {
   ready = false;
   setLoop(null);
   audioLoad = null;
+  const oldCover = current?.coverUrl;
   current = null;
   chart = null;
+  if (oldCover) { // the cover's object URL is released once nothing shows it
+    for (const img of [els.cover, els.infoCover, els.infoPopCover, els.endCover]) { img.removeAttribute('src'); img.hidden = true; }
+    if (oldCover.startsWith('blob:')) URL.revokeObjectURL(oldCover);
+  }
   highway.paneOpts = {};
   highway.setCharts([]);
   // the stage is "never played" again: no bar until the next song plays
@@ -2116,8 +2156,10 @@ els.vocalChoice.addEventListener('click', (e) => { const b = e.target.closest('[
 // The charts are canvas drawings, so the tags are real buttons that follow the rectangles the highway reports (paneRects).
 const paneTags = new Map();
 let menuKey = null; // the instrument whose menu is open
+const seenTags = new Set(); // (reused: one Set per frame was garbage)
 function syncPaneTags() {
-  const seen = new Set();
+  const seen = seenTags;
+  seen.clear();
   for (const r of highway.paneRects) {
     seen.add(r.key);
     if (r.chooser) { // a slot for choosing an instrument: the cards fill the rectangle
@@ -2529,7 +2571,6 @@ if (typeof ResizeObserver !== 'undefined') {
 window.addEventListener('resize', alignStageButtons);
 function setBarHidden(hidden, persist = true) {
   els.app.classList.toggle('bar-hidden', hidden);
-  els.barShow.hidden = true; // (the old tab is gone)
   els.barHide.title = hidden ? 'Expand the top bar (B)' : 'Make the top bar compact (B)';
   els.barHide.setAttribute('aria-label', hidden ? 'Expand the top bar' : 'Make the top bar compact');
   if (persist) store.set('barHidden', hidden ? '1' : '0');
@@ -2539,7 +2580,6 @@ function setBarHidden(hidden, persist = true) {
 setBarHidden(prefs.get('highway.barHidden') === 'hidden' || (prefs.get('highway.barHidden') === 'last' && store.get('barHidden') === '1'));
 if (prefs.get('highway.neck') !== SETTING_DEFAULTS.neck) setSetting('neck', prefs.get('highway.neck')); // the starting neck speed
 els.barHide.addEventListener('click', () => setBarHidden(!els.app.classList.contains('bar-hidden'))); // compact <-> full
-els.barShow.addEventListener('click', () => setBarHidden(false));
 
 // ---------- Background visualizer ----------
 // One animated background behind every fretboard (src/visualizers.js, Highway.setVisualizer). The picker is a popover from the
@@ -2705,7 +2745,6 @@ document.addEventListener('keydown', (e) => {
 // Jumps in the song (seeking, a section, a lyric line) are animated on the fretboards: the notes rush past to the new place
 // instead of the chart snapping there. Only what the highway draws is eased; the clock, the sections and the audio use the real time.
 let vis = { shown: null, last: null, anim: null, chart: null, step: 0 };
-let instantJump = false; // the next jump is not animated (the loop wrap-around)
 const MOTION_BLUR_MIN_STEP = 0.06; // seconds of song per frame from which the jump is blurred
 const SEEK_JUMP_SEC = 0.75; // a bigger step between two frames than playback or a drag can make
 const seekAnimMs = (dist) => Math.min(700, 280 + dist * 25); // longer for longer jumps, 0.7 s at most
@@ -2713,20 +2752,14 @@ let pendingSeekDur = null; // set by seekTo: the duration the audio scrub takes,
 function visualChartTime(ct) {
   const now = performance.now();
   if (!motionPref('highway.seekAnimation') || vis.chart !== chart || vis.last === null) {
-    instantJump = false; // (a pending instant jump is moot: nothing is animated now)
-    vis = { shown: ct, last: ct, anim: null, chart, step: 0 };
-    return ct;
-  }
-  if (instantJump) { // a loop wrap: land at once, no rush and no blur
-    instantJump = false;
     vis = { shown: ct, last: ct, anim: null, chart, step: 0 };
     return ct;
   }
   if (Math.abs(ct - vis.last) > SEEK_JUMP_SEC) { // a jump: ease from where the chart is shown now
     const from = vis.anim ? vis.shown : vis.last;
     vis.anim = { from, t0: now, dur: pendingSeekDur ?? seekAnimMs(Math.abs(ct - from)) };
-    pendingSeekDur = null;
   }
+  pendingSeekDur = null; // (a duration set for a jump that was too short to animate must not leak into a later one)
   vis.last = ct;
   const before = vis.shown;
   if (vis.anim) {
@@ -2747,16 +2780,17 @@ let lastInputAt = performance.now();
 const wakeUp = () => { lastInputAt = performance.now(); };
 for (const type of ['pointermove', 'pointerdown', 'pointerup', 'wheel', 'keydown', 'keyup', 'input', 'change', 'click', 'touchstart', 'dragover', 'drop']) document.addEventListener(type, wakeUp, { capture: true, passive: true });
 for (const type of ['resize', 'hashchange', 'popstate', 'focus', 'visibilitychange']) window.addEventListener(type, wakeUp);
-let lastDraw = { at: -Infinity, t: NaN, w: 0, h: 0, dpr: 0, panes: null, chart: null };
+const lastDraw = { at: -Infinity, t: NaN, w: 0, h: 0, dpr: 0, panes: null, chart: null };
 function canSkipDraw(now, t) {
-  if (player.playing || vis.anim || seeking || highway.visualizer || prefs.get('perf.overlay') !== 'off') return false;
+  if (player.playing || vis.anim || seeking || perfMode !== 'off') return false;
   if (now - Math.max(lastInputAt, highway.dirtyAt) < IDLE_AFTER_MS || now - lastDraw.at >= IDLE_REFRESH_MS) return false;
   const c = els.highway;
   return lastDraw.t === t && lastDraw.w === c.clientWidth && lastDraw.h === c.clientHeight && lastDraw.dpr === window.devicePixelRatio && lastDraw.panes === highway.panes && lastDraw.chart === chart;
 }
 function noteDraw(now, t) {
   const c = els.highway;
-  lastDraw = { at: now, t, w: c.clientWidth, h: c.clientHeight, dpr: window.devicePixelRatio, panes: highway.panes, chart };
+  const d = lastDraw; // (one object, updated in place)
+  d.at = now; d.t = t; d.w = c.clientWidth; d.h = c.clientHeight; d.dpr = window.devicePixelRatio; d.panes = highway.panes; d.chart = chart;
 }
 
 let lastClock = null; // the previous frame's music time and timestamp, for the clock jitter meter
@@ -2815,7 +2849,7 @@ function frame(frameTs) {
         setEnded(true);
         syncPlayButton();
       }
-      if (player.playing && lastClock && !instantJump && Math.abs(t - lastClock.t) < SEEK_JUMP_SEC) perf.clock(((t - lastClock.t) - (((frameTs || frameStart) - lastClock.at) / 1000) * player.rate) * 1000); // steadiness of the music clock
+      if (perfMode !== 'off' && player.playing && lastClock && Math.abs(t - lastClock.t) < SEEK_JUMP_SEC) perf.clock(((t - lastClock.t) - (((frameTs || frameStart) - lastClock.at) / 1000) * player.rate) * 1000); // steadiness of the music clock
       lastClock = { t, at: frameTs || frameStart };
       return t;
     });
@@ -2826,7 +2860,9 @@ function frame(frameTs) {
       if (vis.anim && Math.abs(vis.step) > MOTION_BLUR_MIN_STEP && motionPref('highway.motionBlur')) { // a fast jump: blur the motion
         const span = Math.max(-0.6, Math.min(0.6, vis.step * 0.85)); // the exposure: most of the frame, within limits
         draw(() => highway.renderBlur(Array.from({ length: 8 }, (_, k) => shownTime - span * (1 - k / 7))));
-      } else if (canSkipDraw(frameStart, shownTime)) { /* idle: the picture is unchanged */ } else {
+      } else if (canSkipDraw(frameStart, shownTime)) { // idle: the panes are unchanged; a visualizer behind them (own canvas) keeps moving
+        if (highway.visualizer) draw(() => highway.drawBackground(shownTime));
+      } else {
         draw(() => highway.render(shownTime));
         noteDraw(frameStart, shownTime);
       }
@@ -2840,24 +2876,31 @@ function frame(frameTs) {
           els.seek.value = barT;
           els.seekbox.classList.toggle('animating', !!vis.anim);
           paintSeek(vis.anim ? Math.max(0, Math.min(player.duration, shownTime + settings.chartDelay)) : barT); // the fill travels with the fretboards (the thumb is already at the target)
-          els.timeNow.textContent = fmt(barT);
+          setText(els.timeNow, fmt(barT));
         }
         if (infoOpen) { // the Listen card
           if (document.activeElement !== els.npSeek) els.npSeek.value = t;
-          els.npTime.textContent = `${fmt(t)} / ${fmt(player.duration)}`;
+          setText(els.npTime, `${fmt(t)} / ${fmt(player.duration)}`);
         }
       });
     }
   } else {
-    if (!canSkipDraw(frameStart, 0)) {
+    if (canSkipDraw(frameStart, 0)) {
+      if (highway.visualizer) draw(() => highway.drawBackground(0));
+    } else {
       draw(() => highway.render(0));
       noteDraw(frameStart, 0);
     }
     guarded('pane tags', syncPaneTags);
   }
-  guarded('perf', () => { perf.frame(frameStart, drawMs); perfOverlay.tick(frameStart); });
+  if (perfMode !== 'off') guarded('perf', () => { perf.frame(frameStart, drawMs); perfOverlay.tick(frameStart); }); // (no meters while the overlay is off)
 }
 requestAnimationFrame(frame);
+
+// Assigns textContent only when it changed: setting the same text still replaces the text node (a DOM mutation every frame).
+function setText(el, text) {
+  if (el.textContent !== text) el.textContent = text;
+}
 
 function fmt(sec) {
   const s = Math.floor(sec || 0);
@@ -2898,7 +2941,7 @@ const EFFECTS = {
   'highway.paneMin': (v) => highway.setPaneMin(v),
   'highway.view': (v) => { if (highway.view !== v) setView(v); },
   'highway.noteStyle': (v) => setNoteStyle(v),
-  'perf.overlay': (v) => perfOverlay.setMode(v),
+  'perf.overlay': (v) => { perfMode = v === 'compact' || v === 'detailed' ? v : 'off'; perf.reset(); lastClock = null; perfOverlay.setMode(v); },
   'perf.position': (v) => perfOverlay.setPosition(v),
   'details.chips': applyDetails, 'details.cover': applyDetails, 'details.quote': applyDetails, 'details.sections': applyDetails,
   'details.layout': applyDetails, 'details.stemNames': applyDetails, 'details.maxWidth': applyDetails, 'details.compact': applyDetails,

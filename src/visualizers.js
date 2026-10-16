@@ -1138,7 +1138,7 @@ export async function loadCover(url) {
 }
 
 // What Highway.setVisualizer gets. getSource() -> { key, song, charts, coverUrl }: `key` changes when the charts do.
-// Draws the chosen visualizer (blurred when `blur` > 0). Nothing is laid over it: the stage colour (`s.stage`, 'r, g, b') is only offered to the effects that want it.
+// Draws the chosen visualizer (unblurred: the app blurs it with the CSS #bgGlass layer). Nothing is laid over it: the stage colour (`s.stage`, 'r, g, b') is only offered to the effects that want it.
 export function createDriver({ getSource }) {
   const state = { t: 0, w: 0, h: 0, dpr: 1, beat: {}, density: 0, travel: 0, sp: 0, solo: 0, vocal: 0, perc: 0, hit: 0, section: 0, clock: 0 };
   let id = 'none';
@@ -1148,35 +1148,7 @@ export function createDriver({ getSource }) {
   let vizFor = null;
   let failed = false;
   let coverToken = 0;
-  let lowA = null; // blur: the effect drawn small (the downscale is already a blur), then blurred into lowB
-  let lowB = null;
-  let filterOk = null;
-  const drawBlurred = (g, s, bgRgb) => {
-    const sc = driver.blur <= 6 ? 0.5 : driver.blur <= 16 ? 0.35 : 0.25;
-    const cw = Math.max(8, Math.round(s.w * s.dpr * sc));
-    const ch = Math.max(8, Math.round(s.h * s.dpr * sc));
-    lowA ??= makeCanvas(cw, ch);
-    lowB ??= makeCanvas(cw, ch);
-    for (const c of [lowA, lowB]) if (c.width !== cw || c.height !== ch) { c.width = cw; c.height = ch; }
-    const a = lowA.getContext('2d');
-    a.setTransform(cw / s.w, 0, 0, ch / s.h, 0, 0);
-    a.fillStyle = `rgb(${bgRgb})`;
-    a.fillRect(0, 0, s.w, s.h);
-    a.save();
-    try { viz.draw(a, s); } finally { a.restore(); }
-    const b = lowB.getContext('2d');
-    b.setTransform(1, 0, 0, 1, 0, 0);
-    b.clearRect(0, 0, cw, ch);
-    if (filterOk === null) { b.filter = 'blur(1px)'; filterOk = b.filter !== 'none'; }
-    if (filterOk) b.filter = `blur(${(driver.blur * s.dpr * sc).toFixed(2)}px)`;
-    b.drawImage(lowA, 0, 0);
-    b.filter = 'none';
-    g.imageSmoothingEnabled = true;
-    g.imageSmoothingQuality = 'high';
-    g.drawImage(lowB, 0, 0, s.w, s.h);
-  };
   const driver = {
-    blur: 0, // px of blur on the visualizer (not on the notes); 0 costs nothing
     quality: 0.6, // resolution of the background canvas (fraction of full); the album art always keeps the full resolution
     get scale() { return id === 'cover' || id === 'none' ? 1 : driver.quality; },
     get id() { return id; },
@@ -1230,7 +1202,7 @@ export function createDriver({ getSource }) {
       s.section = sectionAt(data.sections, t);
       g.save();
       try {
-        if (driver.blur > 0) drawBlurred(g, s, bgRgb); else viz.draw(g, s); // (the app blurs with a CSS glass layer now and leaves driver.blur at 0)
+        viz.draw(g, s); // (the blur is the CSS #bgGlass layer, not drawn here)
       } catch (err) {
         failed = true; // never take the whole chart down with a background
         console.error('Visualizer failed:', err);

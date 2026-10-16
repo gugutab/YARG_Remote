@@ -69,7 +69,12 @@ export function createThumbs({
         if (!wanted()) return null; // scrolled away before it started: nothing was spent
         let blob = await load(id);
         if (blob === undefined) {
-          blob = (await render(song)) || 'none';
+          try {
+            blob = (await render(song)) || 'none'; // (null: the song has no cover)
+          } catch (_) { // a failed fetch or decode may be transient: not saved as 'none' (that would hide the cover for good), just skipped for this session
+            missing.add(id);
+            return null;
+          }
           await save(id, blob);
         }
         if (blob === 'none') { missing.add(id); return null; }
@@ -92,7 +97,7 @@ export async function renderCoverThumb(song, findCover, size = 128) {
   let blob;
   if (entry.url) {
     const res = await fetch(entry.url);
-    if (!res.ok) return null;
+    if (!res.ok) throw new Error(`cover ${res.status}`); // (the song has a cover; the server failed: retry later, do not remember 'none')
     blob = await res.blob();
   } else {
     blob = await entry.getFile();
