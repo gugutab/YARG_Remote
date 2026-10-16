@@ -423,10 +423,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       scroller.append(entry.el);
       fresh.push(entry.el);
     }
-    // A pack name that does not fit shows its short code (RB2+, GH3...) instead of ending in an ellipsis; the full name is the tooltip.
-    // (measured together, after all the new rows are in: one layout pass)
-    const fits = fresh.flatMap((el) => [...el.querySelectorAll('[data-pack]')]).filter((e) => e.scrollWidth > e.clientWidth + 1);
-    for (const e of fits) { e.title = e.dataset.pack; e.textContent = packCode(e.dataset.pack); e.classList.add('short'); }
+    fitPacks(fresh);
     if (label) {
       const idx = itemAt(offsets, top);
       let head = '';
@@ -507,6 +504,30 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
   }
 
   // Recomputes the positions (items, card height or number of columns changed) and redraws the visible rows.
+  // Pack names: the full name when it fits the room the card gives it, the short code (RB2+, GH3...) when it does not; never an ellipsis.
+  // The room comes from the width of the card's own block (not from the text's size), and the text is measured with a canvas, so the choice
+  // is the same on every layout pass; it is redone when the list is resized.
+  let measure = null;
+  const widthOf = (text, font) => {
+    measure ||= document.createElement('canvas').getContext('2d');
+    measure.font = font;
+    return measure.measureText(text).width;
+  };
+  function fitPacks(rowEls = [...rows.values()].map((r) => r.el)) {
+    const jobs = rowEls.flatMap((el) => [...el.querySelectorAll('[data-pack]')]);
+    const room = jobs.map((e) => { // (all reads first, then the writes: one layout pass)
+      const box = e.parentElement;
+      const large = box.classList.contains('song-pack');
+      const avail = large ? box.clientWidth - 18 : box.clientWidth * 0.42;
+      return { e, avail, w: widthOf(e.dataset.pack, getComputedStyle(e).font) };
+    });
+    for (const { e, avail, w } of room) {
+      const short = w > avail;
+      e.classList.toggle('short', short);
+      e.textContent = short ? packCode(e.dataset.pack) : e.dataset.pack;
+      e.title = short ? e.dataset.pack : '';
+    }
+  }
   function relayout(keepTop = false) {
     const top = keepTop ? itemAt(offsets, scroller.scrollTop) : 0;
     ({ offsets, bottoms, col: colOf } = layoutGrid(items, cols, rowH));
@@ -541,7 +562,8 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     const next = Math.max(1, Math.floor((scroller.clientWidth - railW) / min));
     if (next !== cols) { cols = next; relayout(true); }
   }
-  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(autoColumns).observe(scroller);
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { autoColumns(); fitPacks(); }).observe(scroller);
+  document.fonts?.ready.then(() => fitPacks());
 
   let highlightTerms = [];
   return {
