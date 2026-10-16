@@ -249,23 +249,40 @@
           <div class="win-edge win-edge-l" id="edgeL" role="separator" aria-orientation="vertical" aria-label="Make the library window narrower or wider" title="Drag to resize the window (double-click for the full width)"></div>
           <div class="win-edge win-edge-r" id="edgeR" role="separator" aria-orientation="vertical" aria-label="Make the library window narrower or wider" title="Drag to resize the window (double-click for the full width)"></div>
         <div class="lib-list" id="libList">
-          <div class="lib-head">
-            <strong>Library</strong>
+          <header class="lib-header">
+            <button id="closeLibrary" class="icon lib-close" type="button" title="Hide the library (L)" aria-label="Hide the library"><svg><use href="#i-chevron"/></svg></button>
+            <div class="lib-title"><strong>Library</strong><span id="count" class="count"></span></div>
+            <div class="search">
+            <svg><use href="#i-search"/></svg>
+            <input id="search" type="search" placeholder="Search songs" aria-label="Search" title="Search title, artist or album. Fields: artist:  album:  genre:  charter:  year:1990-1999  len:&lt;4 (minutes)  inst:drums  no:vocals. A leading - excludes (-artist:queen).">
+            <button id="filterBtn" class="icon filter-btn" type="button" title="Filters" aria-label="Filters" aria-expanded="false" aria-controls="filterPanel"><svg><use href="#i-filter"/></svg><span id="filterBadge" class="badge" hidden></span></button>
+            </div>
+            <div class="lib-bar">
+              <label class="chip-select" title="Sort"><svg><use href="#i-sort"/></svg>
+                <select id="sortBy" aria-label="Sort by">
+                  <option value="title">Title</option>
+                  <option value="artist">Artist</option>
+                  <option value="album">Album</option>
+                  <option value="pack">Pack</option>
+                  <option value="year">Year</option>
+                  <option value="length">Length</option>
+                </select>
+              </label>
+              <button id="sortDir" class="chip-btn sort-dir" type="button" title="Ascending (click to reverse)" aria-label="Reverse order"><svg><use href="#i-arrow-down"/></svg></button>
+              <span class="view-seg seg compact" id="viewSeg" role="group" aria-label="Card style">
+                <button type="button" data-mode="compact" title="Compact: one line" aria-label="Compact cards" aria-pressed="false"><svg><use href="#i-view-compact"/></svg></button>
+                <button type="button" data-mode="normal" title="Normal" aria-label="Normal cards" aria-pressed="true"><svg><use href="#i-view-normal"/></svg></button>
+                <button type="button" data-mode="large" title="Large: cover and instruments" aria-label="Large cards" aria-pressed="false"><svg><use href="#i-view-large"/></svg></button>
+              </span>
+            </div>
             <span class="lib-tools">
               <button id="openSettings" class="icon" type="button" title="Settings (,)" aria-label="Settings"><svg><use href="#i-gear"/></svg></button>
               <button id="pick" class="icon" type="button" title="Choose songs folder" aria-label="Choose songs folder"><svg><use href="#i-folder"/></svg></button>
               <button id="rescan" class="icon" type="button" title="Refresh list" aria-label="Refresh list" hidden><svg><use href="#i-refresh"/></svg></button>
-              <button id="closeLibrary" class="icon small-icon lib-hide" type="button" title="Hide the library (L)" aria-label="Hide the library"><svg><use href="#i-chevron"/></svg></button>
             </span>
             <input id="folderInput" type="file" webkitdirectory hidden>
-          </div>
+          </header>
           <button id="resume" class="resume" type="button" hidden><svg><use href="#i-folder"/></svg><span></span></button>
-
-          <div class="search">
-            <svg><use href="#i-search"/></svg>
-            <input id="search" type="search" placeholder="Search songs" aria-label="Search" title="Search title, artist or album. Fields: artist:  album:  genre:  charter:  year:1990-1999  len:&lt;4 (minutes)  inst:drums  no:vocals. A leading - excludes (-artist:queen).">
-            <button id="filterBtn" class="icon filter-btn" type="button" title="Filters" aria-label="Filters" aria-expanded="false" aria-controls="filterPanel"><svg><use href="#i-filter"/></svg><span id="filterBadge" class="badge" hidden></span></button>
-          </div>
           <div id="filterPanel" class="filter-panel" hidden>
             <div class="fp-group">
               <span class="fp-label">Instruments</span>
@@ -303,26 +320,7 @@
               <button id="filterClear" class="chip-btn" type="button" disabled>Clear</button>
             </div>
           </div>
-          <div class="lib-bar">
-            <label class="chip-select" title="Sort"><svg><use href="#i-sort"/></svg>
-              <select id="sortBy" aria-label="Sort by">
-                <option value="title">Title</option>
-                <option value="artist">Artist</option>
-                <option value="album">Album</option>
-                <option value="pack">Pack</option>
-                <option value="year">Year</option>
-                <option value="length">Length</option>
-              </select>
-            </label>
-            <button id="sortDir" class="chip-btn sort-dir" type="button" title="Ascending (click to reverse)" aria-label="Reverse order"><svg><use href="#i-arrow-down"/></svg></button>
-            <span class="view-seg seg compact" id="viewSeg" role="group" aria-label="Card style">
-              <button type="button" data-mode="compact" title="Compact: one line" aria-label="Compact cards" aria-pressed="false"><svg><use href="#i-view-compact"/></svg></button>
-              <button type="button" data-mode="normal" title="Normal" aria-label="Normal cards" aria-pressed="true"><svg><use href="#i-view-normal"/></svg></button>
-              <button type="button" data-mode="large" title="Large: cover and instruments" aria-label="Large cards" aria-pressed="false"><svg><use href="#i-view-large"/></svg></button>
-            </span>
-          </div>
           <div id="activeFilters" class="active-filters" hidden></div>
-          <div id="count" class="count"></div>
           <div class="songs-wrap">
             <div id="groupLabel" class="group-label" hidden></div>
             <ul id="songs" role="listbox" aria-label="Songs"></ul>
