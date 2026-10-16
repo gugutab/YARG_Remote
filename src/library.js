@@ -68,7 +68,12 @@ export async function scanSongs(entries, { concurrency = SCAN_CONCURRENCY } = {}
   const folders = [...byDir].filter(([, files]) => SONG_MARKERS.some((m) => files.has(m)));
   const folderSongs = await mapLimit(folders, concurrency, async ([dir, files]) => {
     const folderName = dir.split('/').pop() || dir;
-    const ini = files.has('song.ini') ? parseSongIni(new Uint8Array(await readBytes(files.get('song.ini')))) : {};
+    let ini = {};
+    if (files.has('song.ini')) {
+      try {
+        ini = parseSongIni(new Uint8Array(await readBytes(files.get('song.ini'))));
+      } catch { /* unreadable song.ini (locked, vanished, permission): the song stays listed, titled by its folder, like server.mjs */ }
+    }
     return {
       id: dir,
       folder: dir,

@@ -6,6 +6,8 @@
 //                                           (instrument id, and its difficulty after a colon when it has one)
 // <id> is the song's library id (its folder path), URI-encoded.
 
+const DIFFICULTY_IDS = new Set(['easy', 'medium', 'hard', 'expert']); // DIFFICULTIES in chart.js
+
 export function parseRoute(hash = '') {
   const m = /^#\/song\/([^/?]+)(\/play)?\/?(?:\?(.*))?$/.exec(String(hash));
   if (!m) return { view: 'library' };
@@ -20,7 +22,7 @@ export function parseRoute(hash = '') {
   if (list) {
     const instruments = list.split(',').filter(Boolean).map((part) => {
       const [ins, diff] = part.split(':');
-      return diff ? { id: ins, diff } : { id: ins };
+      return DIFFICULTY_IDS.has(diff) ? { id: ins, diff } : { id: ins }; // an unknown difficulty is dropped, not passed on
     });
     if (instruments.length) route.instruments = instruments;
   }

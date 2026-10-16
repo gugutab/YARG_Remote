@@ -1,6 +1,7 @@
 // Canvas renderer for a chart. Drawing is a pure function of the playback time,
 // so seek/pause just means re-rendering at a different `t`.
 
+import { sanitizeSizes } from './panesizes.js';
 import {
   GUITAR_LANE_COLORS,
   KICK_COLOR,
@@ -433,8 +434,9 @@ export class Highway {
   }
 
   setSizes(sizes) {
-    this.weights = sizes?.weights && typeof sizes.weights === 'object' ? { ...sizes.weights } : {};
-    this.vocalH = Number.isFinite(sizes?.vocalH) ? sizes.vocalH : null;
+    const clean = sanitizeSizes(sizes);
+    this.weights = clean.weights;
+    this.vocalH = clean.vocalH;
   }
 
   // One chart in the rectangle (x, y, pw, ph): the drawing code sees a canvas of that size.
@@ -446,6 +448,7 @@ export class Highway {
       g.fillRect(x, y, pw, ph);
       return;
     }
+    if (!(pw >= 1 && ph >= 1)) return; // a zero-size window has nothing to draw (and drawImage of a 0-size canvas throws)
     g.save();
     g.beginPath();
     g.rect(x, y, pw, ph);

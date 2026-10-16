@@ -33,7 +33,7 @@ export function alignChannel(src, sampleRate, delay) {
 
 
 // Old engine, kept as a fallback: one PitchShifter (ScriptProcessorNode) per stem.
-class LegacyPlayer {
+export class LegacyPlayer {
   constructor(ctx, master) {
     this.ctx = ctx;
     this.master = master;
@@ -132,9 +132,11 @@ class LegacyPlayer {
     this.offset = 0;
   }
 
-  unload() { // frees the decoded buffers
+  unload() { // frees the decoded buffers (and drops a load still decoding: it must not install its stems afterwards)
+    this.loadGeneration++;
     this.stems = new Map();
     this.duration = 0;
+    this.offset = 0;
   }
 
   startSources(at) {
@@ -208,10 +210,12 @@ class WorkletPlayer {
 
   // stems: [{ id, label, getFile }]; delay in seconds (see songDelaySeconds)
   async load(stems, { delay = 0, onProgress = () => {} } = {}) {
+    const generation = (this.generation = (this.generation || 0) + 1); // (taken before any await: an unload() while the setup runs also supersedes this load)
     await this.setup();
+    if (generation !== this.generation) return false;
     this.stop();
     this.unload(); // the previous song's audio goes before the new one is decoded: the peak is one song, not two
-    const generation = (this.generation = (this.generation || 0) + 1);
+    this.generation = generation; // (unload() bumps it; this load is the current one)
     const result = await decodeAll(stems, async (s) => {
       const file = await s.getFile();
       const data = await file.arrayBuffer();
@@ -351,11 +355,13 @@ class WorkletPlayer {
 
   // Frees the decoded audio (the worklet holds all the stems as Float32 arrays: tens of MB per song).
   unload() {
+    this.generation = (this.generation || 0) + 1; // a load still decoding is superseded
     this.node?.port.postMessage({ type: 'unload' });
     this.stems = new Map();
     this.ids = [];
     this.volumes = new Map();
     this.duration = 0;
+    this.offset = 0; // no audio, no position: the next song starts at 0
     this.epoch++;
     this.history = [];
   }

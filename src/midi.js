@@ -12,6 +12,12 @@ import { latin1, decodeUtf8OrLatin1 } from './text.js';
 const DEFAULT_US_PER_QUARTER = 500000;
 export const MAX_MIDI_BYTES = 64 * 1024 * 1024;
 export const MAX_MIDI_EVENTS = 8_000_000; // generous: the biggest real charts have well under a million
+// Ticks per quarter note. Real songs use 96..1920 (192, 480, 960 are the usual ones); below 24 a tick is longer than a
+// 1/32 note, so no chart can be written in it and it only serves to blow up per-tick work (beat grid, HOPO distances).
+export const MIN_DIVISION = 24;
+// No event may sit past this tick (2^31: 12 hours at 480 ticks per beat and 120 bpm is only ~41M ticks). Larger values
+// are corrupt or hostile and would make every later time computation meaningless.
+export const MAX_TICK = 2 ** 31;
 
 const invalid = (why) => new Error(`Invalid MIDI: ${why}`);
 
@@ -28,7 +34,7 @@ export function parseMidi(input, { maxBytes = MAX_MIDI_BYTES, maxEvents = MAX_MI
   const division = view.getUint16(12);
   if (headerLen < 6 || 8 + headerLen > bytes.length) throw invalid('bad header length');
   if (division & 0x8000) throw new Error('SMPTE division not supported');
-  if (division === 0) throw invalid('division (ticks per quarter note) is 0');
+  if (division < MIN_DIVISION) throw invalid(`division (ticks per quarter note) ${division} is below ${MIN_DIVISION}`);
 
   const tracks = [];
   const budget = { events: maxEvents };
@@ -63,6 +69,7 @@ function parseTrack(bytes, start, end, budget) {
     const [delta, afterDelta] = readVlq(bytes, pos, end);
     pos = afterDelta;
     tick += delta;
+    if (tick > MAX_TICK) throw invalid(`event at tick ${tick} is past the maximum (${MAX_TICK})`);
     if (pos >= end) throw invalid('event cut off after its delta time');
     const byte = bytes[pos];
 

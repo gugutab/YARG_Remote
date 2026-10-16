@@ -13,8 +13,8 @@ import path from 'node:path';
 import { pipeline } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { parseSongIni } from './src/ini.js';
-import { parseMidi } from './src/midi.js';
-import { parseChart } from './src/chartfile.js';
+import { parseMidi, MAX_MIDI_BYTES } from './src/midi.js';
+import { parseChart, MAX_CHART_BYTES } from './src/chartfile.js';
 import { instrumentOptions } from './src/chart.js';
 import { parseSng, readSngBytes, findSngFile, isSngName } from './src/sng.js';
 
@@ -59,6 +59,21 @@ async function withSngSource(file, fn) {
   }
 }
 
+// Reads a whole file unless it is over `max` bytes (then null: the caller skips it). The size is checked on the open
+// handle and the read is bounded by it, so a multi-GB file named notes.chart/notes.mid is never loaded.
+async function readCapped(file, max) {
+  const fh = await fs.promises.open(file, 'r');
+  try {
+    const { size } = await fh.stat();
+    if (size > max) return null;
+    const buf = Buffer.alloc(size);
+    const { bytesRead } = await fh.read(buf, 0, size, 0);
+    return buf.subarray(0, bytesRead);
+  } finally {
+    await fh.close();
+  }
+}
+
 // The instruments a notes.mid (or notes.chart) really has (tracks with notes), like the picker of the app: guitar, bass, rhythm, keys, drums,
 // vocals (harmony counts as vocals). song.ini often has no difficulty levels, or -1 for everything, while the chart is fine.
 export function partsOf(midiBytes, isChart = false) {
@@ -78,7 +93,7 @@ async function scanSng(file, rel) {
     const byName = new Map(sng.files.map((f) => [f.name.toLowerCase(), f]));
     const chartName = byName.has('notes.mid') ? 'notes.mid' : byName.has('notes.chart') ? 'notes.chart' : null;
     let parts = [];
-    if (chartName) {
+    if (chartName && byName.get(chartName).size <= (chartName === 'notes.chart' ? MAX_CHART_BYTES : MAX_MIDI_BYTES)) { // a bigger one is not readable anyway
       try {
         parts = partsOf(await readSngBytes(source, sng, byName.get(chartName)), chartName === 'notes.chart');
       } catch { /* unreadable chart: no parts */ }
@@ -116,7 +131,8 @@ export async function scanLibrary(songsDir) {
       const chartFile = lower.has('notes.mid') ? 'notes.mid' : lower.has('notes.chart') ? 'notes.chart' : null; // .mid wins, as in the app
       if (chartFile) {
         try {
-          parts = partsOf(await fs.promises.readFile(path.join(dir, lower.get(chartFile))), chartFile === 'notes.chart');
+          const bytes = await readCapped(path.join(dir, lower.get(chartFile)), chartFile === 'notes.chart' ? MAX_CHART_BYTES : MAX_MIDI_BYTES);
+          if (bytes) parts = partsOf(bytes, chartFile === 'notes.chart'); // over the cap: no parts, same as an unreadable chart
         } catch { /* unreadable chart: no parts */ }
       }
       songs.push({
@@ -303,6 +319,8 @@ async function sendSngInner(req, res, songsDir, urlPath) {
   if (at < 0 || at === segs.length - 1) return false;
   const sngFile = safeJoin(songsDir, segs.slice(0, at + 1).join('/'));
   if (!sngFile) return res.writeHead(403).end('Forbidden'), true;
+  // A folder that merely ends in ".sng" is a plain folder: its files are served as usual.
+  if ((await fs.promises.stat(sngFile).catch(() => null))?.isDirectory()) return false;
   const innerName = decodeUrlPath(segs.slice(at + 1).join('/'));
   if (innerName === null) return res.writeHead(400).end(), true;
   if (!isSongFile(innerName)) return res.writeHead(403).end('Forbidden'), true;
@@ -339,6 +357,16 @@ async function sendSngInner(req, res, songsDir, urlPath) {
   return true;
 }
 
+// Shape of a cached song index (a hand-edited or half-written library.json must trigger a rescan, not a crash in the page).
+export function validIndex(songs) {
+  const str = (v) => typeof v === 'string';
+  return Array.isArray(songs) && songs.every((s) => s && typeof s === 'object'
+    && str(s.id) && str(s.folder) && str(s.title) && str(s.artist) && str(s.album)
+    && s.ini && typeof s.ini === 'object' && !Array.isArray(s.ini)
+    && Array.isArray(s.parts) && s.parts.every(str)
+    && Array.isArray(s.files) && s.files.every((f) => f && str(f.name) && str(f.path)));
+}
+
 // `host` is the address the server will be bound to: a loopback bind turns the Host header guard on.
 // `scan` can be replaced in tests.
 export function createServer({ songsDir, appRoot = APP_ROOT, host = '127.0.0.1', scan = scanLibrary, cacheDir = path.join(appRoot, '.cache') }) {
@@ -352,7 +380,7 @@ export function createServer({ songsDir, appRoot = APP_ROOT, host = '127.0.0.1',
     if (!refresh) {
       try {
         const cached = JSON.parse(await fs.promises.readFile(cacheFile, 'utf8'));
-        if (cached.songsDir === songsDir && cached.version === INDEX_VERSION) return (library = cached.songs);
+        if (cached.songsDir === songsDir && cached.version === INDEX_VERSION && validIndex(cached.songs)) return (library = cached.songs);
       } catch { /* no cache yet */ }
     }
     scanning ||= scan(songsDir).finally(() => { scanning = null; });
@@ -368,6 +396,9 @@ export function createServer({ songsDir, appRoot = APP_ROOT, host = '127.0.0.1',
 
   return http.createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    // Nobody may frame the app or the songs (clickjacking). /songs replaces the CSP below with `sandbox`; X-Frame-Options still applies.
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
     try {
       if (guardHost && !hostHeaderAllowed(req.headers.host)) {
         res.writeHead(403).end('Forbidden host');

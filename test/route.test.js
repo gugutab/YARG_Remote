@@ -29,3 +29,7 @@ test('links carry the instruments on screen', () => {
   assert.deepEqual(parseRoute('#/song/x/play?i='), { view: 'play', id: 'x' });
   assert.equal(formatRoute({ view: 'play', id: 'x', instruments: [] }), '#/song/x/play');
 });
+
+test('an unknown difficulty is dropped, the instrument stays', () => {
+  assert.deepEqual(parseRoute('#/song/x/play?i=guitar:nightmare,bass:Hard,drums:expert'), { view: 'play', id: 'x', instruments: [{ id: 'guitar' }, { id: 'bass' }, { id: 'drums', diff: 'expert' }] });
+});

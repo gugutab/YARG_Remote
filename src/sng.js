@@ -11,7 +11,12 @@
 // for the part asked for (blobSource), and Node can use a file handle or a buffer (bufferSource, fileSource in server.mjs).
 
 const MAGIC = 'SNGPKG';
-const MAX_SECTION = 1 << 28; // refuse absurd metadata / index sizes of a corrupt file
+// The metadata and index sections are read whole into memory, and the browser scans several .sng at once (library.js),
+// so they are small: real ones are a few KB (a few hundred bytes of tags; ~20 entries of ~30 bytes). Only the file DATA
+// is big, and that is never read here: it is read by range, bounded by the real size of the file (see parseSng).
+const MAX_SECTION = 8 * 1024 * 1024;
+const MIN_METADATA_PAIR = 8; // two i32 lengths
+const MIN_INDEX_ENTRY = 17; // u8 name length + i64 size + i64 offset
 
 export function blobSource(blob) {
   return { size: blob.size, read: async (start, end) => new Uint8Array(await blob.slice(start, end).arrayBuffer()) };
@@ -31,11 +36,16 @@ async function readExact(source, start, length) {
   return b;
 }
 
-async function readSection(source, pos) {
+// A section is i64 length + body; checked against the cap and the real file size before anything is allocated.
+// `minEntry` is the smallest an entry can be, which bounds the declared count by what the body can really hold.
+async function readSection(source, pos, minEntry) {
   const len = Number(view(await readExact(source, pos, 8)).getBigInt64(0, true));
-  if (len < 8 || len > MAX_SECTION) throw new Error('SNG: bad section size');
+  if (!(len >= 8 && len <= MAX_SECTION)) throw new Error('SNG: bad section size');
+  if (pos + 8 + len > source.size) throw new Error('SNG: truncated file');
   const body = await readExact(source, pos + 8, len);
-  return { count: Number(view(body).getBigUint64(0, true)), bytes: body.subarray(8), end: pos + 8 + len };
+  const count = Number(view(body).getBigUint64(0, true));
+  if (!(count >= 0 && count <= (len - 8) / minEntry)) throw new Error('SNG: bad entry count');
+  return { count, bytes: body.subarray(8), end: pos + 8 + len };
 }
 
 // song.ini values like "1999" become numbers, like parseSongIni.
@@ -51,7 +61,7 @@ export async function parseSng(source) {
   for (let i = 0; i < 256; i++) mask[i] = head[10 + (i % 16)] ^ (i & 0xff);
 
   const text = new TextDecoder('utf-8');
-  const meta = await readSection(source, 26);
+  const meta = await readSection(source, 26, MIN_METADATA_PAIR);
   const metadata = {};
   let p = 0;
   const mv = view(meta.bytes);
@@ -69,7 +79,7 @@ export async function parseSng(source) {
     metadata[key] = iniValue(str().trim());
   }
 
-  const idx = await readSection(source, meta.end);
+  const idx = await readSection(source, meta.end, MIN_INDEX_ENTRY);
   const files = [];
   const iv = view(idx.bytes);
   p = 0;
@@ -82,6 +92,10 @@ export async function parseSng(source) {
     const size = Number(iv.getBigInt64(p, true));
     const offset = Number(iv.getBigInt64(p + 8, true));
     p += 16;
+    // The inner file must lie inside the container: a lying index would otherwise ask for reads (and buffers) of any size.
+    if (!Number.isSafeInteger(size) || !Number.isSafeInteger(offset) || size < 0 || offset < 0 || offset + size > source.size) {
+      throw new Error('SNG: file entry outside the file');
+    }
     files.push({ name, size, offset });
   }
   return { version, mask, metadata, files };

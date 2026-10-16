@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scanSongs, serializeSongs, restoreSongs, resolveFile } from '../src/library.js';
+import { scanSongs, serializeSongs, restoreSongs, resolveFile, mapLimit } from '../src/library.js';
 
 // Minimal stand-in for a FileSystemDirectoryHandle tree: tree = { name: { 'file.txt': 'text' } | subtree }.
 function fakeDir(tree) {
@@ -111,10 +111,17 @@ test('scanning a big library never has more than the concurrency limit of files 
   assert.equal(s2.peak, 2);
 });
 
-test('a song.ini that cannot be read still fails the scan as before', async () => {
+test('a song.ini that cannot be read keeps the song listed (folder name) and the other songs load', async () => {
   const entries = [
     { path: 'S/a/song.ini', getFile: async () => { throw new Error('denied'); } },
     { path: 'S/b/song.ini', getFile: async () => ({ arrayBuffer: async () => new TextEncoder().encode('[song]\nname = B\n').buffer }) },
+    { path: 'S/c/notes.mid', getFile: async () => { throw new Error('never read during the scan'); } },
   ];
-  await assert.rejects(scanSongs(entries), /denied/);
+  const songs = await scanSongs(entries);
+  assert.deepEqual(songs.map((s) => s.title), ['a', 'B', 'c']);
+  assert.deepEqual(songs[0].ini, {});
+});
+
+test('mapLimit still rejects on the first failing item', async () => {
+  await assert.rejects(mapLimit([1, 2, 3], 2, async (n) => { if (n === 2) throw new Error('boom'); return n; }), /boom/);
 });

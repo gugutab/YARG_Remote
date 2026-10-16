@@ -13,7 +13,16 @@
 //   [Events]: sections and global events -> EVENTS track texts; "lyric ..." / phrase_start / phrase_end -> PART VOCALS.
 // Not read: GHL tracks (GHLGuitar/GHLBass/GHLRhythm/GHLCoop), DoubleGuitar (co-op), versus phrases (S 0/1), [Song] Offset
 // (YARG.Core ChartReader ignores it too; the audio offset comes from song.ini), and anchors (A) in [SyncTrack].
-import { createTickToSeconds } from './midi.js';
+import { createTickToSeconds, MAX_MIDI_BYTES, MAX_MIDI_EVENTS, MAX_TICK, MIN_DIVISION } from './midi.js';
+
+// The file is hostile input, like a MIDI: same size and event-count caps as parseMidi, ticks and lengths clamped to
+// MAX_TICK, malformed lines ignored (YARG logs and skips them too) so one bad line does not lose the rest of the song.
+export const MAX_CHART_BYTES = MAX_MIDI_BYTES;
+export const MAX_CHART_EVENTS = MAX_MIDI_EVENTS;
+const MAX_RESOLUTION = 0xffff; // what a MIDI header can hold; real charts use 192, 480, 960
+const MAX_TIME_SIGNATURE_NUMERATOR = 255;
+const MIN_MILLIBEATS = 1; // 0.001 bpm: below it 6e10 / milli leaves the finite range for no real song
+const MAX_MILLIBEATS = 1e9; // 1,000,000 bpm
 
 const DEFAULT_RESOLUTION = 192; // ChartReader.DEFAULT_RESOLUTION
 const DIFFICULTY_BASE = { Easy: 60, Medium: 72, Hard: 84, Expert: 96 }; // ChartIOHelper.TrackNameToTrackDifficultyLookup
@@ -38,8 +47,13 @@ const PHRASE_NOTE = 105; // LYRICS_PHRASE_1
 const MAX_LYRIC_TICKS_FACTOR = 1; // a lyric note lasts until the next lyric, at most one beat
 
 // Accepts the file bytes (BOM-aware like File.ReadAllText: UTF-8, UTF-16) or an already decoded string.
-export function parseChart(input) {
-  return parseChartText(typeof input === 'string' ? input : decode(input));
+// options.maxBytes / options.maxEvents exist for tests; the defaults are the caps above.
+export function parseChart(input, options = {}) {
+  const maxBytes = options.maxBytes ?? MAX_CHART_BYTES;
+  if (typeof input === 'string') return parseChartText(input, options);
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+  if (bytes.length > maxBytes) throw new Error(`Invalid .chart: file too large (${bytes.length} bytes)`);
+  return parseChartText(decode(bytes), options);
 }
 
 function decode(input) {
@@ -50,8 +64,9 @@ function decode(input) {
 }
 
 // [Name] { lines } blocks. A section ends at a line holding only "}" (GetNextSection: braces inside text events are fine).
-function readSections(text) {
+function readSections(text, maxEvents) {
   const sections = [];
+  let budget = maxEvents;
   let current = null;
   let pendingName = null;
   for (const raw of text.replace(/^﻿/, '').split(/\r?\n/)) {
@@ -67,6 +82,7 @@ function readSections(text) {
     } else if (line === '}') {
       current = null;
     } else if (line) {
+      if (--budget < 0) throw new Error('Invalid .chart: too many lines');
       current.lines.push(line);
     }
   }
@@ -79,17 +95,26 @@ function parseLine(line) {
   if (eq < 0) return null;
   const tickText = line.slice(0, eq).trim();
   if (!/^\d+$/.test(tickText)) return null;
+  const tick = Number(tickText);
+  if (tick > MAX_TICK) return null; // also catches Infinity from an absurdly long digit string
   const rest = line.slice(eq + 1).trim();
   const space = rest.search(/\s/);
   const type = space < 0 ? rest : rest.slice(0, space);
   const body = space < 0 ? '' : rest.slice(space).trim();
   if (!type) return null;
-  return { tick: Number(tickText), type, body, args: body ? body.split(/\s+/) : [] };
+  return { tick, type, body, args: body ? body.split(/\s+/) : [] };
 }
 
 const sortedEvents = (lines) => lines.map(parseLine).filter(Boolean)
   .map((e, i) => ({ ...e, order: i }))
   .sort((a, b) => a.tick - b.tick || a.order - b.order); // ChartReader.LoadChart sorts by tick, then file order
+
+// A note / phrase length from the file: finite, 0..MAX_TICK (Infinity, NaN and negative become 0 or the cap).
+function clampLength(arg) {
+  const n = Number(arg);
+  if (Number.isNaN(n)) return 0;
+  return Math.min(MAX_TICK, Math.max(0, n));
+}
 
 // TextEvents.NormalizeTextEvent: an event's text between '[' and ']' if present; here also the surrounding quotes go.
 function eventText(body) {
@@ -105,7 +130,11 @@ function parseSong(lines) {
     if (eq < 0) continue;
     if (line.slice(0, eq).trim() === 'Resolution') {
       const value = Number(line.slice(eq + 1).trim().replace(/"/g, ''));
-      if (Number.isFinite(value) && value > 0) resolution = Math.floor(value);
+      if (Number.isFinite(value) && value > 0) {
+        resolution = Math.floor(value);
+        // 0 or negative: YARG falls back to the default. Anything else outside the sane range is not a song we can place.
+        if (resolution < MIN_DIVISION || resolution > MAX_RESOLUTION) throw new Error(`Invalid .chart: Resolution ${resolution} is outside ${MIN_DIVISION}-${MAX_RESOLUTION}`);
+      }
       break; // SubmitDataSong stops at the first Resolution
     }
   }
@@ -118,11 +147,11 @@ function parseSync(lines) {
   for (const e of sortedEvents(lines)) {
     if (e.type === 'B') { // millibeats per minute (SubmitDataSync: tempo / 1000 bpm)
       const milli = Number(e.args[0]);
-      if (milli > 0) tempos.push({ tick: e.tick, usPerQuarter: 6e10 / milli });
+      if (milli >= MIN_MILLIBEATS && milli <= MAX_MILLIBEATS) tempos.push({ tick: e.tick, usPerQuarter: 6e10 / milli }); // NaN fails both
     } else if (e.type === 'TS') { // numerator, then the denominator as a power of two (default 2 = quarter)
       const num = Number(e.args[0]);
       const exp = e.args[1] === undefined ? 2 : Number(e.args[1]);
-      if (num > 0 && Number.isInteger(exp) && exp >= 0 && exp < 16) timeSignatures.push({ tick: e.tick, num, den: 2 ** exp });
+      if (Number.isInteger(num) && num > 0 && num <= MAX_TIME_SIGNATURE_NUMERATOR && Number.isInteger(exp) && exp >= 0 && exp < 16) timeSignatures.push({ tick: e.tick, num, den: 2 ** exp });
     } // A (anchor): ignored, as YARG does
   }
   return { tempos, timeSignatures };
@@ -156,7 +185,7 @@ function buildInstrument(def, sections) {
     for (const e of events) {
       if (e.type === 'N') {
         const type = Number(e.args[0]);
-        const length = Math.max(0, Number(e.args[1]) || 0);
+        const length = clampLength(e.args[1]);
         if (!Number.isInteger(type)) continue;
         if (!drums) {
           if (type >= 0 && type <= 4) notes.push({ tick: e.tick, length, pitch: base + type });
@@ -173,7 +202,7 @@ function buildInstrument(def, sections) {
         else if (type >= 40 && type <= 44) flagOf.ghost.add(`${type - 39}:${e.tick}`); // NOTE_OFFSET_DRUMS_GHOST + pad
       } else if (e.type === 'S') {
         const type = Number(e.args[0]);
-        const length = Math.max(0, Number(e.args[1]) || 0);
+        const length = clampLength(e.args[1]);
         if (type === 2) addPhrase(STAR_POWER_NOTE, e.tick, length, diff);
         else if (drums && DRUM_PHRASES[type] !== undefined) addPhrase(DRUM_PHRASES[type], e.tick, length, diff);
       } else if (e.type === 'E') { // ConvertSoloEvents: solo ... soloend pairs (a stack)
@@ -244,8 +273,9 @@ function buildEvents(lines, resolution) {
   return { events, vocals };
 }
 
-export function parseChartText(text) {
-  const sections = readSections(text);
+export function parseChartText(text, { maxBytes = MAX_CHART_BYTES, maxEvents = MAX_CHART_EVENTS } = {}) {
+  if (text.length > maxBytes) throw new Error(`Invalid .chart: file too large (${text.length} characters)`);
+  const sections = readSections(text, maxEvents);
   const song = sections.find((s) => s.name === 'Song');
   const sync = sections.find((s) => s.name === 'SyncTrack');
   if (!song) throw new Error('Required section [Song] is missing');

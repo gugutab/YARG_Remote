@@ -614,6 +614,7 @@ let loadAudioWithSong = false; // a #/song/<id>/play link: the audio loads with 
 // Picking a song opens its details, and the player bar and the fretboards keep showing what they showed (a frozen picture of the last
 // song) until the audio starts to load (or the details close): then the new song fades in. The chart itself loads in the background.
 let holdStage = false;
+let ghostObserver = null;
 let barGhost = null; // a still copy of the player bar, laid over the real one while the stage is held
 let stageEverLive = false; // a song has been played (or opened with /play) since the page loaded: until then the player bar is not shown
 function holdStageNow() {
@@ -623,27 +624,45 @@ function holdStageNow() {
   holdStage = true;
   const bar = document.getElementById('topbar');
   const main = bar.parentElement;
-  const r = bar.getBoundingClientRect();
-  const m = main.getBoundingClientRect();
   const ghost = bar.cloneNode(true);
   ghost.removeAttribute('id');
   for (const e of ghost.querySelectorAll('[id]')) e.removeAttribute('id');
   ghost.classList.add('bar-ghost');
   ghost.inert = true;
   ghost.setAttribute('aria-hidden', 'true');
-  ghost.style.cssText = `left:${r.left - m.left}px;top:${r.top - m.top}px;width:${r.width}px;height:${r.height}px;`;
+  const place = () => { // the ghost follows the real bar when the window or the panes resize
+    const rb = bar.getBoundingClientRect();
+    const mb = main.getBoundingClientRect();
+    ghost.style.cssText = `left:${rb.left - mb.left}px;top:${rb.top - mb.top}px;width:${rb.width}px;height:${rb.height}px;`;
+  };
+  place();
   main.append(ghost);
   barGhost = ghost;
+  if (typeof ResizeObserver !== 'undefined') {
+    ghostObserver = new ResizeObserver(place);
+    ghostObserver.observe(bar);
+    ghostObserver.observe(main);
+  }
   els.app.classList.add('stage-held');
 }
 // The audio of the held song starts loading: the loading screen gets the plain background (the old bar copy and the frozen fretboards go)
+function dropGhost() {
+  ghostObserver?.disconnect();
+  ghostObserver = null;
+  barGhost?.remove();
+  barGhost = null;
+}
 let loadingBackdrop = 0; // while the held song's audio loads: when it started (the background visualizer keeps animating behind the loading screen)
 function stageLoading() {
   if (!holdStage) return;
   loadingBackdrop = performance.now();
   els.app.classList.add('stage-loading');
-  barGhost?.remove();
-  barGhost = null;
+  dropGhost();
+}
+// The audio of a song loaded (or failed): the bar belongs to the screen from now on, whether or not the stage was being held.
+function markStageLive() {
+  stageEverLive = true;
+  els.app.classList.remove('stage-unborn');
 }
 function releaseStage() {
   if (!holdStage) return;
@@ -654,6 +673,8 @@ function releaseStage() {
   els.app.classList.add('stage-reveal');
   highway.invalidate();
   const g = barGhost;
+  ghostObserver?.disconnect();
+  ghostObserver = null;
   barGhost = null;
   if (g) { g.classList.add('leaving'); setTimeout(() => g.remove(), 450); }
   setTimeout(() => els.app.classList.remove('stage-reveal'), 500);
@@ -701,6 +722,12 @@ async function selectSong(song) {
   els.sectionBtn.disabled = true;
   els.sectionPop.replaceChildren();
   els.sectionText.textContent = 'No sections';
+  activeSection = -2;
+  els.seek.value = 0; // the bar shows nothing of the previous song until the audio of this one loads
+  els.seek.max = 0;
+  els.seekbox.querySelectorAll('.tick').forEach((t) => t.remove());
+  paintSeek(0);
+  els.timeNow.textContent = els.timeTotal.textContent = fmt(0);
   els.instrumentCards.replaceChildren();
   els.mixerInfo.replaceChildren();
   els.mixer.replaceChildren();
@@ -746,20 +773,26 @@ async function selectSong(song) {
     img.hidden = !coverUrl;
   }
 
-  current = { song, midi, coverUrl, options: instrumentOptions(midi, song.ini), diffChoice: {}, pins: new Set(), choosers: [], chooserSeq: 0, hiddenActive: false, statsCache: new Map(), expandedStats: new Set(), modeChoice: {} };
-  renderMeta(song, midi); // adds the BPM chip
-  renderList({ keepScroll: true }); // highlight the loaded song
-  syncUrl();
-  fillInstrumentOptions();
-  if (pendingInstruments) { applyInstruments(pendingInstruments); pendingInstruments = null; }
-  updateChart(); // the chart exists as soon as the MIDI is read; only playback waits for the audio
-  const stems = relabelStems(audioStemsOf(song, { censor: prefs.get('audio.censor') }), (inst) => hasInstrument(song, inst)); // read per load: a change applies to the next song load
-  els.npPreview.hidden = !previewWindow(song.ini);
-  previewStop = null;
-  buildMixer(stems);
+  try {
+    current = { song, midi, coverUrl, options: instrumentOptions(midi, song.ini), diffChoice: {}, pins: new Set(), choosers: [], chooserSeq: 0, hiddenActive: false, statsCache: new Map(), expandedStats: new Set(), modeChoice: {} };
+    renderMeta(song, midi); // adds the BPM chip
+    renderList({ keepScroll: true }); // highlight the loaded song
+    syncUrl();
+    fillInstrumentOptions();
+    if (pendingInstruments) { applyInstruments(pendingInstruments); pendingInstruments = null; }
+    updateChart(); // the chart exists as soon as the MIDI is read; only playback waits for the audio
+    const stems = relabelStems(audioStemsOf(song, { censor: prefs.get('audio.censor') }), (inst) => hasInstrument(song, inst)); // read per load: a change applies to the next song load
+    els.npPreview.hidden = !previewWindow(song.ini);
+    previewStop = null;
+    buildMixer(stems);
 
-  current.stems = stems;
-  setLoadState('idle', 'The audio loads when you press Play.', 0); // nothing is decoded until then
+    current.stems = stems;
+    setLoadState('idle', 'The audio loads when you press Play.', 0); // nothing is decoded until then
+  } catch (err) {
+    console.error(err);
+    if (token === loadToken) setLoadState('error', `Could not build the chart: ${err.message}`);
+    return;
+  }
   if (chart && prefs.get('general.autoplay')) togglePlay(); // "Start playing as soon as I pick a song"
   else if (chart && wantAudio) ensureAudio(); // (playing needs a click: browsers block sound before one)
 }
@@ -782,12 +815,15 @@ function ensureAudio() {
         onProgress: (p) => { if (token === loadToken) setLoadState('loading', `Loading audio… ${Math.round(p * 100)}%`, 0.02 + p * 0.98); },
       });
     } catch (err) {
-      if (token === loadToken) { setLoadState('error', `Failed to decode audio: ${err.message}`); setInfoOpen(true); }
+      if (token === loadToken) { markStageLive(); setLoadState('error', `Failed to decode audio: ${err.message}`); setInfoOpen(true); }
       return false;
     } finally {
-      if (audioLoad?.song === song) audioLoad = null;
+      if (audioLoad?.song === song) { audioLoad = null; renderLoadState(); } // (the Play buttons come back enabled, so a retry works)
     }
-    if (token !== loadToken || !loaded) return false;
+    if (token !== loadToken || !loaded) {
+      if (token !== loadToken && loaded) player.unload(); // superseded after it installed (the player already refuses superseded loads): drop it
+      return false;
+    }
     els.seek.max = player.duration.toFixed(2);
     els.timeTotal.textContent = fmt(player.duration);
     paintSectionTicks(); // the slider range is known now
@@ -797,7 +833,7 @@ function ensureAudio() {
     ready = true;
     const nFailed = failedIds.size;
     setLoadState('ready', nFailed ? `Ready to play (${nFailed} ${nFailed === 1 ? 'stem' : 'stems'} could not be decoded)` : 'Ready to play', 1);
-    stageEverLive = true; // a song has played: from now on the player bar belongs to the screen
+    markStageLive(); // a song has played: from now on the player bar belongs to the screen
     releaseStage(); // loaded: the bar and the tracks of the new song come in now
     return true;
   })();
@@ -1988,7 +2024,17 @@ function buildEndScreen() {
 }
 
 // A recommended song: opened with the same instruments and difficulties where it has them, and played.
+let playingNext = false; // a second click while the first is opening its song is ignored
 async function playNext(song) {
+  if (playingNext || !current) return;
+  playingNext = true;
+  try {
+    await playNextNow(song);
+  } finally {
+    playingNext = false;
+  }
+}
+async function playNextNow(song) {
   pendingInstruments = [...(current.screen || [])].sort((a, b) => Number(!!b.active) - Number(!!a.active)).map((it) => ({ id: it.optionId, diff: it.diffId, base: it.base }));
   loadAudioWithSong = false;
   await selectSong(song);
@@ -2014,8 +2060,7 @@ function closeSong() {
   holdStage = false;
   loadingBackdrop = 0;
   stageEverLive = false;
-  barGhost?.remove();
-  barGhost = null;
+  dropGhost();
   els.app.classList.remove('stage-held', 'stage-loading', 'stage-reveal');
   els.app.classList.add('stage-unborn');
   showPlayInfo(false);
@@ -2621,7 +2666,8 @@ const SHORTCUT_HANDLERS = {
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tag = e.target.tagName;
-  const typing = ['INPUT', 'SELECT', 'TEXTAREA'].includes(tag) || e.target.isContentEditable;
+  // the seek bars keep the keyboard focus after a click: the app's shortcuts (Space, arrows) still apply there (other sliders, e.g. volumes, keep their arrows)
+  const typing = (['INPUT', 'SELECT', 'TEXTAREA'].includes(tag) && !(e.target.type === 'range' && (e.target === els.seek || e.target === els.npSeek))) || e.target.isContentEditable;
   const action = actionFor(prefs.get('shortcuts.bindings'), comboOf(e));
   if (typeof settingsPage !== 'undefined' && settingsPage.isOpen()) { // the settings page owns the keyboard while it is open
     if (e.code === 'Escape' || (action === 'settings' && !typing)) { e.preventDefault(); settingsPage.close(); }
@@ -2952,6 +2998,6 @@ function openFromHash() {
   loadAudioWithSong = route.view === 'play';
   pendingInstruments = route.instruments || null;
   selectSong(song);
-  if (route.view === 'play') { stageEverLive = true; setInfoOpen(false, { grow: false, release: false }); } // (the stage stays held until the audio of the link has loaded) // a /play link is the player: the bar shows, the library keeps its width
+  if (route.view === 'play') { markStageLive(); setInfoOpen(false, { grow: false, release: false }); } // (the stage stays held until the audio of the link has loaded) // a /play link is the player: the bar shows, the library keeps its width
 }
 window.addEventListener('hashchange', openFromHash);

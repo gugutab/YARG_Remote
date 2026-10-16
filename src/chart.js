@@ -474,6 +474,10 @@ export function fillSpans(track, eventsTrack, mode, toSec) {
 // delegates): a line every `resolution * 4 / denominator` ticks, restarting at each time signature change; the first of
 // every `numerator` lines is a measure line (with x/1 only the very first). The grid runs to the last note or text event
 // of the file. Without a time signature the file is 4/4.
+// At most MAX_BEATS lines are produced: a real song has a few thousand (even 1/16 time over an hour stays under 100k), so
+// the cap only bites on a corrupt file whose last event sits at a huge tick, which would otherwise allocate billions.
+export const MAX_BEATS = 200_000;
+
 export function generateBeats(midi, toSec) {
   let lastTick = 0;
   for (const t of midi.tracks) {
@@ -491,7 +495,7 @@ export function generateBeats(midi, toSec) {
     const end = i + 1 < sigs.length ? sigs[i + 1].tick - 1 : lastTick + 1;
     const step = Math.floor((midi.division * 4) / sig.den);
     if (step < 1) return;
-    for (let tick = sig.tick, count = 0; tick <= end; tick += step, count++) {
+    for (let tick = sig.tick, count = 0; tick <= end && beats.length < MAX_BEATS; tick += step, count++) {
       beats.push({ time: toSec(tick), measure: sig.num === 1 ? count === 0 : count % sig.num === 0 });
     }
   });
