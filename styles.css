@@ -2039,3 +2039,11 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 .song-top { align-items: baseline; }
 .song-packtag { margin-top: 0; padding-right: 0; }
 .song-icons { padding-right: 0; }
+
+/* Cards: small (compact) gets 2 px more inner margin; medium (normal) has its art flush with the card, 46 px, and the text split between the top and the bottom */
+#songs li.row.compact { padding-left: 14px; padding-right: 12px; }
+#songs li.row.normal { padding: 4px 10px 4px 5px; gap: 12px; } /* 3 px inset + 1 px border: the art touches the card's edge */
+#songs li.row.normal .thumb { width: calc(46px * var(--card-scale, 1)); height: calc(46px * var(--card-scale, 1)); border-radius: 11px 6px 6px 11px; }
+#songs li.row.normal .song-text { align-self: stretch; justify-content: space-between; padding: 3px 0; gap: 0; }
+#songs li.row.normal .song-top { align-items: baseline; }
+#songs li.row.normal .song-sub { margin-top: auto; }
