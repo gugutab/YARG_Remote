@@ -2114,3 +2114,5 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* Song cards: the hovered card gets an accent border and a lighter face (the open one keeps its stronger tint) */
 #songs li.row:hover::after { background: color-mix(in srgb, var(--accent) 9%, var(--panel-2)); border-color: color-mix(in srgb, var(--accent) 65%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
 #songs li.row.active:hover::after { border-color: var(--accent); }
+
+.lib-close svg { transform: rotate(90deg); } /* the dock handle's chevron, pointing left: the same kind of arrow as the handle */

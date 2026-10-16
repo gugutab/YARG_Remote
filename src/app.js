@@ -203,54 +203,6 @@ els.libTab.addEventListener('click', () => {
 });
 els.settingsTab.addEventListener('click', () => (settingsIsOpen() ? settingsPage.close() : settingsPage.open()));
 
-// ---------- Peeking: resting the pointer on a handle opens its menu for a while ----------
-// Hovering the handle of a hidden menu (the library's tab) for a moment opens it
-// temporarily: nothing is saved, and it closes again when the pointer has been out of it for a couple of seconds or has stopped
-// moving for a few. It stays while something in it is being edited or a popover is open.
-const PEEK = { hoverMs: 1000, outsideMs: 2000, idleMs: 3000 };
-function setupPeek(handle, panel, { isOpen, open, close }) {
-  let peeking = false;
-  let hoverTimer = 0;
-  let outsideTimer = 0;
-  let idleTimer = 0;
-  const busy = () => { // do not take the menu away from someone who is using it
-    const el = document.activeElement;
-    return !!document.querySelector('.popover:not([hidden])') || (panel.contains(el) && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName));
-  };
-  const end = () => {
-    clearTimeout(outsideTimer);
-    clearTimeout(idleTimer);
-    if (!peeking) return;
-    if (busy()) { arm(); return; } // try again later
-    peeking = false;
-    if (isOpen()) close();
-  };
-  const arm = () => { // the idle timer restarts with every move over the menu
-    clearTimeout(idleTimer);
-    idleTimer = setTimeout(end, PEEK.idleMs);
-  };
-  handle.addEventListener('pointerenter', (e) => {
-    if (e.pointerType === 'touch' || narrow() || isOpen()) return;
-    clearTimeout(hoverTimer);
-    hoverTimer = setTimeout(() => {
-      if (isOpen()) return;
-      peeking = true;
-      open();
-      arm();
-    }, PEEK.hoverMs);
-  });
-  handle.addEventListener('pointerleave', () => clearTimeout(hoverTimer));
-  handle.addEventListener('click', () => { clearTimeout(hoverTimer); peeking = false; }); // a click opens it for good
-  panel.addEventListener('pointerenter', () => clearTimeout(outsideTimer));
-  panel.addEventListener('pointermove', () => { if (peeking) arm(); });
-  panel.addEventListener('pointerleave', () => {
-    if (!peeking) return;
-    clearTimeout(outsideTimer);
-    outsideTimer = setTimeout(end, PEEK.outsideMs);
-  });
-  panel.addEventListener('pointerdown', () => { if (peeking) arm(); });
-}
-setupPeek(els.libTab, els.library, { isOpen: libraryOpen, open: () => setLibraryOpen(true, false), close: () => setLibraryOpen(false, false) });
 let listenQueued = false; // a press while the audio is still loading: it plays when ready (more presses meanwhile do nothing)
 els.npPlay.addEventListener('click', async () => { // the Listen card: play here, without leaving the details
   clearPreview();
