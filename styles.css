@@ -2282,3 +2282,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .card-listen .card-head h3 { justify-self: start; }
 .card-listen .card-head .listen-preview { justify-self: end; }
 .card-listen .card-head .listen-time { justify-self: center; }
+
+/* The rail's bubble always shows the whole group name (it grows to its text; there is room: left of the rail in a wide list, over the details in a narrow one) */
+.rail-bubble { max-width: none; width: max-content; overflow: visible; text-overflow: clip; }
