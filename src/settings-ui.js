@@ -27,9 +27,9 @@ export function mountSettings({ root, settings, sections, renderers = {}, onOpen
   const nav = el('nav', { class: 'sp-nav', 'aria-label': 'Settings sections' });
   const content = el('div', { class: 'sp-content' });
   const search = el('input', { class: 'sp-search', type: 'search', placeholder: 'Search settings', 'aria-label': 'Search settings' });
-  const closeBtn = el('button', { class: 'icon', type: 'button', title: 'Close (Esc)', 'aria-label': 'Close settings', onclick: () => close() }, icon('x'));
+  const closeBtn = el('button', { class: 'icon lib-close', type: 'button', title: 'Close (Esc)', 'aria-label': 'Close settings', onclick: () => close() }, icon('arrow-left')); // (the same back arrow as the library's, at the left of the title)
   root.replaceChildren(
-    el('div', { class: 'sp-head' }, el('h2', { text: 'Settings' }), search, closeBtn),
+    el('div', { class: 'sp-head' }, closeBtn, el('h2', { text: 'Settings' }), search),
     el('div', { class: 'sp-body' }, nav, content),
   );
 

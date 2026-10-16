@@ -721,7 +721,7 @@ function renderList({ keepScroll = false } = {}) {
   list.setHighlight(terms);
   els.sortDir.classList.toggle('desc', sortDesc); // the arrow points up when descending
   els.sortDir.title = sortDesc ? 'Descending (click to reverse)' : 'Ascending (click to reverse)';
-  list.setActive(current?.song ?? null);
+  list.setActive(infoOpen ? current?.song ?? null : null); // marked while its details are open
   const heads = prefs.get('library.dividers') && !ranked; // (a relevance order has no letter groups)
   list.setItems(heads ? buildItems(shown, els.sortBy.value) : shown.map((song) => ({ type: 'song', song })), { keepScroll, evenGroups: heads && els.sortBy.value === 'pack' }); // pack sort: every pack gets a label on the rail
   els.count.textContent = songs.length ? `${shown.length} of ${songs.length} songs${ranked ? ' · best match first' : ''}` : '';
@@ -1074,6 +1074,7 @@ function setInfoOpen(open, { grow = true, release = true } = {}) {
   if (open && typeof settingsPage !== 'undefined' && settingsPage.isOpen()) settingsPage.close(); // one window at a time
   infoOpen = open;
   syncPanelUi();
+  list.setActive(open ? current?.song ?? null : null); // closing the details unmarks the song in the list
   clearTimeout(infoHideTimer);
   els.info.inert = !open;
   if (open || libraryOpen()) els.info.hidden = !open;

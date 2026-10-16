@@ -2096,3 +2096,21 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 @container libpane (max-width: 640px) {
   .lib-header { grid-template-columns: auto 1fr auto !important; grid-template-areas: "close title tools" "search search search" "bar bar bar" !important; }
 }
+
+/* ---------- Round: the handle shows no open state; one animation for the library and the settings; stronger hover on song cards ---------- */
+.edge-dock.has-open { border-color: var(--line); }
+.edge-dock.has-open .dock-handle { color: var(--muted); }
+.edge-dock.has-open:hover .dock-handle { color: var(--accent); }
+.edge-dock.has-open::after { display: none; }
+
+/* Open / close: the window glides in from the left edge (where the dock is), grows from 96 % and fades in; closing is the same backwards, a little quicker */
+.library { transform-origin: 0 50%; transition: transform .34s cubic-bezier(.22, 1, .36, 1), opacity .24s ease, visibility 0s, box-shadow .3s ease; }
+.app.lib-closed:not(.details-only) .library { transform: translateX(-36px) scale(.96); transition: transform .24s cubic-bezier(.55, 0, .8, .4), opacity .18s ease, visibility 0s .24s, box-shadow .2s ease; }
+.settings-page { transform-origin: 0 50%; }
+:root[data-motion="on"] .settings-page:not([hidden]) { animation: settings-in .34s cubic-bezier(.22, 1, .36, 1) backwards; }
+@keyframes settings-in { from { opacity: 0; transform: translateX(-36px) scale(.96); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .library, .app.lib-closed:not(.details-only) .library { transition-duration: .01s; } }
+
+/* Song cards: the hovered card gets an accent border and a lighter face (the open one keeps its stronger tint) */
+#songs li.row:hover::after { background: color-mix(in srgb, var(--accent) 9%, var(--panel-2)); border-color: color-mix(in srgb, var(--accent) 65%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
+#songs li.row.active:hover::after { border-color: var(--accent); }
