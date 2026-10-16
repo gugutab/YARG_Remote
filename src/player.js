@@ -257,14 +257,16 @@ class WorkletPlayer {
   }
 
   // stems: [{ id, label, getFile }]; delay in seconds (see songDelaySeconds)
-  async load(stems, { delay = 0, onProgress = () => {} } = {}) {
+  // `first`: ids of the stems to decode first; the sound is ready when they are, and the others are added while it plays (`onLate` is called then).
+  async load(stems, { delay = 0, onProgress = () => {}, first = [] } = {}) {
     const generation = (this.generation = (this.generation || 0) + 1); // (taken before any await: an unload() while the setup runs also supersedes this load)
     await this.setup();
     if (generation !== this.generation) return false;
     this.stop();
     this.unload(); // the previous song's audio goes before the new one is decoded: the peak is one song, not two
     this.generation = generation; // (unload() bumps it; this load is the current one)
-    const result = await decodeAll(stems, async (s) => {
+    this.wanted = new Map();
+    const decodeOne = async (s) => {
       const file = await s.getFile();
       const data = await file.arrayBuffer();
       const decoded = await this.ctx.decodeAudioData(data);
@@ -274,7 +276,10 @@ class WorkletPlayer {
       }
       if (!channels.length) throw new Error('No audio channels');
       return channels;
-    }, onProgress, () => generation !== this.generation); // (a newer load() took over: stop)
+    };
+    const head = first.length ? stems.filter((s) => first.includes(s.id)) : stems;
+    const tail = head.length && head.length < stems.length ? stems.filter((s) => !head.includes(s)) : [];
+    const result = await decodeAll(tail.length ? head : stems, decodeOne, onProgress, () => generation !== this.generation); // (a newer load() took over: stop)
     if (!result || generation !== this.generation) return false;
     this.failedStems = result.failed;
     // only the stems that decoded reach the worklet, in this order
@@ -291,7 +296,35 @@ class WorkletPlayer {
     this.history = [];
     this.node.port.postMessage({ type: 'load', stems: aligned, rate: this.rate, epoch: this.epoch }, transfer);
     this.postGains();
+    if (tail.length) this.loadLate(tail, decodeOne, generation);
     return true;
+  }
+
+  // The stems that were not needed to start: decoded now and added to the running mix (a failed one is reported like a failed stem).
+  async loadLate(tail, decodeOne, generation) {
+    let result = null;
+    try {
+      result = await decodeAll(tail, decodeOne, () => {}, () => generation !== this.generation);
+    } catch (err) {
+      if (generation !== this.generation) return;
+      this.failedStems = [...this.failedStems, ...(err.failedStems || [])];
+      this.onLate?.();
+      return;
+    }
+    if (!result || generation !== this.generation) return;
+    this.failedStems = [...this.failedStems, ...result.failed];
+    if (result.ok.length) {
+      const aligned = result.ok.map((o) => o.value);
+      for (const o of result.ok) {
+        this.ids.push(o.stem.id);
+        this.stems.set(o.stem.id, true);
+        this.volumes.set(o.stem.id, this.wanted.get(o.stem.id) ?? 1);
+      }
+      this.duration = Math.max(this.duration, ...aligned.map((ch) => ch[0].length / this.ctx.sampleRate));
+      this.node.port.postMessage({ type: 'add', stems: aligned }, aligned.flatMap((ch) => ch.map((a) => a.buffer)));
+      this.postGains();
+    }
+    this.onLate?.();
   }
 
   postGains() {
@@ -299,6 +332,7 @@ class WorkletPlayer {
   }
 
   setVolume(id, value) {
+    (this.wanted ||= new Map()).set(id, value); // (a stem that is still decoding gets it when it joins)
     if (!this.volumes.has(id)) return;
     this.volumes.set(id, value);
     this.postGains();
@@ -425,6 +459,7 @@ export class MultiTrackPlayer {
     this.master = this.ctx.createGain();
     this.master.connect(this.ctx.destination);
     this.impl = new WorkletPlayer(this.ctx, this.master);
+    this.impl.onLate = () => this.onLate?.(); // late stems joined (or failed): the app refreshes its stem states
     this.speed = 1;
     this.engine = 'worklet';
   }

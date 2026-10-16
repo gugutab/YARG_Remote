@@ -23,7 +23,8 @@ class MixProcessor extends AudioWorkletProcessor {
         this.epoch = m.epoch;
         this.core.setStems(m.stems);
         this.core.setRate(m.rate ?? 1);
-      } else if (m.type === 'unload') { this.playing = false; this.core.setStems([]); // frees the audio
+      } else if (m.type === 'add') this.core.addStems(m.stems);
+      else if (m.type === 'unload') { this.playing = false; this.core.setStems([]); // frees the audio
       } else if (m.type === 'gains') this.core.setGains(m.gains);
       else if (m.type === 'rate') this.core.setRate(m.rate);
       else if (m.type === 'seek') { this.finishScrub(false); this.core.seek(m.frame); this.epoch = m.epoch; this.wasEnded = false; }

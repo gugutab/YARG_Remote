@@ -32,6 +32,19 @@ export class MixStretcher {
     this.seek(0);
   }
 
+  // Stems that finished decoding after the playback started: they join at the current position and fade in.
+  addStems(channels) {
+    const n0 = this.stems.length;
+    for (const ch of channels) this.stems.push({ left: ch[0], right: ch[1] || ch[0] });
+    this.length = this.stems.reduce((m, s) => Math.max(m, s.left.length), 0);
+    const target = new Float32Array(this.stems.length).fill(1);
+    target.set(this.target.subarray(0, n0));
+    const current = new Float32Array(this.stems.length); // (the new ones start silent)
+    current.set(this.current.subarray(0, n0));
+    this.target = target;
+    this.current = current;
+  }
+
   setGains(gains) {
     for (let i = 0; i < this.target.length; i++) this.target[i] = gains[i] ?? 1;
   }

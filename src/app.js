@@ -9,6 +9,7 @@ import { createPerfOverlay, PERF_MODES } from './perf-overlay.js';
 import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, readBytes, serializeSongs, restoreSongs, restoreRemoteSongs } from './library.js';
 import { songDelaySeconds, plainText, packOf } from './ini.js';
 import { actionFor, comboOf } from './shortcuts.js';
+import { dropStems, stemPriority } from './stempriority.js';
 import { attachScrollThumb } from './scrollthumb.js';
 import { previewWindow } from './preview.js';
 import { metaRows, extraRows, chartStats, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel, relabelStems } from './songinfo.js';
@@ -234,13 +235,29 @@ function setupPeek(handle, panel, { isOpen, open, close }) {
   panel.addEventListener('pointerdown', () => { if (peeking) arm(); });
 }
 setupPeek(els.libTab, els.library, { isOpen: libraryOpen, open: () => setLibraryOpen(true, false), close: () => setLibraryOpen(false, false) });
+let listenQueued = false; // a press while the audio is still loading: it plays when ready (more presses meanwhile do nothing)
 els.npPlay.addEventListener('click', async () => { // the Listen card: play here, without leaving the details
   clearPreview();
-  if (!player.playing && !(await ensureAudio({ listen: true }))) return; // loads the audio the first time (only the audio: the stage is left alone)
+  if (listenQueued) return;
+  if (!ready) { // loads the audio the first time (only the audio: the stage is left alone); a hover may have started it already
+    listenQueued = true;
+    const ok = await ensureAudio({ listen: true, at: Number(els.npSeek.value) || 0 });
+    listenQueued = false;
+    if (!ok) return;
+    setEnded(false);
+    await player.play();
+    syncPlayButton();
+    return;
+  }
   setEnded(false); // (play() starts over from the end by itself)
   if (player.playing) player.pause(); else await player.play();
   syncPlayButton();
 });
+// Hovering (or focusing) the Listen card starts decoding the audio, so the press finds it ready (or nearly).
+const listenCard = els.npPlay.closest('.card-listen');
+const preloadListen = () => { if (current && chart && !ready && !audioLoad) ensureAudio({ listen: true, at: 0 }); };
+listenCard.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') preloadListen(); });
+listenCard.addEventListener('focusin', preloadListen);
 els.npSeek.addEventListener('input', () => {
   const to = Number(els.npSeek.value);
   if (previewStop != null && (to < previewStart || to > previewStop)) clearPreview(); // a seek outside the preview section turns the preview off
@@ -262,8 +279,9 @@ function paintPreviewBand() {
 function clearPreview() { previewStop = null; if (els.npBand) els.npBand.hidden = true; }
 els.npPreview.addEventListener('click', async () => {
   const win = current && previewWindow(current.song.ini);
-  if (!win || !(await ensureAudio({ listen: true }))) return;
+  if (!win) return;
   const delay = songDelaySeconds(current.song.ini);
+  if (!(await ensureAudio({ listen: true, at: Math.max(0, win.start - delay) }))) return;
   previewStart = Math.max(0, win.start - delay);
   player.seek(previewStart);
   previewStop = Math.min(win.end - delay, player.duration);
@@ -753,7 +771,7 @@ function stageLoading() {
 // A song that was picked but never played has no player bar yet: while its chart is on screen (details closed, nothing loading) a Play
 // button on the stage is the way to start it (on a phone it was a dead end).
 function syncStagePlay() {
-  const show = !!(current && chart) && ((els.app.classList.contains('stage-unborn') && !holdStage) || (listenMode && holdStage)) && !infoOpen && !audioLoad && !endShown; // (listenMode + held: the Listen card was stopped by closing the details)
+  const show = !!(current && chart) && (holdStage || els.app.classList.contains('stage-unborn')) && !infoOpen && !audioLoad && !endShown; // (held: the details were closed without playing the song: the stage still shows what it showed before)
   els.stagePlay.hidden = !show;
 }
 els.stagePlay.addEventListener('click', () => togglePlay());
@@ -893,7 +911,7 @@ async function selectSong(song) {
     fillInstrumentOptions();
     if (pendingInstruments) { applyInstruments(pendingInstruments); pendingInstruments = null; }
     updateChart(); // the chart exists as soon as the MIDI is read; only playback waits for the audio
-    const stems = relabelStems(audioStemsOf(song, { censor: prefs.get('audio.censor') }), (inst) => hasInstrument(song, inst)); // read per load: a change applies to the next song load
+    const stems = dropStems(relabelStems(audioStemsOf(song, { censor: prefs.get('audio.censor') }), (inst) => hasInstrument(song, inst))); // (the crowd is never loaded) // read per load: a change applies to the next song load
     els.npPreview.hidden = !previewWindow(song.ini);
     clearPreview();
     buildMixer(stems);
@@ -914,7 +932,12 @@ async function selectSong(song) {
 let audioLoad = null; // { song, promise } while a load runs
 // `listen`: the Listen card only wants the sound: no loading screen, the stage (bar, fretboards, background) stays as it is and the progress
 // shows in the card. A later full Play on a load still running upgrades it to the normal one (loading screen).
-function ensureAudio({ listen = false } = {}) {
+function refreshStemFailures() {
+  const failedIds = new Set(player.failedStems.map((f) => f.id));
+  for (const st of stemStates) st.failed = failedIds.has(st.stem.id);
+  stemStates.forEach(applyStem);
+}
+function ensureAudio({ listen = false, at = 0 } = {}) {
   if (ready) return Promise.resolve(true);
   if (!current || !chart) return Promise.resolve(false);
   if (audioLoad?.song === current.song) {
@@ -929,7 +952,9 @@ function ensureAudio({ listen = false } = {}) {
     setLoadState('loading', 'Loading audio…', 0.02);
     let loaded = false;
     try {
+      const { first } = listen ? stemPriority(current.stems, current.midi, at) : { first: [] }; // (Listen: the sound starts when the backing track and the instruments playing around `at` are ready)
       loaded = await player.load(current.stems, {
+        first,
         delay: songDelaySeconds(song.ini),
         onProgress: (p) => { if (token === loadToken) setLoadState('loading', `Loading audio… ${Math.round(p * 100)}%`, 0.02 + p * 0.98); },
       });
@@ -950,6 +975,7 @@ function ensureAudio({ listen = false } = {}) {
     for (const st of stemStates) st.failed = failedIds.has(st.stem.id);
     stemStates.forEach(applyStem); // volumes chosen while loading
     ready = true;
+    player.onLate = refreshStemFailures; // (the stems that were left for later join the mix or fail)
     const nFailed = failedIds.size;
     setLoadState('ready', nFailed ? `Ready to play (${nFailed} ${nFailed === 1 ? 'stem' : 'stems'} could not be decoded)` : 'Ready to play', 1);
     if (!rec.listen) { markStageLive(); releaseStage(); } else listenMode = true; // loaded: the bar and the tracks of the new song come in now (a listen-only load leaves the stage held)
@@ -974,7 +1000,8 @@ function renderLoadState() {
   els.infoState.textContent = text;
   els.infoBar.style.width = `${Math.round(fraction * 100)}%`;
   els.infoProgress.dataset.state = state;
-  els.play.disabled = els.infoPlay.disabled = els.npPlay.disabled = !chart || (!ready && !!audioLoad);
+  els.play.disabled = els.infoPlay.disabled = !chart || (!ready && !!audioLoad);
+  els.npPlay.disabled = !chart || (!ready && !!audioLoad && !audioLoad.listen); // (a press during the Listen load is queued)
   els.npSeek.disabled = !(ready && chart);
   const listenLoading = !!audioLoad?.listen && state === 'loading';
   els.npPlay.classList.toggle('loading', listenLoading); // a spinner on the button and the progress in the time text while the Listen card loads the audio
@@ -1031,7 +1058,7 @@ function setInfoOpen(open, { grow = true, release = true } = {}) {
   } else if (!open && was) {
     const stopListening = listenMode && player.playing; // closing the details while the Listen card plays only stops the music: the stage is left as it is
     if (stopListening) { clearPreview(); player.pause(); player.seek(0); syncPlayButton(); }
-    if (release && !audioLoad && !stopListening) releaseStage(); // the details are closed: the song they were about is what the stage shows now (while its audio loads the stage waits for the load)
+    // (closing the details does not load the song into the stage: only Play does) // the details are closed: the song they were about is what the stage shows now (while its audio loads the stage waits for the load)
     const a = document.activeElement;
     if (infoOpener?.isConnected && infoOpener.offsetParent !== null && (!a || a === document.body || els.info.contains(a))) infoOpener.focus({ preventScroll: true });
     infoOpener = null;
