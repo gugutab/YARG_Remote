@@ -2119,3 +2119,8 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* Library title: more room between "Library" and the count, and a line box tall enough for the descenders (the overflow clip cut them) */
 .lib-title { gap: 4px; line-height: 1.2; }
 .lib-title .count { line-height: 1.4; padding-bottom: 1px; }
+
+/* Settings' pattern: the headers stay dark and the content area is lighter. The library list and the details content get the same lift
+   (a light layer over the window), and the cards inside are lighter again, like the settings rows. */
+.songs-wrap, .info-scroll { background: color-mix(in srgb, var(--panel-2) 52%, transparent); }
+.info-card { background: color-mix(in srgb, var(--panel-2) 55%, transparent); }
