@@ -361,3 +361,4 @@ Only checked by synthetic test, headless run or code reading:
 - Listen card: `#npTime` is in the card's top row, centred between the title and the Preview checkbox; the seek bar fills the player row.
 - The letter rail's hover bubble (`.rail-bubble`) is not width-limited any more: it shows the full group name (pack names can be long) both left of the rail (wide list) and over the details (`.right`).
 - Rail bubble placement: to the right of the rail only when the library WINDOW (not the viewport) has room there (the details open beside the list), otherwise to the left over the list; a bubble placed outside the window used to be cut by it.
+- Selected medium/large cards: the accent outline is `li.row.active::before` (z-index 2, over the flush art); `::after` keeps the face and its own border underneath.

@@ -2286,3 +2286,9 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* The rail's bubble always shows the whole group name (it grows to its text; there is room: left of the rail in a wide list, over the details in a narrow one) */
 .rail-bubble { max-width: none; width: max-content; overflow: visible; text-overflow: clip; }
 
+
+/* The selected card's outline is drawn over the album art too (medium and large cards have the art flush against the card's edge) */
+#songs li.row.active.normal::before, #songs li.row.active.large::before {
+  content: ""; display: block; position: absolute; inset: 4px; z-index: 2; border-radius: 10px; pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--accent) 70%, transparent); background: none; width: auto; left: 4px; top: 4px; bottom: 4px;
+}
