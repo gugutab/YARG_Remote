@@ -103,11 +103,83 @@ function matchesField(song, { field, value }) {
   return inst ? hasInstrument(song, inst) : true; // inst: / has: / no:
 }
 
+// ---- Text search: a per-song index, computed once (the songs do not change between keystrokes) ----
+// "flat" text: no accents, lower case, every run of non-letters/digits is one space ("AC/DC" -> "ac dc", "Don't" -> "don t").
+const flat = (s) => norm(s).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+const indexOf = new WeakMap();
+function searchIndex(song) {
+  let ix = indexOf.get(song);
+  if (!ix) {
+    const title = flat(plainText(song.title));
+    const artist = flat(plainText(song.artist));
+    const album = flat(plainText(song.album));
+    const pack = flat(plainText(packOf(song)));
+    const all = `${title} ${artist} ${album} ${pack}`; // the pack is searchable too
+    ix = { title, artist, album, pack, all, allc: all.replace(/ /g, '') }; // allc: no spaces, so "acdc" finds "AC/DC"
+    indexOf.set(song, ix);
+  }
+  return ix;
+}
+const termMatches = (ix, t) => ix.all.includes(t) || ix.allc.includes(t.replace(/ /g, ''));
+
+// How well a song answers the free-text terms: higher is better. Per term the best field counts: the title (starts with it, a word
+// starts with it, contains it), then the artist, the album and the pack; a title equal to the whole query wins over everything.
+export function relevanceScore(song, terms) {
+  const ix = searchIndex(song);
+  const ts = terms.map(flat).filter(Boolean);
+  if (!ts.length) return 0;
+  const rank = (text, t, full, word, any) => (text === t ? full + 20 : text.startsWith(t) ? full : text.includes(` ${t}`) ? word : text.includes(t) ? any : 0);
+  let score = 0;
+  for (const t of ts) {
+    score += Math.max(rank(ix.title, t, 100, 80, 60), rank(ix.artist, t, 50, 45, 40), rank(ix.album, t, 25, 22, 20), ix.pack.includes(t) ? 10 : 0);
+  }
+  if (ix.title === ts.join(' ')) score += 200;
+  return score;
+}
+
+// The songs best first (a stable order: equal scores keep the order they came in). With no free-text terms the list is returned as it is.
+export function rankByRelevance(songs, query) {
+  const { terms } = parseQuery(query);
+  if (!terms.length) return songs;
+  const scored = songs.map((song, i) => ({ song, i, score: relevanceScore(song, terms) }));
+  scored.sort((a, b) => b.score - a.score || a.i - b.i);
+  return scored.map((x) => x.song);
+}
+
+// Ranges [start, end) of `text` that match the terms (for highlighting). Accent, case and punctuation blind, like the search itself.
+export function highlightRanges(text, terms) {
+  const src = String(text ?? '');
+  let n = '';
+  const at = []; // at[i] = index in `src` of the character that produced n[i]
+  for (let i = 0; i < src.length; i++) {
+    const c = norm(src[i]);
+    for (let k = 0; k < c.length; k++) { n += c[k]; at.push(i); }
+  }
+  const ranges = [];
+  for (const t of terms) {
+    const chars = [...flat(t).replace(/ /g, '')];
+    if (!chars.length) continue;
+    const re = new RegExp(chars.map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[^\\p{L}\\p{N}]*'), 'gu');
+    for (const m of n.matchAll(re)) {
+      if (!m[0]) continue;
+      ranges.push([at[m.index], at[m.index + m[0].length - 1] + 1]);
+    }
+  }
+  ranges.sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  for (const r of ranges) {
+    const last = merged[merged.length - 1];
+    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+    else merged.push([r[0], r[1]]);
+  }
+  return merged;
+}
+
 // filters: { query, instruments: [], minLevel, genre, decade, instrument (old single value) }
 export function filterSongs(songs, { query = '', instruments = [], instrument = '', minLevel = 0, genre = '', decade = 0, pack = '' } = {}) {
   const { terms, fields } = parseQuery(query);
   const wanted = [...new Set([...instruments, ...(instrument ? [instrument] : [])])];
-  const normTerms = terms.map(norm);
+  const normTerms = terms.map(flat).filter(Boolean);
   const list = (v) => (Array.isArray(v) ? v : v ? [v] : []);
   const genres = list(genre);
   const packList = list(pack);
@@ -131,8 +203,8 @@ export function filterSongs(songs, { query = '', instruments = [], instrument = 
       if (!pass) return false;
     }
     if (!normTerms.length) return true;
-    const hay = norm(plainText(`${s.title} ${s.artist} ${s.album} ${packOf(s)}`)); // the pack is searchable too
-    return normTerms.every((t) => hay.includes(t));
+    const ix = searchIndex(s);
+    return normTerms.every((t) => termMatches(ix, t));
   });
 }
 

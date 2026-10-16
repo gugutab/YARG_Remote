@@ -20,7 +20,7 @@ import { resolveTheme, applyTheme } from './themes.js';
 import { mountSettings } from './settings-ui.js';
 import { renderThemeStudio, renderDataTools, renderShortcuts } from './settings-custom.js';
 import { saveLibrary, loadLibrary, loadThumb, saveThumb, clearThumbs } from './store.js';
-import { filterSongs, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, anchorLabel, INSTRUMENTS, hasInstrument } from './songlist.js';
+import { filterSongs, parseQuery, rankByRelevance, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, anchorLabel, INSTRUMENTS, hasInstrument } from './songlist.js';
 import { createVirtualList, DEFAULT_CARDS } from './virtuallist.js';
 import { createThumbs, renderCoverThumb } from './thumbs.js';
 import { chartFacts, factRows } from './songstats.js';
@@ -459,7 +459,22 @@ function syncFilterUi() {
     return b;
   }));
 }
-els.search.addEventListener('input', renderList);
+// Typing waits a moment (120 ms) so a fast typist filters once, not at every key.
+let searchTimer = 0;
+els.search.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(renderList, 120); });
+els.search.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { // the first result opens
+    clearTimeout(searchTimer);
+    renderList();
+    if (shownSongs[0]) { e.preventDefault(); selectSong(shownSongs[0]); }
+  } else if (e.key === 'Escape' && els.search.value) { // Esc clears the text first; a second Esc leaves the field
+    e.preventDefault();
+    e.stopPropagation();
+    els.search.value = '';
+    clearTimeout(searchTimer);
+    renderList();
+  }
+});
 for (const el of [els.filterGenre, els.filterDecade, els.filterPack]) el.addEventListener('input', () => { syncFilterUi(); renderList(); });
 els.instChips.addEventListener('click', (e) => {
   const b = e.target.closest('[data-inst]');
@@ -677,16 +692,23 @@ els.viewSeg.addEventListener('click', (e) => {
 // (the columns come from the "Columns" setting: see applyColumns)
 syncViewSeg();
 
+let shownSongs = []; // the list as it is on screen (Enter in the search opens the first one)
 function renderList({ keepScroll = false } = {}) {
-  const shown = sortSongs(filterSongs(songs, {
-    query: els.search.value, instruments: [...filters.instruments], minLevel: filters.minLevel, genre: picked(els.filterGenre), decade: picked(els.filterDecade), pack: picked(els.filterPack),
+  const query = els.search.value;
+  const terms = parseQuery(query).terms;
+  const ranked = terms.length > 0 && prefs.get('library.searchRelevance'); // free text in the search: best match first
+  let shown = sortSongs(filterSongs(songs, {
+    query, instruments: [...filters.instruments], minLevel: filters.minLevel, genre: picked(els.filterGenre), decade: picked(els.filterDecade), pack: picked(els.filterPack),
   }), els.sortBy.value, sortDesc);
+  if (ranked) shown = rankByRelevance(shown, query);
+  shownSongs = shown;
+  list.setHighlight(terms);
   els.sortDir.classList.toggle('desc', sortDesc); // the arrow points up when descending
   els.sortDir.title = sortDesc ? 'Descending (click to reverse)' : 'Ascending (click to reverse)';
   list.setActive(current?.song ?? null);
-  const heads = prefs.get('library.dividers');
+  const heads = prefs.get('library.dividers') && !ranked; // (a relevance order has no letter groups)
   list.setItems(heads ? buildItems(shown, els.sortBy.value) : shown.map((song) => ({ type: 'song', song })), { keepScroll, evenGroups: heads && els.sortBy.value === 'pack' }); // pack sort: every pack gets a label on the rail
-  els.count.textContent = songs.length ? `${shown.length} of ${songs.length} songs` : '';
+  els.count.textContent = songs.length ? `${shown.length} of ${songs.length} songs${ranked ? ' · best match first' : ''}` : '';
   els.empty.hidden = songs.length > 0;
 }
 
@@ -2836,9 +2858,15 @@ document.addEventListener('mousemove', wake);
 
 // ---------- Keyboard ----------
 // What each shortcut action does; the keys are in src/shortcuts.js and the `shortcuts.bindings` setting.
+// Opens the library if it is closed and puts the cursor in its search box (the text is selected, so typing replaces it).
+function focusSearch() {
+  if (!libraryOpen()) setLibraryOpen(true);
+  requestAnimationFrame(() => { els.search.focus({ preventScroll: true }); els.search.select(); });
+}
 const SHORTCUT_HANDLERS = {
   playPause: () => { if (chart) togglePlay(); },
   details: () => { if (current || loadInfo.state !== 'idle') setInfoOpen(!infoOpen); },
+  search: () => focusSearch(),
   library: () => setLibraryOpen(!libraryOpen()),
   topBar: () => setBarHidden(!els.app.classList.contains('bar-hidden')),
   fullscreen: () => toggleFullscreen(),
@@ -2858,6 +2886,7 @@ const SHORTCUT_HANDLERS = {
   settings: () => (settingsPage.isOpen() ? settingsPage.close() : settingsPage.open()),
 };
 document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.code === 'KeyK' && !(typeof settingsPage !== 'undefined' && settingsPage.isOpen())) { e.preventDefault(); focusSearch(); return; } // Ctrl/Cmd+K: search
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tag = e.target.tagName;
   // the seek bars keep the keyboard focus after a click: the app's shortcuts (Space, arrows) still apply there (other sliders, e.g. volumes, keep their arrows)
@@ -3093,6 +3122,7 @@ const EFFECTS = {
   'library.sortDesc': (v) => { sortDesc = v; renderList(); },
   'library.columns': applyColumns,
   'library.dividers': () => renderList(),
+  'library.searchRelevance': () => renderList(),
   'library.rail': (v) => document.querySelector('.songs-wrap').classList.toggle('no-rail', !v),
   'library.thumbs': applyCards, 'library.cardScale': applyCards, 'library.iconSize': applyCards,
   ...Object.fromEntries(['compact.artist', 'compact.pack', 'normal.artist', 'normal.pack', 'normal.icons', ...Object.keys(DEFAULT_CARDS.large).map((k) => `large.${k}`)].map((k) => [`cards.${k}`, applyCards])),

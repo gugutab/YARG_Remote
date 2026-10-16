@@ -1,4 +1,4 @@
-import { evenPerRow } from './songlist.js';
+import { evenPerRow, highlightRanges } from './songlist.js';
 
 // A windowed list for the library: only the rows near the viewport exist in the DOM, so ~750 songs with album
 // thumbnails scroll smoothly and stay light on memory. Items are fixed-height song rows and group headers.
@@ -210,18 +210,35 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     el.setAttribute('role', 'option');
     el.setAttribute('aria-selected', String(song === activeSong));
     const d = describe(song);
+    // Text with the matched part of the search marked (mark.hit); `prefix` is plain text before it (" — ").
+    const put = (node, txt, prefix = '') => {
+      const ranges = highlightTerms.length ? highlightRanges(txt, highlightTerms) : [];
+      if (!ranges.length) { node.textContent = prefix + txt; return node; }
+      node.textContent = prefix;
+      let at = 0;
+      for (const [a, b] of ranges) {
+        if (a > at) node.append(txt.slice(at, a));
+        const mark = document.createElement('mark');
+        mark.className = 'hit';
+        mark.textContent = txt.slice(a, b);
+        node.append(mark);
+        at = b;
+      }
+      if (at < txt.length) node.append(txt.slice(at));
+      return node;
+    };
     if (mode === 'compact') { // one line: Title - Artist (· pack)
       const c = cards.compact;
       const line = document.createElement('span');
       line.className = 'song-line';
       const title = document.createElement('span');
       title.className = 'song-title';
-      title.textContent = text(song.title);
+      put(title, text(song.title));
       line.append(title);
       if (c.artist) {
         const artist = document.createElement('span');
         artist.className = 'song-artist';
-        artist.textContent = ` — ${text(song.artist)}`;
+        put(artist, text(song.artist), ' — ');
         line.append(artist);
       }
       if (c.pack && d.pack) {
@@ -250,8 +267,8 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       e.textContent = txt;
       return e;
     };
-    const titleEl = mk('song-title', text(song.title));
-    const artistEl = mk('song-artist', text(song.artist));
+    const titleEl = put(mk('song-title', ''), text(song.title));
+    const artistEl = put(mk('song-artist', ''), text(song.artist));
     const iconList = (withBadge = true) => {
       const icons = document.createElement('span');
       icons.className = 'song-icons';
@@ -508,6 +525,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
   }
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(autoColumns).observe(scroller);
 
+  let highlightTerms = [];
   return {
     setCards(next) { // what the cards show / how big: rebuild the visible rows (the list keeps its place)
       cards = next;
@@ -542,6 +560,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       drawRail();
       render();
     },
+    setHighlight(terms) { highlightTerms = terms || []; }, // the free-text terms of the search: rows built after this mark them
     setActive(song) {
       activeSong = song;
       for (const [i, { el }] of rows) {

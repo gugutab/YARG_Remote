@@ -17,6 +17,7 @@ export const ACTIONS = [
   { id: 'vocalView', group: 'Windows', label: 'Vocals: switch notes / karaoke', key: 'KeyK' },
   { id: 'visualizerNext', group: 'Windows', label: 'Next visualizer', key: 'KeyG' },
   { id: 'visualizerPrev', group: 'Windows', label: 'Previous visualizer', key: 'Shift+KeyG' },
+  { id: 'search', group: 'Panels', label: 'Search the library', key: 'Slash' },
   { id: 'library', group: 'Panels', label: 'Show / hide the library', key: 'KeyL' },
   { id: 'details', group: 'Panels', label: 'Song details / chart', key: 'KeyI' },
   { id: 'topBar', group: 'Panels', label: 'Expand / compact the player bar', key: 'KeyB' },

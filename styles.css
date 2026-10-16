@@ -2024,3 +2024,5 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 .songs-wrap { padding-left: 8px; } /* the cards line up with the header's padding */
 .library .group-label { left: 8px; }
 #songs li.row.large, #songs li.row.normal { padding-left: 12px; padding-right: 10px; }
+
+#songs mark.hit { background: color-mix(in srgb, var(--accent) 32%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; margin: 0 -1px; }
