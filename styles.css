@@ -2173,3 +2173,4 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .songs-wrap, .info-scroll { background: none; }
 .library .group-label { background: color-mix(in srgb, var(--panel) 60%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 .library { background: color-mix(in srgb, var(--panel) 28%, transparent); } /* (over the dark stage this makes the body clearly darker than the dense headers) */
+.library { background: color-mix(in srgb, var(--panel) 50%, transparent); } /* body opacity: 50 % */
