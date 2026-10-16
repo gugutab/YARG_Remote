@@ -2276,3 +2276,9 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
   .lib-header .search { margin-top: 10px; }
   .lib-header .lib-bar { margin-top: 8px; }
 }
+
+/* Listen: the time sits centred in the top row (between the title and the Preview checkbox); the seek bar takes the room it had */
+.card-listen .card-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
+.card-listen .card-head h3 { justify-self: start; }
+.card-listen .card-head .listen-preview { justify-self: end; }
+.card-listen .card-head .listen-time { justify-self: center; }
