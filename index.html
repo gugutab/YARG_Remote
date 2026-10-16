@@ -210,10 +210,12 @@
         <div id="loading" class="loading" hidden role="status" aria-live="polite"></div>
         <button id="stagePlay" class="stage-play cta" type="button" hidden><svg><use href="#i-play"/></svg><span>Play</span></button>
         <div id="loadScreen" class="load-screen" hidden role="status" aria-live="polite">
-          <img id="lsCover" alt="" hidden>
-          <h2 id="lsTitle"></h2>
-          <div class="ls-bar"><i id="lsBar"></i></div>
-          <p id="lsText"></p>
+          <div class="ls-card">
+            <img id="lsCover" alt="" hidden>
+            <h2 id="lsTitle"></h2>
+            <div class="ls-bar"><i id="lsBar"></i></div>
+            <p id="lsText"></p>
+          </div>
         </div>
         <!-- End of song: a glass window that replaces the fretboards when the song reaches its end (src/songstats.js, src/recommend.js) -->
         <section id="endScreen" class="end-screen" hidden role="region" aria-label="End of song" tabindex="-1">

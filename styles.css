@@ -2229,3 +2229,24 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .rail { background: var(--pinned-bg); }
 :root { --pinned-bg: color-mix(in srgb, color-mix(in srgb, var(--panel-2) 38%, var(--panel)) 80%, transparent); } /* 20 % transparent */
 :root { --pinned-bg: color-mix(in srgb, color-mix(in srgb, var(--panel-2) 38%, var(--panel)) 60%, transparent); } /* 40 % transparent */
+
+/* The loading screen is a glass window (the same look as the end-of-song window and the library) centred over the stage */
+.load-screen h2, .load-screen p { text-shadow: none; }
+.ls-card {
+  position: relative; width: min(440px, 100%); display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 26px 28px 24px; text-align: center;
+  background: color-mix(in srgb, var(--panel) 78%, transparent); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: 14px; box-shadow: 0 10px 34px rgba(0, 0, 0, .4); color: var(--text);
+}
+.ls-card::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.ls-card img { width: min(200px, 60%); }
+:root[data-motion="on"] .load-screen:not([hidden]) .ls-card { animation: settings-in .34s cubic-bezier(.22, 1, .36, 1) backwards; }
+
+/* The first details card: with room (a wide card) the player sits beside the art, under the title and the chips, instead of under everything */
+@container (min-width: 760px) {
+  .info-head { grid-template-rows: auto 1fr; }
+  .info-head img { grid-row: 1 / span 2; align-self: stretch; height: auto; min-height: 180px; }
+  .info-head .info-head-text { grid-row: 1; }
+  .info-head .card-listen { grid-column: 2; grid-row: 2; align-self: end; margin: 0; padding: 12px 14px 14px 0; border-top: 0; }
+  .info-head .card-listen .card-head { margin-bottom: 6px; }
+}
+@container (min-width: 760px) { .info-head .card-listen { padding-left: 14px; } }
