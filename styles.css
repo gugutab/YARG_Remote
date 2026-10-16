@@ -2138,3 +2138,29 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .app.lib-wide:not(.lib-closed) .pane-tag { visibility: hidden; }
 .library .lib-bar .chip-select, .library .lib-bar .chip-btn, .library .view-seg { background: color-mix(in srgb, var(--panel-2) 70%, transparent); border-color: color-mix(in srgb, var(--line) 80%, transparent); }
 .library .active-filters .chip { background: color-mix(in srgb, var(--panel-2) 70%, transparent); }
+
+/* Wide library header: the search is centred (equal flexible sides); the sort / card-style tools follow it, the folder and refresh tools end the row */
+.lib-left, .lib-right { display: contents; } /* (narrow panes: the items sit in the three-row grid as before) */
+@media (min-width: 701px) {
+  .lib-header { grid-template-columns: 1fr minmax(160px, 560px) 1fr; grid-template-areas: "left search right"; }
+  .lib-left { grid-area: left; display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .lib-right { grid-area: right; display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .lib-right .lib-tools { margin-left: auto; }
+  .lib-left .lib-close, .lib-left .lib-title { grid-area: auto; }
+  .lib-right .lib-bar, .lib-right .lib-tools { grid-area: auto; }
+}
+@container libpane (max-width: 640px) {
+  .lib-left, .lib-right { display: contents !important; }
+  .lib-header { grid-template-columns: auto 1fr auto !important; grid-template-areas: "close title tools" "search search search" "bar bar bar" !important; }
+  .lib-left .lib-close { grid-area: close !important; }
+  .lib-left .lib-title { grid-area: title !important; }
+  .lib-right .lib-bar { grid-area: bar !important; }
+  .lib-right .lib-tools { grid-area: tools !important; margin-left: 0; }
+}
+
+/* Song cards in the style of the end-of-song window's buttons (.end-row): 10 px corners, translucent raised face, hairline border, accent wash on hover */
+#songs li.row::after { border-radius: 10px; background: color-mix(in srgb, var(--panel-2, var(--panel)) 60%, transparent); border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); box-shadow: none; }
+#songs li.row:hover::after { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: color-mix(in srgb, var(--line) 80%, transparent); box-shadow: none; }
+#songs li.row.active::after { background: color-mix(in srgb, var(--accent) 24%, transparent); border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
+#songs li.row.active:hover::after { border-color: var(--accent); }
+#songs li.row.normal .thumb, #songs li.row.large .thumb { border-radius: 9px 5px 5px 9px; }
