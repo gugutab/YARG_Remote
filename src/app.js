@@ -10,6 +10,7 @@ import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, re
 import { songDelaySeconds, plainText, packOf } from './ini.js';
 import { actionFor, comboOf } from './shortcuts.js';
 import { dropStems, stemPriority } from './stempriority.js';
+import { rememberPick, serializePick, parsePick } from './lastpick.js';
 import { attachScrollThumb } from './scrollthumb.js';
 import { previewWindow } from './preview.js';
 import { metaRows, extraRows, chartStats, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel, relabelStems } from './songinfo.js';
@@ -704,6 +705,14 @@ if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => requestAnima
 
 // ---------- Song and chart selection ----------
 let pendingInstruments = null; // the instruments of a link, applied once the chart is read
+// The instruments and difficulties used last (src/lastpick.js): offered again on the next song unless a link or "play next" names them.
+let lastPick = parsePick(store.get('lastPick'));
+let openingSong = false; // while a song is being opened its first chart is not a choice of the user: it must not overwrite the memory
+function saveLastPick() {
+  if (openingSong || !current?.screen?.length || !prefs.get('general.rememberInstruments')) return;
+  lastPick = rememberPick(lastPick, current.screen);
+  store.set('lastPick', serializePick(lastPick));
+}
 let loadAudioWithSong = false; // a #/song/<id>/play link: the audio loads with the song, like a Play press would
 // Picking a song opens its details, and the player bar and the fretboards keep showing what they showed (a frozen picture of the last
 // song) until the audio starts to load (or the details close): then the new song fades in. The chart itself loads in the background.
@@ -895,9 +904,14 @@ async function selectSong(song) {
     renderMeta(song, midi); // adds the BPM chip
     renderList({ keepScroll: true }); // highlight the loaded song
     syncUrl();
+    const remember = prefs.get('general.rememberInstruments');
+    if (remember) for (const o of current.options) if (o.base && lastPick.diffs[o.base]) current.diffChoice[o.id] = lastPick.diffs[o.base]; // each instrument opens at the difficulty it had last
     fillInstrumentOptions();
-    if (pendingInstruments) { applyInstruments(pendingInstruments); pendingInstruments = null; }
+    openingSong = true;
+    if (pendingInstruments) { applyInstruments(pendingInstruments); pendingInstruments = null; } // (a link or "play next" names them)
+    else if (remember && lastPick.items.length) applyInstruments(lastPick.items); // otherwise the ones used last, where this song has them
     updateChart(); // the chart exists as soon as the MIDI is read; only playback waits for the audio
+    openingSong = false;
     const stems = dropStems(relabelStems(audioStemsOf(song, { censor: prefs.get('audio.censor') }), (inst) => hasInstrument(song, inst))); // (the crowd is never loaded) // read per load: a change applies to the next song load
     els.npPreviewBox.hidden = !previewWindow(song.ini);
     clearPreview();
@@ -1395,6 +1409,7 @@ function updateChart() {
   for (const [key, el] of chooserEls) fillChooser(el, key); // the cards follow the instruments that are not on screen
   renderLoadState();
   syncUrl(); // the link carries the instruments on screen
+  saveLastPick(); // (the user's own changes; see openingSong)
 }
 
 els.instrument.addEventListener('change', () => { fillDifficultyOptions(); updateChart(); });
