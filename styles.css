@@ -2261,3 +2261,18 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .ls-card img { width: 100%; max-height: 52vh; aspect-ratio: 1; object-fit: cover; border-radius: 0; box-shadow: none; }
 .ls-card h2, .ls-card p { margin-inline: 28px; }
 .ls-card .ls-bar { width: calc(100% - 56px); }
+
+/* The two window headers (library and details) are the same height, so their bottom lines meet: --head-h. In a narrow list pane (details open beside it) the
+   library header's first row is that height, its line is drawn under it, and the search / sort row sits below as a toolbar. */
+:root { --head-h: 62px; }
+.info-top { box-sizing: border-box; height: var(--head-h); }
+.lib-header { box-sizing: border-box; min-height: var(--head-h); }
+@media (min-width: 701px) { .lib-header { padding-block: 0; } }
+@container libpane (max-width: 640px) {
+  .lib-header {
+    padding: 0 12px 12px !important; row-gap: 0 !important; grid-template-rows: calc(var(--head-h) - 1px) auto auto;
+    background-image: linear-gradient(color-mix(in srgb, var(--line) 70%, transparent), color-mix(in srgb, var(--line) 70%, transparent)); background-repeat: no-repeat; background-size: 100% 1px; background-position: 0 calc(var(--head-h) - 1px);
+  }
+  .lib-header .search { margin-top: 10px; }
+  .lib-header .lib-bar { margin-top: 8px; }
+}
