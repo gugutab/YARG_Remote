@@ -2116,3 +2116,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 #songs li.row.active:hover::after { border-color: var(--accent); }
 
 .lib-close svg { transform: rotate(90deg); } /* the dock handle's chevron, pointing left: the same kind of arrow as the handle */
+/* Library title: more room between "Library" and the count, and a line box tall enough for the descenders (the overflow clip cut them) */
+.lib-title { gap: 4px; line-height: 1.2; }
+.lib-title .count { line-height: 1.4; padding-bottom: 1px; }
