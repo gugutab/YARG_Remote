@@ -2189,3 +2189,21 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 #songs li.row:hover::after { background: color-mix(in srgb, var(--accent) 18%, color-mix(in srgb, var(--panel-2) 80%, transparent)); }
 #songs li.row.active::after { background: color-mix(in srgb, var(--accent) 26%, color-mix(in srgb, var(--panel-2) 80%, transparent)); }
 .info-card, #info .icard { background: color-mix(in srgb, var(--panel-2) 80%, transparent); }
+
+/* Pinned and in-list sub-headers: a touch larger; the pinned one starts a little further left; the list scroll area has the pinned label's background (60 % panel). */
+#songs li.divider, .library .group-label { font-size: 13px; }
+.library .group-label { padding-left: 1px; background: color-mix(in srgb, var(--panel) 60%, transparent); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.songs-wrap { background: color-mix(in srgb, var(--panel) 60%, transparent); }
+
+/* Window body: 15 points less transparent (50 % -> 65 % opaque) */
+.library { background: color-mix(in srgb, var(--panel) 65%, transparent); }
+
+/* The search shrinks first when the header gets tight: the side groups and the search may all be narrower than their content */
+@media (min-width: 701px) {
+  .lib-header { grid-template-columns: minmax(0, 1fr) minmax(90px, 560px) minmax(0, 1fr); }
+  .lib-header .search, .lib-header .search input { min-width: 0; }
+}
+@media (min-width: 701px) {
+  /* the side groups keep their content width (min = max-content); what is left goes to the search, up to 560 px, so the search is what shrinks */
+  .lib-header { grid-template-columns: minmax(max-content, 1fr) minmax(90px, 560px) minmax(max-content, 1fr); }
+}
