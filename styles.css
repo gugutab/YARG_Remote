@@ -2047,3 +2047,11 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 #songs li.row.normal .song-text { align-self: stretch; justify-content: space-between; padding: 3px 0; gap: 0; }
 #songs li.row.normal .song-top { align-items: baseline; }
 #songs li.row.normal .song-sub { margin-top: auto; }
+
+/* Medium: art 50 px; the pack tag's top lines up with the title's top. Large: the art fills the card's height, flush like the medium one */
+#songs li.row.normal .thumb { width: calc(50px * var(--card-scale, 1)); height: calc(50px * var(--card-scale, 1)); }
+#songs li.row.normal .song-top { align-items: flex-start; }
+#songs li.row.normal .song-packtag { line-height: 1.35; }
+#songs li.row.large { padding: 4px 10px 4px 5px; gap: 12px; align-items: stretch; }
+#songs li.row.large .thumb { width: calc(var(--row-h) - 8px); height: calc(var(--row-h) - 8px); border-radius: 11px 6px 6px 11px; }
+#songs li.row.large .song-text { padding: 7px 0; }

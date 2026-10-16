@@ -19,7 +19,7 @@ export const DEFAULT_CARDS = {
 export function cardHeight(mode, cards = DEFAULT_CARDS) {
   const { thumbs, scale } = cards;
   if (mode === 'compact') return Math.max(22, Math.round(ROW_HEIGHTS.compact * scale));
-  if (mode === 'normal') return Math.max(46, thumbs ? Math.round(46 * scale + 8) : 0); // the art (46 px) fills the card: + 3 px gap and 1 px border on each side
+  if (mode === 'normal') return Math.max(46, thumbs ? Math.round(50 * scale + 8) : 0); // the art (50 px) fills the card: + 3 px gap and 1 px border on each side
   const l = cards.large;
   const meta = l.album || l.year || l.length || l.genre || l.charter;
   const text = 20 + 17 + (meta ? 15 : 0) + (l.pack ? 15 : 0) + (l.instruments ? 45 : 0); // title, artist, meta, pack, chips (2 lines)
@@ -207,6 +207,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     const song = item.song;
     el.className = `row ${mode}` + (song === activeSong ? ' active' : '') + (firstCol ? ' first-col' : '');
     el.style.height = `${rowH}px`;
+    el.style.setProperty('--row-h', `${rowH}px`); // (the large card's art fills the card: its size follows the row)
     el.setAttribute('role', 'option');
     el.setAttribute('aria-selected', String(song === activeSong));
     const d = describe(song);
