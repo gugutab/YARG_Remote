@@ -2228,3 +2228,4 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .library .group-label { background: var(--pinned-bg); }
 .rail { background: var(--pinned-bg); }
 :root { --pinned-bg: color-mix(in srgb, color-mix(in srgb, var(--panel-2) 38%, var(--panel)) 80%, transparent); } /* 20 % transparent */
+:root { --pinned-bg: color-mix(in srgb, color-mix(in srgb, var(--panel-2) 38%, var(--panel)) 60%, transparent); } /* 40 % transparent */
