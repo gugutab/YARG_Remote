@@ -2183,3 +2183,9 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 #songs li.row.large { padding: 5px 12px 5px 5px; }
 #songs li.row.compact { padding: 4px 12px 4px 14px; }
 #songs li.row.large .thumb { width: calc(var(--row-h) - 10px); height: calc(var(--row-h) - 10px); }
+
+/* Cards at 80 % opacity: the song cards and the details' cards (info cards and the instrument cards) */
+#songs li.row::after { background: color-mix(in srgb, var(--panel-2, var(--panel)) 80%, transparent); }
+#songs li.row:hover::after { background: color-mix(in srgb, var(--accent) 18%, color-mix(in srgb, var(--panel-2) 80%, transparent)); }
+#songs li.row.active::after { background: color-mix(in srgb, var(--accent) 26%, color-mix(in srgb, var(--panel-2) 80%, transparent)); }
+.info-card, #info .icard { background: color-mix(in srgb, var(--panel-2) 80%, transparent); }
