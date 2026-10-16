@@ -1630,7 +1630,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 
 /* phone: a full-height drawer over everything (the bar included) with a scrim */
 @media (max-width: 700px) {
-  .library { position: fixed; top: 0; bottom: 0; left: 0; z-index: 30; width: min(88vw, 340px); border-radius: 0 14px 14px 0; border-left: 0; background: color-mix(in srgb, var(--panel) 94%, transparent); }
+  .library { position: fixed; top: 0; bottom: 0; left: 0; z-index: 30; width: calc(100vw - 44px); border-radius: 0 14px 14px 0; border-left: 0; background: color-mix(in srgb, var(--panel) 94%, transparent); }
   .app.lib-closed:not(.details-only) .library { transform: translateX(-105%); }
   .lib-list { width: 100%; }
   /* the details take the whole drawer (the list is hidden) until they close */

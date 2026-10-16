@@ -325,3 +325,4 @@ Only checked by synthetic test, headless run or code reading:
 - touch dragging on a real phone (dividers, loop handles, scroll thumb);
 - GPU cost of the stacked `backdrop-filter` layers over the animating canvas (no gain measurable headless; a CSS idea: drop `backdrop-filter` on `.pane-tag`, `.stage-btn`, `.perf-overlay` under `data-motion="off"`);
 - `.sng` files with real packs (only synthetic ones from `test/sng-writer.js` were read).
+- Phone drawer width: `calc(100vw - 44px)` (a 44 px strip of the background stays visible and tappable as the scrim); with the details open it is full screen.
