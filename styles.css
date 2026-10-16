@@ -1915,16 +1915,17 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 /* centred in the part the library window leaves free */
 @media (min-width: 701px) { .stage-play { left: calc(var(--lib-inset, 0px) + (100% - var(--lib-inset, 0px)) / 2); } }
 
-/* ---------- The edge dock: one handle on the left edge; hover or click opens the Library and Settings buttons ---------- */
-.edge-dock { position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 40; display: flex; align-items: center; }
+/* ---------- The edge dock: one handle on the left edge; hover or click grows it and the Library and Settings buttons appear inside it ---------- */
+.edge-dock { position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 40; width: 26px; height: 76px; overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-left: 0; border-radius: 0 12px 12px 0; transition: width .2s ease, height .2s ease, background .15s, box-shadow .2s; }
 .edge-dock[hidden] { display: none; }
-.dock-handle { width: 26px; height: 76px; padding: 0; display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); border-left: 0; border-radius: 0 10px 10px 0; color: var(--muted); cursor: pointer; transition: color .15s, background .15s; }
-.dock-handle svg { width: 18px; height: 18px; transform: rotate(-90deg); transition: transform .2s ease; } /* points right: where the buttons come from */
-.edge-dock:hover .dock-handle, .dock-handle:focus-visible { color: var(--accent); background: var(--panel-2); }
-.edge-dock.open .dock-handle svg { transform: rotate(90deg); }
-.dock-buttons { display: flex; flex-direction: column; gap: 6px; max-width: 0; opacity: 0; overflow: hidden; padding-block: 6px; margin-left: 0; transition: max-width .2s ease, opacity .15s ease, margin-left .2s ease; pointer-events: none; }
-.edge-dock.open .dock-buttons { max-width: 56px; opacity: 1; margin-left: 6px; pointer-events: auto; }
-.dock-btn { flex: none; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line); border-radius: 12px; color: var(--text); cursor: pointer; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 6px 20px rgba(0, 0, 0, .35); }
-.dock-btn:hover { color: var(--accent); background: var(--panel-2); }
+.edge-dock.open { width: 58px; height: 112px; background: color-mix(in srgb, var(--panel) 92%, transparent); box-shadow: 0 8px 26px rgba(0, 0, 0, .4); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.dock-handle { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; display: grid; place-items: center; background: none; border: 0; color: var(--muted); cursor: pointer; }
+.dock-handle svg { width: 18px; height: 18px; transform: rotate(-90deg); transition: opacity .12s ease, color .15s; } /* points right: where the buttons come from */
+.edge-dock:hover .dock-handle, .dock-handle:focus-visible { color: var(--accent); }
+.edge-dock.open .dock-handle svg { opacity: 0; } /* the arrow goes away: the buttons take its place */
+.dock-buttons { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding-right: 2px; opacity: 0; pointer-events: none; transition: opacity .15s ease; }
+.edge-dock.open .dock-buttons { opacity: 1; pointer-events: auto; transition-delay: .06s; }
+.dock-btn { flex: none; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; background: none; border: 0; border-radius: 10px; color: var(--text); cursor: pointer; }
+.dock-btn:hover, .dock-btn:focus-visible { color: var(--accent); background: var(--panel-2); }
 .dock-btn svg { width: 20px; height: 20px; }
 body.details-open .edge-dock { display: none; } /* the details fill the window area: no dock over them */
