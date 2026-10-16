@@ -4,7 +4,7 @@ import { evenPerRow, highlightRanges, packCode } from './songlist.js';
 // thumbnails scroll smoothly and stay light on memory. Items are fixed-height song rows and group headers.
 
 // Row heights per card style: compact (one text line), normal (thumb + 2 lines), large (big thumb + details).
-export const ROW_HEIGHTS = { compact: 32, normal: 56, large: 128 };
+export const ROW_HEIGHTS = { compact: 34, normal: 58, large: 128 };
 export const ROW_H = ROW_HEIGHTS.normal;
 
 // What the cards show and how big they are (the settings page edits this; the list gets it through setCards()).
@@ -19,7 +19,7 @@ export const DEFAULT_CARDS = {
 export function cardHeight(mode, cards = DEFAULT_CARDS) {
   const { thumbs, scale } = cards;
   if (mode === 'compact') return Math.max(22, Math.round(ROW_HEIGHTS.compact * scale));
-  if (mode === 'normal') return Math.max(46, thumbs ? Math.round(50 * scale + 8) : 0); // the art (50 px) fills the card: + 3 px gap and 1 px border on each side
+  if (mode === 'normal') return Math.max(46, thumbs ? Math.round(50 * scale + 10) : 0); // the art (50 px) fills the card: + 4 px gap and 1 px border on each side
   const l = cards.large;
   const meta = l.album || l.year || l.genre || l.charter; // (the length sits at the title's right)
   const text = 20 + 17 + (meta ? 15 : 0) + (l.pack ? 15 : 0) + (l.instruments ? 45 : 0); // title, artist, meta, pack, chips (2 lines)

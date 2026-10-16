@@ -15,12 +15,12 @@ test('layout offsets add up heads and rows', () => {
 test('visibleRange returns only the items near the viewport', () => {
   const items = Array.from({ length: 1000 }, () => ({ type: 'song' }));
   const o = layoutOffsets(items);
-  assert.deepEqual(visibleRange(o, 0, 560, 0), [0, 10]);
-  const [a, b] = visibleRange(o, 56 * 500, 560, 112);
+  assert.deepEqual(visibleRange(o, 0, ROW_H * 10, 0), [0, 10]);
+  const [a, b] = visibleRange(o, ROW_H * 500, ROW_H * 10, ROW_H * 2);
   assert.equal(a, 498);
   assert.equal(b, 512);
   assert.deepEqual(visibleRange(layoutOffsets([]), 0, 500), [0, 0]);
-  const [x, y] = visibleRange(o, 56 * 1000, 560); // scrolled past the end
+  const [x, y] = visibleRange(o, ROW_H * 1000, ROW_H * 10); // scrolled past the end
   assert.ok(x <= 1000 && y === 1000);
 });
 
