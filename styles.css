@@ -2164,3 +2164,12 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 #songs li.row.active::after { background: color-mix(in srgb, var(--accent) 24%, transparent); border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
 #songs li.row.active:hover::after { border-color: var(--accent); }
 #songs li.row.normal .thumb, #songs li.row.large .thumb { border-radius: 9px 5px 5px 9px; }
+
+/* More see-through window: the body of the library and the details lets the stage show (blurred); the headers stay dense so they stand out. */
+.library { background: color-mix(in srgb, var(--panel) 52%, transparent); box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .26), 0 18px 60px rgba(0, 0, 0, .5), inset 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent); }
+.library::before { backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+@media (max-width: 700px) { .library { box-shadow: none; } }
+.lib-header, .info-top { background: color-mix(in srgb, var(--panel) 90%, transparent); }
+.songs-wrap, .info-scroll { background: none; }
+.library .group-label { background: color-mix(in srgb, var(--panel) 60%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.library { background: color-mix(in srgb, var(--panel) 28%, transparent); } /* (over the dark stage this makes the body clearly darker than the dense headers) */
