@@ -923,7 +923,15 @@ const radialViz = (ctx) => {
       const L = Math.min(layers.length, bufs.length);
       const spread = Math.max(2.5, M / 14);
       const idle = (b, li) => 0.05 + 0.035 * Math.sin(b * 0.5 + s.beat.pos * 1.3 + li);
-      const lenOf = (li) => base * 0.25 * (L === 1 ? 1 : 0.38 + 0.72 * (li / (L - 1))); // the longest bar of a layer: growing with the layer
+      // The bars reach towards the screen edge in their own direction (not a fixed length): along the width there is much more room than along the height, so the
+      // spectrum fills the screen as an ellipse around the (unchanged) record. A layer's share of that room grows with the layer.
+      const fracOf = (li) => (L === 1 ? 1.2 : 0.75 + 0.65 * (li / (L - 1)));
+      const room = bufs.room ?? (bufs.room = new Float32Array(2 * M));
+      for (let k = 0; k < 2 * M; k++) {
+        const c = Math.abs(Math.cos(lay.angle[k]));
+        const sn = Math.abs(Math.sin(lay.angle[k]));
+        room[k] = Math.max(base * 0.05, Math.min(c > 1e-6 ? cx / c : Infinity, sn > 1e-6 ? cy / sn : Infinity) - ringR - 4);
+      }
       const N = 2 * M;
       const bw = (TAU * ringR) / N * 0.64;
       const order = [...Array(L).keys()].sort((x, y) => (layers[x].shown !== false) - (layers[y].shown !== false) || y - x); // faint first, tallest first
@@ -937,14 +945,14 @@ const radialViz = (ctx) => {
         const on = layers[li].shown !== false;
         const { now, past, peak } = bufs[li];
         const col = layerColor(kind, li, pal);
-        const maxLen = lenOf(li);
+        const frac = fracOf(li);
         const level = levelOf(layerGain(kind));
         spectrumAt(events, s.t, M, now, spread);
         g.beginPath(); // the bars of the layer: one path
         for (let k = 0; k < N; k++) {
           const b = lay.bin[k];
           const a = lay.angle[k];
-          const len = Math.min(1.3, level(now[b]) + idle(b, li)) * maxLen;
+          const len = Math.min(room[k], Math.min(1.3, level(now[b]) + idle(b, li)) * frac * room[k]);
           const cos = Math.cos(a);
           const sin = Math.sin(a);
           g.moveTo(cx + cos * ringR, cy + sin * ringR);
@@ -964,10 +972,10 @@ const radialViz = (ctx) => {
           const a = lay.angle[k];
           const cos = Math.cos(a);
           const sin = Math.sin(a);
-          const bar = Math.min(1.3, level(now[b]) + idle(b, li)) * maxLen;
+          const bar = Math.min(room[k], Math.min(1.3, level(now[b]) + idle(b, li)) * frac * room[k]);
           g.moveTo(cx + cos * (ringR + bar - 4), cy + sin * (ringR + bar - 4));
           g.lineTo(cx + cos * (ringR + bar), cy + sin * (ringR + bar));
-          const cap = Math.min(1.3, peak[b] + idle(b, li)) * maxLen;
+          const cap = Math.min(room[k], Math.min(1.3, peak[b] + idle(b, li)) * frac * room[k]);
           if (cap > bar + 6) {
             g.moveTo(cx + cos * (ringR + cap - 3), cy + sin * (ringR + cap - 3));
             g.lineTo(cx + cos * (ringR + cap), cy + sin * (ringR + cap));
