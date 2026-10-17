@@ -1393,6 +1393,7 @@ function renderPickers() {
         btn.type = 'button';
         btn.textContent = o.modeLabel ?? o.label;
         btn.setAttribute('aria-pressed', String(on && o.id === group.chosen.id));
+        if (!on && o.id === group.chosen.id) btn.dataset.next = 'true'; // the type a click on the card will use
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           current.modeChoice[group.key] = o.id;
