@@ -1644,7 +1644,7 @@ export class Highway {
     }
     if (i < 0) return;
     const envOf = (n) => { // 0..1: fade in over the start, 1 while sung and held, then the fade-out
-      const attack = Math.max(0, Math.min(1, (t - n.time + 0.04) / 0.12));
+      const attack = Math.max(0, Math.min(1, (t - n.time + 0.02) / 0.04)); // a very quick fade in
       const after = t - n.end;
       if (after <= VOC_GLOW_HOLD) return attack;
       return Math.max(0, 1 - (after - VOC_GLOW_HOLD) / VOC_GLOW_FADE) * attack;
@@ -1662,24 +1662,30 @@ export class Highway {
     if (y === null || y === undefined) y = vocY(n.pitch);
     const g = this.g;
     const v = 0.5 + 0.5 * Math.sin(t * 9 + n.time * 3) * 0.6 + 0.5 * Math.sin(t * 23 + n.time * 7) * 0.4; // 0..1, varying
-    const R = Math.max(9, half * 1.8) * (0.9 + 0.2 * v); // the body of the glow
+    const R = Math.max(9, half * 1.7);
+    // A glint, not a halo: a thin vertical streak of light along the hit line and a shorter horizontal one through the note, crossing in a small bright core, all in
+    // the note's colour. Each streak is a few stacked ellipses (wide and faint to narrow and strong), and their lengths shimmer.
+    const streak = (rx, ry, strength) => {
+      for (let q = 0; q < 6; q++) {
+        const k = 1 - q * 0.16;
+        g.globalAlpha = strength * env * (0.07 + q * 0.05);
+        g.beginPath();
+        g.ellipse(hitX, y, rx * k, ry * k, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+    };
     g.save();
     g.fillStyle = color;
-    for (let q = 0; q < 12; q++) { // the light reaches out: many thin discs stacked, so the falloff is smooth
-      const k = 3.0 - q * 0.15;
-      g.globalAlpha = 0.017 * (0.75 + 0.5 * v) * env;
-      g.beginPath();
-      g.arc(hitX, y, R * k, 0, Math.PI * 2);
-      g.fill();
-    }
-    g.globalAlpha = (0.3 + 0.14 * v) * env; // the glow
+    streak(R * 0.55, R * (3.1 + 0.7 * v), 1); // up and down the line
+    streak(R * (2.3 + 0.5 * (1 - v)), R * 0.4, 0.9); // sideways through the note
+    g.globalAlpha = (0.35 + 0.2 * v) * env; // the core
     g.beginPath();
-    g.arc(hitX, y, R, 0, Math.PI * 2);
+    g.arc(hitX, y, R * 0.55, 0, Math.PI * 2);
     g.fill();
-    g.fillStyle = '#ffffff'; // the heart
-    g.globalAlpha = (0.4 + 0.25 * v) * env;
+    g.fillStyle = '#ffffff';
+    g.globalAlpha = (0.55 + 0.25 * v) * env;
     g.beginPath();
-    g.arc(hitX, y, R * 0.45, 0, Math.PI * 2);
+    g.arc(hitX, y, R * 0.28, 0, Math.PI * 2);
     g.fill();
     g.restore();
   }
