@@ -2319,3 +2319,17 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .bg-canvas { opacity: var(--viz-opacity, 1); }
 /* The slider rows of the visualizer picker: icon, slider, value (the generic .viz-level columns left a 70 px gap after the icon) */
 .viz-pop .viz-level.viz-slider { grid-template-columns: 22px 1fr 44px; padding-block: 4px; }
+
+/* ================= Song information overlay (src/startinfo.js): fades in at the start of a song, out a few seconds later ================= */
+.song-info {
+  position: absolute; z-index: 5; top: 12%; left: calc(50% + var(--lib-inset, 0px) / 2); transform: translateX(-50%); max-width: min(560px, 86%); padding: 14px 22px; text-align: center;
+  background: color-mix(in srgb, var(--panel) 70%, transparent); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius: 14px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, .35); color: var(--text); pointer-events: none; opacity: 0; visibility: hidden; transition: opacity .5s ease, visibility 0s linear .5s;
+}
+.song-info.show { opacity: 1; visibility: visible; transition: opacity .5s ease; }
+.song-info::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.si-title { font-size: 20px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.si-artist { font-size: 15px; margin-top: 2px; overflow-wrap: anywhere; }
+.si-details { margin-top: 6px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.si-details div { overflow-wrap: anywhere; }
+.si-details:empty { display: none; }

@@ -14,6 +14,7 @@ import { rememberPick, serializePick, parsePick } from './lastpick.js';
 import { parseVolumes, serializeVolumes, remember as rememberLevel, recall as recallLevel } from './volmemory.js';
 import { attachScrollThumb } from './scrollthumb.js';
 import { previewWindow } from './preview.js';
+import { isFreshStart, overlayLines, startPlan, INFO_FIRST_PLAY_MS } from './startinfo.js';
 import { metaRows, extraRows, chartStats, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel, relabelStems } from './songinfo.js';
 import { parseRoute, formatRoute } from './route.js';
 import { createSettings } from './settings.js';
@@ -37,7 +38,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'barHide', 'mixerVal', 'speedVal', 'stagePlay', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'barHide', 'mixerVal', 'speedVal', 'stagePlay', 'songInfo', 'siTitle', 'siArtist', 'siDetails', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
   'endScreen', 'endCover', 'endTitle', 'endArtist', 'endAgain', 'endSearch', 'endCards', 'endNextBox', 'endNext',
@@ -897,6 +898,7 @@ async function selectSong(song) {
   if (!keep) holdStageNow();
   const token = ++loadToken;
   clearRewind();
+  if (!keep) { cancelStartWait(); hideSongInfo(); }
   setEnded(false);
   // (the sound that is playing is left alone: browsing the details of another song does not stop it; the audio of the new song, when it
   // loads, replaces it, and the old decoded audio is freed then)
@@ -2266,6 +2268,7 @@ async function togglePlay() {
     return;
   }
   if (resumeTimer) { cancelResumeRewind(); syncPlayButton(); return; } // Play pressed again during the rewind: stay paused
+  if (startDone) { cancelStartWait(); syncPlayButton(); return; } // Play (pause) pressed during the start delay: stay at the start
   if (player.playing && !backgroundAudio()) {
     rememberPause();
     player.pause();
@@ -2277,14 +2280,93 @@ async function togglePlay() {
     markStageLive(); // (the audio may have been loaded by the Listen card with the stage held: now the chart and the bar come in)
     releaseStage();
     if (await rewindBeforePlay()) return; // (resumed from a pause: the rewind starts the sound itself)
+    const plan = startPlan({
+      fresh: isFreshStart({ position: player.currentTime(), resumed: pausedAt !== null, loop: !!loop, background: listenMode || backgroundAudio(), ended }),
+      delay: prefs.get('playback.startDelay'), overlayOn: prefs.get('playback.songInfoOverlay'), keep: prefs.get('playback.keepSongInfo'), firstOfSong: infoShownFor !== current?.song,
+    });
+    if (plan.show) showSongInfo(plan.delay > 0 ? null : plan.hideMs);
+    if (plan.delay > 0) { await startAfterDelay(plan); return; } // (the sound starts itself when the wait is over)
     await player.play();
   }
   syncPlayButton();
 }
 
+// Song start delay (YARG's SONG_START_DELAY) and the song information overlay (SongInfoText). A Play from the very beginning waits playback.startDelay
+// seconds with the fretboards at the start and the button in its playing state; Play/pause or a seek during the wait cancels it (like the resume rewind's
+// timer: startDone resolves the wait early and startCancelled tells it not to play). The overlay fades in with the wait (or with the first play of a song when
+// there is no delay) and out INFO_*_MS after the sound starts, unless playback.keepSongInfo; closing the song or opening another hides it at once.
+let startTimer = 0;
+let startDone = null; // resolves the wait of a start delay that is running (a cancel resolves it too)
+let startCancelled = false;
+let infoShownFor = null; // the song whose overlay was shown (a first play of another song shows it again)
+let infoTimer = 0;
+function showSongInfo(hideMs) {
+  const song = current?.song;
+  if (!song) return;
+  const l = overlayLines(song);
+  els.siTitle.textContent = l.title;
+  els.siArtist.textContent = l.artist;
+  els.siDetails.replaceChildren(...l.details.map((d) => Object.assign(document.createElement('div'), { textContent: d })));
+  infoShownFor = song;
+  els.songInfo.classList.add('show');
+  scheduleInfoHide(hideMs);
+}
+function scheduleInfoHide(ms) {
+  clearTimeout(infoTimer);
+  infoTimer = 0;
+  if (ms == null || prefs.get('playback.keepSongInfo')) return;
+  infoTimer = setTimeout(() => { infoTimer = 0; els.songInfo.classList.remove('show'); }, ms);
+}
+function hideSongInfo() {
+  clearTimeout(infoTimer);
+  infoTimer = 0;
+  els.songInfo.classList.remove('show');
+}
+function cancelStartWait() {
+  clearTimeout(startTimer);
+  startTimer = 0;
+  if (!startDone) return;
+  startCancelled = true;
+  startDone();
+  hideSongInfo();
+}
+async function startAfterDelay(plan) {
+  startCancelled = false;
+  const wait = new Promise((resolve) => { startDone = resolve; startTimer = setTimeout(() => { startTimer = 0; resolve(); }, plan.delay * 1000); });
+  syncPlayButton();
+  await wait;
+  startDone = null;
+  if (startCancelled) { syncPlayButton(); return; }
+  scheduleInfoHide(plan.hideMs);
+  await player.play();
+  syncPlayButton();
+}
+
+// Focus loss (YARG's PauseOnFocusLoss / MuteOnFocusLoss): the window or the tab goes away. Pause is the same as the user's (rememberPause, so Play
+// resumes with the rewind) and only for the song's own player, never the Listen card's or another song's sound; nothing resumes by itself. Mute silences the
+// master output without touching the saved volume or mute, and is undone on return.
+let focusLost = false;
+function onFocusLoss() {
+  if (focusLost) return;
+  focusLost = true;
+  if (prefs.get('playback.muteOnFocusLoss')) player.setMaster(0);
+  if (!prefs.get('playback.pauseOnFocusLoss')) return;
+  if (startDone) { cancelStartWait(); syncPlayButton(); }
+  else if (resumeTimer) { cancelResumeRewind(); syncPlayButton(); }
+  else if (player.playing && !listenMode && !backgroundAudio() && !liveStage) { rememberPause(); player.pause(); syncPlayButton(); }
+}
+function onFocusBack() {
+  if (!focusLost || document.hidden) return;
+  focusLost = false;
+  player.setMaster(masterState.muted ? 0 : masterState.value);
+}
+window.addEventListener('blur', onFocusLoss);
+window.addEventListener('focus', onFocusBack);
+document.addEventListener('visibilitychange', () => (document.hidden ? onFocusLoss() : onFocusBack()));
+
 const PLAY_TITLES = { play: els.play.title, npPlay: els.npPlay.title };
 function syncPlayButton() {
-  const playing = player.playing;
+  const playing = player.playing || !!startDone; // (the start delay shows the playing state)
   const restart = ended && !playing; // at the end of the song the play button restarts it
   const icon = playing ? '#i-pause' : restart ? '#i-restart' : '#i-play';
   const detailIcon = playing && !backgroundAudio() ? '#i-pause' : '#i-play'; // (the Listen card: the sound of another song is not its)
@@ -2307,7 +2389,7 @@ let ended = false;
 let endDismissed = false;
 let endShown = false;
 const NEXT_COUNT = 20;
-player.onSeek = () => { setEnded(false); if (!internalSeek) clearRewind(); }; // (a seek of the user ends a rewind; the rewind's own seek does not)
+player.onSeek = () => { setEnded(false); cancelStartWait(); if (!internalSeek) clearRewind(); }; // (a seek of the user ends a rewind; the rewind's own seek does not)
 
 function setEnded(on) {
   if (ended === on) return;
@@ -2432,6 +2514,9 @@ async function playNextNow(song) {
 // "View my library": the song is closed (audio unloaded, chart and player UI gone) and the library window is what is left
 function closeSong() {
   clearRewind();
+  cancelStartWait();
+  hideSongInfo();
+  infoShownFor = null;
   if (liveStage?.coverUrl?.startsWith('blob:')) URL.revokeObjectURL(liveStage.coverUrl);
   setLiveStage(null);
   if (infoOpen) setInfoOpen(false, { grow: false, release: false });
@@ -3393,6 +3478,8 @@ const EFFECTS = {
   'highway.stageColor': () => { applyStage(); syncVizPop(); },
   'ui.barPosition': (v) => { els.app.classList.toggle('bar-bottom', v !== 'top'); closePopovers(); },
   'general.endScreen': () => syncEndScreen(),
+  'playback.songInfoOverlay': (v) => { if (!v) hideSongInfo(); },
+  'playback.keepSongInfo': (v) => { if (!v && els.songInfo.classList.contains('show') && !startDone) scheduleInfoHide(INFO_FIRST_PLAY_MS); },
   'ui.animations': () => { document.documentElement.dataset.motion = motionPref('ui.animations') ? 'on' : 'off'; },
 };
 for (const [id, fn] of Object.entries(EFFECTS)) fn(prefs.get(id));
