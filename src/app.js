@@ -2,6 +2,7 @@ import { parseMidi } from './midi.js';
 import { parseChart } from './chartfile.js';
 import { DIFFICULTIES, EXTENDED_DRUM_LANES, instrumentOptions, availableDifficulties, buildChart, sectionIndexAt } from './chart.js';
 import { MultiTrackPlayer } from './player.js';
+import { Metronome } from './metronome.js';
 import { Highway } from './highway.js';
 import { createErrorGate } from './errorgate.js';
 import { PerfMeter } from './perf.js';
@@ -38,7 +39,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'barHide', 'mixerVal', 'speedVal', 'stagePlay', 'songInfo', 'siTitle', 'siArtist', 'siDetails', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'barHide', 'metronomeBtn', 'mixerVal', 'speedVal', 'stagePlay', 'songInfo', 'siTitle', 'siArtist', 'siDetails', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
   'endScreen', 'endCover', 'endTitle', 'endArtist', 'endAgain', 'endSearch', 'endCards', 'endNextBox', 'endNext',
@@ -1832,7 +1833,7 @@ function applyStem(st) {
 // Settings: one value each, shown by every [data-setting] slider (menu popover and info screen).
 const SETTING_DEFAULTS = { speed: 1, neck: 1.2, chartDelay: 0 };
 const SETTING_FORMAT = {
-  speed: (v) => `${v.toFixed(1)}×`,
+  speed: (v) => `${Number(v.toFixed(2))}×`,
   neck: (v) => `${v.toFixed(1)}×`,
   // Chart delay: only the highway is shifted. Positive = notes arrive later than the audio.
   chartDelay: (v) => `${v >= 0 ? '+' : ''}${v.toFixed(2)} s`,
@@ -2389,7 +2390,7 @@ let ended = false;
 let endDismissed = false;
 let endShown = false;
 const NEXT_COUNT = 20;
-player.onSeek = () => { setEnded(false); cancelStartWait(); if (!internalSeek) clearRewind(); }; // (a seek of the user ends a rewind; the rewind's own seek does not)
+player.onSeek = () => { metronome.reset(); setEnded(false); cancelStartWait(); if (!internalSeek) clearRewind(); }; // (a seek of the user ends a rewind; the rewind's own seek does not)
 
 function setEnded(on) {
   if (ended === on) return;
@@ -3192,6 +3193,10 @@ const SHORTCUT_HANDLERS = {
   vocalView: () => { if (highway.panes.some((p) => p.chart.mode === 'vocals')) setVocalView(highway.vocalView === 'karaoke' ? 'track' : 'karaoke'); },
   perf: () => cyclePerfOverlay(),
   loop: () => { if (chart && !liveStage) toggleLoop(); },
+  metronome: () => prefs.set('audio.metronome', !prefs.get('audio.metronome')),
+  speedDown: () => stepSpeed(-1),
+  speedUp: () => stepSpeed(1),
+  speedReset: () => stepSpeed(0),
   visualizerNext: () => cycleVisualizer(1),
   visualizerPrev: () => cycleVisualizer(-1),
   noteStyle: () => setNoteStyle(highway.noteStyle === 'rect' ? 'round' : 'rect'),
@@ -3442,7 +3447,38 @@ function applyDetails() {
   layoutWindow(); // ("Max width" caps the details pane)
   if (current) renderMeta(current.song, current.midi); // the chips
 }
+// Metronome (src/metronome.js): clicks on the beat grid of the chart on screen, shifted by the chart delay like the notes
+// (the chart is drawn at player time - delay, so beat b is heard at player time b + delay); out through the master gain.
+const metronome = new Metronome({ ctx: player.ctx, destination: player.master, clock: () => player.metronomeClock(), beats: () => (liveStage ? null : chart?.beats), delay: () => settings.chartDelay });
+function paintMetronome(on) {
+  els.metronomeBtn.setAttribute('aria-pressed', String(on));
+  els.metronomeBtn.title = on ? 'Metronome off (M)' : 'Metronome (M)';
+}
+els.metronomeBtn.addEventListener('click', () => prefs.set('audio.metronome', !prefs.get('audio.metronome')));
+// A small note over the player for a moment (the speed after a shortcut).
+let flashEl = null;
+function flashNote(text) {
+  if (!flashEl) {
+    flashEl = document.createElement('div');
+    flashEl.setAttribute('role', 'status');
+    flashEl.style.cssText = 'position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:9998;padding:6px 14px;border-radius:8px;background:rgba(20,22,28,.9);color:#fff;font:600 14px system-ui,sans-serif;pointer-events:none;transition:opacity .25s;opacity:0';
+    document.body.append(flashEl);
+  }
+  flashEl.textContent = text;
+  flashEl.style.opacity = '1';
+  clearTimeout(flashEl.hideTimer);
+  flashEl.hideTimer = setTimeout(() => { flashEl.style.opacity = '0'; }, 1200);
+}
+// Speed in 5 % steps (YARG practice: song speed +-0.05); dir 0 = back to 1x.
+function stepSpeed(dir) {
+  const v = dir ? Math.min(2, Math.max(0.2, Math.round((settings.speed + dir * 0.05) * 100) / 100)) : 1;
+  setSetting('speed', v);
+  flashNote(`Speed ${Math.round(v * 100)}%`);
+}
 const EFFECTS = {
+  'audio.metronome': (v) => { metronome.setEnabled(v); paintMetronome(v); },
+  'audio.metronomeVolume': (v) => metronome.setVolume(v),
+  'audio.metronomeSound': (v) => metronome.setSound(v),
   'highway.lyricsAbove': (v) => { highway.sheetPeek = v / 100; },
   'highway.countdown': (v) => { highway.countdowns = v; },
   'highway.countdownUnit': (v) => { highway.countdownUnit = v; highway.invalidate(); },

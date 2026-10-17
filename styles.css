@@ -1133,7 +1133,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .prow .row-loop { flex: none; width: 24px; height: 24px; opacity: 0.55; }
 .prow:hover .row-loop, .prow .row-loop[aria-pressed="true"] { opacity: 1; }
 .prow .row-loop[aria-pressed="true"] { color: var(--accent); }
-#loopBtn[aria-pressed="true"] { color: var(--accent); }
+#loopBtn[aria-pressed="true"], #metronomeBtn[aria-pressed="true"] { color: var(--accent); }
 .pc-head .pc-all { margin-left: auto; padding: 3px 10px; font-size: 12px; border-radius: 999px; }
 .pc-head .pc-all[hidden] { display: none; }
 

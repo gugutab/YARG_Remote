@@ -136,6 +136,11 @@ export class LegacyPlayer {
     return Math.min(this.duration, this.offset + (this.ctx.currentTime - this.startedAt) * this.rate);
   }
 
+  // For the metronome: the song position heard at audio time `at` (see metronome.js).
+  metronomeClock() {
+    return { playing: this.playing, pos: this.currentTime(), at: this.ctx.currentTime, rate: this.rate };
+  }
+
   // Speed change: re-anchor the clock at the current position and retime the shifters.
   // Pitch is unchanged because the shifters stretch time instead of resampling.
   setRate(rate) {
@@ -372,6 +377,15 @@ class WorkletPlayer {
     return Math.min(this.duration, Math.max(0, positionAt(this.history, heardAt, this.rate)));
   }
 
+  // For the metronome: the song position heard at audio time `at` (the sound reaches the speakers outputLatency after it is rendered,
+  // so the position being heard now is the one at ctx.currentTime - outputLatency). Not while a seek is rushing (the sound is skipping).
+  metronomeClock() {
+    if (!this.playing) return { playing: false };
+    const pos = this.rawTime();
+    if (this.scrub) return { playing: false };
+    return { playing: true, pos, at: this.ctx.currentTime - this.outputLatency, rate: this.rate };
+  }
+
   setRate(rate) {
     this.rate = rate; // the history already holds exact positions from before the change
     this.node?.port.postMessage({ type: 'rate', rate });
@@ -491,6 +505,7 @@ export class MultiTrackPlayer {
   setVolume(id, value) { this.impl.setVolume(id, value); }
   setRate(rate) { this.speed = rate; this.impl.setRate(rate); }
   currentTime() { return this.impl.currentTime(); }
+  metronomeClock() { return this.impl.metronomeClock(); }
   play() { return this.impl.play(); }
   pause() { this.impl.pause(); }
   seek(seconds) { this.onSeek?.(); this.impl.seek(seconds); } // onSeek: set by the app (any seek leaves the "ended" state)

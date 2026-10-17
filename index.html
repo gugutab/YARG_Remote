@@ -29,6 +29,7 @@
       <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
       <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></symbol>
       <symbol id="i-volume-off" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM16 9.5l5 5M21 9.5l-5 5"/></symbol>
+      <symbol id="i-metronome" viewBox="0 0 24 24"><path d="M9 3h6l3.5 18h-13zM12 16l4-9M10 12.5h4"/></symbol>
       <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 1 2.3 5.7M4 5v6h6"/></symbol>
       <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></symbol>
       <!-- Instrument icons: silhouettes traced from the YARG icon sheets (LGPL-3.0, see vendor/README.md; scripts/build-yarg-icons.py) -->
@@ -162,11 +163,12 @@
             <button id="settingsBtn" class="icon" type="button" title="Speed" aria-label="Speed" aria-expanded="false"><svg><use href="#i-speed"/></svg><span class="tool-val" id="speedVal"></span></button>
             <div class="popover" id="settingsPop" hidden>
               <div class="pop-title">Settings</div>
-              <label class="row">Speed <input data-setting="speed" type="range" min="0.2" max="2" step="0.1" value="1"><output data-out="speed">1.0×</output><button class="icon small-icon reset" type="button" data-reset="speed" title="Reset" aria-label="Reset speed"><svg><use href="#i-reset"/></svg></button></label>
+              <label class="row">Speed <input data-setting="speed" type="range" min="0.2" max="2" step="0.05" value="1"><output data-out="speed">1.0×</output><button class="icon small-icon reset" type="button" data-reset="speed" title="Reset" aria-label="Reset speed"><svg><use href="#i-reset"/></svg></button></label>
             </div>
           </div>
               
           
+          <button id="metronomeBtn" class="icon" type="button" title="Metronome (M)" aria-label="Metronome" aria-pressed="false"><svg><use href="#i-metronome"/></svg></button>
           <button id="loopBtn" class="icon" type="button" title="Loop the current section (R)" aria-label="Loop" aria-pressed="false"><svg><use href="#i-loop"/></svg></button>
           <div class="pop-wrap" id="vizWrap">
             <button id="visualizerBtn" class="icon" type="button" title="Background visualizer (G)" aria-label="Background visualizer" aria-expanded="false"><svg><use href="#i-visualizer"/></svg></button>
@@ -381,7 +383,7 @@
               <div class="info-cols">
               <div class="info-card card-adjust">
                 <h3>Speed</h3>
-                <label class="row"><svg class="row-icon" role="img" aria-label="Speed" focusable="false"><title>Speed</title><use href="#i-speed"/></svg><input data-setting="speed" type="range" min="0.2" max="2" step="0.1" value="1"><output data-out="speed">1.0×</output><button class="icon small-icon reset" type="button" data-reset="speed" title="Reset" aria-label="Reset speed"><svg><use href="#i-reset"/></svg></button></label>
+                <label class="row"><svg class="row-icon" role="img" aria-label="Speed" focusable="false"><title>Speed</title><use href="#i-speed"/></svg><input data-setting="speed" type="range" min="0.2" max="2" step="0.05" value="1"><output data-out="speed">1.0×</output><button class="icon small-icon reset" type="button" data-reset="speed" title="Reset" aria-label="Reset speed"><svg><use href="#i-reset"/></svg></button></label>
               </div>
 
               <div class="info-card card-volume">
