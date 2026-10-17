@@ -199,3 +199,14 @@ test('buildEvents: vocal charts count their harmony notes, and shared charts use
   const data = buildSongData({ song: {}, charts: [guitar, vocals], kinds: ['guitar', 'mic'], layerCharts: [[guitar], [vocals]], shown: [false, true] });
   assert.deepEqual(data.layers.map((l) => [l.kind, l.shown, l.events.count]), [['guitar', false, 1], ['mic', true, 3]]);
 });
+
+test('layerGain exaggerates the instruments but not the voice, and hitLevel takes the gain', async () => {
+  const { layerGain, hitLevel, INSTRUMENT_GAIN, buildEvents } = await import('../src/visualizers.js');
+  assert.equal(layerGain('guitar'), INSTRUMENT_GAIN);
+  assert.equal(layerGain('drum'), INSTRUMENT_GAIN);
+  assert.equal(layerGain('mic'), 1);
+  assert.equal(layerGain('harmony'), 1);
+  const ev = buildEvents([{ mode: 'lanes', lanes: 5, notes: [{ time: 1, end: 1, lane: 2 }], duration: 5 }]);
+  assert.ok(hitLevel(ev, 1.05, 1.7) > hitLevel(ev, 1.05));
+  assert.equal(hitLevel(ev, 1.05), hitLevel(ev, 1.05, 1));
+});

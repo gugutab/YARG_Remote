@@ -245,6 +245,9 @@ export function buildEvents(charts, { shared = false } = {}) {
 }
 
 // The colour of each instrument's layer (the equalizer): a fixed hue per instrument, so a guitar is always green and the drums orange.
+// The instruments' reactions are exaggerated, the voice's (lead and harmony) are not: the same rule in every visualizer that follows the notes.
+export const INSTRUMENT_GAIN = 1.7;
+export const layerGain = (kind) => (kind === 'mic' || kind === 'harmony' ? 1 : INSTRUMENT_GAIN);
 export const tint = (c, k) => [c[0] + (255 - c[0]) * k, c[1] + (255 - c[1]) * k, c[2] + (255 - c[2]) * k]; // towards white by k (0..1)
 // `kind` is the pane's icon name (guitar, bass, drum, mic, harmony, keys, rhythm); an unknown one takes a colour from the palette.
 export const INSTRUMENT_COLORS = {
@@ -265,10 +268,10 @@ export function lowerBound(times, t) {
 }
 
 // How hard the chart is hitting right now, 0..1: onsets in the last 0.25 s, newest strongest.
-export function hitLevel(events, t) {
+export function hitLevel(events, t, gain = 1) {
   let sum = 0;
   for (let i = lowerBound(events.times, t - 0.25); i < events.count && events.times[i] <= t; i++) sum += 1 - (t - events.times[i]) / 0.25;
-  return 1 - Math.exp(-sum * 0.6);
+  return 1 - Math.exp(-sum * 0.6 * gain);
 }
 
 // Singing right now (1), fading out for a third of a second afterwards. `notes` sorted by time.
@@ -739,7 +742,6 @@ const ringsViz = (ctx) => ({
 // Cheap on purpose: each layer is a few paths filled once (not a gradient and a rectangle per bar), and the colour ramp is one gradient per layer,
 // reused for all its bars (the colour follows the depth below the top edge).
 const EQ_MAX_BARS = 96;
-const EQ_GAIN = 1.7; // how much the instruments' bars are exaggerated (the voice keeps 1)
 const eqViz = (ctx) => {
   const bufs = Array.from({ length: 8 }, () => ({ now: new Float32Array(EQ_MAX_BARS), past: new Float32Array(EQ_MAX_BARS), peak: new Float32Array(EQ_MAX_BARS), ramp: null, rampKey: '' }));
   const levelOf = (gain) => (v) => Math.min(1.3, 1 - Math.exp(-v * 1.1 * gain));
@@ -767,7 +769,7 @@ const eqViz = (ctx) => {
         const { now, past, peak } = b;
         const col = layerColor(kind, li, pal);
         const maxH = heightOf(li);
-        const level = levelOf(kind === 'mic' || kind === 'harmony' ? 1 : EQ_GAIN); // the instruments' bars are exaggerated, the voice's are not
+        const level = levelOf(layerGain(kind)); // the instruments' bars are exaggerated, the voice's are not
         spectrumAt(events, s.t, n, now, spread);
         const idleAt = (k) => 0.04 + 0.03 * Math.sin(k * 0.45 + s.beat.pos * 1.3 + li);
         if (!on) { // an instrument that is not on screen: a faint plain version
@@ -821,10 +823,15 @@ const embersViz = (ctx) => {
   const sprites = memo();
   const glow = memo();
   return {
+    // The sparks belong to the instruments of the song (a spark's colour is its instrument's, lightened to glow), and an instrument's sparks flare as it plays
+    // (exaggerated for the instruments, not for the voice); those of an instrument that is not on screen are dim. Without layers: the palette's sparks.
     draw(g, s) {
       const { w, h } = s;
       const pal = ctx.song.palette;
-      const set = sprites(pal.v.join(), () => [pal.va, pal.v[0], pal.v[1], [255, 220, 150]].map(glowSprite));
+      const layers = ctx.song.layers ?? [];
+      const cols = layers.length ? layers.map((l, i) => tint(layerColor(l.kind, i, pal), 0.35)) : [pal.va, pal.v[0], pal.v[1], [255, 220, 150]];
+      const set = sprites(`${pal.v.join()}|${cols.join('|')}`, () => cols.map(glowSprite));
+      const heat = layers.map((l) => (l.shown !== false ? 0.35 + 1.2 * hitLevel(l.events, s.t, layerGain(l.kind)) : 0.22)); // how lively each instrument's sparks are
       g.fillStyle = glow(`${h}${pal.va}`, () => {
         const gr = g.createLinearGradient(0, h, 0, h * 0.4);
         gr.addColorStop(0, rgba(pal.va, 0.35));
@@ -841,9 +848,10 @@ const embersViz = (ctx) => {
         const phase = fract(hash01(i, 1) + (s.travel * 0.9) / life);
         const x = hash01(i, 2) * w + Math.sin(phase * TAU * 1.5 + hash01(i, 4) * 20) * w * 0.02;
         const y = h * (1.05 - phase * 1.15);
-        const size = (10 + hash01(i, 5) * 28) * (1 - phase * 0.55) * (1 + s.hit * 0.35);
-        g.globalAlpha = Math.sin(phase * Math.PI) * (0.5 + 0.5 * Math.sin(s.t * 5 + hash01(i, 6) * 30) ** 2) * (0.55 + 0.45 * s.beat.pulse);
-        g.drawImage(set[i & 3], x - size, y - size, size * 2, size * 2);
+        const own = heat.length ? heat[i % heat.length] : 1;
+        const size = (10 + hash01(i, 5) * 28) * (1 - phase * 0.55) * (1 + s.hit * 0.35) * (0.8 + 0.35 * Math.min(1.5, own));
+        g.globalAlpha = Math.min(1, Math.sin(phase * Math.PI) * (0.5 + 0.5 * Math.sin(s.t * 5 + hash01(i, 6) * 30) ** 2) * (0.55 + 0.45 * s.beat.pulse) * Math.min(1.4, own));
+        g.drawImage(set[heat.length ? i % set.length : i & 3], x - size, y - size, size * 2, size * 2);
       }
       g.restore();
     },
@@ -857,13 +865,14 @@ const mixRgb = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k,
 const RADIAL_BINS = 40; // spectrum bars per side
 const radialViz = (ctx) => {
   const lay = radialLayout(RADIAL_BINS);
-  const now = new Float32Array(RADIAL_BINS);
-  const past = new Float32Array(RADIAL_BINS);
-  const peak = new Float32Array(RADIAL_BINS);
+  const bufs = Array.from({ length: 8 }, () => ({ now: new Float32Array(RADIAL_BINS), past: new Float32Array(RADIAL_BINS), peak: new Float32Array(RADIAL_BINS) }));
   const disc = memo();
-  const level = (v) => Math.min(1.15, 1 - Math.exp(-v * 1.1));
   const M = RADIAL_BINS;
+  const levelOf = (gain) => (v) => Math.min(1.3, 1 - Math.exp(-v * 1.1 * gain));
   return {
+    // The same rules as the MIDI equalizer: one set of bars per instrument of the song, all starting at the record's edge, each longer than the one before and
+    // the longest drawn first (behind), in the instrument's own (dark) colour with a light tip; the instruments on screen are full, the others faint; the
+    // instruments' bars are exaggerated, the voice's are not.
     draw(g, s) {
       const { w, h } = s;
       const song = ctx.song;
@@ -873,77 +882,61 @@ const radialViz = (ctx) => {
       const base = Math.min(w, h);
       const discR = base * 0.2;
       const ringR = discR * 1.14;
-      const maxLen = base * 0.25;
+      const layers = song.layers?.length ? song.layers : [{ kind: '', events: song.events, shown: true }];
+      const L = Math.min(layers.length, bufs.length);
       const spread = Math.max(2.5, M / 14);
-      spectrumAt(song.events, s.t, M, now, spread);
-      peak.fill(0);
-      for (let k = 0; k <= 5; k++) {
-        spectrumAt(song.events, s.t - k * 0.1, M, past, spread);
-        for (let b = 0; b < M; b++) peak[b] = Math.max(peak[b], level(past[b]) - k * 0.05);
-      }
-      const idle = (b) => 0.05 + 0.035 * Math.sin(b * 0.5 + s.beat.pos * 1.3);
-      const groupColors = [pal.v[0], pal.va, pal.v[2]];
-      const groupOf = (b) => (b < M * 0.34 ? 0 : b < M * 0.67 ? 1 : 2);
+      const idle = (b, li) => 0.05 + 0.035 * Math.sin(b * 0.5 + s.beat.pos * 1.3 + li);
+      const lenOf = (li) => base * 0.25 * (L === 1 ? 1 : 0.38 + 0.72 * (li / (L - 1))); // the longest bar of a layer: growing with the layer
       const N = 2 * M;
-      g.save();
-      g.globalCompositeOperation = 'lighter';
-      g.lineJoin = 'round';
-      EQ_ECHOES.forEach((dt, e) => { // the same spectrum a moment earlier, as fainter outer rings
-        spectrumAt(song.events, s.t - dt, M, past, spread);
-        g.beginPath();
-        for (let i = 0; i < N; i++) {
-          const r = ringR + Math.min(1.15, level(past[lay.bin[i]]) + 0.03) * maxLen * (1 + 0.06 * (e + 1));
-          const a = lay.angle[i];
-          if (i === 0) g.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); else g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
-        }
-        g.closePath();
-        g.fillStyle = rgba(pal.va, 0.07 - e * 0.015);
-        g.fill();
-        g.strokeStyle = rgba(pal.v[0], 0.28 - e * 0.07);
-        g.lineWidth = 1.5;
-        g.stroke();
-      });
       const bw = (TAU * ringR) / N * 0.64;
+      const order = [...Array(L).keys()].sort((x, y) => (layers[x].shown !== false) - (layers[y].shown !== false) || y - x); // faint first, tallest first
+      g.save();
+      g.globalCompositeOperation = L > 1 ? 'source-over' : 'lighter';
+      g.lineJoin = 'round';
+      g.lineCap = 'butt';
       g.lineWidth = bw;
-      for (let grp = 0; grp < 3; grp++) { // bars, one path per colour
-        g.beginPath();
-        for (let i = 0; i < N; i++) {
-          const b = lay.bin[i];
-          if (groupOf(b) !== grp) continue;
-          const a = lay.angle[i];
-          const len = Math.min(1.15, level(now[b]) + idle(b)) * maxLen;
+      for (const li of order) {
+        const { kind, events } = layers[li];
+        const on = layers[li].shown !== false;
+        const { now, past, peak } = bufs[li];
+        const col = layerColor(kind, li, pal);
+        const maxLen = lenOf(li);
+        const level = levelOf(layerGain(kind));
+        spectrumAt(events, s.t, M, now, spread);
+        g.beginPath(); // the bars of the layer: one path
+        for (let k = 0; k < N; k++) {
+          const b = lay.bin[k];
+          const a = lay.angle[k];
+          const len = Math.min(1.3, level(now[b]) + idle(b, li)) * maxLen;
           const cos = Math.cos(a);
           const sin = Math.sin(a);
           g.moveTo(cx + cos * ringR, cy + sin * ringR);
           g.lineTo(cx + cos * (ringR + len), cy + sin * (ringR + len));
         }
-        g.strokeStyle = rgba(groupColors[grp], 0.9);
+        g.strokeStyle = rgba(col, on ? (L > 1 ? 0.62 : 0.9) : 0.15);
         g.stroke();
-      }
-      g.lineWidth = bw;
-      g.beginPath(); // glowing tips
-      for (let i = 0; i < N; i++) {
-        const b = lay.bin[i];
-        const a = lay.angle[i];
-        const r = ringR + Math.min(1.15, level(now[b]) + idle(b)) * maxLen;
-        g.moveTo(cx + Math.cos(a) * (r - 3), cy + Math.sin(a) * (r - 3));
-        g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
-      }
-      g.strokeStyle = 'rgba(255,255,255,0.8)';
-      g.stroke();
-      for (let grp = 0; grp < 3; grp++) { // peak caps
-        g.beginPath();
-        for (let i = 0; i < N; i++) {
-          const b = lay.bin[i];
-          if (groupOf(b) !== grp) continue;
-          const a = lay.angle[i];
-          const bar = Math.min(1.15, level(now[b]) + idle(b)) * maxLen;
-          const r = Math.min(1.15, peak[b] + idle(b)) * maxLen;
-          if (r <= bar + 4) continue;
-          g.moveTo(cx + Math.cos(a) * (ringR + r - 2), cy + Math.sin(a) * (ringR + r - 2));
-          g.lineTo(cx + Math.cos(a) * (ringR + r), cy + Math.sin(a) * (ringR + r));
+        if (!on) continue;
+        peak.fill(0);
+        for (let k = 0; k <= 4; k++) {
+          spectrumAt(events, s.t - k * 0.1, M, past, spread);
+          for (let b = 0; b < M; b++) peak[b] = Math.max(peak[b], level(past[b]) - k * 0.05);
         }
-        g.strokeStyle = rgba(groupColors[grp], 0.9);
+        g.beginPath(); // the tips and the peak caps: a light tint of the colour, the brightest part
+        for (let k = 0; k < N; k++) {
+          const b = lay.bin[k];
+          const a = lay.angle[k];
+          const cos = Math.cos(a);
+          const sin = Math.sin(a);
+          const bar = Math.min(1.3, level(now[b]) + idle(b, li)) * maxLen;
+          g.moveTo(cx + cos * (ringR + bar - 4), cy + sin * (ringR + bar - 4));
+          g.lineTo(cx + cos * (ringR + bar), cy + sin * (ringR + bar));
+          const cap = Math.min(1.3, peak[b] + idle(b, li)) * maxLen;
+          if (cap > bar + 6) {
+            g.moveTo(cx + cos * (ringR + cap - 3), cy + sin * (ringR + cap - 3));
+            g.lineTo(cx + cos * (ringR + cap), cy + sin * (ringR + cap));
+          }
+        }
+        g.strokeStyle = rgba(tint(col, 0.72), 0.95);
         g.stroke();
       }
       g.restore();
@@ -1014,10 +1007,13 @@ const radialViz = (ctx) => {
 const spotViz = (ctx) => {
   const haze = memo();
   return {
+    // One beam per instrument of the song (at least three), each in the instrument's colour and as strong as the instrument is playing (the instruments'
+    // reactions are exaggerated, the voice's are not); an instrument that is not on screen has a faint beam. Without layers: the palette's beams.
     draw(g, s) {
       const { w, h } = s;
       const pal = ctx.song.palette;
-      const n = w > 1100 ? 6 : 5;
+      const layers = ctx.song.layers ?? [];
+      const n = Math.max(3, layers.length || (w > 1100 ? 6 : 5));
       const len = h * 1.25;
       const drive = clamp01(0.75 + 0.3 * s.density + 0.25 * s.vocal + 0.15 * s.sp);
       g.save();
@@ -1032,10 +1028,13 @@ const spotViz = (ctx) => {
       g.globalCompositeOperation = 'lighter';
       const warm = [255, 190, 90];
       for (let i = 0; i < n; i++) {
+        const layer = layers[i];
         const x = (w * (i + 0.5)) / n;
         const ang = beamAngle(i, n, s.beat.pos) * (1 + 0.35 * s.sp);
-        const col = mixRgb(pal.v[i % 4], warm, 0.65 * s.sp).map(Math.round);
-        const half = 0.1 + 0.025 * s.vocal + 0.02 * s.density; // half-opening of the cone, radians
+        const base = layer ? layerColor(layer.kind, i, pal) : pal.v[i % 4];
+        const col = mixRgb(layer ? tint(base, 0.3) : base, warm, 0.65 * s.sp).map(Math.round); // (a beam is light: a lighter version of the instrument's colour)
+        const power = layer ? (layer.shown !== false ? clamp01(0.3 + 1.3 * hitLevel(layer.events, s.t, layerGain(layer.kind))) : 0.18) : 1;
+        const half = (0.1 + 0.025 * s.vocal + 0.02 * s.density) * (0.8 + 0.4 * power); // half-opening of the cone, radians
         g.save();
         g.translate(x, -4);
         g.rotate(-ang);
@@ -1046,7 +1045,7 @@ const spotViz = (ctx) => {
         g.fillStyle = gr;
         [[0.5, 0.5], [1, 0.35], [2, 0.16]].forEach(([wide, a]) => { // soft edges: nested cones
           const hw = Math.tan(half * wide) * len;
-          g.globalAlpha = Math.min(1, a * drive * 1.7);
+          g.globalAlpha = Math.min(1, a * drive * 1.7 * power);
           g.beginPath();
           g.moveTo(0, 0);
           g.lineTo(-hw, len);
@@ -1062,14 +1061,14 @@ const spotViz = (ctx) => {
         g.scale(1, 0.16);
         const pr = h * (0.2 + 0.05 * s.vocal);
         const pool = g.createRadialGradient(0, 0, 0, 0, 0, pr);
-        pool.addColorStop(0, rgba(col, 0.5 * drive));
+        pool.addColorStop(0, rgba(col, 0.5 * drive * power));
         pool.addColorStop(1, rgba(col, 0));
         g.fillStyle = pool;
         g.fillRect(-pr, -pr, pr * 2, pr * 2);
         g.restore();
         const lamp = g.createRadialGradient(x, 0, 0, x, 0, 26); // the fixture
-        lamp.addColorStop(0, 'rgba(255,255,255,0.8)');
-        lamp.addColorStop(0.3, rgba(col, 0.5));
+        lamp.addColorStop(0, `rgba(255,255,255,${0.35 + 0.45 * power})`);
+        lamp.addColorStop(0.3, rgba(col, 0.5 * power));
         lamp.addColorStop(1, rgba(col, 0));
         g.fillStyle = lamp;
         g.fillRect(x - 26, 0, 52, 26);
@@ -1242,7 +1241,7 @@ export function createDriver({ getSource }) {
       s.solo = spanAmount(data.solos, t);
       s.vocal = vocalLevel(data.vocalNotes, t);
       s.perc = pulseAfter(data.percussion, t, 0.3);
-      s.hit = hitLevel(data.events, t);
+      s.hit = data.layers.length ? Math.max(...data.layers.map((l) => (l.shown ? hitLevel(l.events, t, layerGain(l.kind)) : 0))) : hitLevel(data.events, t); // (the instruments on screen, exaggerated)
       s.section = sectionAt(data.sections, t);
       g.save();
       try {

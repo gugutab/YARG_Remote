@@ -2895,7 +2895,7 @@ function buildVizAll() {
 const vizDriver = createVisualizerDriver({
   getSource() { // rebuilt only when the charts on screen change (setCharts makes a new panes array)
     if (!current || !highway.panes.length) return null;
-    if (vizDriver.id === 'equalizer' && !liveStage) { // the equalizer shows every instrument of the song, the ones on screen highlighted
+    if (['equalizer', 'radial', 'spotlights', 'embers'].includes(vizDriver.id) && !liveStage) { // the visualizers that follow the notes show every instrument of the song, the ones on screen highlighted
       vizAll ??= buildVizAll();
       if (vizAll) return vizAll;
     }
