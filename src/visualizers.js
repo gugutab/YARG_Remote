@@ -8,6 +8,7 @@
 const TAU = Math.PI * 2;
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const fract = (v) => v - Math.floor(v);
+const clampRange = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
 // ---------- Small maths ----------
 
@@ -414,6 +415,7 @@ export function buildSongData({ song = {}, charts = [], kinds = [], layerCharts 
   return {
     title: song.title ?? '', artist: song.artist ?? '', genre: song.genre ?? '', year: song.year ?? '', bpm, duration, seed,
     beats: charts.find((c) => c.beats?.length)?.beats ?? [],
+    avgBpm: (() => { const b = charts.find((c) => c.beats?.length)?.beats; return b && b.length > 8 && b[b.length - 1].time > b[0].time ? clampRange(((b.length - 1) / (b[b.length - 1].time - b[0].time)) * 60, 40, 240) : 120; })(), // the song's average tempo
     sections: main?.sections ?? [],
     density: densityHistogram(timesOf(lanes.length ? lanes : charts), duration),
     events: buildEvents(charts),
@@ -501,7 +503,7 @@ const coverViz = (ctx) => {
       // straight line), reaching as far as the edge without showing it. Song time only: it stands still when the music is paused.
       const room = (view) => Math.max(view * 0.03, (size * zoom - view) / 2 - amp * zoom * 1.5);
       const wander = (t, f, ph) => 0.55 * Math.sin(t * f[0] + ph[0]) + 0.3 * Math.sin(t * f[1] + ph[1]) + 0.15 * Math.sin(t * f[2] + ph[2]); // -1..1
-      g.translate(w / 2 + wander(s.t, [0.1, 0.23, 0.39], [0.6, 2.1, 4.4]) * room(w), h / 2 + wander(s.t, [0.08, 0.19, 0.33], [2.2, 0.4, 3.3]) * room(h));
+      g.translate(w / 2 + wander(s.bt, [0.1, 0.23, 0.39], [0.6, 2.1, 4.4]) * room(w), h / 2 + wander(s.bt, [0.08, 0.19, 0.33], [2.2, 0.4, 3.3]) * room(h));
       g.scale(zoom, zoom);
       const x0 = -size / 2;
       const y0 = -size / 2;
@@ -564,8 +566,8 @@ const auroraViz = (ctx) => {
         const kindColor = layer.fallback === undefined ? layerColor(layer.kind, li, pal) : pal.v[layer.fallback % pal.v.length];
         const col = mixRgb(tint(kindColor, 0.1), [255, 200, 120], 0.15 * s.sp).map(Math.round);
         const e = m.energy;
-        const y0 = h * (0.86 - 0.72 * m.pitch) + Math.sin(s.t * 0.17 + li * 1.9) * h * 0.05; // the melody: high notes are high in the sky (the whole height is used), with a slow drift
-        const amp = h * (0.055 + 0.14 * e) * (0.8 + 0.4 * s.density);
+        const y0 = h * (0.86 - 0.72 * m.pitch) + Math.sin(s.bt * 0.17 + li * 1.9) * h * 0.05; // the melody: high notes are high in the sky (the whole height is used), with a slow drift
+        const amp = h * (0.055 + 0.14 * e) * (0.8 + 0.4 * s.density) * (0.8 + 0.25 * s.tempo); // a faster part waves a little taller too
         const thick = h * (0.016 + 0.04 * e);
         const ph = li * 2.3 + song.seed % 7;
         const f1 = 0.0042 + li * 0.0006; // radians per px
@@ -581,7 +583,7 @@ const auroraViz = (ctx) => {
           g.beginPath();
           for (let k = 0; k <= AURORA_POINTS; k++) {
             const x = k * step;
-            const y = y0 + off + Math.sin(x * f1 - s.t * v1 + sph) * amp + Math.sin(x * f2 + s.t * v2 + sph * 1.7) * amp * 0.5 + Math.sin(x * f3 + s.t * v3 + sph * 0.6) * amp * 0.22;
+            const y = y0 + off + Math.sin(x * f1 - s.bt * v1 + sph) * amp + Math.sin(x * f2 + s.bt * v2 + sph * 1.7) * amp * 0.5 + Math.sin(x * f3 + s.bt * v3 + sph * 0.6) * amp * 0.22;
             if (k === 0) g.moveTo(x, y); else g.lineTo(x, y);
           }
           [[2.6, 0.028], [1.6, 0.05], [0.95, 0.085], [0.4, 0.15]].forEach(([wide, alpha]) => { // soft glow: the same line stroked wide and faint, then narrow and bright
@@ -699,15 +701,15 @@ const warpViz = (ctx) => {
         const m = melodyAt(layers[li].events, s.t, layerGain(layers[li].kind), mel[li]);
         if (layers[li].shown !== false) { lean += (0.5 - m.pitch) * m.energy; total += m.energy; }
       }
-      const cx = w / 2 + Math.sin(s.t * 0.11) * w * 0.03;
-      const cy = h / 2 + Math.cos(s.t * 0.09) * h * 0.03 + (total > 0 ? (lean / total) * Math.min(1, total) * h * 0.14 : 0);
+      const cx = w / 2 + Math.sin(s.bt * 0.11) * w * 0.03;
+      const cy = h / 2 + Math.cos(s.bt * 0.09) * h * 0.03 + (total > 0 ? (lean / total) * Math.min(1, total) * h * 0.14 : 0);
       const R = Math.hypot(w, h) * 0.53;
       const busy = L ? Math.min(1, total / 2) : s.density; // how much the instruments on screen play together
-      const streak = 0.015 + 0.06 * Math.max(s.density, busy) + 0.04 * s.sp;
+      const streak = (0.015 + 0.06 * Math.max(s.density, busy) + 0.04 * s.sp) * (0.75 + 0.35 * s.tempo);
       const hot = s.sp > 0 ? [170, 225, 255] : null;
       g.save();
       g.lineCap = 'round';
-      const travel = s.travel * 0.1;
+      const travel = s.travel * 0.1 + s.bt * 0.04; // the density's travel plus the tempo's own: a fast part rushes, a slow one drifts
       const groups = L || 2;
       for (let gi = 0; gi < groups; gi++) {
         const layer = L ? layers[gi] : null;
@@ -827,7 +829,7 @@ const eqViz = (ctx) => {
         const b = bufs[li];
         const { now, past, peak } = b;
         const col = layerColor(kind, li, pal);
-        const maxH = heightOf(li);
+        const maxH = heightOf(li) * (1 + 0.045 * Math.cos((s.beat.pos + li * 0.25) * TAU)); // the layer breathes once per beat, gently (a slow cosine, no flash)
         const level = levelOf(layerGain(kind)); // the instruments' bars are exaggerated, the voice's are not
         spectrumAt(events, s.t, n, now, spread);
         const idleAt = (k) => 0.04 + 0.03 * Math.sin(k * 0.45 + s.beat.pos * 1.3 + li);
@@ -905,7 +907,7 @@ const embersViz = (ctx) => {
       g.globalCompositeOperation = 'lighter';
       for (let i = 0; i < visible; i++) {
         const life = 5 + hash01(i, 3) * 6; // travel units to cross the screen
-        const phase = fract(hash01(i, 1) + (s.travel * 0.9) / life);
+        const phase = fract(hash01(i, 1) + (s.travel * 0.9 + s.bt * 0.5) / life);
         const x = hash01(i, 2) * w + Math.sin(phase * TAU * 1.5 + hash01(i, 4) * 20) * w * 0.02;
         const y = h * (1.05 - phase * 1.15);
         const own = heat.length ? heat[i % heat.length] : 1;
@@ -941,7 +943,7 @@ const radialViz = (ctx) => {
       const cy = h / 2;
       const base = Math.min(w, h);
       const discR = base * 0.2;
-      const ringR = discR * 1.14;
+      const ringR = discR * (1.14 + 0.012 * Math.cos(s.beat.pos * TAU)); // the ring breathes once per beat (the record keeps its size)
       const layers = song.layers?.length ? song.layers : [{ kind: '', events: song.events, shown: true }];
       const L = Math.min(layers.length, bufs.length);
       const spread = Math.max(2.5, M / 14);
@@ -1252,7 +1254,9 @@ export async function loadCover(url) {
 // What Highway.setVisualizer gets. getSource() -> { key, song, charts, coverUrl }: `key` changes when the charts do.
 // Draws the chosen visualizer (unblurred: the app blurs it with the CSS #bgGlass layer). Nothing is laid over it: the stage colour (`s.stage`, 'r, g, b') is only offered to the effects that want it.
 export function createDriver({ getSource }) {
-  const state = { t: 0, w: 0, h: 0, dpr: 1, beat: {}, density: 0, travel: 0, sp: 0, solo: 0, vocal: 0, perc: 0, hit: 0, section: 0, clock: 0 };
+  const tA = {};
+  const tB = {};
+  const state = { bt: 0, bpm: 120, tempo: 1, t: 0, w: 0, h: 0, dpr: 1, beat: {}, density: 0, travel: 0, sp: 0, solo: 0, vocal: 0, perc: 0, hit: 0, section: 0, clock: 0 };
   let id = 'none';
   let data = null;
   let dataKey = null;
@@ -1303,6 +1307,13 @@ export function createDriver({ getSource }) {
       s.clock = performance.now() / 1000;
       beatInfo(data.beats, t, s.beat);
       s.beat.pulse = 0; // no punch on the beat (it read as flicker); the tempo-locked motion (beat.pos) stays
+      // The tempo: `bt` is the beat count in units of a 120 BPM second (it runs faster in a fast part, slower in a slow one, continuously: the clock of every
+      // motion that should follow the music's pace); `bpm` the tempo around t (over +-1.2 s, so a tempo change glides), `tempo` its ratio to the song's average.
+      s.bt = s.beat.pos * 0.5;
+      const bA = beatInfo(data.beats, t - 1.2, tA).pos;
+      const bB = beatInfo(data.beats, t + 1.2, tB).pos;
+      s.bpm = clampRange(((bB - bA) / 2.4) * 60, 30, 300);
+      s.tempo = clampRange(s.bpm / (data.avgBpm || 120), 0.5, 2);
       s.beat.measurePulse = 0;
       s.density = densityAt(data.density, t);
       s.travel = travelAt(data.density, t);
