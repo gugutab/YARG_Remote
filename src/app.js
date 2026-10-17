@@ -1483,6 +1483,10 @@ function updateChart() {
       name: group.chosen.label, base: group.chosen.base, optionId: group.chosen.id, diffId: d?.id, diffLabel: shown.mode === 'vocals' ? '' : d?.label ?? '', active: group.active,
     });
   }
+  if (!liveStage) { // with no instrument on screen the stage offers the cards to add one (the details' cards are all off); they go as soon as one is on
+    current.choosers = current.choosers.filter((c) => !c.auto || !items.some((x) => !x.chooser));
+    if (!items.some((x) => !x.chooser) && !current.choosers.length) openChooser(null, true);
+  }
   for (const c of current.choosers) if (c.at === null) items.push({ chooser: true, key: `choose:${c.id}` }); // an added one goes last
   current.screen = items.filter((x) => !x.chooser); // what is on screen, for the end-of-song window
   if (liveStage) { // the stage is another song's: these details only choose what will go there
@@ -2491,9 +2495,9 @@ function closePane(group) {
   selectInstrument(next.chosen.id, diffFor(next.chosen).chosen?.id);
 }
 const hiddenGroups = () => instrumentGroups().filter((g) => !(g.active && !current.hiddenActive) && !g.pinned);
-function openChooser(at) {
+function openChooser(at, auto = false) { // auto: opened by the app because no instrument is on screen (it cannot be cancelled: there is nothing to go back to)
   current.chooserSeq = (current.chooserSeq ?? 0) + 1;
-  current.choosers.push({ id: current.chooserSeq, at, modes: {} });
+  current.choosers.push({ id: current.chooserSeq, at, modes: {}, auto });
 }
 function swapPane(group) { // the fretboard and its tag go; the cards to choose the next instrument take its place
   if (group.pinned) current.pins.delete(group.key);
@@ -2557,6 +2561,7 @@ function fillChooser(el, key) {
   head.className = 'pc-head';
   head.innerHTML = '<b>Choose an instrument</b><button type="button" class="pc-all" title="Put every instrument on screen">Add all</button><button type="button" class="icon small-icon pc-cancel" title="Cancel" aria-label="Cancel"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>';
   head.querySelector('.pc-cancel').addEventListener('click', () => cancelChooser(chooser));
+  head.querySelector('.pc-cancel').hidden = !!chooser.auto;
   const all = head.querySelector('.pc-all');
   all.hidden = hiddenGroups().length < 2;
   all.addEventListener('click', () => addAllInto(chooser));
