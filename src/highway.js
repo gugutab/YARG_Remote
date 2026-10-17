@@ -1630,41 +1630,29 @@ export class Highway {
     return null;
   }
 
-  // The hit zone while a note (the lead's or a harmony's) is sung: a small, constant, fast flame at the hit line that sits on the line of the voice (it rises and
-  // falls with the pitch, also along the ribbons that join the notes) and trails a few pixels of flickering tail behind it, in the note's own colour.
+  // The hit zone while the voice is at the line: a glow a little larger than the thickness of the note, on the line of the voice (it rises, falls and bends with
+  // the pitch, also along the ribbons that join the notes), in the note's colour with a lighter heart. Its size and strength vary all the time, from two
+  // shimmers of different speeds, so it looks alive but never flashes.
   vocalHitFx(n, prev, t, half, color, hitX) {
     const y0 = this.vocalLineY(n, prev, hitX);
     if (y0 === null) return;
     const g = this.g;
-    const r = Math.max(4.5, Math.min(8, half * 0.9)); // small: about the thickness of the ribbon
-    const len = r * 5; // the tail
-    const pts = [];
-    for (let d = 0; d <= len; d += 4) { // the line of the voice behind the hit line (the tail follows its curves)
-      const yy = this.vocalLineY(n, prev, hitX - d) ?? (pts.length ? pts[pts.length - 1][1] : y0);
-      const wob = Math.sin(t * 46 - d * 0.55 + n.time * 7) * (d / len) * r * 0.55; // the flicker: fast, growing along the tail
-      pts.push([hitX - d, yy + wob]);
-    }
+    const v = 0.5 + 0.5 * Math.sin(t * 9 + n.time * 3) * 0.6 + 0.5 * Math.sin(t * 23 + n.time * 7) * 0.4; // 0..1, varying
+    const R = Math.max(7, half * 1.55) * (0.9 + 0.2 * v); // a little larger than the note is thick
     g.save();
-    g.lineCap = 'round';
-    g.lineJoin = 'round';
-    g.strokeStyle = color;
     g.fillStyle = color;
-    const flick = 0.85 + 0.15 * Math.sin(t * 38 + n.time * 5); // a fast, small shimmer of the glow
-    g.globalAlpha = 0.2 * flick;
+    g.globalAlpha = 0.16 + 0.1 * v; // the outer halo
     g.beginPath();
-    g.arc(hitX, y0, r * 2.1, 0, Math.PI * 2);
+    g.arc(hitX, y0, R * 1.35, 0, Math.PI * 2);
     g.fill();
-    [[1.7, 0.22], [1.15, 0.45], [0.6, 0.85]].forEach(([wide, alpha]) => { // the tail: three strokes, a wide faint one under a narrow bright one
-      g.globalAlpha = alpha;
-      g.lineWidth = r * wide;
-      g.beginPath();
-      pts.forEach(([x, y], k) => (k === 0 ? g.moveTo(x, y) : g.lineTo(x, y)));
-      g.stroke();
-    });
-    g.globalAlpha = 0.95 * flick; // the head: a hot white-ish core
-    g.fillStyle = '#ffffff';
+    g.globalAlpha = 0.34 + 0.18 * v; // the glow
     g.beginPath();
-    g.arc(hitX, y0, r * 0.55, 0, Math.PI * 2);
+    g.arc(hitX, y0, R, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = '#ffffff'; // the heart
+    g.globalAlpha = 0.45 + 0.3 * v;
+    g.beginPath();
+    g.arc(hitX, y0, R * 0.5, 0, Math.PI * 2);
     g.fill();
     g.restore();
   }
