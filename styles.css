@@ -2333,3 +2333,20 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .si-details { margin-top: 6px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
 .si-details div { overflow-wrap: anywhere; }
 .si-details:empty { display: none; }
+
+/* ================= Quick settings while paused (setting playback.pausePanel): glass like the song information, fades in 0.3 s after the pause ================= */
+.pause-panel {
+  position: absolute; z-index: 6; top: 50%; left: calc(50% + var(--lib-inset, 0px) / 2); transform: translate(-50%, -50%); width: min(320px, 86%); padding: 14px 16px; display: grid; gap: 10px;
+  background: color-mix(in srgb, var(--panel) 70%, transparent); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius: 14px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, .35); color: var(--text); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .25s ease, visibility 0s linear .25s;
+}
+.pause-panel.show { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity .25s ease; }
+.pause-panel::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.pp-row { display: flex; align-items: center; gap: 8px; }
+.pp-name { flex: 0 0 82px; font-size: 13px; color: var(--muted); }
+.pp-val { min-width: 44px; text-align: center; font-size: 13px; font-variant-numeric: tabular-nums; }
+.pp-row input[type=range] { flex: 1 1 auto; min-width: 0; }
+.pp-toggle { min-width: 52px; }
+.pp-toggle[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 26%, transparent); color: var(--accent); }
+.pp-resume { justify-self: center; display: inline-flex; align-items: center; gap: 6px; }
+.pp-resume svg { width: 16px; height: 16px; }

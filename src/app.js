@@ -15,6 +15,7 @@ import { rememberPick, serializePick, parsePick } from './lastpick.js';
 import { parseVolumes, serializeVolumes, remember as rememberLevel, recall as recallLevel } from './volmemory.js';
 import { attachScrollThumb } from './scrollthumb.js';
 import { previewWindow } from './preview.js';
+import { setLoopPoint, restartNote, pausePanelWanted } from './practice.js';
 import { isFreshStart, overlayLines, startPlan, INFO_FIRST_PLAY_MS } from './startinfo.js';
 import { metaRows, extraRows, chartStats, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel, relabelStems } from './songinfo.js';
 import { parseRoute, formatRoute } from './route.js';
@@ -39,7 +40,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'barHide', 'metronomeBtn', 'mixerVal', 'speedVal', 'stagePlay', 'songInfo', 'siTitle', 'siArtist', 'siDetails', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'barHide', 'metronomeBtn', 'mixerVal', 'speedVal', 'stagePlay', 'songInfo', 'pausePanel', 'ppSlower', 'ppFaster', 'ppSpeed', 'ppMetronome', 'ppVolume', 'ppVolVal', 'ppResume', 'siTitle', 'siArtist', 'siDetails', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
   'endScreen', 'endCover', 'endTitle', 'endArtist', 'endAgain', 'endSearch', 'endCards', 'endNextBox', 'endNext',
@@ -2079,6 +2080,7 @@ const seekMax = () => Number(els.seek.max) || 0;
 const timeLeft = (at) => `calc(${(at / (seekMax() || 1)).toFixed(5)} * (100% - 12px) + 6px)`;
 
 function setLoop(range) {
+  cancelLoopWait();
   if (range) clearRewind();
   loop = range && seekMax() > 0 ? range : null;
   loopPrev = null;
@@ -2094,6 +2096,61 @@ function paintLoop() {
   els.loopEnd.style.left = timeLeft(loop.end);
   els.loopBand.style.left = timeLeft(loop.start);
   els.loopBand.style.width = `calc(${((loop.end - loop.start) / seekMax()).toFixed(5)} * (100% - 12px))`;
+}
+// A: the loop start / B: the loop end at the playhead (an end set past the other one swaps them; shorter than MIN_LOOP is refused).
+function setLoopHere(which) {
+  if (!chart || liveStage || !ready) return;
+  const range = setLoopPoint(loop, which, player.currentTime(), seekMax(), MIN_LOOP);
+  if (!range) { flashNote('Loop too short'); return; }
+  setLoop(range);
+  flashNote(which === 'start' ? 'Loop start set' : 'Loop end set');
+  rewindIntoLoop();
+}
+// Loop restart delay (YARG's practice restart delay): at the loop end the song pauses (the play button keeps its playing state, the fretboards stay at the end)
+// for playback.loopRestartDelay seconds, then restarts like a normal wrap. Play/pause, a seek, a loop change, a focus-loss pause or closing the song cancel it.
+let loopWait = null; // { until, timer, shown } while the wait runs
+function cancelLoopWait() {
+  if (!loopWait) return;
+  clearInterval(loopWait.timer);
+  loopWait = null;
+  if (flashEl) flashEl.style.opacity = '0';
+  syncPlayButton();
+}
+function holdAtLoopEnd(delaySec) {
+  player.pause();
+  const w = { until: performance.now() + delaySec * 1000, timer: 0, shown: Math.ceil(delaySec) };
+  loopWait = w;
+  w.timer = setInterval(() => {
+    const left = (w.until - performance.now()) / 1000;
+    if (left <= 0) { finishLoopWait(); return; }
+    const n = Math.ceil(left - 1e-9);
+    if (n !== w.shown) { w.shown = n; flashNote(restartNote(left)); }
+  }, 100);
+  flashNote(restartNote(delaySec));
+  syncPlayButton();
+}
+async function finishLoopWait() {
+  const w = loopWait;
+  if (!w) return;
+  clearInterval(w.timer);
+  loopWait = null;
+  if (flashEl) flashEl.style.opacity = '0';
+  if (!loop || !ready || player.playing) { syncPlayButton(); return; }
+  wrapLoop();
+  loopPrev = null;
+  await player.play();
+  syncPlayButton();
+}
+// The restart itself: one second before the loop start (the same rewind as after a pause) with the notes of that second drawn disabled, until the song
+// reaches the start. Returns the new player time.
+function wrapLoop() {
+  const back = prefs.get('playback.resumeRewind') ? Math.max(0, loop.start - PAUSE_REWIND_SEC) : loop.start;
+  internalSeek = true;
+  player.seek(back); // the audio restarts at once (no scrub)...
+  internalSeek = false;
+  pendingSeekDur = 450; // ...and the fretboards rewind with the usual seek animation, a little quicker
+  if (back < loop.start) { replay = { from: back, to: loop.start }; highway.replayWindow = replay; } else clearRewind();
+  return back;
 }
 async function toggleLoop() {
   if (loop) { setLoop(null); return; }
@@ -2268,6 +2325,7 @@ async function togglePlay() {
     syncPlayButton();
     return;
   }
+  if (loopWait) { cancelLoopWait(); return; } // Play (pause) pressed during the loop restart delay: stay paused at the loop end
   if (resumeTimer) { cancelResumeRewind(); syncPlayButton(); return; } // Play pressed again during the rewind: stay paused
   if (startDone) { cancelStartWait(); syncPlayButton(); return; } // Play (pause) pressed during the start delay: stay at the start
   if (player.playing && !backgroundAudio()) {
@@ -2352,7 +2410,8 @@ function onFocusLoss() {
   focusLost = true;
   if (prefs.get('playback.muteOnFocusLoss')) player.setMaster(0);
   if (!prefs.get('playback.pauseOnFocusLoss')) return;
-  if (startDone) { cancelStartWait(); syncPlayButton(); }
+  if (loopWait) cancelLoopWait();
+  else if (startDone) { cancelStartWait(); syncPlayButton(); }
   else if (resumeTimer) { cancelResumeRewind(); syncPlayButton(); }
   else if (player.playing && !listenMode && !backgroundAudio() && !liveStage) { rememberPause(); player.pause(); syncPlayButton(); }
 }
@@ -2367,7 +2426,7 @@ document.addEventListener('visibilitychange', () => (document.hidden ? onFocusLo
 
 const PLAY_TITLES = { play: els.play.title, npPlay: els.npPlay.title };
 function syncPlayButton() {
-  const playing = player.playing || !!startDone; // (the start delay shows the playing state)
+  const playing = player.playing || !!startDone || !!loopWait; // (the start delay shows the playing state)
   const restart = ended && !playing; // at the end of the song the play button restarts it
   const icon = playing ? '#i-pause' : restart ? '#i-restart' : '#i-play';
   const detailIcon = playing && !backgroundAudio() ? '#i-pause' : '#i-play'; // (the Listen card: the sound of another song is not its)
@@ -2390,7 +2449,7 @@ let ended = false;
 let endDismissed = false;
 let endShown = false;
 const NEXT_COUNT = 20;
-player.onSeek = () => { metronome.reset(); setEnded(false); cancelStartWait(); if (!internalSeek) clearRewind(); }; // (a seek of the user ends a rewind; the rewind's own seek does not)
+player.onSeek = () => { cancelLoopWait(); metronome.reset(); setEnded(false); cancelStartWait(); if (!internalSeek) clearRewind(); }; // (a seek of the user ends a rewind; the rewind's own seek does not)
 
 function setEnded(on) {
   if (ended === on) return;
@@ -3193,6 +3252,8 @@ const SHORTCUT_HANDLERS = {
   vocalView: () => { if (highway.panes.some((p) => p.chart.mode === 'vocals')) setVocalView(highway.vocalView === 'karaoke' ? 'track' : 'karaoke'); },
   perf: () => cyclePerfOverlay(),
   loop: () => { if (chart && !liveStage) toggleLoop(); },
+  loopStart: () => setLoopHere('start'),
+  loopEnd: () => setLoopHere('end'),
   metronome: () => prefs.set('audio.metronome', !prefs.get('audio.metronome')),
   speedDown: () => stepSpeed(-1),
   speedUp: () => stepSpeed(1),
@@ -3218,6 +3279,7 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (e.code === 'Escape') {
+    if (pausePanelShown) { ppDismissed = true; syncPausePanel(); return; } // the quick settings close (the song stays paused)
     if (endShown && popovers.every(([, pop]) => pop.hidden)) { endDismissed = true; syncEndScreen(); els.play.focus({ preventScroll: true }); return; } // the end window goes, the fretboards come back
     if (popovers.every(([, pop]) => pop.hidden) && infoOpen) setInfoOpen(false); // details -> chart
     const open = popovers.find(([, pop]) => !pop.hidden);
@@ -3315,6 +3377,7 @@ function guarded(part, fn) {
 
 function frame(frameTs) {
   requestAnimationFrame(frame); // first, so nothing below can end the loop
+  guarded('pause panel', syncPausePanel);
   const frameStart = performance.now();
   if (frameTs) player.frameNow = frameTs; // the clock of this animation frame (vsync aligned)
   let drawMs = 0;
@@ -3327,14 +3390,8 @@ function frame(frameTs) {
         // right when the old end would have been heard.
         const ahead = ((player.outputLatency || 0) + 0.01) * player.rate;
         if (shouldWrap(loop, loopPrev, t, ahead)) {
-          // The loop restarts one second before its start (the same rewind as after a pause) with the notes of that second drawn disabled, until the song reaches the start.
-          const back = prefs.get('playback.resumeRewind') ? Math.max(0, loop.start - PAUSE_REWIND_SEC) : loop.start;
-          internalSeek = true;
-          player.seek(back); // the audio restarts at once (no scrub)...
-          internalSeek = false;
-          pendingSeekDur = 450; // ...and the fretboards rewind with the usual seek animation, a little quicker
-          t = back;
-          if (back < loop.start) { replay = { from: back, to: loop.start }; highway.replayWindow = replay; } else clearRewind();
+          const delay = prefs.get('playback.loopRestartDelay');
+          if (delay > 0) holdAtLoopEnd(delay); else t = wrapLoop();
         }
       }
       loopPrev = t;
@@ -3455,6 +3512,40 @@ function paintMetronome(on) {
   els.metronomeBtn.title = on ? 'Metronome off (M)' : 'Metronome (M)';
 }
 els.metronomeBtn.addEventListener('click', () => prefs.set('audio.metronome', !prefs.get('audio.metronome')));
+// Quick settings while paused (setting playback.pausePanel; rules in practice.js `pausePanelWanted`). The panel fades in 0.3 s after the user pauses and
+// goes when the sound resumes, a seek (it clears `pausedAt`), a wait starts, Esc (stays closed until the next pause) or any other blocker; it reuses the
+// bar's own functions (stepSpeed, the metronome setting, masterState/applyStem, togglePlay) and keeps no state of its own.
+let pausePanelShown = false;
+let ppDismissed = false;
+let ppTimer = 0;
+function syncPausePanel() {
+  if (!pausePanelShown && !ppTimer && !prefs.get('playback.pausePanel')) return;
+  const basic = pausePanelWanted({
+    enabled: prefs.get('playback.pausePanel'), pausedByUser: pausedAt !== null, playing: player.playing, ready, waiting: !!(startDone || resumeTimer || loopWait),
+    listen: listenMode, background: backgroundAudio(), liveStage: !!liveStage, ended, hidden: document.hidden, focusLost,
+    overlayOpen: infoOpen || (typeof settingsPage !== 'undefined' && settingsPage.isOpen()),
+  });
+  if (!basic) ppDismissed = false; // (the Esc applies to this pause only)
+  const want = basic && !ppDismissed;
+  if (want && !pausePanelShown && !ppTimer) ppTimer = setTimeout(() => { ppTimer = 0; pausePanelShown = true; syncPausePanel(); }, 300);
+  if (!want) { clearTimeout(ppTimer); ppTimer = 0; }
+  if (pausePanelShown && !want) pausePanelShown = false;
+  const on = pausePanelShown;
+  if (els.pausePanel.classList.contains('show') !== on) { els.pausePanel.classList.toggle('show', on); els.pausePanel.setAttribute('aria-hidden', String(!on)); }
+  if (!on) return;
+  const speed = `${Math.round(settings.speed * 100)}%`;
+  if (els.ppSpeed.textContent !== speed) els.ppSpeed.textContent = speed;
+  const met = prefs.get('audio.metronome');
+  if (els.ppMetronome.getAttribute('aria-pressed') !== String(met)) { els.ppMetronome.setAttribute('aria-pressed', String(met)); els.ppMetronome.textContent = met ? 'On' : 'Off'; }
+  const vol = masterState.muted ? 0 : masterState.value;
+  if (Number(els.ppVolume.value) !== vol && document.activeElement !== els.ppVolume) els.ppVolume.value = vol;
+  els.ppVolVal.textContent = masterState.muted ? 'Muted' : `${Math.round(masterState.value * 100)}%`;
+}
+els.ppSlower.addEventListener('click', () => stepSpeed(-1));
+els.ppFaster.addEventListener('click', () => stepSpeed(1));
+els.ppMetronome.addEventListener('click', () => prefs.set('audio.metronome', !prefs.get('audio.metronome')));
+els.ppVolume.addEventListener('input', () => { masterState.value = Number(els.ppVolume.value); masterState.muted = false; applyStem(masterState); });
+els.ppResume.addEventListener('click', () => togglePlay());
 // A small note over the player for a moment (the speed after a shortcut).
 let flashEl = null;
 function flashNote(text) {

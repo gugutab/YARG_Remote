@@ -10,6 +10,8 @@ export const ACTIONS = [
   { id: 'prevSection', group: 'Playback', label: 'Previous section', key: 'Shift+BracketLeft' },
   { id: 'nextSection', group: 'Playback', label: 'Next section', key: 'Shift+BracketRight' },
   { id: 'loop', group: 'Playback', label: 'Loop the current section', key: 'KeyR' },
+  { id: 'loopStart', group: 'Playback', label: 'Set the loop start (A) here', key: 'KeyA' },
+  { id: 'loopEnd', group: 'Playback', label: 'Set the loop end (B) here', key: 'KeyS' },
   { id: 'metronome', group: 'Playback', label: 'Metronome on / off', key: 'KeyM' },
   { id: 'speedDown', group: 'Playback', label: 'Slower by 5 %', key: 'Minus' },
   { id: 'speedUp', group: 'Playback', label: 'Faster by 5 %', key: 'Equal' },
