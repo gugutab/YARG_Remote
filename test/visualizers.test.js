@@ -186,3 +186,16 @@ test('buildSongData builds one layer of events per instrument, with its kind', a
   assert.deepEqual(layerColor('guitar', 0), INSTRUMENT_COLORS.guitar);
   assert.equal(layerColor('mystery', 1, { v: [[1, 2, 3], [4, 5, 6]] })[0], 4); // an unknown instrument takes a colour from the palette
 });
+
+test('buildEvents: vocal charts count their harmony notes, and shared charts use the whole range', async () => {
+  const { buildEvents, buildSongData } = await import('../src/visualizers.js');
+  const vocals = { mode: 'vocals', notes: [{ time: 1, end: 2, pitch: 60 }], harmonies: [{ part: 2, notes: [{ time: 1, end: 2, pitch: 70 }, { time: 3, end: 4, pitch: 50 }] }], duration: 10 };
+  const guitar = { mode: 'lanes', lanes: 5, notes: [{ time: 1, end: 1, lane: 4 }], duration: 10 };
+  assert.equal(buildEvents([vocals]).count, 3); // the lead and the two harmony notes
+  const apart = buildEvents([guitar, vocals]);
+  const shared = buildEvents([guitar, vocals], { shared: true });
+  assert.ok(Math.max(...apart.pos.slice(0, 1)) <= 1 && Math.min(...apart.pos) >= 0);
+  assert.ok(shared.pos[shared.count - 1] >= 0 && Math.max(...shared.pos) <= 1);
+  const data = buildSongData({ song: {}, charts: [guitar, vocals], kinds: ['guitar', 'mic'], layerCharts: [[guitar], [vocals]], shown: [false, true] });
+  assert.deepEqual(data.layers.map((l) => [l.kind, l.shown, l.events.count]), [['guitar', false, 1], ['mic', true, 3]]);
+});

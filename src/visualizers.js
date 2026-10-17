@@ -220,14 +220,17 @@ export function spanAmount(spans, t, ramp = 0.4) {
 
 // Everything the chart plays as one time-sorted list for the "spectrum": times, ends and a 0..1 position along the spectrum.
 // Each chart gets its own band (instruments side by side); lanes spread inside it (the drum kick at its low end), vocals by pitch.
-export function buildEvents(charts) {
+// `shared`: every chart uses the whole 0..1 range (the layered equalizer: one set of events per instrument) instead of a band of its own.
+// A vocal chart also counts the notes of its harmony parts (HARM1-3).
+export function buildEvents(charts, { shared = false } = {}) {
   const rows = [];
-  const bands = charts.length || 1;
+  const bands = shared ? 1 : charts.length || 1;
   charts.forEach((chart, ci) => {
-    const lo = ci / bands;
+    const lo = shared ? 0 : ci / bands;
     const span = 1 / bands;
     const vocal = chart.mode === 'vocals';
-    for (const n of chart.notes) {
+    const notes = vocal && chart.harmonies?.length ? [...chart.notes, ...chart.harmonies.flatMap((h) => h.notes || [])] : chart.notes;
+    for (const n of notes) {
       const p = vocal ? clamp01(((n.pitch ?? 60) - 36) / 48) : n.lane < 0 ? 0.03 : clamp01(((n.lane ?? 0) + 0.5) / Math.max(1, chart.lanes || 5));
       rows.push([n.time, Math.max(n.end ?? n.time, n.time), lo + p * span]);
     }
@@ -373,7 +376,7 @@ export function sectionValue(sections, t, index, fn, ramp = 2) {
 
 // All the data the visualizers read, built once per song and chart set (not per frame).
 // song: { title, artist, genre, year, length, bpmRange }; charts: the charts on screen (buildChart results).
-export function buildSongData({ song = {}, charts = [], kinds = [] } = {}) {
+export function buildSongData({ song = {}, charts = [], kinds = [], layerCharts = null, shown = [] } = {}) {
   const lanes = charts.filter((c) => c.mode !== 'vocals');
   const vocal = charts.find((c) => c.mode === 'vocals') ?? null;
   const main = lanes[0] ?? vocal ?? charts[0] ?? null;
@@ -390,7 +393,9 @@ export function buildSongData({ song = {}, charts = [], kinds = [] } = {}) {
     sections: main?.sections ?? [],
     density: densityHistogram(timesOf(lanes.length ? lanes : charts), duration),
     events: buildEvents(charts),
-    layers: charts.map((chart, i) => ({ kind: kinds[i] ?? '', events: buildEvents([chart]) })), // one set of events per instrument (the layered equalizer)
+    // one set of events per instrument (the layered equalizer); `layerCharts` lists the charts of every layer (the vocal layer has the lead and the harmony),
+    // `shown` marks the instruments that are on screen
+    layers: (layerCharts ?? charts.map((c) => [c])).map((cs, i) => ({ kind: kinds[i] ?? '', events: buildEvents(cs, { shared: true }), shown: shown[i] !== false })),
     starPower: merged('starPower'),
     solos: merged('solos'),
     vocalNotes: vocal ? vocal.notes : [],
@@ -725,9 +730,10 @@ const ringsViz = (ctx) => ({
   },
 });
 
-// The MIDI equalizer: one equalizer per instrument, each in its own colour. They all hang from the same top edge, but each is taller than the one
-// before (the first instrument has the shortest bars, the last the tallest), and the taller ones are drawn first, behind: every instrument shows
-// its own bars below the shorter ones. A bar follows the notes being played, with trailing echoes and a peak cap that falls.
+// The MIDI equalizer: one equalizer per instrument of the song (all of them, whether or not its fretboard is on screen), each in its own colour. They all
+// hang from the same top edge, but each is taller than the one before (the first instrument has the shortest bars, the last the tallest) and the taller
+// ones are drawn first, behind. The instruments that are on screen are drawn in full, with echoes and a peak cap; the others are a faint, plain
+// version of the same bars. A vocal layer counts the lead and the harmony notes.
 const EQ_MAX_BARS = 96;
 const eqViz = (ctx) => {
   const bufs = Array.from({ length: 8 }, () => ({ now: new Float32Array(EQ_MAX_BARS), past: new Float32Array(EQ_MAX_BARS), peak: new Float32Array(EQ_MAX_BARS) }));
@@ -736,42 +742,49 @@ const eqViz = (ctx) => {
     draw(g, s) {
       const { w, h } = s;
       const pal = ctx.song.palette;
-      const layers = ctx.song.layers?.length ? ctx.song.layers : [{ kind: '', events: ctx.song.events }];
+      const layers = ctx.song.layers?.length ? ctx.song.layers : [{ kind: '', events: ctx.song.events, shown: true }];
       const L = Math.min(layers.length, bufs.length);
       const n = Math.max(32, Math.min(EQ_MAX_BARS, Math.round(w / 16)));
       const bw = w / n;
       const spread = Math.max(3, n / 14); // each note lights a wide soft hill, so the bars fill the whole width
-      const echoes = L <= 2 ? [0.09, 0.2, 0.34] : [0.12, 0.27]; // seconds back: the delayed copies that trail behind the bars
-      const peakSteps = L <= 2 ? 6 : 4;
+      const lit = layers.slice(0, L).filter((l) => l.shown !== false).length;
+      const echoes = lit <= 2 ? [0.09, 0.2, 0.34] : [0.12, 0.27]; // seconds back: the delayed copies that trail behind the bars
+      const peakSteps = lit <= 2 ? 6 : 4;
       const heightOf = (li) => h * (L === 1 ? 0.9 : 0.28 + 0.62 * (li / (L - 1))); // the tallest bar of a layer: growing with the layer
+      // the faint ones first (behind everything), then the lit ones; each group from the tallest to the shortest
+      const order = [...Array(L).keys()].sort((a, b) => (layers[a].shown !== false) - (layers[b].shown !== false) || b - a);
       g.save();
       g.globalCompositeOperation = L > 1 ? 'source-over' : 'lighter'; // (the layers overlap at the top: added together they would turn white)
       g.font = '600 11px system-ui, sans-serif';
       g.textBaseline = 'bottom';
-      for (let li = L - 1; li >= 0; li--) { // the tallest layer first (at the back), the shortest last (in front)
+      for (const li of order) {
         const { kind, events } = layers[li];
+        const on = layers[li].shown !== false;
         const { now, past, peak } = bufs[li];
         const col = layerColor(kind, li, pal);
         const maxH = heightOf(li);
         spectrumAt(events, s.t, n, now, spread);
-        peak.fill(0, 0, n); // the highest level over the last 0.5 s, shown as a cap that "falls"
-        for (let k = 0; k <= peakSteps; k++) {
-          spectrumAt(events, s.t - k * 0.1, n, past, spread);
-          for (let b = 0; b < n; b++) peak[b] = Math.max(peak[b], level(past[b]) - k * 0.05);
-        }
-        echoes.forEach((dt, e) => { // trails: the same spectrum a moment earlier, longer and fainter
-          spectrumAt(events, s.t - dt, n, past, spread);
-          g.fillStyle = rgba(col, 0.2 - e * 0.06);
-          for (let b = 0; b < n; b++) {
-            const v = Math.min(1.15, level(past[b]) + 0.03);
-            g.fillRect(b * bw + bw * 0.1, 0, bw * 0.8, v * maxH * (1 + 0.06 * (e + 1)));
+        if (on) {
+          peak.fill(0, 0, n); // the highest level over the last 0.5 s, shown as a cap that "falls"
+          for (let k = 0; k <= peakSteps; k++) {
+            spectrumAt(events, s.t - k * 0.1, n, past, spread);
+            for (let b = 0; b < n; b++) peak[b] = Math.max(peak[b], level(past[b]) - k * 0.05);
           }
-        });
+          echoes.forEach((dt, e) => { // trails: the same spectrum a moment earlier, longer and fainter
+            spectrumAt(events, s.t - dt, n, past, spread);
+            g.fillStyle = rgba(col, 0.2 - e * 0.06);
+            for (let b = 0; b < n; b++) {
+              const v = Math.min(1.15, level(past[b]) + 0.03);
+              g.fillRect(b * bw + bw * 0.1, 0, bw * 0.8, v * maxH * (1 + 0.06 * (e + 1)));
+            }
+          });
+        }
         for (let b = 0; b < n; b++) {
           const idle = 0.04 + 0.03 * Math.sin(b * 0.45 + s.beat.pos * 1.3 + li);
           const v = Math.min(1.15, level(now[b]) + idle);
           const bh = v * maxH;
           const x = b * bw + bw * 0.12;
+          if (!on) { g.fillStyle = rgba(col, 0.16); g.fillRect(x, 0, bw * 0.76, bh); continue; } // an instrument that is not on screen: a faint plain bar
           const gr = g.createLinearGradient(0, 0, 0, bh);
           gr.addColorStop(0, rgba(col, L > 1 ? 0.8 : 0.35));
           gr.addColorStop(1, rgba(col, 0.95));
@@ -782,8 +795,8 @@ const eqViz = (ctx) => {
           const ph = Math.min(1.15, peak[b] + idle) * maxH; // the peak cap
           if (ph > bh + 4) { g.fillStyle = rgba(col, 0.9); g.fillRect(x, ph - 2, bw * 0.76, 2); }
         }
-        if (L > 1 && kind) { // the instrument's name at the foot of its tallest bar
-          g.fillStyle = rgba(col, 0.9);
+        if (L > 1 && kind) { // the instrument's name at the foot of its tallest bar (brighter when it is on screen)
+          g.fillStyle = rgba(col, on ? 0.95 : 0.4);
           g.fillText(INSTRUMENT_NAMES[kind] ?? kind, 10, maxH + 14);
         }
       }
@@ -1187,7 +1200,7 @@ export function createDriver({ getSource }) {
       if (dataKey !== src.key) {
         dataKey = src.key;
         const prev = data;
-        data = buildSongData({ song: src.song, charts: src.charts, kinds: src.kinds });
+        data = buildSongData({ song: src.song, charts: src.charts, kinds: src.kinds, layerCharts: src.layerCharts, shown: src.shown });
         if (prev && prev.coverKey === src.coverUrl && src.coverUrl) { data.palette = prev.palette; data.coverCanvas = prev.coverCanvas; data.coverKey = prev.coverKey; }
         viz = null;
         if (src.coverUrl && data.coverKey !== src.coverUrl) {

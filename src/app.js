@@ -908,6 +908,7 @@ async function selectSong(song) {
   audioLoad = null;
   current = null;
   chart = null;
+  vizAll = null;
   if (!keep) highway.setCharts([]);
   renderList({ keepScroll: true });
   if (!narrow() && prefs.get('panels.libraryAutoHide')) setLibraryOpen(false, false); // the list gets out of the way (the details stay; a phone keeps the list behind them)
@@ -1507,6 +1508,7 @@ function updateChart() {
   else if (!els.paneMenu.hidden) buildPaneMenu(); // keep an open menu up to date
   for (const [key, el] of chooserEls) fillChooser(el, key); // the cards follow the instruments that are not on screen
   renderLoadState();
+  vizAll = null; // (the equalizer's layers follow what is on screen)
   syncUrl(); // the link carries the instruments on screen
   saveLastPick(); // (the user's own changes; see openingSong)
 }
@@ -2861,9 +2863,42 @@ els.barHide.addEventListener('click', () => setBarHidden(!els.app.classList.cont
 // One animated background behind every fretboard (src/visualizers.js, Highway.setVisualizer). The picker is a popover from the
 // tools row; the choice and its blur live in prefs (highway.visualizer, highway.visualizerBlur).
 let vizSrc = null;
+let vizAll = null; // the equalizer's source: every instrument of the song (the ones on screen are marked); null = rebuild
+const vizSongInfo = () => {
+  const ini = current.song.ini || {};
+  return { title: plainText(current.song.title), artist: plainText(current.song.artist), genre: ini.genre, year: ini.year, length: (Number(ini.song_length) || 0) / 1000, bpmRange: bpmRange(current.midi?.tempos) };
+};
+// One layer per instrument group of the song (drums: the chosen mode; vocals: the lead and the harmony together), each with the chart at its chosen
+// difficulty (cached for the song), and whether the group is on screen.
+function buildVizAll() {
+  const ini = current.song.ini || {};
+  const cache = (current.vizCharts ??= new Map());
+  const chartOf = (o, d) => {
+    const k = `${o.id}:${d.id}`;
+    if (!cache.has(k)) cache.set(k, buildChart(current.midi, o, d, ini));
+    return cache.get(k);
+  };
+  const layers = instrumentGroups().map((g) => {
+    const options = g.key === 'vocals' ? g.options : [g.chosen];
+    const charts = options.map((o) => { const d = diffFor(o).chosen; return d ? chartOf(o, d) : null; }).filter(Boolean);
+    return { g, charts };
+  }).filter((l) => l.charts.length);
+  if (!layers.length) return null;
+  return {
+    key: layers, coverUrl: current.coverUrl, song: vizSongInfo(),
+    charts: layers.map((l) => l.charts[0]),
+    kinds: layers.map((l) => INSTRUMENT_ICON[l.g.chosen.base] || 'music'),
+    layerCharts: layers.map((l) => l.charts),
+    shown: layers.map((l) => isOn(l.g)),
+  };
+}
 const vizDriver = createVisualizerDriver({
   getSource() { // rebuilt only when the charts on screen change (setCharts makes a new panes array)
     if (!current || !highway.panes.length) return null;
+    if (vizDriver.id === 'equalizer' && !liveStage) { // the equalizer shows every instrument of the song, the ones on screen highlighted
+      vizAll ??= buildVizAll();
+      if (vizAll) return vizAll;
+    }
     if (vizSrc?.key !== highway.panes) {
       const ini = current.song.ini || {};
       vizSrc = {
