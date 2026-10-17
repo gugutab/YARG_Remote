@@ -2308,3 +2308,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 @media (min-width: 701px) {
   .settings-page { top: calc(var(--settings-top, 0px) + 16px); bottom: calc(var(--settings-bottom, 0px) + 16px); }
 }
+
+/* A live stage (the song on it goes on while the details of another are browsed): its controls that need that song's chart are switched off */
+.app.live-stage .pane-tag, .app.live-stage #loopBtn, .app.live-stage #sectionBtn, .app.live-stage #back, .app.live-stage #forward { pointer-events: none; opacity: .45; }

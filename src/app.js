@@ -75,7 +75,60 @@ let loadToken = 0; // bumped on every song selection, so a slow load cannot over
 let sortDesc = false; // the "Reverse the order" setting
 let ready = false; // audio decoded and a chart built: playback is allowed
 let audioSong = null; // the song whose audio is in the player (it can differ from `current`: another song's details may be open while it plays)
-const backgroundAudio = () => player.playing && !!audioSong && audioSong !== current?.song; // sound of a song other than the one on screen
+const backgroundAudio = () => !!audioSong && audioSong !== current?.song; // the loaded audio is of a song other than the selected one
+// While the details of ANOTHER song are browsed, the song that is on the stage keeps it: its fretboards, its bar and its sound go on (liveStage:
+// the song and chart the frame loop needs). The selected song (`current`, `chart`) only feeds the details until it is played (Play or Listen):
+// takeStage() then puts it on the stage the old way (the stage holds its last picture while the new audio loads).
+let liveStage = null; // { song, chart, coverUrl }
+function setLiveStage(v) {
+  liveStage = v;
+  els.app.classList.toggle('live-stage', !!v); // (the stage's own controls that need its chart are switched off meanwhile)
+  return v;
+}
+const stageIsLive = () => !!(current && chart && ready && audioSong === current.song && stageEverLive && !holdStage);
+async function toggleBackground() { // the bar's play/pause while the stage belongs to another song than the details
+  if (player.playing) player.pause(); else await player.play();
+  syncPlayButton();
+}
+// The bar's texts, cover, sections, seek and time for `current`; the details of a song never write them while the stage is live.
+function bindStageText(song) {
+  showPlayInfo(true);
+  els.title.textContent = plainText(song.title);
+  requestAnimationFrame(fitTitleWidth);
+  els.artist.textContent = plainText(song.artist);
+  els.tertiary.textContent = [packOf(song), plainText(song.ini?.charter || '')].filter(Boolean).join(' - '); // pack - charter, shown in the wide open bar
+  els.cover.hidden = true;
+}
+function resetStageBar() {
+  els.sectionSelect.replaceChildren(new Option('No sections', ''));
+  els.sectionSelect.disabled = true;
+  els.sectionBtn.disabled = true;
+  els.sectionPop.replaceChildren();
+  els.sectionText.textContent = 'No sections';
+  activeSection = -2;
+  els.seek.value = 0; // the bar shows nothing of the previous song until the audio of this one loads
+  els.seek.max = 0;
+  els.seekbox.querySelectorAll('.tick').forEach((t) => t.remove());
+  paintSeek(0);
+  els.timeNow.textContent = els.timeTotal.textContent = fmt(0);
+}
+// The selected song takes the stage from the live one (Play or Listen on it): the stage freezes on its last picture under the bar's ghost, the bar and
+// the fretboards of the new song are prepared behind it and come in when its audio has loaded (the usual way).
+function takeStage() {
+  if (!liveStage || !current) return;
+  const old = liveStage;
+  setLiveStage(null);
+  holdStageNow();
+  setLoop(null); // a loop belongs to one song, and so do the options of each window
+  highway.paneOpts = {};
+  bindStageText(current.song);
+  resetStageBar();
+  if (current.coverUrl) { els.cover.src = current.coverUrl; els.cover.hidden = false; }
+  if (old.coverUrl?.startsWith('blob:')) URL.revokeObjectURL(old.coverUrl);
+  buildMixer(current.stems); // (both mixers: the levels were kept in the memory of volumes)
+  updateChart(); // its fretboards (not drawn while the stage is held)
+}
+
 let infoOpen = false;
 let loadInfo = { state: 'idle', text: '', fraction: 0 };
 const settings = { speed: 1, neck: 1.2, chartDelay: 0 };
@@ -838,47 +891,37 @@ async function selectSong(song) {
     els.folderInput.click();
     return;
   }
-  holdStageNow(); // the bar and the fretboards stay as they are until the audio loads
+  // A live stage (a song playing or paused on it) is kept as it is while the details of this song are browsed; otherwise the stage holds its last
+  // picture (and the bar) until the audio of the new song loads.
+  const keep = liveStage || (stageIsLive() ? setLiveStage({ song: current.song, chart, coverUrl: current.coverUrl }) : null);
+  if (!keep) holdStageNow();
   const token = ++loadToken;
   setEnded(false);
   // (the sound that is playing is left alone: browsing the details of another song does not stop it; the audio of the new song, when it
   // loads, replaces it, and the old decoded audio is freed then)
   syncPlayButton();
   ready = false;
-  setLoop(null); // a loop belongs to one song
-  highway.paneOpts = {}; // so do the options of each window
+  if (!keep) {
+    setLoop(null); // a loop belongs to one song
+    highway.paneOpts = {}; // so do the options of each window
+  }
   audioLoad = null;
   current = null;
   chart = null;
-  highway.setCharts([]);
+  if (!keep) highway.setCharts([]);
   renderList({ keepScroll: true });
   if (!narrow() && prefs.get('panels.libraryAutoHide')) setLibraryOpen(false, false); // the list gets out of the way (the details stay; a phone keeps the list behind them)
 
   els.welcome.hidden = true;
-  showPlayInfo(true);
-  els.title.textContent = plainText(song.title);
-  requestAnimationFrame(fitTitleWidth);
-  els.artist.textContent = plainText(song.artist);
-  els.tertiary.textContent = [packOf(song), plainText(song.ini?.charter || '')].filter(Boolean).join(' - '); // pack - charter, shown in the wide open bar
-  els.cover.hidden = true;
+  if (!keep) bindStageText(song);
   els.infoCover.hidden = true;
   els.infoPopCover.hidden = true;
   els.instrument.replaceChildren();
   els.difficulty.replaceChildren();
-  els.sectionSelect.replaceChildren(new Option('No sections', ''));
-  els.sectionSelect.disabled = true;
-  els.sectionBtn.disabled = true;
-  els.sectionPop.replaceChildren();
-  els.sectionText.textContent = 'No sections';
-  activeSection = -2;
-  els.seek.value = 0; // the bar shows nothing of the previous song until the audio of this one loads
-  els.seek.max = 0;
-  els.seekbox.querySelectorAll('.tick').forEach((t) => t.remove());
-  paintSeek(0);
-  els.timeNow.textContent = els.timeTotal.textContent = fmt(0);
+  if (!keep) resetStageBar();
   els.instrumentCards.replaceChildren();
   els.mixerInfo.replaceChildren();
-  els.mixer.replaceChildren();
+  if (!keep) els.mixer.replaceChildren();
   const swapping = infoOpen; // the details of another song were showing: the new ones slide in
   renderSongInfo(song);
   infoScroll.scrollTop = 0; // a new song starts at the top
@@ -916,14 +959,15 @@ async function selectSong(song) {
     if (coverUrl) URL.revokeObjectURL(coverUrl);
     return;
   }
-  if (els.cover.src.startsWith('blob:')) URL.revokeObjectURL(els.cover.src);
-  for (const img of [els.cover, els.infoCover, els.infoPopCover]) {
+  if (!liveStage && els.cover.src.startsWith('blob:')) URL.revokeObjectURL(els.cover.src); // (a live stage still shows its own cover)
+  for (const img of liveStage ? [els.infoCover, els.infoPopCover] : [els.cover, els.infoCover, els.infoPopCover]) {
     img.src = coverUrl || '';
     img.hidden = !coverUrl;
   }
 
   try {
     current = { song, midi, coverUrl, options: instrumentOptions(midi, song.ini), diffChoice: {}, pins: new Set(), choosers: [], chooserSeq: 0, hiddenActive: false, statsCache: new Map(), expandedStats: new Set(), modeChoice: {} };
+    syncPlayButton(); // (the Listen card's button now knows whose sound is playing)
     renderMeta(song, midi); // adds the BPM chip
     renderList({ keepScroll: true }); // highlight the loaded song
     syncUrl();
@@ -972,6 +1016,7 @@ function refreshStemFailures() {
 function ensureAudio({ listen = false, at = 0 } = {}) {
   if (ready) return Promise.resolve(true);
   if (!current || !chart) return Promise.resolve(false);
+  if (liveStage) takeStage(); // (Listen too: the sound of the live stage is about to be replaced)
   if (audioLoad?.song === current.song) {
     if (audioLoad.listen && !listen) { audioLoad.listen = false; stageLoading(); renderLoadState(); }
     return audioLoad.promise;
@@ -1047,8 +1092,8 @@ function renderLoadState() {
     els.lsTitle.textContent = `${plainText(current.song.title)} — ${plainText(current.song.artist)}`;
     els.lsBar.style.width = `${Math.round(fraction * 100)}%`;
     els.lsText.textContent = text;
-    els.lsCover.src = els.cover.src || '';
-    els.lsCover.hidden = !els.cover.src || els.cover.hidden;
+    els.lsCover.src = current?.coverUrl || '';
+    els.lsCover.hidden = !current?.coverUrl;
   }
   const overlay = !infoOpen && !screen && state === 'error';
   els.loading.hidden = !overlay;
@@ -1438,8 +1483,15 @@ function updateChart() {
     });
   }
   for (const c of current.choosers) if (c.at === null) items.push({ chooser: true, key: `choose:${c.id}` }); // an added one goes last
-  highway.setCharts(items);
   current.screen = items.filter((x) => !x.chooser); // what is on screen, for the end-of-song window
+  if (liveStage) { // the stage is another song's: these details only choose what will go there
+    renderPickers();
+    renderLoadState();
+    syncUrl();
+    saveLastPick();
+    return;
+  }
+  highway.setCharts(items);
   if (endShown) buildEndScreen();
   fillSectionOptions();
   const hasLanes = items.some((x) => x.chooser || x.chart.mode !== 'vocals');
@@ -1516,6 +1568,7 @@ function setActiveSection(index) {
 
 // The highway shows chart time t - delay, so seeking to a section needs the delay added back.
 function seekToSection(i) {
+  if (liveStage) return;
   const section = chart?.sections[i];
   if (!section) return;
   seekTo(Math.max(0, section.time + settings.chartDelay));
@@ -1524,7 +1577,7 @@ els.sectionSelect.addEventListener('change', () => seekToSection(Number(els.sect
 els.back.addEventListener('click', () => stepSection(-1));
 els.forward.addEventListener('click', () => stepSection(1));
 function stepSection(dir) {
-  if (!chart?.sections.length) return;
+  if (liveStage || !chart?.sections.length) return;
   const here = sectionIndexAt(chart.sections, player.currentTime() - settings.chartDelay);
   const sectionStart = chart.sections[here].time + settings.chartDelay;
   // "Previous" first returns to the start of the current section, as media players do.
@@ -1562,7 +1615,8 @@ function rememberVolume(kind, key, value) {
 }
 function buildMixer(stems) {
   const restore = prefs.get('audio.rememberVolumes');
-  stemStates = stems.map((stem) => ({ stem, value: restore ? recallLevel(volMem, 'stems', stem.label) : 1, muted: false, group: null, views: [] }));
+  const owner = current?.song ?? null; // (whose audio the track is: another song's sound is not touched by this mixer)
+  stemStates = stems.map((stem) => ({ stem, owner, value: restore ? recallLevel(volMem, 'stems', stem.label) : 1, muted: false, group: null, views: [] }));
   const byKey = new Map();
   for (const st of stemStates) {
     const key = stemGroup(st.stem.label);
@@ -1574,10 +1628,11 @@ function buildMixer(stems) {
   for (const g of groupList) if (g.members.length > 1) for (const m of g.members) m.group = g;
   groupList = groupList.filter((g) => g.members.length > 1); // a lone stem needs no group
 
-  masterState.views = [];
+  masterState.views = liveStage ? masterState.views.filter((v) => v.container !== els.mixerInfo) : []; // (a live stage keeps its own bar mixer and the master row in it)
   const grouped = new Set(groupList.flatMap((g) => g.members));
-  for (const container of [els.mixer, els.mixerInfo]) {
+  for (const container of liveStage ? [els.mixerInfo] : [els.mixer, els.mixerInfo]) {
     const master = mixerRow(masterState);
+    masterState.views[masterState.views.length - 1].container = container;
     master.classList.add('master');
     const rows = [master];
     const done = new Set();
@@ -1743,7 +1798,7 @@ function applyStem(st) {
     player.setMaster(st.muted ? 0 : st.value);
     store.set('master', String(st.value)); // the master level and its mute are kept between visits
     store.set('masterMuted', st.muted ? '1' : '0');
-  } else if (!backgroundAudio()) player.setVolume(st.stem.id, effectiveVolume(st)); // (the sound of another song is not touched by this song's mixer)
+  } else if (st.owner === audioSong || !audioSong) player.setVolume(st.stem.id, effectiveVolume(st)); // (the sound of another song is not touched by this song's mixer)
   const off = st.master ? st.muted : silent(st);
   for (const v of st.views) {
     v.range.value = st.value;
@@ -1971,7 +2026,7 @@ document.addEventListener('click', (e) => {
 });
 
 // ---------- Transport ----------
-els.play.addEventListener('click', togglePlay);
+els.play.addEventListener('click', () => (liveStage ? toggleBackground() : togglePlay())); // (the bar belongs to the song on the stage)
 function paintSeek(at = Number(els.seek.value)) { // the fill: the playing position (the thumb alone follows the pointer while it is dragged)
   const max = Number(els.seek.max) || 1;
   els.seek.style.setProperty('--pct', `${Math.min(100, (at / max) * 100)}%`);
@@ -1980,7 +2035,12 @@ els.seek.addEventListener('input', () => {
   seeking = true;
   els.timeNow.textContent = fmt(Number(els.seek.value));
 });
-els.seek.addEventListener('change', () => { clearPreview(); seekTo(Number(els.seek.value)); seeking = false; });
+els.seek.addEventListener('change', () => {
+  if (liveStage) { player.seek(Number(els.seek.value)); seeking = false; return; } // (the song on the stage, not the one in the details)
+  clearPreview();
+  seekTo(Number(els.seek.value));
+  seeking = false;
+});
 // The mouse wheel over the seek bar moves the song: up goes forward, down goes back, 5 s per notch (1 s with Shift).
 els.seekbox.addEventListener('wheel', (e) => {
   if (!ready) return;
@@ -2117,6 +2177,7 @@ function seekTo(t) {
 
 async function togglePlay() {
   if (!chart) return;
+  if (liveStage) takeStage(); // the details' Play: this song goes onto the stage (the sound that was playing is replaced when its audio loads)
   if (ended && !player.playing) return restartSong(); // the button reads Restart
   clearPreview();
   if (player.playing && listenMode && !backgroundAudio()) { // listening from the Listen card: Play takes the sound to the chart and keeps it going
@@ -2145,10 +2206,11 @@ function syncPlayButton() {
   const playing = player.playing;
   const restart = ended && !playing; // at the end of the song the play button restarts it
   const icon = playing ? '#i-pause' : restart ? '#i-restart' : '#i-play';
+  const detailIcon = playing && !backgroundAudio() ? '#i-pause' : '#i-play'; // (the Listen card: the sound of another song is not its)
   els.play.querySelector('use').setAttribute('href', icon);
   els.play.setAttribute('aria-label', playing ? 'Pause' : restart ? 'Restart' : 'Play');
   els.play.title = restart ? 'Restart (Space)' : PLAY_TITLES.play;
-  els.npPlay.querySelector('use').setAttribute('href', icon);
+  els.npPlay.querySelector('use').setAttribute('href', detailIcon);
   els.npPlay.title = restart ? 'Restart' : PLAY_TITLES.npPlay;
   els.infoPlay.querySelector('use').setAttribute('href', restart ? '#i-restart' : '#i-play');
   els.infoPlay.querySelector('span').textContent = restart ? 'Restart' : 'Play';
@@ -2288,6 +2350,8 @@ async function playNextNow(song) {
 
 // "View my library": the song is closed (audio unloaded, chart and player UI gone) and the library window is what is left
 function closeSong() {
+  if (liveStage?.coverUrl?.startsWith('blob:')) URL.revokeObjectURL(liveStage.coverUrl);
+  setLiveStage(null);
   if (infoOpen) setInfoOpen(false, { grow: false, release: false });
   loadToken++; // a load in flight is dropped
   player.pause();
@@ -2905,7 +2969,7 @@ function focusSearch() {
   requestAnimationFrame(() => { els.search.focus({ preventScroll: true }); els.search.select(); });
 }
 const SHORTCUT_HANDLERS = {
-  playPause: () => { if (chart) togglePlay(); },
+  playPause: () => { if (liveStage) toggleBackground(); else if (chart) togglePlay(); },
   details: () => { if (current || loadInfo.state !== 'idle') setInfoOpen(!infoOpen); },
   search: () => focusSearch(),
   library: () => (libraryOpen() ? minimizeLibrary() : setLibraryOpen(true)),
@@ -2916,14 +2980,14 @@ const SHORTCUT_HANDLERS = {
   focusPrev: () => highway.shiftFocus(-1),
   vocalView: () => { if (highway.panes.some((p) => p.chart.mode === 'vocals')) setVocalView(highway.vocalView === 'karaoke' ? 'track' : 'karaoke'); },
   perf: () => cyclePerfOverlay(),
-  loop: () => { if (chart) toggleLoop(); },
+  loop: () => { if (chart && !liveStage) toggleLoop(); },
   visualizerNext: () => cycleVisualizer(1),
   visualizerPrev: () => cycleVisualizer(-1),
   noteStyle: () => setNoteStyle(highway.noteStyle === 'rect' ? 'round' : 'rect'),
   prevSection: () => stepSection(-1),
   nextSection: () => stepSection(1),
-  back5: () => { if (ready) seekTo(Math.max(0, player.currentTime() - 5)); },
-  forward5: () => { if (ready) seekTo(Math.min(player.duration, player.currentTime() + 5)); },
+  back5: () => { if (liveStage) player.seek(Math.max(0, player.currentTime() - 5)); else if (ready) seekTo(Math.max(0, player.currentTime() - 5)); },
+  forward5: () => { if (liveStage) player.seek(Math.min(player.duration, player.currentTime() + 5)); else if (ready) seekTo(Math.min(player.duration, player.currentTime() + 5)); },
   settings: () => (settingsPage.isOpen() ? settingsPage.close() : settingsPage.open()),
 };
 document.addEventListener('keydown', (e) => {
@@ -3039,7 +3103,7 @@ function frame(frameTs) {
   if (frameTs) player.frameNow = frameTs; // the clock of this animation frame (vsync aligned)
   let drawMs = 0;
   const draw = (fn) => { if (holdStage) { if (loadingBackdrop) guarded('loading background', () => highway.drawBackground((performance.now() - loadingBackdrop) / 1000)); return; } const d0 = performance.now(); guarded('draw', fn); drawMs = performance.now() - d0; }; // (held: the fretboards keep the last picture)
-  if (current && chart && !backgroundAudio()) {
+  if (current && chart && !liveStage) {
     let t = guarded('clock', () => {
       let t = player.currentTime();
       if (loop && player.playing) {
@@ -3097,6 +3161,17 @@ function frame(frameTs) {
         }
       });
     }
+  } else if (liveStage) { // another song's details are open: the song on the stage goes on (fretboards, bar, time)
+    const t = player.currentTime();
+    if (player.playing && t >= player.duration) { player.pause(); syncPlayButton(); }
+    const chartTime = t - settings.chartDelay;
+    draw(() => highway.render(chartTime));
+    guarded('seek bar', () => {
+      if (seeking) { paintSeek(t); return; }
+      els.seek.value = t;
+      paintSeek(t);
+      setText(els.timeNow, fmt(t));
+    });
   } else {
     if (player.playing && current && player.currentTime() >= player.duration) { player.pause(); syncPlayButton(); } // (a song that plays on in the background reached its end: nothing to show, the sound just stops)
     if (canSkipDraw(frameStart, 0)) {
