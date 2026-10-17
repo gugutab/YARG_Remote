@@ -3235,6 +3235,8 @@ function frame(frameTs) {
         }
       }
       loopPrev = t;
+      const wantLoopEnd = loop ? loop.end : null; // (the notes after the end of a loop are disabled on the fretboards)
+      if (highway.loopEnd !== wantLoopEnd) { highway.loopEnd = wantLoopEnd; highway.invalidate(); }
       if (replay && t >= replay.to) clearRewind(); // the song has passed the pause point: the stretch is live again
       if (previewStop != null && (!player.playing || t >= previewStop)) {
         if (player.playing) { player.pause(); syncPlayButton(); }

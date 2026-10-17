@@ -123,6 +123,7 @@ export class Highway {
     this.sheets = []; // the lyric sheets on screen this frame: { x, y, w, h, step, hits, state } (canvas coordinates)
     this._countdowns = true; // show the wait countdowns
     this.countdownUnit = 'measures'; // the number in the countdown: 'measures' (YARG's default) or 'seconds'
+    this.loopEnd = null; // while a loop runs: the notes after its end are disabled (the loop never plays them)
     this.replayWindow = null; // { from, to }: the stretch replayed after a pause (rewind): its notes are drawn disabled
     this.weights = {}; // relative width of each fretboard, by pane key (dragging the dividers between them changes it)
     this.vocalH = null; // height of the vocal band in px, once the user dragged its divider (null: the default)
@@ -1189,6 +1190,13 @@ export class Highway {
     else this.renderLyricSheet(t, w, h, this.karaokeLines(pane, 'main'), this.sheetState(pane, 'main'), 0, 0, this.lyricCtx(pane));
   }
 
+  // The opacity of a note's head: disabled notes (the stretch replayed after a rewind, and what comes after the end of a loop) are dim, ghost notes a little less.
+  noteAlpha(n) {
+    if (this.replayWindow && n.time >= this.replayWindow.from && n.time <= this.replayWindow.to) return REPLAY_ALPHA;
+    if (this.loopEnd !== null && n.time > this.loopEnd) return REPLAY_ALPHA;
+    return n.ghost ? GHOST_ALPHA : 1;
+  }
+
   renderLanes(t, w, h) {
     const g = this.g;
     const chart = this.chart;
@@ -1333,7 +1341,7 @@ export class Highway {
       const amt = heldAmount(n, t);
       const white = Math.min(1, k + amt * (0.32 + 0.12 * shimmer)); // an active long note's head is lighter, like its tail
       // ghost notes are dimmed, accents are larger (YARG draws them the same way)
-      g.globalAlpha = (1 - k) * (this.replayWindow && n.time >= this.replayWindow.from && n.time <= this.replayWindow.to ? REPLAY_ALPHA : n.ghost ? GHOST_ALPHA : 1); // disabled while replaying a rewound stretch
+      g.globalAlpha = (1 - k) * this.noteAlpha(n); // disabled while replaying a rewound stretch or after the end of a loop
       const cx = x0 + (n.lane + 0.5) * laneW;
       const r = radius * noteScale(n) * (1 + 0.4 * k) * (1 + (pulse - 1) * amt);
       if (amt > 0) { // a soft halo while the note is held

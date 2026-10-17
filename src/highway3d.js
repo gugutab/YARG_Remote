@@ -328,7 +328,7 @@ export function renderLanes3D(hw, t, w, h) {
       g.globalCompositeOperation = 'source-over';
     }
     const body = tintWhite(n.sp ? noteColor(n, colors) : n.tap ? TAP_COLOR : colors[n.lane], Math.min(1, kx + amt * (0.32 + 0.12 * shimmer))); // an active long note's head is lighter, like its tail
-    g.globalAlpha = (1 - kx) * (hw.replayWindow && n.time >= hw.replayWindow.from && n.time <= hw.replayWindow.to ? 0.3 : n.ghost ? GHOST_ALPHA : 1) * Math.min(1, (1 - d) / FADE_IN);
+    g.globalAlpha = (1 - kx) * hw.noteAlpha(n) * Math.min(1, (1 - d) / FADE_IN);
     // thickness: a thin darker edge underneath the top face (no cast shadow; all of it moves, grows and fades with the note)
     const th = Math.max(0.5, rx * 0.21);
     const headStyle = n.cymbal ? 'tri' : hw.noteStyle; // cymbals: rounded triangle (and no ring)
