@@ -1058,9 +1058,9 @@ const spotViz = (ctx) => {
       const { w, h } = s;
       const pal = ctx.song.palette;
       const layers = ctx.song.layers ?? [];
-      const n = Math.max(3, layers.length || (w > 1100 ? 6 : 5));
-      const len = h * 1.25;
-      const drive = clamp01(0.75 + 0.3 * s.density + 0.25 * s.vocal + 0.15 * s.sp);
+      const n = Math.max(w > 1100 ? 8 : 6, layers.length); // more beams than instruments: an instrument lights every few beams across the stage
+      const len = Math.hypot(w * 0.35, h) * 1.2; // long enough to cross the whole stage when tilted
+      const drive = clamp01(0.8 + 0.3 * s.density + 0.25 * s.vocal + 0.15 * s.sp);
       g.save();
       g.fillStyle = haze(`${h}${pal.v[2]}${pal.va}`, () => {
         const gr = g.createLinearGradient(0, 0, 0, h);
@@ -1073,13 +1073,13 @@ const spotViz = (ctx) => {
       g.globalCompositeOperation = 'lighter';
       const warm = [255, 190, 90];
       for (let i = 0; i < n; i++) {
-        const layer = layers[i];
+        const layer = layers.length ? layers[i % layers.length] : undefined;
         const x = (w * (i + 0.5)) / n;
-        const ang = beamAngle(i, n, s.beat.pos) * (1 + 0.35 * s.sp);
+        const ang = beamAngle(i, n, s.beat.pos) * (1.35 + 0.35 * s.sp); // wider sweeps
         const base = layer ? layerColor(layer.kind, i, pal) : pal.v[i % 4];
         const col = mixRgb(layer ? tint(base, 0.3) : base, warm, 0.65 * s.sp).map(Math.round); // (a beam is light: a lighter version of the instrument's colour)
         const power = layer ? (layer.shown !== false ? clamp01(0.3 + 1.3 * hitLevel(layer.events, s.t, layerGain(layer.kind))) : 0.18) : 1;
-        const half = (0.1 + 0.025 * s.vocal + 0.02 * s.density) * (0.8 + 0.4 * power); // half-opening of the cone, radians
+        const half = (0.17 + 0.03 * s.vocal + 0.03 * s.density) * (0.8 + 0.4 * power); // wide cones: they overlap and fill the stage // half-opening of the cone, radians
         g.save();
         g.translate(x, -4);
         g.rotate(-ang);
@@ -1104,7 +1104,7 @@ const spotViz = (ctx) => {
         g.save();
         g.translate(hitX, h * 0.97);
         g.scale(1, 0.16);
-        const pr = h * (0.2 + 0.05 * s.vocal);
+        const pr = h * (0.34 + 0.06 * s.vocal);
         const pool = g.createRadialGradient(0, 0, 0, 0, 0, pr);
         pool.addColorStop(0, rgba(col, 0.5 * drive * power));
         pool.addColorStop(1, rgba(col, 0));
