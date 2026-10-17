@@ -2912,6 +2912,8 @@ const vizDriver = createVisualizerDriver({
   },
 });
 highway.vizScale = () => vizDriver.scale; // the background canvas resolution follows the visualizer quality
+let vizFps = 60; // how often the background is redrawn (the setting; Infinity = every screen frame)
+highway.vizFps = () => vizFps;
 const vizBtn = document.getElementById('visualizerBtn');
 const vizPop = document.getElementById('visualizerPop');
 // A slider row led by an icon instead of a text label (shown only when a visualizer is selected).
@@ -3292,6 +3294,7 @@ const EFFECTS = {
   'ui.font': (v) => document.documentElement.style.setProperty('--font', fontCss(v)),
   'highway.visualizer': (v) => { vizDriver.select(v); highway.setVisualizer(vizDriver.fn); applyVizGlass(); syncVizPop(); },
   'highway.visualizerQuality': (v) => { vizDriver.quality = { high: 1, medium: 0.6, low: 0.4 }[v] ?? 0.6; },
+  'highway.visualizerFps': (v) => { vizFps = v === 'unlimited' ? Infinity : Math.max(1, Number(v) || 60); highway.invalidate(); },
   'highway.visualizerBlur': () => { applyVizGlass(); syncVizPop(); },
   'highway.trackOpacity': (v) => { highway.trackOpacity = v / 100; },
   'highway.stageColorOn': () => { applyStage(); syncVizPop(); },

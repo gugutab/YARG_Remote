@@ -105,6 +105,8 @@ export class Highway {
     this.view = '2d';
     this.noteStyle = 'round'; // 'round' or 'rect' (rounded rectangles)
     this.vizScale = () => 1; // the resolution of the background canvas, 0..1 (set by the app from the visualizer quality)
+    this.vizFps = () => Infinity; // how many times per second the background may be redrawn (set by the app from the setting)
+    this.bgNext = 0; // the time (ms) from which the background may be redrawn
     this.paneOpts = {}; // per window overrides, see setPaneOpt
     this.neck = 1.2; // neck speed (the app default): scales distance between notes only; timing is unchanged
     this.bg = '#0d1117'; // chart background and the colour its fades dissolve into (the theme's "stage" colour)
@@ -148,6 +150,7 @@ export class Highway {
   // Marks the picture as stale: the page keeps redrawing every frame for a while after this (it skips frames only when paused and idle).
   invalidate() {
     this.dirtyAt = performance.now();
+    this.bgNext = 0; // the background is redrawn at once after a change (charts, visualizer, size...)
   }
 
   // The background visualizer: one drawing for the whole canvas, under all the panes. null removes it.
@@ -290,7 +293,17 @@ export class Highway {
     const dpr = Math.min(window.devicePixelRatio || 1, 2) * sc;
     const w = c.clientWidth;
     const h = c.clientHeight;
-    if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+    const resized = c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr);
+    if (resized) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+    else if (this.visualizer) { // a frame-rate cap: between two redraws the canvas keeps its picture (the drawing is a function of the song time, so skipping is safe)
+      const fps = this.vizFps();
+      if (Number.isFinite(fps)) {
+        const now = performance.now();
+        if (now < this.bgNext - 1) return;
+        const gap = 1000 / fps;
+        this.bgNext = Math.max(this.bgNext + gap, now - gap); // (drift-corrected: 60 on a 144 Hz screen still averages 60)
+      }
+    }
     const vg = c.getContext('2d');
     vg.setTransform(dpr, 0, 0, dpr, 0, 0);
     vg.clearRect(0, 0, w, h);
