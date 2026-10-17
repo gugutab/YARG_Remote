@@ -90,6 +90,8 @@ const lyricFont = (size) => {
 };
 const trackStyles = new Map(); // alpha -> [black, white] fill styles of trackBase
 const NO_SHIFTS = [];
+const VOC_GLOW_HOLD = 0.22; // seconds the vocal hit glow stays after the voice stops (a shorter gap does not dim it at all)
+const VOC_GLOW_FADE = 0.35; // and then fades out over this long
 const PERC_HOLD = 0.4; // seconds a percussion hit stays on the hit line (its quick pulse)
 const PERC_RINGS = [[0, 1.9, 3.5], [0.18, 1.4, 2]]; // percussion hit: [delay, growth, width] of the two rings
 
@@ -1603,8 +1605,8 @@ export class Highway {
         this.vocalShape(n, prev, x1, bw, y, half, colors[0]);
         g.restore();
       }
-      if (colors && !n.talkie && n.time - 0.05 <= t + 3 && t >= (joined ? prev.end : n.time) && t <= n.end) this.vocalHitFx(n, prev, t, half, colors[1], hitX); // the voice at the hit line: a note, or the ribbon that joins a slide
     }
+    if (colors) this.vocalHitGlow(notes, t, half, colors[1], hitX);
   }
 
   // The height of the vocal line at pixel x, from note `n` (and the one before it): the bar of the note, the S-shaped ribbon that joins a slide to the previous
@@ -1632,30 +1634,56 @@ export class Highway {
 
   // The hit zone while the voice is at the line: a glow a little larger than the thickness of the note, on the line of the voice (it rises, falls and bends with
   // the pitch, also along the ribbons that join the notes), in the note's colour with a lighter heart. Its size and strength vary all the time, from two
-  // shimmers of different speeds, so it looks alive but never flashes.
-  vocalHitFx(n, prev, t, half, color, hitX) {
-    const y0 = this.vocalLineY(n, prev, hitX);
-    if (y0 === null) return;
+  // shimmers of different speeds, so it looks alive but never flashes. It fades in as a note starts and, when the voice stops, stays for a moment (HOLD) and
+  // then fades out (FADE): a short gap between two notes does not make it disappear at all.
+  vocalHitGlow(notes, t, half, color, hitX) {
+    let i = -1;
+    for (let k = 0; k < notes.length; k++) { // the last note that has started (a few ms ahead: the fade-in begins just before)
+      if (notes[k].time > t + 0.04) break;
+      if (!notes[k].talkie) i = k;
+    }
+    if (i < 0) return;
+    const envOf = (n) => { // 0..1: fade in over the start, 1 while sung and held, then the fade-out
+      const attack = Math.max(0, Math.min(1, (t - n.time + 0.04) / 0.12));
+      const after = t - n.end;
+      if (after <= VOC_GLOW_HOLD) return attack;
+      return Math.max(0, 1 - (after - VOC_GLOW_HOLD) / VOC_GLOW_FADE) * attack;
+    };
+    const n = notes[i];
+    let prevI = i - 1;
+    while (prevI >= 0 && notes[prevI].talkie) prevI--;
+    const prev = prevI >= 0 ? notes[prevI] : null;
+    let env = envOf(n);
+    let lead = n; // the note whose position the glow takes
+    if (prev) {
+      const ep = envOf(prev);
+      if (ep > env) { env = ep; lead = prev; } // still holding the previous note while the new one fades in
+    }
+    if (env <= 0.004) return;
+    let y = this.vocalLineY(lead, lead === n ? prev : notes[prevI - 1] ?? null, hitX);
+    const next = notes[i + 1];
+    if (next && !next.talkie && next.slide) y = this.vocalLineY(next, n, hitX) ?? y; // on the ribbon that joins a slide
+    if (y === null || y === undefined) y = vocY(lead.pitch);
     const g = this.g;
     const v = 0.5 + 0.5 * Math.sin(t * 9 + n.time * 3) * 0.6 + 0.5 * Math.sin(t * 23 + n.time * 7) * 0.4; // 0..1, varying
-    const R = Math.max(10, half * 2.1) * (0.9 + 0.2 * v); // the body of the glow: well larger than the note is thick
+    const R = Math.max(9, half * 1.8) * (0.9 + 0.2 * v); // the body of the glow
     g.save();
     g.fillStyle = color;
-    for (let q = 0; q < 12; q++) { // the light reaches far: many thin discs stacked, so the falloff is smooth (no visible steps), the farthest barely there
-      const k = 3.6 - q * 0.19;
-      g.globalAlpha = 0.032 * (0.75 + 0.5 * v);
+    for (let q = 0; q < 12; q++) { // the light reaches out: many thin discs stacked, so the falloff is smooth
+      const k = 3.0 - q * 0.15;
+      g.globalAlpha = 0.017 * (0.75 + 0.5 * v) * env;
       g.beginPath();
-      g.arc(hitX, y0, R * k, 0, Math.PI * 2);
+      g.arc(hitX, y, R * k, 0, Math.PI * 2);
       g.fill();
     }
-    g.globalAlpha = 0.4 + 0.2 * v; // the glow
+    g.globalAlpha = (0.3 + 0.14 * v) * env; // the glow
     g.beginPath();
-    g.arc(hitX, y0, R, 0, Math.PI * 2);
+    g.arc(hitX, y, R, 0, Math.PI * 2);
     g.fill();
     g.fillStyle = '#ffffff'; // the heart
-    g.globalAlpha = 0.5 + 0.3 * v;
+    g.globalAlpha = (0.4 + 0.25 * v) * env;
     g.beginPath();
-    g.arc(hitX, y0, R * 0.48, 0, Math.PI * 2);
+    g.arc(hitX, y, R * 0.45, 0, Math.PI * 2);
     g.fill();
     g.restore();
   }
