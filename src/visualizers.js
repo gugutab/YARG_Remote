@@ -682,49 +682,71 @@ const synthViz = (ctx) => {
 };
 
 const STARS = 220;
-const warpViz = (ctx) => ({
-  draw(g, s) {
-    const { w, h } = s;
-    const pal = ctx.song.palette;
-    const cx = w / 2 + Math.sin(s.t * 0.11) * w * 0.03;
-    const cy = h / 2 + Math.cos(s.t * 0.09) * h * 0.03;
-    const R = Math.hypot(w, h) * 0.53;
-    const streak = 0.015 + 0.06 * s.density + 0.04 * s.sp;
-    const hot = s.sp > 0 ? [170, 225, 255] : null;
-    const cols = [hot ?? [235, 240, 255], hot ?? pal.v[1]];
-    g.save();
-    g.lineCap = 'round';
-    const travel = s.travel * 0.1;
-    for (let band = 0; band < 3; band++) { // by brightness band, so a whole band is one path
-      for (let ci = 0; ci < 2; ci++) {
-        g.beginPath();
-        for (let i = ci; i < STARS; i += 2) {
-          const z = fract(hash01(i, 1) + travel);
-          if (Math.min(2, Math.floor(z * 3)) !== band) continue;
-          const a = hash01(i, 2) * TAU;
-          const z0 = Math.max(0, z - streak * (0.5 + z));
-          const r1 = z ** 1.9 * R;
-          const r0 = z0 ** 1.9 * R;
-          g.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
-          g.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
-        }
-        g.strokeStyle = rgba(cols[ci], 0.35 + band * 0.25);
-        g.lineWidth = 1 + band * 0.9;
-        g.stroke();
+const warpViz = (ctx) => {
+  const mel = Array.from({ length: 8 }, () => ({ pitch: 0.5, energy: 0 }));
+  return {
+    // The stars belong to the instruments of the song (star i takes layer i % layers): an instrument's stars are in its colour and stretch into longer, brighter
+    // streaks as it plays (a slow swell of its energy, instruments exaggerated, the voice not), so the field breathes with who is playing; the vanishing
+    // point leans towards the pitch of the melody (high notes pull it up). Without layers: the palette's stars as before.
+    draw(g, s) {
+      const { w, h } = s;
+      const pal = ctx.song.palette;
+      const layers = ctx.song.layers ?? [];
+      const L = Math.min(layers.length, mel.length);
+      let lean = 0;
+      let total = 0;
+      for (let li = 0; li < L; li++) {
+        const m = melodyAt(layers[li].events, s.t, layerGain(layers[li].kind), mel[li]);
+        if (layers[li].shown !== false) { lean += (0.5 - m.pitch) * m.energy; total += m.energy; }
       }
-    }
-    g.restore();
-    const glow = g.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * 0.5);
-    glow.addColorStop(0, rgba(hot ?? pal.v[0], 0.18 + 0.3 * s.sp + 0.15 * s.hit));
-    glow.addColorStop(1, rgba(hot ?? pal.v[0], 0));
-    g.fillStyle = glow;
-    g.fillRect(0, 0, w, h);
-    if (s.sp > 0) { // star power: a flash on every beat
-      g.fillStyle = rgba([180, 225, 255], 0.1 * s.sp * s.beat.pulse);
+      const cx = w / 2 + Math.sin(s.t * 0.11) * w * 0.03;
+      const cy = h / 2 + Math.cos(s.t * 0.09) * h * 0.03 + (total > 0 ? (lean / total) * Math.min(1, total) * h * 0.14 : 0);
+      const R = Math.hypot(w, h) * 0.53;
+      const busy = L ? Math.min(1, total / 2) : s.density; // how much the instruments on screen play together
+      const streak = 0.015 + 0.06 * Math.max(s.density, busy) + 0.04 * s.sp;
+      const hot = s.sp > 0 ? [170, 225, 255] : null;
+      g.save();
+      g.lineCap = 'round';
+      const travel = s.travel * 0.1;
+      const groups = L || 2;
+      for (let gi = 0; gi < groups; gi++) {
+        const layer = L ? layers[gi] : null;
+        const e = layer ? mel[gi].energy : 0.5;
+        const on = layer ? layer.shown !== false : true;
+        const col = hot ?? (layer ? tint(layerColor(layer.kind, gi, pal), 0.5) : gi === 0 ? [235, 240, 255] : pal.v[1]);
+        const stretch = layer ? 0.55 + 1.5 * e : 1; // this instrument's streaks
+        const alpha = layer ? (on ? 0.5 + 0.5 * e : 0.2) : 1;
+        for (let band = 0; band < 3; band++) { // by brightness band, so a whole band is one path
+          g.beginPath();
+          for (let i = gi; i < STARS; i += groups) {
+            const z = fract(hash01(i, 1) + travel);
+            if (Math.min(2, Math.floor(z * 3)) !== band) continue;
+            const a = hash01(i, 2) * TAU;
+            const z0 = Math.max(0, z - streak * stretch * (0.5 + z));
+            const r1 = z ** 1.9 * R;
+            const r0 = z0 ** 1.9 * R;
+            g.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+            g.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+          }
+          g.strokeStyle = rgba(col, Math.min(1, (0.35 + band * 0.25) * alpha));
+          g.lineWidth = (1 + band * 0.9) * (layer ? 0.8 + 0.5 * e : 1);
+          g.stroke();
+        }
+      }
+      g.restore();
+      const glowCol = hot ?? (L && total > 0 ? tint(layerColor(layers[mel.slice(0, L).reduce((best, m, k) => (m.energy > mel[best].energy ? k : best), 0)].kind, 0, pal), 0.2) : pal.v[0]);
+      const glow = g.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * (0.5 + 0.1 * busy));
+      glow.addColorStop(0, rgba(glowCol, 0.16 + 0.3 * s.sp + 0.2 * busy));
+      glow.addColorStop(1, rgba(glowCol, 0));
+      g.fillStyle = glow;
       g.fillRect(0, 0, w, h);
-    }
-  },
-});
+      if (s.sp > 0) { // star power: a flash on every beat
+        g.fillStyle = rgba([180, 225, 255], 0.1 * s.sp * s.beat.pulse);
+        g.fillRect(0, 0, w, h);
+      }
+    },
+  };
+};
 
 const ringsViz = (ctx) => ({
   draw(g, s) {
