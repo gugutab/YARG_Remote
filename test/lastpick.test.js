@@ -22,8 +22,15 @@ test('rememberPick: difficulties of instruments no longer on screen are kept', (
 test('serialize and parse round-trip; malformed input is dropped', () => {
   const pick = rememberPick(null, screen);
   assert.deepEqual(parsePick(serializePick(pick)), pick);
-  assert.deepEqual(parsePick('not json'), { items: [], diffs: {} });
+  assert.deepEqual(parsePick('not json'), { items: [], diffs: {}, off: [] });
   assert.deepEqual(parsePick('{"items":[{"id":"<script>"},{"id":"guitar","diff":"expert","base":"guitar"}],"diffs":{"x y":"hard","bass":"medium"}}'),
-    { items: [{ id: 'guitar', diff: 'expert', base: 'guitar' }], diffs: { bass: 'medium' } });
-  assert.deepEqual(parsePick(null), { items: [], diffs: {} });
+    { items: [{ id: 'guitar', diff: 'expert', base: 'guitar' }], diffs: { bass: 'medium' }, off: [] });
+  assert.deepEqual(parsePick(null), { items: [], diffs: {}, off: [] });
+});
+
+test('rememberPick keeps what was switched off, and parsePick drops invalid keys', () => {
+  const pick = rememberPick(null, screen, ['vocals', 'vocals', 'bass']);
+  assert.deepEqual(pick.off, ['vocals', 'bass']);
+  assert.deepEqual(parsePick(serializePick(pick)).off, ['vocals', 'bass']);
+  assert.deepEqual(parsePick('{"off":["drums","<b>",5]}').off, ['drums']);
 });

@@ -709,8 +709,9 @@ let pendingInstruments = null; // the instruments of a link, applied once the ch
 let lastPick = parsePick(store.get('lastPick'));
 let openingSong = false; // while a song is being opened its first chart is not a choice of the user: it must not overwrite the memory
 function saveLastPick() {
-  if (openingSong || !current?.screen?.length || !prefs.get('general.rememberInstruments')) return;
-  lastPick = rememberPick(lastPick, current.screen);
+  if (openingSong || !current?.screen || !prefs.get('general.rememberInstruments')) return;
+  const off = instrumentGroups().filter((g) => !isOn(g)).map((g) => g.key);
+  lastPick = rememberPick(lastPick, current.screen, off);
   store.set('lastPick', serializePick(lastPick));
 }
 let loadAudioWithSong = false; // a #/song/<id>/play link: the audio loads with the song, like a Play press would
@@ -908,8 +909,15 @@ async function selectSong(song) {
     if (remember) for (const o of current.options) if (o.base && lastPick.diffs[o.base]) current.diffChoice[o.id] = lastPick.diffs[o.base]; // each instrument opens at the difficulty it had last
     fillInstrumentOptions();
     openingSong = true;
+    const openedPending = !!pendingInstruments;
     if (pendingInstruments) { applyInstruments(pendingInstruments); pendingInstruments = null; } // (a link or "play next" names them)
     else if (remember && lastPick.items.length) applyInstruments(lastPick.items); // otherwise the ones used last, where this song has them
+    if (!openedPending) { // not named by a link: everything is on, except what the user switched off (remembered)
+      const off = new Set(remember ? lastPick.off : []);
+      const groups = instrumentGroups();
+      for (const g of groups) if (!g.active && !current.pins.has(g.key) && !off.has(g.key)) current.pins.add(g.key);
+      if (groups.length && groups.every((g) => off.has(g.key))) current.hiddenActive = true; // all off: the active one only keeps the clock
+    }
     updateChart(); // the chart exists as soon as the MIDI is read; only playback waits for the audio
     openingSong = false;
     const stems = dropStems(relabelStems(audioStemsOf(song, { censor: prefs.get('audio.censor') }), (inst) => hasInstrument(song, inst))); // (the crowd is never loaded) // read per load: a change applies to the next song load
@@ -1218,20 +1226,29 @@ function layoutInstrumentCards() {
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(layoutInstrumentCards).observe(els.instrumentCards);
 
 // Several fretboards at once: a card (or menu row) can be pinned to show next to the active instrument.
-function pinButton(group) {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'icon small-icon pin-btn';
-  b.innerHTML = '<svg><use href="#i-layers"/></svg>';
-  b.title = group.pinned ? 'Stop showing it next to the others' : 'Show it together with the others';
-  b.setAttribute('aria-label', `${group.pinned ? 'Hide' : 'Show'} ${group.label} together with the others`);
-  b.setAttribute('aria-pressed', String(group.pinned));
-  b.addEventListener('click', (e) => {
-    e.stopPropagation();
-    current.pins[group.pinned ? 'delete' : 'add'](group.key);
+// An instrument card is an on/off switch: on = its fretboard is on screen. Turning one on uses the difficulty it had last (diffChoice, kept from
+// the memory of the last picks) unless a difficulty button is pressed; turning the active one off keeps it driving the timeline (hiddenActive).
+const isOn = (group) => (group.active && !current.hiddenActive) || group.pinned;
+function turnOn(group, ins, diffId) {
+  current.modeChoice[group.key] = ins.id;
+  const diff = diffId ?? diffFor(ins).chosen?.id;
+  if (group.active) { // the (hidden) active instrument comes back
+    current.hiddenActive = false;
+    selectInstrument(ins.id, diff);
+  } else if (current.hiddenActive) { // nothing was on: this one becomes the active one
+    current.hiddenActive = false;
+    selectInstrument(ins.id, diff);
+  } else {
+    if (diff) current.diffChoice[ins.id] = diff;
+    current.pins.add(group.key);
     updateChart();
-  });
-  return b;
+  }
+}
+function turnOff(group) {
+  if (group.pinned) { current.pins.delete(group.key); updateChart(); return; }
+  const next = instrumentGroups().find((g) => g.pinned); // the active one goes off: another one drives the timeline
+  if (next) { current.pins.delete(next.key); selectInstrument(next.chosen.id, diffFor(next.chosen).chosen?.id); }
+  else { current.hiddenActive = true; updateChart(); } // the only one: it stays the clock, but is not drawn
 }
 
 // A difficulty button: on the active card or a card that is not shown it picks the instrument; on a pinned card it only changes that fretboard.
@@ -1239,7 +1256,8 @@ function pickDifficulty(group, ins, diffId) {
   if (group.pinned) {
     current.diffChoice[ins.id] = diffId;
     updateChart();
-  } else selectInstrument(ins.id, diffId);
+  } else if (group.active && !current.hiddenActive) selectInstrument(ins.id, diffId); // the active one: a new difficulty
+  else turnOn(group, ins, diffId); // an instrument that was off: it goes on at that difficulty
 }
 
 function renderPickers() {
@@ -1255,13 +1273,14 @@ function renderPickers() {
     const vocal = ins.mode === 'vocals';
     const card = document.createElement('div');
     card.className = 'icard';
-    card.dataset.active = String(group.active);
-    card.dataset.pinned = String(group.pinned);
+    const on = isOn(group);
+    card.dataset.active = String(on); // (lit when its fretboard is on screen)
+    card.dataset.pinned = 'false';
 
     const head = document.createElement('button');
     head.type = 'button';
     head.className = 'icard-head';
-    head.setAttribute('aria-pressed', String(group.active));
+    head.setAttribute('aria-pressed', String(on));
     head.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[ins.base] || 'music'}"/></svg><span class="icard-name"></span>`;
     head.querySelector('.icard-name').textContent = group.label;
 
@@ -1287,7 +1306,6 @@ function renderPickers() {
       });
       top.append(info);
     }
-    if (!group.active) top.append(pinButton(group));
     const level = instrumentLevel(current.song, ins);
     if (level !== null) {
       const pips = document.createElement('span');
@@ -1297,7 +1315,7 @@ function renderPickers() {
       top.append(pips);
     }
     // The whole card selects the instrument (with its remembered mode and difficulty); the buttons stop the click.
-    card.addEventListener('click', () => selectInstrument(ins.id, chosen?.id));
+    card.addEventListener('click', () => { if (on) turnOff(group); else turnOn(group, ins, undefined); }); // (the buttons stop the click)
     card.append(top);
 
     if (group.options.length > 1) { // drum mode selector, same look as the difficulty one
@@ -1307,12 +1325,13 @@ function renderPickers() {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = o.modeLabel ?? o.label;
-        btn.setAttribute('aria-pressed', String((group.active || group.pinned) && o.id === group.chosen.id));
+        btn.setAttribute('aria-pressed', String(on && o.id === group.chosen.id));
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           current.modeChoice[group.key] = o.id;
           if (group.pinned) updateChart(); // a fretboard shown next to the active one keeps showing
-          else selectInstrument(o.id, diffFor(o).chosen?.id);
+          else if (group.active && !current.hiddenActive) selectInstrument(o.id, diffFor(o).chosen?.id);
+          else turnOn(group, o, undefined); // it was off: it goes on in that mode
         });
         modes.append(btn);
       }
@@ -1325,7 +1344,8 @@ function renderPickers() {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = d.label;
-        btn.setAttribute('aria-pressed', String((group.active || group.pinned) && d.id === chosen?.id));
+        btn.setAttribute('aria-pressed', String(on && d.id === chosen?.id));
+        if (!on && d.id === chosen?.id) btn.dataset.next = 'true'; // the difficulty a click on the card will use
         btn.addEventListener('click', (e) => { e.stopPropagation(); pickDifficulty(group, ins, d.id); });
         seg.append(btn);
       }
