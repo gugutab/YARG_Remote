@@ -11,6 +11,7 @@ import { songDelaySeconds, plainText, packOf } from './ini.js';
 import { actionFor, comboOf } from './shortcuts.js';
 import { dropStems, stemPriority } from './stempriority.js';
 import { rememberPick, serializePick, parsePick } from './lastpick.js';
+import { parseVolumes, serializeVolumes, remember as rememberLevel, recall as recallLevel } from './volmemory.js';
 import { attachScrollThumb } from './scrollthumb.js';
 import { previewWindow } from './preview.js';
 import { metaRows, extraRows, chartStats, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel, relabelStems } from './songinfo.js';
@@ -1529,8 +1530,18 @@ const silent = (st) => st.muted || Boolean(st.group?.muted); // not audible beca
 const groupSilent = (g) => g.muted || g.members.every((m) => m.muted);
 const effectiveVolume = (st) => (silent(st) ? 0 : st.value * (st.group?.value ?? 1));
 
+// The volume of every track is remembered (src/volmemory.js, store key `stemVolumes`, setting `audio.rememberVolumes`): a song opens with the levels you left.
+let volMem = parseVolumes(store.get('stemVolumes'));
+let volTimer = 0;
+function rememberVolume(kind, key, value) {
+  if (!prefs.get('audio.rememberVolumes')) return;
+  rememberLevel(volMem, kind, key, value);
+  clearTimeout(volTimer);
+  volTimer = setTimeout(() => store.set('stemVolumes', serializeVolumes(volMem)), 250); // (a slider drag sends many values)
+}
 function buildMixer(stems) {
-  stemStates = stems.map((stem) => ({ stem, value: 1, muted: false, group: null, views: [] }));
+  const restore = prefs.get('audio.rememberVolumes');
+  stemStates = stems.map((stem) => ({ stem, value: restore ? recallLevel(volMem, 'stems', stem.label) : 1, muted: false, group: null, views: [] }));
   const byKey = new Map();
   for (const st of stemStates) {
     const key = stemGroup(st.stem.label);
@@ -1538,6 +1549,7 @@ function buildMixer(stems) {
     byKey.get(key).members.push(st);
   }
   groupList = [...byKey.values()];
+  if (restore) for (const g of groupList) g.value = recallLevel(volMem, 'groups', g.key);
   for (const g of groupList) if (g.members.length > 1) for (const m of g.members) m.group = g;
   groupList = groupList.filter((g) => g.members.length > 1); // a lone stem needs no group
 
@@ -1604,13 +1616,13 @@ function mixerRow(st) {
   const view = { row, range: row.querySelector('input'), val: row.querySelector('.mix-val'), mute, reset: row.querySelector('.reset') };
   paintRange(view.range, st.master ? 1 : 1);
   st.views.push(view);
-  view.range.addEventListener('input', () => { st.value = Number(view.range.value); st.muted = false; applyStem(st); }); // moving the slider re-enables the track
+  view.range.addEventListener('input', () => { st.value = Number(view.range.value); st.muted = false; applyStem(st); if (!st.master) rememberVolume('stems', st.stem.label, st.value); }); // moving the slider re-enables the track
   pressHandlers(mute, st.master ? null : () => soloStem(st), () => {
     if (st.group?.muted) { st.group.muted = false; applyGroup(st.group); return; } // the group was muted: this click turns it back on
     st.muted = !st.muted;
     applyStem(st);
   });
-  row.querySelector('.reset').addEventListener('click', () => { st.value = 1; st.muted = false; applyStem(st); });
+  row.querySelector('.reset').addEventListener('click', () => { st.value = 1; st.muted = false; applyStem(st); if (!st.master) rememberVolume('stems', st.stem.label, 1); });
   return row;
 }
 
@@ -1634,13 +1646,13 @@ function groupBlock(g, own = null) { // own: the instrument menu keeps its own o
   const view = { row, range: row.querySelector('input'), val: row.querySelector('.mix-val'), mute, reset: row.querySelector('.reset'), expand, kids };
   paintRange(view.range, 1);
   g.views.push(view);
-  view.range.addEventListener('input', () => { g.value = Number(view.range.value); unmuteGroup(g); applyGroup(g); });
+  view.range.addEventListener('input', () => { g.value = Number(view.range.value); unmuteGroup(g); applyGroup(g); rememberVolume('groups', g.key, g.value); });
   pressHandlers(mute, () => soloGroup(g), () => {
     if (groupSilent(g)) unmuteGroup(g);
     else g.muted = true;
     applyGroup(g);
   });
-  row.querySelector('.reset').addEventListener('click', () => { g.value = 1; unmuteGroup(g); applyGroup(g); });
+  row.querySelector('.reset').addEventListener('click', () => { g.value = 1; unmuteGroup(g); applyGroup(g); rememberVolume('groups', g.key, 1); });
   if (own) view.own = own.open; // this view opens and closes on its own, not with the Stem volume card
   expand.addEventListener('click', () => {
     if (own) { view.own = !view.own; own.toggle(view.own); } else g.expanded = !g.expanded;
