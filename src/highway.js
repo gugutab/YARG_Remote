@@ -1695,7 +1695,7 @@ export class Highway {
       }
     };
     g.save();
-    g.fillStyle = color;
+    g.fillStyle = '#ffffff'; // white, with transparency (the note's colour is not used)
     // Three crosses, each turned differently and each with its own rotation speed: the upright one (it only rocks), one at 45 degrees and one at 22.5 degrees that
     // keeps turning; lengths wander too (slow sines of different speeds and phases), so the glint turns and breathes and is never the same twice.
     const wob = (f, ph) => Math.sin(t * f + n.time * 5 + ph);
