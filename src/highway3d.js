@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   GUITAR_LANE_COLORS, KICK_COLOR, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
 
@@ -202,6 +202,7 @@ export function renderLanes3D(hw, t, w, h) {
   // rails, and a bar that thins out as it fades.
   for (let i = end - 1; i >= from; i--) {
     const n = notes[i];
+    g.filter = hw.disabledNote(n) ? DISABLED_FILTER : 'none'; // disabled notes lose their colour
     if (n.lane >= 0 && !n.open) continue;
     const past = t - exitTime(n);
     if (past > FADE_SEC) continue;
@@ -253,6 +254,7 @@ export function renderLanes3D(hw, t, w, h) {
   // sustains
   for (let vi = from; vi < end; vi++) {
     const n = notes[vi];
+    g.filter = hw.disabledNote(n) ? DISABLED_FILTER : 'none'; // disabled notes lose their colour
     if (!n.length || n.lane < 0) continue;
     const dTop = depth(n.time + n.length);
     const dBot = depth(Math.max(n.time, t));
@@ -307,6 +309,7 @@ export function renderLanes3D(hw, t, w, h) {
   // heads, far to near so closer ones cover farther ones
   for (let i = end - 1; i >= from; i--) {
     const n = notes[i];
+    g.filter = hw.disabledNote(n) ? DISABLED_FILTER : 'none'; // disabled notes lose their colour
     if (n.lane < 0 || n.open) continue;
     const past = t - exitTime(n); // long notes: the exit starts when the tail ends
     if (past > FADE_SEC) continue;
@@ -351,6 +354,7 @@ export function renderLanes3D(hw, t, w, h) {
     }
   }
   g.globalAlpha = 1;
+  g.filter = 'none';
 
   // a very short fade at the bottom: the board dissolves right below the pads
   const padBottom = hitY + padRy;

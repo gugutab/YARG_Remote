@@ -10,6 +10,7 @@ export const TAP_COLOR = '#b25cff';
 export const ACCENT_OUTLINE_WIDTH = 4;
 export const ACCENT_OUTLINE_DARKEN = 0.55; // multiplier applied to the note colour for the accent outline
 export const GHOST_ALPHA = 0.45;
+export const DISABLED_FILTER = 'saturate(0.06)'; // canvas filter of the disabled notes (a replayed stretch, what follows a loop): almost no colour
 export const ROLL_COLORS = {
   kick: 'rgba(242,134,30,0.14)',
   tremolo: 'rgba(63,191,63,0.14)',

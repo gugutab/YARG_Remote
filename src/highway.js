@@ -13,6 +13,7 @@ import {
   ACCENT_OUTLINE_WIDTH,
   ACCENT_OUTLINE_DARKEN,
   GHOST_ALPHA,
+  DISABLED_FILTER,
   ROLL_COLORS,
   FILL_COLORS,
   FADE_SEC,
@@ -92,7 +93,7 @@ const trackStyles = new Map(); // alpha -> [black, white] fill styles of trackBa
 const NO_SHIFTS = [];
 const VOC_GLOW_HOLD = 0.22; // seconds the vocal hit glow stays after the voice stops (a shorter gap does not dim it at all)
 const VOC_GLOW_FADE = 0.35; // and then fades out over this long
-const REPLAY_ALPHA = 0.3; // the notes of the stretch replayed after a pause
+const REPLAY_ALPHA = 0.5; // (they are also drawn almost without colour: DISABLED_FILTER)
 const PERC_HOLD = 0.4; // seconds a percussion hit stays on the hit line (its quick pulse)
 const PERC_RINGS = [[0, 1.9, 3.5], [0.18, 1.4, 2]]; // percussion hit: [delay, growth, width] of the two rings
 
@@ -1191,9 +1192,12 @@ export class Highway {
   }
 
   // The opacity of a note's head: disabled notes (the stretch replayed after a rewind, and what comes after the end of a loop) are dim, ghost notes a little less.
+  disabledNote(n) {
+    return (this.replayWindow !== null && n.time >= this.replayWindow.from && n.time <= this.replayWindow.to) || (this.loopEnd !== null && n.time > this.loopEnd);
+  }
+
   noteAlpha(n) {
-    if (this.replayWindow && n.time >= this.replayWindow.from && n.time <= this.replayWindow.to) return REPLAY_ALPHA;
-    if (this.loopEnd !== null && n.time > this.loopEnd) return REPLAY_ALPHA;
+    if (this.disabledNote(n)) return REPLAY_ALPHA;
     return n.ghost ? GHOST_ALPHA : 1;
   }
 
@@ -1288,6 +1292,7 @@ export class Highway {
     // pedal bars go behind the other notes and sustains
     for (let vi = from; vi < end; vi++) {
       const n = notes[vi];
+      g.filter = this.disabledNote(n) ? DISABLED_FILTER : 'none'; // disabled notes lose their colour
       if (n.lane >= 0 && !n.open) continue;
       const past = t - exitTime(n); // long notes: the exit starts when the tail ends
       if (past > FADE_SEC) continue;
@@ -1305,6 +1310,7 @@ export class Highway {
 
     for (let vi = from; vi < end; vi++) {
       const n = notes[vi];
+      g.filter = this.disabledNote(n) ? DISABLED_FILTER : 'none'; // disabled notes lose their colour
       if (!n.length || n.lane < 0) continue;
       const yTop = laneY(n.time + n.length);
       const yBot = laneY(Math.max(n.time, t));
@@ -1333,6 +1339,7 @@ export class Highway {
     // it grows, fades and turns white over FADE_SEC, for pedals too.
     for (let vi = from; vi < end; vi++) {
       const n = notes[vi];
+      g.filter = this.disabledNote(n) ? DISABLED_FILTER : 'none'; // disabled notes lose their colour
       if (n.lane < 0 || n.open) continue; // pedals and open notes are drawn above, behind the other notes
       const past = t - exitTime(n); // long notes: the exit starts when the tail ends
       if (past > FADE_SEC) continue;
@@ -1368,6 +1375,7 @@ export class Highway {
       }
     }
     g.globalAlpha = 1;
+    g.filter = 'none';
 
     // a very short fade at the bottom: the board dissolves right below the pads
     const bottomFade = Math.min(h - hitY, radius * 1.05 + 80);

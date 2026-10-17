@@ -2177,6 +2177,19 @@ els.seekbox.addEventListener('pointerleave', () => { if (!loopDrag) hideSeekTip(
 // through the skipped stretch for as long as the fretboards take to get there (see scrub.js), then plays on. Paused, or with the
 // animation off, it is immediate.
 function seekTo(t) {
+  // Optionally the seek lands PAUSE_REWIND_SEC early, as a resume from a pause does: the notes of that second are drawn disabled until the song reaches the target.
+  if (ready && !loop && prefs.get('playback.seekRewind') && t > 0.05) {
+    const back = Math.max(0, t - PAUSE_REWIND_SEC);
+    clearRewind();
+    internalSeek = true;
+    seekPlain(back);
+    internalSeek = false;
+    if (back < t) { replay = { from: back, to: t }; highway.replayWindow = replay; highway.invalidate(); }
+    return;
+  }
+  seekPlain(t);
+}
+function seekPlain(t) {
   const dist = Math.abs(t - player.currentTime());
   if (!ready || !player.playing || dist <= SEEK_JUMP_SEC || !motionPref('highway.seekAnimation')) { player.seek(t); return; }
   const ms = seekAnimMs(dist);
