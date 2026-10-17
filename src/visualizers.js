@@ -245,10 +245,11 @@ export function buildEvents(charts, { shared = false } = {}) {
 }
 
 // The colour of each instrument's layer (the equalizer): a fixed hue per instrument, so a guitar is always green and the drums orange.
+export const tint = (c, k) => [c[0] + (255 - c[0]) * k, c[1] + (255 - c[1]) * k, c[2] + (255 - c[2]) * k]; // towards white by k (0..1)
 // `kind` is the pane's icon name (guitar, bass, drum, mic, harmony, keys, rhythm); an unknown one takes a colour from the palette.
 export const INSTRUMENT_COLORS = {
-  guitar: [61, 220, 151], bass: [77, 163, 255], drum: [255, 112, 67], mic: [255, 210, 63], harmony: [255, 170, 80], keys: [179, 107, 255], rhythm: [45, 212, 191],
-};
+  guitar: [26, 128, 90], bass: [36, 88, 186], drum: [190, 66, 36], mic: [196, 154, 30], harmony: [176, 112, 40], keys: [104, 58, 182], rhythm: [20, 124, 112],
+}; // (a darker, deeper palette: the bright part of the picture is the cap at the tip of each bar)
 export const INSTRUMENT_NAMES = { guitar: 'Guitar', bass: 'Bass', drum: 'Drums', mic: 'Vocals', harmony: 'Harmony', keys: 'Keys', rhythm: 'Rhythm' };
 export const layerColor = (kind, index, palette) => INSTRUMENT_COLORS[kind] ?? palette?.v?.[index % (palette.v.length || 1)] ?? [200, 200, 200];
 
@@ -738,9 +739,10 @@ const ringsViz = (ctx) => ({
 // Cheap on purpose: each layer is a few paths filled once (not a gradient and a rectangle per bar), and the colour ramp is one gradient per layer,
 // reused for all its bars (the colour follows the depth below the top edge).
 const EQ_MAX_BARS = 96;
+const EQ_GAIN = 1.7; // how much the instruments' bars are exaggerated (the voice keeps 1)
 const eqViz = (ctx) => {
   const bufs = Array.from({ length: 8 }, () => ({ now: new Float32Array(EQ_MAX_BARS), past: new Float32Array(EQ_MAX_BARS), peak: new Float32Array(EQ_MAX_BARS), ramp: null, rampKey: '' }));
-  const level = (v) => Math.min(1.15, 1 - Math.exp(-v * 1.1));
+  const levelOf = (gain) => (v) => Math.min(1.3, 1 - Math.exp(-v * 1.1 * gain));
   return {
     draw(g, s) {
       const { w, h } = s;
@@ -765,12 +767,13 @@ const eqViz = (ctx) => {
         const { now, past, peak } = b;
         const col = layerColor(kind, li, pal);
         const maxH = heightOf(li);
+        const level = levelOf(kind === 'mic' || kind === 'harmony' ? 1 : EQ_GAIN); // the instruments' bars are exaggerated, the voice's are not
         spectrumAt(events, s.t, n, now, spread);
         const idleAt = (k) => 0.04 + 0.03 * Math.sin(k * 0.45 + s.beat.pos * 1.3 + li);
         if (!on) { // an instrument that is not on screen: a faint plain version
           g.fillStyle = rgba(col, 0.15);
           g.beginPath();
-          for (let k = 0; k < n; k++) g.rect(k * bw + bw * 0.12, 0, bw * 0.76, Math.min(1.15, level(now[k]) + idleAt(k)) * maxH);
+          for (let k = 0; k < n; k++) g.rect(k * bw + bw * 0.12, 0, bw * 0.76, Math.min(1.3, level(now[k]) + idleAt(k)) * maxH);
           g.fill();
           continue;
         }
@@ -791,20 +794,20 @@ const eqViz = (ctx) => {
           spectrumAt(events, s.t - dt, n, past, spread);
           g.fillStyle = rgba(col, 0.16 - e * 0.04);
           g.beginPath();
-          for (let k = 0; k < n; k++) g.rect(k * bw + bw * 0.1, 0, bw * 0.8, Math.min(1.15, level(past[k]) + 0.03) * maxH * (1 + 0.06 * (e + 1)));
+          for (let k = 0; k < n; k++) g.rect(k * bw + bw * 0.1, 0, bw * 0.8, Math.min(1.3, level(past[k]) + 0.03) * maxH * (1 + 0.06 * (e + 1)));
           g.fill();
         });
         g.fillStyle = b.ramp;
         g.beginPath();
-        for (let k = 0; k < n; k++) g.rect(k * bw + bw * 0.12, 0, bw * 0.76, Math.min(1.15, level(now[k]) + idleAt(k)) * maxH);
+        for (let k = 0; k < n; k++) g.rect(k * bw + bw * 0.12, 0, bw * 0.76, Math.min(1.3, level(now[k]) + idleAt(k)) * maxH);
         g.fill();
-        g.fillStyle = rgba(col, 0.9); // the tips and the peak caps, in the layer's colour (one path each)
+        g.fillStyle = rgba(tint(col, 0.72), 0.95); // the tips and the peak caps: a light version of the colour, the brightest part of the picture
         g.beginPath();
         for (let k = 0; k < n; k++) {
-          const bh = Math.min(1.15, level(now[k]) + idleAt(k)) * maxH;
-          g.rect(k * bw + bw * 0.12, bh - 2, bw * 0.76, 2);
-          const ph = Math.min(1.15, peak[k] + idleAt(k)) * maxH;
-          if (ph > bh + 4) g.rect(k * bw + bw * 0.12, ph - 2, bw * 0.76, 2);
+          const bh = Math.min(1.3, level(now[k]) + idleAt(k)) * maxH;
+          g.rect(k * bw + bw * 0.12, bh - 4, bw * 0.76, 4);
+          const ph = Math.min(1.3, peak[k] + idleAt(k)) * maxH;
+          if (ph > bh + 6) g.rect(k * bw + bw * 0.12, ph - 3, bw * 0.76, 3);
         }
         g.fill();
       }
