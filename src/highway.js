@@ -1660,29 +1660,55 @@ export class Highway {
     const next = notes[i + 1];
     if (next && !next.talkie && next.slide) y = this.vocalLineY(next, n, hitX) ?? y; // on the ribbon that joins a slide
     if (y === null || y === undefined) y = vocY(n.pitch);
+    // The vertical position is animated: it glides to the voice's height (about 60 ms) instead of jumping when the pitch changes; after a seek or a pause of
+    // the song it snaps to the new place.
+    const st = (this.vocGlowState ??= new WeakMap()).get(notes) ?? { t: -1e9, y };
+    const dt = t - st.t;
+    st.y = dt > 0 && dt < 0.25 ? st.y + (y - st.y) * (1 - Math.exp(-dt / 0.06)) : y;
+    st.t = t;
+    this.vocGlowState.set(notes, st);
+    y = st.y;
     const g = this.g;
     const v = 0.5 + 0.5 * Math.sin(t * 9 + n.time * 3) * 0.6 + 0.5 * Math.sin(t * 23 + n.time * 7) * 0.4; // 0..1, varying
     const R = Math.max(9, half * 1.7);
     // A glint, not a halo: a thin vertical streak of light along the hit line and a shorter horizontal one through the note, crossing in a small bright core, all in
     // the note's colour. Each streak is a few stacked ellipses (wide and faint to narrow and strong), and their lengths shimmer.
-    const streak = (rx, ry, strength, rot) => {
-      for (let q = 0; q < 6; q++) {
-        const k = 1 - q * 0.16;
-        g.globalAlpha = strength * env * (0.07 + q * 0.05);
+    // A spike is a thin lozenge with concave sides (pinched towards the middle), so the tips end in fine points; a few of them stacked, wide and faint to narrow and strong.
+    const spike = (len, wid, strength, rot) => {
+      const c = Math.cos(rot);
+      const sn = Math.sin(rot);
+      const P = (u, w) => [hitX + u * c - w * sn, y + u * sn + w * c]; // a point along (u) and across (w) the spike
+      for (let q = 0; q < 5; q++) {
+        const k = 1 - q * 0.17;
+        const L = len * k;
+        const W = wid * k;
+        g.globalAlpha = strength * env * (0.09 + q * 0.07);
         g.beginPath();
-        g.ellipse(hitX, y, rx * k, ry * k, rot, 0, Math.PI * 2);
+        let p = P(-L, 0);
+        g.moveTo(p[0], p[1]);
+        for (const [tu, tw, cu, cw] of [[0, W, -L * 0.1, W * 0.3], [L, 0, L * 0.1, W * 0.3], [0, -W, L * 0.1, -W * 0.3], [-L, 0, -L * 0.1, -W * 0.3]]) {
+          p = P(tu, tw);
+          const cp = P(cu, cw);
+          g.quadraticCurveTo(cp[0], cp[1], p[0], p[1]);
+        }
+        g.closePath();
         g.fill();
       }
     };
     g.save();
     g.fillStyle = color;
-    // Four streaks: the upright cross and the same cross turned 45 degrees (shorter, fainter). Each has its own length and angle that wander (slow sines of
-    // different speeds and phases), so the glint is never the same twice and seems to turn and breathe.
+    // Three crosses, each turned differently and each with its own rotation speed: the upright one (it only rocks), one at 45 degrees and one at 22.5 degrees that
+    // keeps turning; lengths wander too (slow sines of different speeds and phases), so the glint turns and breathes and is never the same twice.
     const wob = (f, ph) => Math.sin(t * f + n.time * 5 + ph);
-    streak(R * 0.55, R * (3.1 + 0.8 * wob(7, 0)), 1, 0.12 * wob(4.3, 1)); // up and down the line
-    streak(R * (2.3 + 0.6 * wob(5.1, 2)), R * 0.4, 0.9, 0.1 * wob(3.7, 3)); // sideways through the note
-    streak(R * 0.42, R * (2.3 + 0.7 * wob(6.2, 4)), 0.7, Math.PI / 4 + 0.2 * wob(3.1, 5)); // the diagonals: the cross turned by 45 degrees
-    streak(R * 0.42, R * (2.3 + 0.7 * wob(5.6, 6)), 0.7, -Math.PI / 4 + 0.2 * wob(4.7, 7));
+    const rotA = 0.1 * wob(4.3, 1);
+    const rotB = Math.PI / 4 + 0.25 * wob(2.6, 5);
+    const rotC = Math.PI / 8 + t * 0.7 + 0.2 * wob(3.4, 9);
+    spike(R * (3.2 + 0.8 * wob(7, 0)), R * 0.5, 1, rotA + Math.PI / 2); // up and down the line
+    spike(R * (2.4 + 0.6 * wob(5.1, 2)), R * 0.38, 0.9, rotA); // sideways through the note
+    spike(R * (2.5 + 0.7 * wob(6.2, 4)), R * 0.4, 0.7, rotB);
+    spike(R * (2.5 + 0.7 * wob(5.6, 6)), R * 0.4, 0.7, rotB + Math.PI / 2);
+    spike(R * (2.0 + 0.6 * wob(6.8, 8)), R * 0.32, 0.55, rotC); // the third cross: shorter, fainter, always turning
+    spike(R * (2.0 + 0.6 * wob(5.9, 10)), R * 0.32, 0.55, rotC + Math.PI / 2);
     g.globalAlpha = (0.35 + 0.2 * v) * env; // the core
     g.beginPath();
     g.arc(hitX, y, R * 0.55, 0, Math.PI * 2);
