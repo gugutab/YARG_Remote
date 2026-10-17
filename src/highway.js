@@ -1603,44 +1603,69 @@ export class Highway {
         this.vocalShape(n, prev, x1, bw, y, half, colors[0]);
         g.restore();
       }
-      if (colors && n.time <= t && t <= n.end) this.vocalHitFx(n, prev, t, y, half, colors[1], hitX); // a note sounding at the hit line
+      if (colors && !n.talkie && n.time - 0.05 <= t + 3 && t >= (joined ? prev.end : n.time) && t <= n.end) this.vocalHitFx(n, prev, t, half, colors[1], hitX); // the voice at the hit line: a note, or the ribbon that joins a slide
     }
   }
 
-  // The hit zone while a note (the lead's or a harmony's) is sung: a soft halo that breathes on the note, a ring and a few spokes that burst out when it starts
-  // (not for the continuation of a slide), all in the note's colour. Only the notes at the line cost anything.
-  vocalHitFx(n, prev, t, y, half, color, hitX) {
-    const g = this.g;
-    const age = t - n.time;
-    half = Math.max(half, 9) * 1.35; // the notes are thin: the effect is sized for the eye, not for the ribbon
-    g.save();
-    g.fillStyle = color;
-    g.strokeStyle = color;
-    const breathe = 0.5 + 0.5 * Math.sin(t * 11 + n.time * 3); // a steady shimmer: slow enough not to flicker
-    for (const [k, a] of [[3.2, 0.14], [2.3, 0.22], [1.5, 0.34]]) { // the halo: three soft discs
-      g.globalAlpha = a * (0.75 + 0.25 * breathe);
-      g.beginPath();
-      g.arc(hitX, y, half * (k + 0.15 * breathe), 0, Math.PI * 2);
-      g.fill();
-    }
-    if (!(n.slide && prev && !prev.talkie) && age < 0.4) { // the burst at the start of the note
-      const k = age / 0.4;
-      g.globalAlpha = 0.9 * (1 - k);
-      g.lineWidth = Math.max(1.5, half * 0.35 * (1 - k));
-      g.beginPath();
-      g.arc(hitX, y, half * (1.2 + 3.6 * k), 0, Math.PI * 2);
-      g.stroke();
-      g.lineCap = 'round';
-      g.lineWidth = Math.max(1.5, half * 0.25 * (1 - k));
-      g.beginPath();
-      for (let i = 0; i < 8; i++) {
-        const ang = (i * Math.PI) / 4 + 0.4;
-        const from = half * (1.6 + 2.2 * k);
-        g.moveTo(hitX + Math.cos(ang) * from, y + Math.sin(ang) * from);
-        g.lineTo(hitX + Math.cos(ang) * (from + half * 0.9 * (1 - k)), y + Math.sin(ang) * (from + half * 0.9 * (1 - k)));
+  // The height of the vocal line at pixel x, from note `n` (and the one before it): the bar of the note, the S-shaped ribbon that joins a slide to the previous
+  // note, or the previous note's bar. null when the line is not there.
+  vocalLineY(n, prev, x) {
+    if (n.talkie) return null;
+    const x1 = vocX(n.time);
+    const x2 = Math.max(x1 + 6, vocX(n.end));
+    if (x >= x1 && x <= x2) return vocY(n.pitch);
+    if (n.slide && prev && !prev.talkie) {
+      const xa = vocX(prev.end);
+      if (x > xa && x < x1) { // on the ribbon: the pitch glides in a smooth S
+        const u = (x - xa) / Math.max(1, x1 - xa);
+        const b = u * u * (3 - 2 * u);
+        const ya = vocY(prev.pitch);
+        return ya + (vocY(n.pitch) - ya) * b;
       }
-      g.stroke();
     }
+    if (prev && !prev.talkie) {
+      const p1 = vocX(prev.time);
+      if (x >= p1 && x <= Math.max(p1 + 6, vocX(prev.end))) return vocY(prev.pitch);
+    }
+    return null;
+  }
+
+  // The hit zone while a note (the lead's or a harmony's) is sung: a small, constant, fast flame at the hit line that sits on the line of the voice (it rises and
+  // falls with the pitch, also along the ribbons that join the notes) and trails a few pixels of flickering tail behind it, in the note's own colour.
+  vocalHitFx(n, prev, t, half, color, hitX) {
+    const y0 = this.vocalLineY(n, prev, hitX);
+    if (y0 === null) return;
+    const g = this.g;
+    const r = Math.max(4.5, Math.min(8, half * 0.9)); // small: about the thickness of the ribbon
+    const len = r * 5; // the tail
+    const pts = [];
+    for (let d = 0; d <= len; d += 4) { // the line of the voice behind the hit line (the tail follows its curves)
+      const yy = this.vocalLineY(n, prev, hitX - d) ?? (pts.length ? pts[pts.length - 1][1] : y0);
+      const wob = Math.sin(t * 46 - d * 0.55 + n.time * 7) * (d / len) * r * 0.55; // the flicker: fast, growing along the tail
+      pts.push([hitX - d, yy + wob]);
+    }
+    g.save();
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    g.strokeStyle = color;
+    g.fillStyle = color;
+    const flick = 0.85 + 0.15 * Math.sin(t * 38 + n.time * 5); // a fast, small shimmer of the glow
+    g.globalAlpha = 0.2 * flick;
+    g.beginPath();
+    g.arc(hitX, y0, r * 2.1, 0, Math.PI * 2);
+    g.fill();
+    [[1.7, 0.22], [1.15, 0.45], [0.6, 0.85]].forEach(([wide, alpha]) => { // the tail: three strokes, a wide faint one under a narrow bright one
+      g.globalAlpha = alpha;
+      g.lineWidth = r * wide;
+      g.beginPath();
+      pts.forEach(([x, y], k) => (k === 0 ? g.moveTo(x, y) : g.lineTo(x, y)));
+      g.stroke();
+    });
+    g.globalAlpha = 0.95 * flick; // the head: a hot white-ish core
+    g.fillStyle = '#ffffff';
+    g.beginPath();
+    g.arc(hitX, y0, r * 0.55, 0, Math.PI * 2);
+    g.fill();
     g.restore();
   }
 
