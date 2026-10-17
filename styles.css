@@ -2301,3 +2301,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* The Speed card: an icon instead of the word in front of the slider */
 .card-adjust .row-icon { width: 20px; height: 20px; color: var(--muted); }
 .card-adjust .row { grid-template-columns: 22px 1fr 52px 28px; }
+
+/* The library window reaches the bottom of the stage (no gap under it); the other three margins stay */
+.library { bottom: 0; }
+.win-edge { bottom: 14px; }
