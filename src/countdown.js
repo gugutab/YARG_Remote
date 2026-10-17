@@ -43,3 +43,38 @@ export function countdownAt(list, t) {
   if (!c || t >= c.end) return null;
   return { remaining: c.end - t, total: c.end - c.start };
 }
+
+// The display rules of YARG's CountdownDisplay (game repo, Gameplay/HUD/CountdownDisplay.cs): shown only while more than HIDE_DELAY + FADE (1.5 s) remain,
+// fading in over 0.5 s at the start of the gap and out over 0.5 s as the 1.5 s mark passes (gone at 1 s remaining).
+export const COUNTDOWN_HIDE_SEC = 1;
+export const COUNTDOWN_FADE_SEC = 0.5;
+export function countdownAlpha(c) {
+  const fadeIn = Math.min(1, (c.total - c.remaining) / COUNTDOWN_FADE_SEC);
+  const fadeOut = Math.max(0, Math.min(1, (c.remaining - COUNTDOWN_HIDE_SEC) / COUNTDOWN_FADE_SEC));
+  return Math.min(fadeIn, fadeOut);
+}
+
+// The start times of the measures: the beats flagged as a measure start, else every fourth beat (YARG counts measures through the sync track's time signatures).
+export function measureStarts(beats) {
+  if (!beats?.length) return [];
+  const flagged = beats.filter((b) => b.measure).map((b) => b.time);
+  return flagged.length > 1 ? flagged : beats.filter((_, i) => i % 4 === 0).map((b) => b.time);
+}
+
+// The measure position of t: the index of the measure that has started plus how far into it (continuing at the nearest bar length outside the grid).
+export function measurePosition(starts, t) {
+  const n = starts.length;
+  if (n < 2) return t / 2; // no grid: 2 s bars (120 BPM, 4/4)
+  let lo = 0;
+  let hi = n - 1;
+  let i = -1;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (starts[mid] <= t) { i = mid; lo = mid + 1; } else hi = mid - 1; }
+  if (i < 0) return (t - starts[0]) / Math.max(0.05, starts[1] - starts[0]);
+  if (i >= n - 1) return i + (t - starts[i]) / Math.max(0.05, starts[n - 1] - starts[n - 2]);
+  return i + (t - starts[i]) / Math.max(0.05, starts[i + 1] - starts[i]);
+}
+
+// YARG's "Measures" countdown number: the whole measures left until the measure the notes come back in (the end snapped down to the start of its measure).
+export function measuresLeft(starts, t, end) {
+  return Math.max(0, Math.ceil(Math.floor(measurePosition(starts, end)) - measurePosition(starts, t)));
+}

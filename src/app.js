@@ -896,6 +896,7 @@ async function selectSong(song) {
   const keep = liveStage || (stageIsLive() ? setLiveStage({ song: current.song, chart, coverUrl: current.coverUrl }) : null);
   if (!keep) holdStageNow();
   const token = ++loadToken;
+  clearRewind();
   setEnded(false);
   // (the sound that is playing is left alone: browsing the details of another song does not stop it; the audio of the new song, when it
   // loads, replaces it, and the old decoded audio is freed then)
@@ -2075,6 +2076,7 @@ const seekMax = () => Number(els.seek.max) || 0;
 const timeLeft = (at) => `calc(${(at / (seekMax() || 1)).toFixed(5)} * (100% - 12px) + 6px)`;
 
 function setLoop(range) {
+  if (range) clearRewind();
   loop = range && seekMax() > 0 ? range : null;
   loopPrev = null;
   paintLoop();
@@ -2182,6 +2184,61 @@ function seekTo(t) {
   player.scrubTo(t, ms);
 }
 
+// Resuming from a pause (YARG's GameManager.Resume / RewindAndResume): the song goes back PAUSE_REWIND_SEC before the pause point, never before the limit set
+// by the first pause when pausing again (rewindLimit), the screen takes REWIND_ANIM_MS to travel back, then the sound starts; the notes of the stretch up to the
+// pause point are drawn disabled (YARG judges no input until the song has passed the pause point). Not with a loop, after a seek, or when the setting is off.
+const PAUSE_REWIND_SEC = 1;
+const REWIND_ANIM_MS = 500;
+let pausedAt = null; // where the song was paused by the user (null: not a resume from a pause)
+let rewindLimit = -Infinity;
+let resumeTimer = 0;
+let replay = null; // { from, to }: the replayed stretch while it runs
+let internalSeek = false;
+function rememberPause() {
+  const t = player.currentTime();
+  if (!replay) { // (pausing again during the replay keeps the first pause's point and limit)
+    pausedAt = t;
+    rewindLimit = Math.max(t - PAUSE_REWIND_SEC, rewindLimit);
+  }
+}
+function clearRewind() {
+  clearTimeout(resumeTimer);
+  resumeTimer = 0;
+  pausedAt = null;
+  rewindLimit = -Infinity;
+  replay = null;
+  highway.replayWindow = null;
+}
+let resumeDone = null; // resolves the wait of a rewind that is running (a cancel resolves it too)
+let resumeCancelled = false;
+function cancelResumeRewind() {
+  clearTimeout(resumeTimer);
+  resumeTimer = 0;
+  resumeCancelled = true;
+  resumeDone?.();
+}
+async function rewindBeforePlay() {
+  const at = replay?.to ?? pausedAt;
+  if (at === null || !prefs.get('playback.resumeRewind') || loop || listenMode || ended) return false;
+  const target = Math.max(0, rewindLimit);
+  const now = player.currentTime();
+  if (now - target < 0.05 || target >= at) { return false; }
+  internalSeek = true;
+  pendingSeekDur = REWIND_ANIM_MS; // the fretboards travel back in this time
+  player.seek(target);
+  internalSeek = false;
+  replay = { from: target, to: at };
+  highway.replayWindow = replay;
+  highway.invalidate();
+  resumeCancelled = false;
+  await new Promise((resolve) => { resumeDone = resolve; resumeTimer = setTimeout(() => { resumeTimer = 0; resolve(); }, REWIND_ANIM_MS); });
+  resumeDone = null;
+  if (resumeCancelled || replay === null) return true; // (cancelled while waiting: it stays paused at the rewound point)
+  await player.play();
+  syncPlayButton();
+  return true;
+}
+
 async function togglePlay() {
   if (!chart) return;
   if (liveStage) takeStage(); // the details' Play: this song goes onto the stage (the sound that was playing is replaced when its audio loads)
@@ -2195,14 +2252,18 @@ async function togglePlay() {
     syncPlayButton();
     return;
   }
-  if (player.playing && !backgroundAudio()) player.pause();
-  else {
+  if (resumeTimer) { cancelResumeRewind(); syncPlayButton(); return; } // Play pressed again during the rewind: stay paused
+  if (player.playing && !backgroundAudio()) {
+    rememberPause();
+    player.pause();
+  } else {
     if ((infoOpen || !ready) && libraryOpen()) setLibraryOpen(false, false); // Play from the details (or the first Play of a song) gets the library out of the chart's way
     const loading = ensureAudio(); // (starts the load first: closing the details must not release the held stage before it)
     if (infoOpen) setInfoOpen(false); // starting from the details goes to the chart
     if (!(await loading)) return; // the first Play loads the audio behind the loading screen
     markStageLive(); // (the audio may have been loaded by the Listen card with the stage held: now the chart and the bar come in)
     releaseStage();
+    if (await rewindBeforePlay()) return; // (resumed from a pause: the rewind starts the sound itself)
     await player.play();
   }
   syncPlayButton();
@@ -2233,7 +2294,7 @@ let ended = false;
 let endDismissed = false;
 let endShown = false;
 const NEXT_COUNT = 20;
-player.onSeek = () => setEnded(false);
+player.onSeek = () => { setEnded(false); if (!internalSeek) clearRewind(); }; // (a seek of the user ends a rewind; the rewind's own seek does not)
 
 function setEnded(on) {
   if (ended === on) return;
@@ -2357,6 +2418,7 @@ async function playNextNow(song) {
 
 // "View my library": the song is closed (audio unloaded, chart and player UI gone) and the library window is what is left
 function closeSong() {
+  clearRewind();
   if (liveStage?.coverUrl?.startsWith('blob:')) URL.revokeObjectURL(liveStage.coverUrl);
   setLiveStage(null);
   if (infoOpen) setInfoOpen(false, { grow: false, release: false });
@@ -3168,6 +3230,7 @@ function frame(frameTs) {
         }
       }
       loopPrev = t;
+      if (replay && t >= replay.to) clearRewind(); // the song has passed the pause point: the stretch is live again
       if (previewStop != null && (!player.playing || t >= previewStop)) {
         if (player.playing) { player.pause(); syncPlayButton(); }
         clearPreview();
@@ -3277,6 +3340,7 @@ function applyDetails() {
 const EFFECTS = {
   'highway.lyricsAbove': (v) => { highway.sheetPeek = v / 100; },
   'highway.countdown': (v) => { highway.countdowns = v; },
+  'highway.countdownUnit': (v) => { highway.countdownUnit = v; highway.invalidate(); },
   'highway.vocalView': (v) => { if (highway.vocalView !== v) setVocalView(v); },
   'highway.paneMin': (v) => highway.setPaneMin(v),
   'highway.view': (v) => { if (highway.view !== v) setView(v); },

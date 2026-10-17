@@ -45,3 +45,26 @@ test('percussion: false counts a percussion section as a rest (for the lyric vie
   assert.deepEqual(waitCountdowns(c), [{ start: 30, end: 40 }]); // hits every 5 s keep the gaps short, until the last one
   assert.deepEqual(waitCountdowns(c, { percussion: false }), [{ start: 2, end: 40 }]);
 });
+
+import { countdownAlpha, measureStarts, measurePosition, measuresLeft } from '../src/countdown.js';
+
+test('countdownAlpha: fades in over 0.5 s, full in the middle, gone at 1 s remaining (YARG shows it while more than 1.5 s remain)', () => {
+  assert.equal(countdownAlpha({ total: 20, remaining: 20 }), 0);
+  assert.equal(countdownAlpha({ total: 20, remaining: 19.75 }), 0.5);
+  assert.equal(countdownAlpha({ total: 20, remaining: 10 }), 1);
+  assert.equal(countdownAlpha({ total: 20, remaining: 1.5 }), 1);
+  assert.equal(countdownAlpha({ total: 20, remaining: 1.25 }), 0.5);
+  assert.equal(countdownAlpha({ total: 20, remaining: 1 }), 0);
+});
+
+test('measuresLeft counts the whole measures until the measure the notes come back in', () => {
+  const beats = Array.from({ length: 41 }, (_, i) => ({ time: i * 0.5, measure: i % 4 === 0 })); // 4/4 at 120 BPM: a measure every 2 s
+  const starts = measureStarts(beats);
+  assert.deepEqual(starts.slice(0, 3), [0, 2, 4]);
+  assert.equal(measurePosition(starts, 3), 1.5);
+  assert.equal(measuresLeft(starts, 0, 20), 10); // the end (measure 10) is 10 measures away
+  assert.equal(measuresLeft(starts, 1, 20), 10); // 9.5 measures to go: rounded up
+  assert.equal(measuresLeft(starts, 2, 20), 9); // at the start of the second measure: 9 to go
+  assert.equal(measuresLeft(starts, 2.1, 21), 9); // the end snaps down to the start of its measure (21 s is inside measure 10)
+  assert.equal(measuresLeft(starts, 19.9, 20), 1);
+});

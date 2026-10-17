@@ -45,7 +45,7 @@ import {
 export { firstVisibleIndex } from './gfx.js';
 import { renderLanes3D } from './highway3d.js';
 import { buildKaraokeLines, karaokeAt, syllableProgress } from './karaoke.js';
-import { waitCountdowns, countdownAt } from './countdown.js';
+import { waitCountdowns, countdownAt, countdownAlpha, measureStarts, measuresLeft, COUNTDOWN_HIDE_SEC } from './countdown.js';
 
 const RECT_WIDEN_2D = 1.18;
 const VOCAL_LEAD = '#5b8def'; // lead vocal notes
@@ -92,6 +92,7 @@ const trackStyles = new Map(); // alpha -> [black, white] fill styles of trackBa
 const NO_SHIFTS = [];
 const VOC_GLOW_HOLD = 0.22; // seconds the vocal hit glow stays after the voice stops (a shorter gap does not dim it at all)
 const VOC_GLOW_FADE = 0.35; // and then fades out over this long
+const REPLAY_ALPHA = 0.3; // the notes of the stretch replayed after a pause
 const PERC_HOLD = 0.4; // seconds a percussion hit stays on the hit line (its quick pulse)
 const PERC_RINGS = [[0, 1.9, 3.5], [0.18, 1.4, 2]]; // percussion hit: [delay, growth, width] of the two rings
 
@@ -121,6 +122,8 @@ export class Highway {
     this.paneRects = []; // where each chart is drawn this frame: { key, label, icon, x, y, w, h }
     this.sheets = []; // the lyric sheets on screen this frame: { x, y, w, h, step, hits, state } (canvas coordinates)
     this._countdowns = true; // show the wait countdowns
+    this.countdownUnit = 'measures'; // the number in the countdown: 'measures' (YARG's default) or 'seconds'
+    this.replayWindow = null; // { from, to }: the stretch replayed after a pause (rewind): its notes are drawn disabled
     this.weights = {}; // relative width of each fretboard, by pane key (dragging the dividers between them changes it)
     this.vocalH = null; // height of the vocal band in px, once the user dragged its divider (null: the default)
     this.dividers = []; // the draggable dividers drawn this frame
@@ -661,18 +664,21 @@ export class Highway {
     if (lyrics) pane.countdownsLyrics ??= waitCountdowns(pane.chart, { percussion: false }); // karaoke: percussion hits are no singing
     else pane.countdowns ??= waitCountdowns(pane.chart);
     const c = countdownAt(lyrics ? pane.countdownsLyrics : pane.countdowns, t);
-    return c && c.remaining >= 0.25 ? c : null;
+    if (!c || c.remaining <= COUNTDOWN_HIDE_SEC) return null; // (YARG hides it 1.5 s before the notes: faded out by 1 s)
+    if (this.countdownUnit === 'measures') {
+      pane.measureStarts ??= measureStarts(pane.chart.beats);
+      c.label = measuresLeft(pane.measureStarts, t, t + c.remaining);
+    }
+    return c;
   }
 
   // The countdown badge: a ring that empties around the seconds left, centred at (cx, cy).
   drawCountdownBadge(cx, cy, r, c) {
     const g = this.g;
-    const fadeIn = Math.min(1, (c.total - c.remaining) / 0.5); // eases in at the start of the gap, out as the notes return
-    const fadeOut = Math.min(1, c.remaining / 0.6);
-    const secs = c.dim ? Math.round(c.total) : Math.ceil(c.remaining); // a dim badge (past / future) shows the length of the rest
+    const secs = c.dim ? Math.round(c.total) : c.label ?? Math.ceil(c.remaining); // a dim badge (past / future) shows the length of the rest in seconds; a live one the measures or the seconds left
     const urgent = !c.dim && c.remaining <= 3.05;
     g.save();
-    g.globalAlpha *= c.dim ?? Math.min(fadeIn, fadeOut);
+    g.globalAlpha *= c.dim ?? countdownAlpha(c); // eases in at the start of the gap and out before the notes return (YARG's fade)
     g.beginPath();
     g.arc(cx, cy, r, 0, Math.PI * 2);
     g.fillStyle = 'rgba(8,11,16,0.72)';
@@ -1327,7 +1333,7 @@ export class Highway {
       const amt = heldAmount(n, t);
       const white = Math.min(1, k + amt * (0.32 + 0.12 * shimmer)); // an active long note's head is lighter, like its tail
       // ghost notes are dimmed, accents are larger (YARG draws them the same way)
-      g.globalAlpha = (1 - k) * (n.ghost ? GHOST_ALPHA : 1);
+      g.globalAlpha = (1 - k) * (this.replayWindow && n.time >= this.replayWindow.from && n.time <= this.replayWindow.to ? REPLAY_ALPHA : n.ghost ? GHOST_ALPHA : 1); // disabled while replaying a rewound stretch
       const cx = x0 + (n.lane + 0.5) * laneW;
       const r = radius * noteScale(n) * (1 + 0.4 * k) * (1 + (pulse - 1) * amt);
       if (amt > 0) { // a soft halo while the note is held
