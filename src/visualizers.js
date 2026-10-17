@@ -725,9 +725,9 @@ const ringsViz = (ctx) => ({
   },
 });
 
-// The MIDI equalizer: one equalizer per instrument, each in its own colour and in its own band, stacked from the top of the picture downwards (the
-// first instrument on top). A bar hangs from the top edge of its band with the notes being played, trailing echoes behind it and a peak cap that
-// falls, so the guitar, the bass, the drums and the voice can be told apart.
+// The MIDI equalizer: one equalizer per instrument, each in its own colour. They all hang from the same top edge, but each is taller than the one
+// before (the first instrument has the shortest bars, the last the tallest), and the taller ones are drawn first, behind: every instrument shows
+// its own bars below the shorter ones. A bar follows the notes being played, with trailing echoes and a peak cap that falls.
 const EQ_MAX_BARS = 96;
 const eqViz = (ctx) => {
   const bufs = Array.from({ length: 8 }, () => ({ now: new Float32Array(EQ_MAX_BARS), past: new Float32Array(EQ_MAX_BARS), peak: new Float32Array(EQ_MAX_BARS) }));
@@ -743,17 +743,16 @@ const eqViz = (ctx) => {
       const spread = Math.max(3, n / 14); // each note lights a wide soft hill, so the bars fill the whole width
       const echoes = L <= 2 ? [0.09, 0.2, 0.34] : [0.12, 0.27]; // seconds back: the delayed copies that trail behind the bars
       const peakSteps = L <= 2 ? 6 : 4;
-      const band = h / L; // each instrument's band, one under the other
-      const maxH = band * 0.9; // the bars hang from the top of the band and reach most of the way down it
+      const heightOf = (li) => h * (L === 1 ? 0.9 : 0.28 + 0.62 * (li / (L - 1))); // the tallest bar of a layer: growing with the layer
       g.save();
-      g.globalCompositeOperation = 'lighter';
+      g.globalCompositeOperation = L > 1 ? 'source-over' : 'lighter'; // (the layers overlap at the top: added together they would turn white)
       g.font = '600 11px system-ui, sans-serif';
-      g.textBaseline = 'top';
-      for (let li = 0; li < L; li++) {
+      g.textBaseline = 'bottom';
+      for (let li = L - 1; li >= 0; li--) { // the tallest layer first (at the back), the shortest last (in front)
         const { kind, events } = layers[li];
         const { now, past, peak } = bufs[li];
         const col = layerColor(kind, li, pal);
-        const top = li * band;
+        const maxH = heightOf(li);
         spectrumAt(events, s.t, n, now, spread);
         peak.fill(0, 0, n); // the highest level over the last 0.5 s, shown as a cap that "falls"
         for (let k = 0; k <= peakSteps; k++) {
@@ -762,11 +761,10 @@ const eqViz = (ctx) => {
         }
         echoes.forEach((dt, e) => { // trails: the same spectrum a moment earlier, longer and fainter
           spectrumAt(events, s.t - dt, n, past, spread);
-          const a = 0.2 - e * 0.06;
-          g.fillStyle = rgba(col, a);
+          g.fillStyle = rgba(col, 0.2 - e * 0.06);
           for (let b = 0; b < n; b++) {
             const v = Math.min(1.15, level(past[b]) + 0.03);
-            g.fillRect(b * bw + bw * 0.1, top, bw * 0.8, v * maxH * (1 + 0.06 * (e + 1)));
+            g.fillRect(b * bw + bw * 0.1, 0, bw * 0.8, v * maxH * (1 + 0.06 * (e + 1)));
           }
         });
         for (let b = 0; b < n; b++) {
@@ -774,20 +772,19 @@ const eqViz = (ctx) => {
           const v = Math.min(1.15, level(now[b]) + idle);
           const bh = v * maxH;
           const x = b * bw + bw * 0.12;
-          const gr = g.createLinearGradient(0, top, 0, top + bh);
-          gr.addColorStop(0, rgba(col, 0.35));
+          const gr = g.createLinearGradient(0, 0, 0, bh);
+          gr.addColorStop(0, rgba(col, L > 1 ? 0.8 : 0.35));
           gr.addColorStop(1, rgba(col, 0.95));
           g.fillStyle = gr;
-          g.fillRect(x, top, bw * 0.76, bh);
-          g.fillStyle = rgba([255, 255, 255], 0.85); // the tip glows
-          g.fillRect(x, top + bh - 3, bw * 0.76, 3);
+          g.fillRect(x, 0, bw * 0.76, bh);
+          g.fillStyle = rgba([255, 255, 255], L > 1 ? 0.55 : 0.85); // the tip glows
+          g.fillRect(x, bh - 3, bw * 0.76, 3);
           const ph = Math.min(1.15, peak[b] + idle) * maxH; // the peak cap
-          if (ph > bh + 4) { g.fillStyle = rgba(col, 0.9); g.fillRect(x, top + ph - 2, bw * 0.76, 2); }
+          if (ph > bh + 4) { g.fillStyle = rgba(col, 0.9); g.fillRect(x, ph - 2, bw * 0.76, 2); }
         }
-        if (L > 1) { // the band's top line and the instrument's name
-          g.fillStyle = rgba(col, 0.5);
-          g.fillRect(0, top, w, 1);
-          if (kind) { g.fillStyle = rgba(col, 0.9); g.fillText(INSTRUMENT_NAMES[kind] ?? kind, 10, top + 4); }
+        if (L > 1 && kind) { // the instrument's name at the foot of its tallest bar
+          g.fillStyle = rgba(col, 0.9);
+          g.fillText(INSTRUMENT_NAMES[kind] ?? kind, 10, maxH + 14);
         }
       }
       g.restore();
