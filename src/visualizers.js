@@ -476,12 +476,12 @@ const coverViz = (ctx) => {
       g.save();
       g.imageSmoothingEnabled = true;
       g.imageSmoothingQuality = 'high';
-      // The camera pans softly and organically over the whole picture, also the parts that are off screen (the cover is a square cropped to the
+      // The camera pans organically over the whole picture, also the parts that are off screen (the cover is a square cropped to the
       // window): each axis is three slow waves of unrelated speeds added together (so the path never repeats in an obvious loop and never moves in a
       // straight line), reaching as far as the edge without showing it. Song time only: it stands still when the music is paused.
       const room = (view) => Math.max(view * 0.03, (size * zoom - view) / 2 - amp * zoom * 1.5);
       const wander = (t, f, ph) => 0.55 * Math.sin(t * f[0] + ph[0]) + 0.3 * Math.sin(t * f[1] + ph[1]) + 0.15 * Math.sin(t * f[2] + ph[2]); // -1..1
-      g.translate(w / 2 + wander(s.t, [0.041, 0.093, 0.157], [0.6, 2.1, 4.4]) * room(w), h / 2 + wander(s.t, [0.033, 0.077, 0.139], [2.2, 0.4, 3.3]) * room(h));
+      g.translate(w / 2 + wander(s.t, [0.1, 0.23, 0.39], [0.6, 2.1, 4.4]) * room(w), h / 2 + wander(s.t, [0.08, 0.19, 0.33], [2.2, 0.4, 3.3]) * room(h));
       g.scale(zoom, zoom);
       const x0 = -size / 2;
       const y0 = -size / 2;
