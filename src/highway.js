@@ -1654,16 +1654,12 @@ export class Highway {
     while (prevI >= 0 && notes[prevI].talkie) prevI--;
     const prev = prevI >= 0 ? notes[prevI] : null;
     let env = envOf(n);
-    let lead = n; // the note whose position the glow takes
-    if (prev) {
-      const ep = envOf(prev);
-      if (ep > env) { env = ep; lead = prev; } // still holding the previous note while the new one fades in
-    }
+    if (prev) env = Math.max(env, envOf(prev)); // the strength carries over from the previous note while the new one fades in (the position does not: it is always the latest note's)
     if (env <= 0.004) return;
-    let y = this.vocalLineY(lead, lead === n ? prev : notes[prevI - 1] ?? null, hitX);
+    let y = this.vocalLineY(n, prev, hitX);
     const next = notes[i + 1];
     if (next && !next.talkie && next.slide) y = this.vocalLineY(next, n, hitX) ?? y; // on the ribbon that joins a slide
-    if (y === null || y === undefined) y = vocY(lead.pitch);
+    if (y === null || y === undefined) y = vocY(n.pitch);
     const g = this.g;
     const v = 0.5 + 0.5 * Math.sin(t * 9 + n.time * 3) * 0.6 + 0.5 * Math.sin(t * 23 + n.time * 7) * 0.4; // 0..1, varying
     const R = Math.max(9, half * 1.8) * (0.9 + 0.2 * v); // the body of the glow
