@@ -367,3 +367,4 @@ Only checked by synthetic test, headless run or code reading:
 - The details card that held the speed slider is titled "Speed" (it was "Settings") and the slider row starts with the speed gauge icon instead of the word; the section name in the settings page is "Speed" too.
 - Track volumes are remembered (`src/volmemory.js`, store key `stemVolumes`, setting `audio.rememberVolumes`, default on): moving or resetting a track's or an instrument group's slider stores its level by track label / group key (default levels have no entry; debounced 250 ms) and `buildMixer` restores them; mute and solo are not remembered, the master has its own memory.
 - The library window has no bottom margin (`bottom: 0`); top, left and right keep `--lib-gap`.
+- Minimizing the library (back arrow, or L with the list open: `minimizeLibrary`) closes the details too; the dock button already did. Auto-hide after picking a song and Play still close only the list.

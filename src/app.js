@@ -181,7 +181,13 @@ window.matchMedia('(max-width: 700px)').addEventListener('change', (e) => {
   if (e.matches) setLibraryOpen(false, false);
   syncPanelUi();
 });
-els.closeLibrary.addEventListener('click', () => setLibraryOpen(false, false));
+// Minimizing the library (its back arrow, or L while the list is open) closes the details with it: the window goes away as a whole.
+// (Other things that close the list on their own, like picking a song with auto-hide, leave the details up.)
+function minimizeLibrary() {
+  setLibraryOpen(false, false);
+  if (infoOpen) setInfoOpen(false);
+}
+els.closeLibrary.addEventListener('click', minimizeLibrary);
 els.scrim.addEventListener('click', () => { if (infoOpen) setInfoOpen(false); setLibraryOpen(false, false); }); // (phone) everything out of the way
 els.welcomeOpen.addEventListener('click', () => setLibraryOpen(true));
 // The dock: a handle on the left edge; hovering it (mouse) or clicking/tapping it opens the Library and Settings buttons, which fold back
@@ -2887,7 +2893,7 @@ const SHORTCUT_HANDLERS = {
   playPause: () => { if (chart) togglePlay(); },
   details: () => { if (current || loadInfo.state !== 'idle') setInfoOpen(!infoOpen); },
   search: () => focusSearch(),
-  library: () => setLibraryOpen(!libraryOpen()),
+  library: () => (libraryOpen() ? minimizeLibrary() : setLibraryOpen(true)),
   topBar: () => setBarHidden(!els.app.classList.contains('bar-hidden')),
   fullscreen: () => toggleFullscreen(),
   view3d: () => setView(highway.view === '3d' ? '2d' : '3d'),
