@@ -2917,16 +2917,17 @@ highway.vizFps = () => vizFps;
 const vizBtn = document.getElementById('visualizerBtn');
 const vizPop = document.getElementById('visualizerPop');
 // A slider row led by an icon instead of a text label (shown only when a visualizer is selected).
-function vizSlider(icon, label, min, max, step, pref) {
+function vizSlider(icon, label, min, max, step, pref, unit = '') {
   const row = document.createElement('label');
   row.className = 'viz-level viz-slider';
   row.title = label;
   row.innerHTML = `<svg aria-hidden="true"><use href="#${icon}"/></svg><input type="range" min="${min}" max="${max}" step="${step}" aria-label="${label}"><output></output>`;
   const input = row.querySelector('input');
   input.addEventListener('input', () => prefs.set(pref, Number(input.value)));
-  return { row, input, output: row.querySelector('output') };
+  return { row, input, output: row.querySelector('output'), pref, unit };
 }
-const vizBlur = vizSlider('i-blur', 'Blur', 0, 40, 1, 'highway.visualizerBlur');
+const vizBlur = vizSlider('i-blur', 'Blur', 0, 40, 1, 'highway.visualizerBlur', 'px');
+const vizOpacity = vizSlider('i-opacity', 'Opacity', 0, 100, 1, 'highway.visualizerOpacity', '%');
 const vizColor = document.createElement('div'); // the stage colour: shown with "None" too, and behind visualizers that let it through
 vizColor.className = 'viz-level viz-color';
 vizColor.innerHTML = '<span>Background</span><span class="viz-color-row"><input type="color" aria-label="Stage colour"><button type="button" class="seg-btn">Theme</button></span><output></output>';
@@ -2950,7 +2951,7 @@ vizList.replaceChildren(...VISUALIZERS.map((v) => {
 }));
 const vizFoot = document.createElement('div');
 vizFoot.className = 'viz-foot';
-vizFoot.append(vizBlur.row, vizColor);
+vizFoot.append(vizOpacity.row, vizBlur.row, vizColor);
 vizPop.replaceChildren(vizList, vizFoot);
 // The visualizer's blur is a glass layer over the background canvas (CSS backdrop-filter, composited on the GPU) instead of
 // a blur drawn into the canvas every frame; the chart canvas is above it, so the notes stay sharp.
@@ -2967,12 +2968,18 @@ function syncVizPop() {
     row.dataset.active = String(row.dataset.id === id);
     row.setAttribute('aria-selected', String(row.dataset.id === id));
   }
-  vizBlur.row.hidden = id === 'none';
-  vizBlur.input.value = prefs.get('highway.visualizerBlur');
+  for (const sl of [vizOpacity, vizBlur]) {
+    sl.row.hidden = id === 'none';
+    sl.input.value = prefs.get(sl.pref);
+    sl.output.textContent = `${sl.input.value}${sl.unit}`;
+  }
   const custom = prefs.get('highway.stageColorOn');
   vizColorInput.value = custom ? prefs.get('highway.stageColor') : themeStage;
   vizColor.querySelector('button').hidden = !custom;
-  vizBlur.output.textContent = `${vizBlur.input.value}px`;
+}
+// The opacity of the visualizer over the stage colour: the background canvas is made translucent (the stage colour is the CSS background behind it).
+function applyVizOpacity() {
+  document.documentElement.style.setProperty('--viz-opacity', String(prefs.get('highway.visualizerOpacity') / 100));
 }
 popovers.push([vizBtn, vizPop]);
 registerPopover(vizBtn, vizPop);
@@ -3295,6 +3302,7 @@ const EFFECTS = {
   'highway.visualizer': (v) => { vizDriver.select(v); highway.setVisualizer(vizDriver.fn); applyVizGlass(); syncVizPop(); },
   'highway.visualizerQuality': (v) => { vizDriver.quality = { high: 1, medium: 0.6, low: 0.4 }[v] ?? 0.6; },
   'highway.visualizerFps': (v) => { vizFps = v === 'unlimited' ? Infinity : Math.max(1, Number(v) || 60); highway.invalidate(); },
+  'highway.visualizerOpacity': () => { applyVizOpacity(); syncVizPop(); },
   'highway.visualizerBlur': () => { applyVizGlass(); syncVizPop(); },
   'highway.trackOpacity': (v) => { highway.trackOpacity = v / 100; },
   'highway.stageColorOn': () => { applyStage(); syncVizPop(); },

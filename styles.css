@@ -2314,3 +2314,8 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 
 /* An off card shows what a click on it will select: the type and the difficulty, tinted like a pressed button */
 .seg button[data-next="true"] { background: color-mix(in srgb, var(--accent) 26%, transparent); color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
+
+/* The visualizer's opacity (the picker's slider and the setting) */
+.bg-canvas { opacity: var(--viz-opacity, 1); }
+/* The slider rows of the visualizer picker: icon, slider, value (the generic .viz-level columns left a 70 px gap after the icon) */
+.viz-pop .viz-level.viz-slider { grid-template-columns: 22px 1fr 44px; padding-block: 4px; }
