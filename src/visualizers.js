@@ -857,6 +857,7 @@ const eqViz = (ctx) => {
 
 const EMBERS = 150;
 const embersViz = (ctx) => {
+  const melTmp = { pitch: 0.5, energy: 0 };
   const sprites = memo();
   const glow = memo();
   return {
@@ -868,7 +869,7 @@ const embersViz = (ctx) => {
       const layers = ctx.song.layers ?? [];
       const cols = layers.length ? layers.map((l, i) => tint(layerColor(l.kind, i, pal), 0.35)) : [pal.va, pal.v[0], pal.v[1], [255, 220, 150]];
       const set = sprites(`${pal.v.join()}|${cols.join('|')}`, () => cols.map(glowSprite));
-      const heat = layers.map((l) => (l.shown !== false ? 0.35 + 1.2 * hitLevel(l.events, s.t, layerGain(l.kind)) : 0.22)); // how lively each instrument's sparks are
+      const heat = layers.map((l) => (l.shown !== false ? 0.55 + 0.75 * melodyAt(l.events, s.t, layerGain(l.kind), melTmp).energy : 0.22)); // how lively each instrument's sparks are: a slow swell, not a flash per note
       g.fillStyle = glow(`${h}${pal.va}`, () => {
         const gr = g.createLinearGradient(0, h, 0, h * 0.4);
         gr.addColorStop(0, rgba(pal.va, 0.35));
@@ -1051,6 +1052,7 @@ const radialViz = (ctx) => {
 // together. Busy music and singing make them brighter and wider; star power turns them warm and widens the sweep.
 const spotViz = (ctx) => {
   const haze = memo();
+  const melTmp = { pitch: 0.5, energy: 0 };
   return {
     // One beam per instrument of the song (at least three), each in the instrument's colour and as strong as the instrument is playing (the instruments'
     // reactions are exaggerated, the voice's are not); an instrument that is not on screen has a faint beam. Without layers: the palette's beams.
@@ -1078,7 +1080,7 @@ const spotViz = (ctx) => {
         const ang = beamAngle(i, n, s.beat.pos) * (1.35 + 0.35 * s.sp); // wider sweeps
         const base = layer ? layerColor(layer.kind, i, pal) : pal.v[i % 4];
         const col = mixRgb(layer ? tint(base, 0.3) : base, warm, 0.65 * s.sp).map(Math.round); // (a beam is light: a lighter version of the instrument's colour)
-        const power = layer ? (layer.shown !== false ? clamp01(0.3 + 1.3 * hitLevel(layer.events, s.t, layerGain(layer.kind))) : 0.18) : 1;
+        const power = layer ? (layer.shown !== false ? 0.55 + 0.45 * melodyAt(layer.events, s.t, layerGain(layer.kind), melTmp).energy : 0.2) : 1; // a slow swell (the energy glides over about a second), never a flash on every note
         const half = (0.17 + 0.03 * s.vocal + 0.03 * s.density) * (0.8 + 0.4 * power); // wide cones: they overlap and fill the stage // half-opening of the cone, radians
         g.save();
         g.translate(x, -4);
