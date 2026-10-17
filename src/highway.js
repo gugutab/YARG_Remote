@@ -90,6 +90,7 @@ const lyricFont = (size) => {
 };
 const trackStyles = new Map(); // alpha -> [black, white] fill styles of trackBase
 const NO_SHIFTS = [];
+const PERC_HOLD = 0.4; // seconds a percussion hit stays on the hit line (its quick pulse)
 const PERC_RINGS = [[0, 1.9, 3.5], [0.18, 1.4, 2]]; // percussion hit: [delay, growth, width] of the two rings
 
 // Speed of the vocal chart in pixels per second at the default neck speed: a 1000 px wide window shows 2.5 s ahead, a wider one more.
@@ -1452,14 +1453,14 @@ export class Highway {
     const percussion = chart.percussion;
     for (let i = 0; percussion && i < percussion.length; i++) {
       const p = percussion[i];
-      if (p.time < t - behind || p.time > t + ahead) continue;
-      const x = vocX(p.time);
       const past = t - p.time;
+      if (past > PERC_HOLD || p.time > t + ahead) continue; // a hit stops on the hit line, pulses there for a moment and is gone (it does not scroll past)
+      const x = past > 0 ? hitX : vocX(p.time);
       const r = Math.max(14, Math.min(22, h * 0.08)); // percussion marker radius
-      const k = past > 0 ? Math.min(1, past / 0.5) : 0; // 0..1 over the half second after the hit
+      const k = past > 0 ? Math.min(1, past / PERC_HOLD) : 0; // 0..1 over the pulse
       g.save();
-      g.globalAlpha = past > 0.5 ? 0.4 : 1;
-      if (past > 0 && past < 0.5) {
+      g.globalAlpha = past > PERC_HOLD * 0.7 ? 1 - (past - PERC_HOLD * 0.7) / (PERC_HOLD * 0.3) : 1;
+      if (past > 0 && past < PERC_HOLD) {
         const fade = 1 - k;
         const glow = g.createRadialGradient(x, percussionY, r * 0.4, x, percussionY, r * (2.2 + k));
         glow.addColorStop(0, `rgba(108,182,255,${0.55 * fade})`);
@@ -1490,8 +1491,8 @@ export class Highway {
           g.stroke();
         }
       }
-      const pop = past > 0 && past < 0.2 ? 1 + 0.5 * Math.sin((Math.PI * past) / 0.2) : 1; // the ball swells and settles
-      const lit = past > 0 && past < 0.35 ? 1 - past / 0.35 : 0; // and flashes from blue-white back to white
+      const pop = past > 0 && past < 0.12 ? 1 + 0.65 * Math.sin((Math.PI * past) / 0.12) : 1; // a quick beat: the ball swells and settles in 0.12 s
+      const lit = past > 0 && past < PERC_HOLD ? 1 - past / PERC_HOLD : 0; // and flashes from blue-white back to white
       g.beginPath();
       g.arc(x, percussionY, r * pop, 0, Math.PI * 2);
       g.fillStyle = lit > 0 ? `rgb(${Math.round(230 - 122 * lit)},${Math.round(237 - 55 * lit)},255)` : '#e6edf3';
