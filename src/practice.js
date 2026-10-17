@@ -21,8 +21,9 @@ export function restartNote(leftSec) {
   return leftSec > 0 ? `Restarting loop in ${Math.ceil(leftSec - 1e-9)}` : '';
 }
 
-// Should the quick-settings panel be on screen? `s` holds the app's state; every reason to stay hidden is one flag.
+// Should the quick-settings panel be on screen? `s` holds the app's state; every reason to stay hidden is one flag (`infoVisible`: the song info
+// overlay is still on screen, the panel waits until it has faded).
 export function pausePanelWanted(s) {
   return !!(s.enabled && s.pausedByUser && !s.playing && s.ready && !s.waiting && !s.listen && !s.background && !s.liveStage
-    && !s.ended && !s.hidden && !s.focusLost && !s.overlayOpen && !s.dismissed);
+    && !s.ended && !s.hidden && !s.focusLost && !s.overlayOpen && !s.infoVisible && !s.dismissed);
 }

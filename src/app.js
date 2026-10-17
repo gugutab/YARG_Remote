@@ -901,6 +901,7 @@ async function selectSong(song) {
   const token = ++loadToken;
   clearRewind();
   if (!keep) { cancelStartWait(); hideSongInfo(); }
+  else if (startDone && keep.song !== song) cancelStartWait(); // a start delay waiting on the stage: browsing another song's details cancels it (the song stays paused at 0; a song already playing keeps playing)
   setEnded(false);
   // (the sound that is playing is left alone: browsing the details of another song does not stop it; the audio of the new song, when it
   // loads, replaces it, and the old decoded audio is freed then)
@@ -1834,7 +1835,7 @@ function applyStem(st) {
 // Settings: one value each, shown by every [data-setting] slider (menu popover and info screen).
 const SETTING_DEFAULTS = { speed: 1, neck: 1.2, chartDelay: 0 };
 const SETTING_FORMAT = {
-  speed: (v) => `${Number(v.toFixed(2))}×`,
+  speed: (v) => `${Number(v.toFixed(2))}×`, // (also the bar's readout, the quick settings and the speed note)
   neck: (v) => `${v.toFixed(1)}×`,
   // Chart delay: only the highway is shifted. Positive = notes arrive later than the audio.
   chartDelay: (v) => `${v >= 0 ? '+' : ''}${v.toFixed(2)} s`,
@@ -1848,7 +1849,7 @@ function setSetting(name, value) {
   for (const out of document.querySelectorAll(`[data-out="${name}"]`)) out.textContent = SETTING_FORMAT[name](value);
   for (const btn of document.querySelectorAll(`[data-reset="${name}"]`)) btn.disabled = value === SETTING_DEFAULTS[name];
   if (name === 'chartDelay') { paintSectionTicks(); highway.delay = value; }
-  if (name === 'speed') { player.setRate(value); els.speedVal.textContent = `${Number(value.toFixed(2))}×`; }
+  if (name === 'speed') { player.setRate(value); els.speedVal.textContent = SETTING_FORMAT.speed(value); }
   if (name === 'neck') highway.setNeckSpeed(value);
 }
 // The mouse wheel over any slider moves it (up = more, 5 notches... one step per notch; a slider with many steps moves 2% of its range per
@@ -2081,6 +2082,7 @@ const timeLeft = (at) => `calc(${(at / (seekMax() || 1)).toFixed(5)} * (100% - 1
 
 function setLoop(range) {
   cancelLoopWait();
+  loopHeld = false;
   if (range) clearRewind();
   loop = range && seekMax() > 0 ? range : null;
   loopPrev = null;
@@ -2100,15 +2102,18 @@ function paintLoop() {
 // A: the loop start / B: the loop end at the playhead (an end set past the other one swaps them; shorter than MIN_LOOP is refused).
 function setLoopHere(which) {
   if (!chart || liveStage || !ready) return;
-  const range = setLoopPoint(loop, which, player.currentTime(), seekMax(), MIN_LOOP);
+  const at = player.currentTime();
+  const range = setLoopPoint(loop, which, at, seekMax(), MIN_LOOP);
   if (!range) { flashNote('Loop too short'); return; }
   setLoop(range);
-  flashNote(which === 'start' ? 'Loop start set' : 'Loop end set');
+  // say what changed: an end set past the other one swaps them, so the pressed key may have become the other end
+  flashNote(Math.abs(range.start - Math.max(0, Math.min(at, seekMax()))) < 1e-9 ? 'Loop start set' : 'Loop end set');
   rewindIntoLoop();
 }
 // Loop restart delay (YARG's practice restart delay): at the loop end the song pauses (the play button keeps its playing state, the fretboards stay at the end)
 // for playback.loopRestartDelay seconds, then restarts like a normal wrap. Play/pause, a seek, a loop change, a focus-loss pause or closing the song cancel it.
 let loopWait = null; // { until, timer, shown } while the wait runs
+let loopHeld = false; // the user paused during the wait: the next Play does the wrap itself (the hold was served for this pass)
 function cancelLoopWait() {
   if (!loopWait) return;
   clearInterval(loopWait.timer);
@@ -2325,7 +2330,7 @@ async function togglePlay() {
     syncPlayButton();
     return;
   }
-  if (loopWait) { cancelLoopWait(); return; } // Play (pause) pressed during the loop restart delay: stay paused at the loop end
+  if (loopWait) { rememberPause(); cancelLoopWait(); loopHeld = true; return; } // Play (pause) pressed during the loop restart delay: a user pause at the loop end (the panel shows, Play resumes with the wrap)
   if (resumeTimer) { cancelResumeRewind(); syncPlayButton(); return; } // Play pressed again during the rewind: stay paused
   if (startDone) { cancelStartWait(); syncPlayButton(); return; } // Play (pause) pressed during the start delay: stay at the start
   if (player.playing && !backgroundAudio()) {
@@ -2339,6 +2344,10 @@ async function togglePlay() {
     markStageLive(); // (the audio may have been loaded by the Listen card with the stage held: now the chart and the bar come in)
     releaseStage();
     if (await rewindBeforePlay()) return; // (resumed from a pause: the rewind starts the sound itself)
+    if (loopHeld) { // paused during the loop restart delay: the hold was served, restart the loop now instead of waiting again
+      loopHeld = false;
+      if (loop) { wrapLoop(); loopPrev = null; }
+    }
     const plan = startPlan({
       fresh: isFreshStart({ position: player.currentTime(), resumed: pausedAt !== null, loop: !!loop, background: listenMode || backgroundAudio(), ended }),
       delay: prefs.get('playback.startDelay'), overlayOn: prefs.get('playback.songInfoOverlay'), keep: prefs.get('playback.keepSongInfo'), firstOfSong: infoShownFor !== current?.song,
@@ -2449,7 +2458,7 @@ let ended = false;
 let endDismissed = false;
 let endShown = false;
 const NEXT_COUNT = 20;
-player.onSeek = () => { cancelLoopWait(); metronome.reset(); setEnded(false); cancelStartWait(); if (!internalSeek) clearRewind(); }; // (a seek of the user ends a rewind; the rewind's own seek does not)
+player.onSeek = () => { cancelLoopWait(); loopHeld = false; metronome.reset(); setEnded(false); cancelStartWait(); if (!internalSeek) clearRewind(); }; // (a seek of the user ends a rewind; the rewind's own seek does not)
 
 function setEnded(on) {
   if (ended === on) return;
@@ -2467,6 +2476,12 @@ async function restartSong() {
   if (!(await ensureAudio())) return;
   setEnded(false);
   player.seek(loop ? loop.start : 0);
+  // from the beginning it is a fresh Play: the start delay and the info overlay apply (not when it restarts a loop)
+  const plan = startPlan({
+    fresh: !loop, delay: prefs.get('playback.startDelay'), overlayOn: prefs.get('playback.songInfoOverlay'), keep: prefs.get('playback.keepSongInfo'), firstOfSong: infoShownFor !== current?.song,
+  });
+  if (plan.show) showSongInfo(plan.delay > 0 ? null : plan.hideMs);
+  if (plan.delay > 0) { await startAfterDelay(plan); return; }
   await player.play();
   syncPlayButton();
 }
@@ -3279,7 +3294,7 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (e.code === 'Escape') {
-    if (pausePanelShown) { ppDismissed = true; syncPausePanel(); return; } // the quick settings close (the song stays paused)
+    if (pausePanelShown && popovers.every(([, pop]) => pop.hidden)) { ppDismissed = true; syncPausePanel(); return; } // the quick settings close (the song stays paused); an open popover/menu goes first
     if (endShown && popovers.every(([, pop]) => pop.hidden)) { endDismissed = true; syncEndScreen(); els.play.focus({ preventScroll: true }); return; } // the end window goes, the fretboards come back
     if (popovers.every(([, pop]) => pop.hidden) && infoOpen) setInfoOpen(false); // details -> chart
     const open = popovers.find(([, pop]) => !pop.hidden);
@@ -3524,6 +3539,7 @@ function syncPausePanel() {
     enabled: prefs.get('playback.pausePanel'), pausedByUser: pausedAt !== null, playing: player.playing, ready, waiting: !!(startDone || resumeTimer || loopWait),
     listen: listenMode, background: backgroundAudio(), liveStage: !!liveStage, ended, hidden: document.hidden, focusLost,
     overlayOpen: infoOpen || (typeof settingsPage !== 'undefined' && settingsPage.isOpen()),
+    infoVisible: els.songInfo.classList.contains('show') && !prefs.get('playback.keepSongInfo'), // (a fading overlay: the panel waits for it; a kept one is covered by the panel instead)
   });
   if (!basic) ppDismissed = false; // (the Esc applies to this pause only)
   const want = basic && !ppDismissed;
@@ -3531,9 +3547,10 @@ function syncPausePanel() {
   if (!want) { clearTimeout(ppTimer); ppTimer = 0; }
   if (pausePanelShown && !want) pausePanelShown = false;
   const on = pausePanelShown;
+  els.songInfo.classList.toggle('under-panel', on); // (a kept overlay hides while the panel is up)
   if (els.pausePanel.classList.contains('show') !== on) { els.pausePanel.classList.toggle('show', on); els.pausePanel.setAttribute('aria-hidden', String(!on)); }
   if (!on) return;
-  const speed = `${Math.round(settings.speed * 100)}%`;
+  const speed = SETTING_FORMAT.speed(settings.speed);
   if (els.ppSpeed.textContent !== speed) els.ppSpeed.textContent = speed;
   const met = prefs.get('audio.metronome');
   if (els.ppMetronome.getAttribute('aria-pressed') !== String(met)) { els.ppMetronome.setAttribute('aria-pressed', String(met)); els.ppMetronome.textContent = met ? 'On' : 'Off'; }
@@ -3564,7 +3581,7 @@ function flashNote(text) {
 function stepSpeed(dir) {
   const v = dir ? Math.min(2, Math.max(0.2, Math.round((settings.speed + dir * 0.05) * 100) / 100)) : 1;
   setSetting('speed', v);
-  flashNote(`Speed ${Math.round(v * 100)}%`);
+  flashNote(`Speed ${SETTING_FORMAT.speed(v)}`);
 }
 const EFFECTS = {
   'audio.metronome': (v) => { metronome.setEnabled(v); paintMetronome(v); },

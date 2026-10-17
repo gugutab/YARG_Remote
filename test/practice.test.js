@@ -28,7 +28,7 @@ test('restartNote counts whole seconds', () => {
 test('pausePanelWanted needs a user pause and no blocker', () => {
   const ok = { enabled: true, pausedByUser: true, playing: false, ready: true };
   assert.equal(pausePanelWanted(ok), true);
-  for (const k of ['waiting', 'listen', 'background', 'liveStage', 'ended', 'hidden', 'focusLost', 'overlayOpen', 'dismissed']) assert.equal(pausePanelWanted({ ...ok, [k]: true }), false, k);
+  for (const k of ['waiting', 'listen', 'background', 'liveStage', 'ended', 'hidden', 'focusLost', 'overlayOpen', 'infoVisible', 'dismissed']) assert.equal(pausePanelWanted({ ...ok, [k]: true }), false, k);
   assert.equal(pausePanelWanted({ ...ok, enabled: false }), false);
   assert.equal(pausePanelWanted({ ...ok, pausedByUser: false }), false);
   assert.equal(pausePanelWanted({ ...ok, playing: true }), false);
