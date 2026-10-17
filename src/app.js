@@ -152,6 +152,21 @@ let dockTimer = 0; // (the dock's close timer; declared before syncPanelUi first
 // The dock on the left edge is always there (on a phone it gives way while a window is open: the drawer and the settings fill the screen).
 // It shows which windows are open: the Library button (the list and/or the song details) and the Settings button light up, and the handle
 // takes the accent colour; pressing the button of an open window closes it.
+// The settings window is fixed over the whole page; it leaves the player bar visible: the room the bar takes at the top or the bottom of the page
+// is published as --settings-top / --settings-bottom (the bar is not there before a song has played, or when it floats over the stage).
+function syncSettingsInsets() {
+  const bar = document.getElementById('topbar');
+  const r = bar.getBoundingClientRect();
+  const shown = r.height > 0 && getComputedStyle(bar).display !== 'none' && !els.app.classList.contains('stage-unborn') && !els.app.classList.contains('immersive');
+  const bottom = shown && els.app.classList.contains('bar-bottom') ? Math.max(0, Math.round(innerHeight - r.top)) : 0;
+  const top = shown && !els.app.classList.contains('bar-bottom') ? Math.max(0, Math.round(r.bottom)) : 0;
+  const root = document.documentElement.style;
+  if (root.getPropertyValue('--settings-bottom') !== `${bottom}px`) root.setProperty('--settings-bottom', `${bottom}px`);
+  if (root.getPropertyValue('--settings-top') !== `${top}px`) root.setProperty('--settings-top', `${top}px`);
+}
+window.addEventListener('resize', syncSettingsInsets);
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(syncSettingsInsets).observe(document.getElementById('topbar'));
+new MutationObserver(syncSettingsInsets).observe(els.app, { attributes: true, attributeFilter: ['class'] }); // (bar position, hidden bar, first play)
 let settingsFlag = false; // the settings window is open (set by its onOpen / onClose: the page object itself is created further down)
 const settingsIsOpen = () => settingsFlag;
 function syncPanelUi() {
@@ -3181,7 +3196,7 @@ reduceQuery.addEventListener?.('change', (e) => { osReduceMotion = e.matches; EF
 const settingsPage = mountSettings({
   root: document.getElementById('settingsPage'), settings: prefs, sections: SECTIONS,
   onClose: () => { settingsFlag = false; syncPanelUi(); },
-  onOpen: () => { settingsFlag = true; if (libraryOpen()) setLibraryOpen(false, false); if (infoOpen) setInfoOpen(false); syncPanelUi(); }, // (the list first, so it does not grow into the details' room; not remembered: the library comes back as it was at the next start)
+  onOpen: () => { settingsFlag = true; syncSettingsInsets(); if (libraryOpen()) setLibraryOpen(false, false); if (infoOpen) setInfoOpen(false); syncPanelUi(); }, // (the list first, so it does not grow into the details' room; not remembered: the library comes back as it was at the next start)
   renderers: {
     'shortcuts.bindings': (host, ctx) => renderShortcuts(host, { ...ctx, notify: setStatus }),
     theme: (host, ctx) => renderThemeStudio(host, { ...ctx, prefersDark: () => darkQuery.matches, notify: setStatus }),

@@ -2302,6 +2302,9 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .card-adjust .row-icon { width: 20px; height: 20px; color: var(--muted); }
 .card-adjust .row { grid-template-columns: 22px 1fr 52px 28px; }
 
-/* The library window reaches the bottom of the stage (no gap under it); the other three margins stay */
-.library { bottom: 0; }
-.win-edge { bottom: 14px; }
+/* The library window keeps its gap to the bottom of the stage again (--lib-gap, as on the other sides) */
+
+/* The settings window leaves the player bar visible: app.js (syncSettingsInsets) sets how much of the screen the bar takes at the top or at the bottom */
+@media (min-width: 701px) {
+  .settings-page { top: calc(var(--settings-top, 0px) + 16px); bottom: calc(var(--settings-bottom, 0px) + 16px); }
+}
