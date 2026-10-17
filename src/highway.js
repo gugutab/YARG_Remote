@@ -1638,21 +1638,24 @@ export class Highway {
     if (y0 === null) return;
     const g = this.g;
     const v = 0.5 + 0.5 * Math.sin(t * 9 + n.time * 3) * 0.6 + 0.5 * Math.sin(t * 23 + n.time * 7) * 0.4; // 0..1, varying
-    const R = Math.max(7, half * 1.55) * (0.9 + 0.2 * v); // a little larger than the note is thick
+    const R = Math.max(10, half * 2.1) * (0.9 + 0.2 * v); // the body of the glow: well larger than the note is thick
     g.save();
     g.fillStyle = color;
-    g.globalAlpha = 0.16 + 0.1 * v; // the outer halo
-    g.beginPath();
-    g.arc(hitX, y0, R * 1.35, 0, Math.PI * 2);
-    g.fill();
-    g.globalAlpha = 0.34 + 0.18 * v; // the glow
+    for (let q = 0; q < 12; q++) { // the light reaches far: many thin discs stacked, so the falloff is smooth (no visible steps), the farthest barely there
+      const k = 3.6 - q * 0.19;
+      g.globalAlpha = 0.032 * (0.75 + 0.5 * v);
+      g.beginPath();
+      g.arc(hitX, y0, R * k, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.globalAlpha = 0.4 + 0.2 * v; // the glow
     g.beginPath();
     g.arc(hitX, y0, R, 0, Math.PI * 2);
     g.fill();
     g.fillStyle = '#ffffff'; // the heart
-    g.globalAlpha = 0.45 + 0.3 * v;
+    g.globalAlpha = 0.5 + 0.3 * v;
     g.beginPath();
-    g.arc(hitX, y0, R * 0.5, 0, Math.PI * 2);
+    g.arc(hitX, y0, R * 0.48, 0, Math.PI * 2);
     g.fill();
     g.restore();
   }
