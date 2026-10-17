@@ -210,3 +210,18 @@ test('layerGain exaggerates the instruments but not the voice, and hitLevel take
   assert.ok(hitLevel(ev, 1.05, 1.7) > hitLevel(ev, 1.05));
   assert.equal(hitLevel(ev, 1.05), hitLevel(ev, 1.05, 1));
 });
+
+test('melodyAt follows the pitch of the recent notes smoothly and rests in the middle', async () => {
+  const { melodyAt, buildEvents } = await import('../src/visualizers.js');
+  const chart = { mode: 'lanes', lanes: 5, notes: [{ time: 1, end: 1, lane: 4 }, { time: 3, end: 3, lane: 0 }], duration: 10 }; // high, then low
+  const ev = buildEvents([chart]);
+  const at = (t) => melodyAt(ev, t, 1, {});
+  assert.ok(Math.abs(at(0).pitch - 0.5) < 1e-9 && at(0).energy === 0); // nothing yet: the middle, silent
+  assert.ok(at(1.5).pitch > 0.8 && at(1.5).energy > 0.2); // right after the high note
+  assert.ok(at(3.5).pitch < 0.5); // after the low one
+  assert.ok(Math.abs(at(30).pitch - 0.5) < 0.02 && at(30).energy < 0.01); // long after: back to rest
+  const a = at(1.0001).pitch;
+  const b = at(0.9999).pitch;
+  assert.ok(Math.abs(a - b) < 0.02); // continuous at the onset (the note fades in)
+  assert.ok(melodyAt(ev, 1.5, 1.7, {}).energy > at(1.5).energy); // the gain exaggerates the energy
+});

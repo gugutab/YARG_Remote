@@ -327,6 +327,26 @@ export function spectrumAt(events, t, bars, out, spread = 3) {
   return out;
 }
 
+// The melody of a set of events at t: `pitch` is the (smoothed) height of the notes played lately, 0..1 (a note counts for about a second after it ends, so the
+// value glides from note to note and rests at the middle with no notes), and `energy` how much is being played, 0..1. A note fades in over 0.12 s, so both are
+// continuous in t. Writes into `out`.
+export function melodyAt(events, t, gain = 1, out = {}) {
+  let sw = 0;
+  let sp = 0;
+  const from = lowerBound(events.times, t - 4 - events.maxLen);
+  for (let i = from; i < events.count && events.times[i] <= t; i++) {
+    const age = t - events.times[i];
+    const held = Math.min(4, Math.max(0, events.ends[i] - events.times[i]));
+    const w = Math.exp(-Math.max(0, age - held) / 0.8) * Math.min(1, age / 0.12);
+    if (w < 0.01) continue;
+    sw += w;
+    sp += w * events.pos[i];
+  }
+  out.pitch = (sp + 0.5 * 0.12) / (sw + 0.12);
+  out.energy = 1 - Math.exp(-sw * 0.45 * gain);
+  return out;
+}
+
 // ---------- Shapes of the newer effects (pure) ----------
 
 // Album art as cloth: how the strip at u (0..1 across the picture) is moved. Two travelling sine waves whose phase is the beat
@@ -509,100 +529,61 @@ const coverViz = (ctx) => {
   };
 };
 
-// Aurora: curtains of light hanging in the sky, one per instrument of the song, in the instrument's colour. Each curtain is made of vertical rays whose length
-// follows the notes that instrument is playing: its pitch is where along the sky the rays rise (like the equalizer's bars), and the notes are averaged over
-// the last quarter of a second, so the light swells and fades instead of flickering. The edge of a curtain sways on slow waves of the SONG time (never of the
-// beat count or a hit, which are what made the old aurora jump), so it moves steadily and only moves when the music does. Instruments that are not on screen
-// are faint. A busy part of the song fills the sky; star power warms it.
-const AURORA_MAX_COLS = 128;
+// Aurora: ribbons of light drifting across the night sky, one per instrument, in the instrument's colour. Unlike the equalizer (bars along the pitch axis)
+// the ribbon is one flowing line: its HEIGHT in the sky is the melody the instrument is playing (a high note lifts it, a low one lets it sink, gliding from
+// note to note, resting in the middle when it is silent), and how much it plays makes it wider, brighter and more wavy. The waves travel along it on the SONG
+// time (never the beat count or a single hit, which made the first version jump), so the motion is steady and only happens when the music does. Instruments
+// that are not on screen are faint. Star power warms the colours.
+const AURORA_POINTS = 40;
 const auroraViz = (ctx) => {
-  const bufs = Array.from({ length: 8 }, () => ({
-    now: new Float32Array(AURORA_MAX_COLS), past: new Float32Array(AURORA_MAX_COLS), lvl: new Float32Array(AURORA_MAX_COLS),
-    len: new Float32Array(AURORA_MAX_COLS), tmp: new Float32Array(AURORA_MAX_COLS), top: new Float32Array(AURORA_MAX_COLS), fill: null, fillKey: '',
-  }));
+  const mel = Array.from({ length: 8 }, () => ({ pitch: 0.5, energy: 0 }));
   const sky = memo();
-  const level = (v) => 1 - Math.exp(-v * 0.9);
   return {
     draw(g, s) {
       const { w, h } = s;
       const song = ctx.song;
       const pal = song.palette;
       const layers = song.layers?.length ? song.layers : [0, 1, 2].map((k) => ({ kind: '', events: song.events, shown: true, fallback: k }));
-      const L = Math.min(layers.length, bufs.length);
-      const n = Math.max(48, Math.min(AURORA_MAX_COLS, Math.round(w / 12)));
-      const cw = w / n;
-      const spread = Math.max(2.5, n / 18);
-      const wide = clamp01(0.55 + 0.4 * s.density + 0.25 * s.sp); // how much of the sky a busy part fills
+      const L = Math.min(layers.length, mel.length);
       g.save();
       g.fillStyle = sky(`${h}${pal.v[0]}${pal.v[2]}`, () => { // the night sky
         const gr = g.createLinearGradient(0, 0, 0, h);
-        gr.addColorStop(0, rgba(pal.v[2], 0.14));
-        gr.addColorStop(1, rgba(pal.v[0], 0.22));
+        gr.addColorStop(0, rgba(pal.v[2], 0.16));
+        gr.addColorStop(1, rgba(pal.v[0], 0.24));
         return gr;
       });
       g.fillRect(0, 0, w, h);
       g.globalCompositeOperation = 'lighter';
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+      const step = w / AURORA_POINTS;
       for (let li = 0; li < L; li++) {
         const layer = layers[li];
         const on = layer.shown !== false;
-        const b = bufs[li];
+        const m = melodyAt(layer.events, s.t, layerGain(layer.kind), mel[li]);
         const kindColor = layer.fallback === undefined ? layerColor(layer.kind, li, pal) : pal.v[layer.fallback % pal.v.length];
-        const col = mixRgb(tint(kindColor, 0.12), [255, 200, 120], 0.15 * s.sp).map(Math.round); // the instrument's colour (a hint lighter), kept saturated: added together the curtains would wash out
-        // the notes the instrument plays now and a moment ago, averaged: the level of every column of the sky
-        spectrumAt(layer.events, s.t, n, b.now, spread);
-        spectrumAt(layer.events, s.t - 0.12, n, b.past, spread);
-        for (let k = 0; k < n; k++) b.lvl[k] = b.now[k] * 0.4 + b.past[k] * 0.35;
-        spectrumAt(layer.events, s.t - 0.25, n, b.past, spread);
-        for (let k = 0; k < n; k++) b.lvl[k] += b.past[k] * 0.25;
-        const gain = layerGain(layer.kind);
-        const top0 = h * (0.03 + 0.17 * (L === 1 ? 0 : li / (L - 1))); // where the curtain hangs from
-        const reach = h * (0.5 + 0.12 * (L === 1 ? 0 : li / (L - 1))) * wide; // how far its longest rays fall
-        const f1 = 0.0045 + li * 0.0007; // radians per px: the swaying of the curtain's edge
-        const a1 = h * 0.05 * (0.6 + wide);
+        const col = mixRgb(tint(kindColor, 0.25), [255, 200, 120], 0.15 * s.sp).map(Math.round);
+        const e = m.energy;
+        const y0 = h * (0.74 - 0.56 * m.pitch); // the melody: high notes are high in the sky
+        const amp = h * (0.025 + 0.085 * e) * (0.8 + 0.4 * s.density);
+        const thick = h * (0.012 + 0.05 * e);
         const ph = li * 2.3 + song.seed % 7;
-        for (let k = 0; k < n; k++) { // the length of the rays, then smoothed along the sky (a smooth silhouette, not a row of bars)
-          b.tmp[k] = (0.12 + Math.min(1.25, level(b.lvl[k] * gain) + 0.05)) * reach;
-          const x = k * cw + cw / 2;
-          b.top[k] = top0 + Math.sin(x * f1 + s.t * 0.12 + ph) * a1 + Math.sin(x * f1 * 2.7 - s.t * 0.08 + ph * 1.7) * a1 * 0.45;
-        }
-        for (let pass = 0; pass < 2; pass++) {
-          for (let k = 0; k < n; k++) b.len[k] = (b.tmp[Math.max(0, k - 1)] + 2 * b.tmp[k] + b.tmp[Math.min(n - 1, k + 1)]) / 4;
-          b.tmp.set(b.len.subarray(0, n));
-        }
-        const key = `${Math.round(top0)}|${Math.round(reach)}|${col}`;
-        if (b.fillKey !== key) { // the glow: strongest near the top of the curtain, fading away downwards
-          const gr = g.createLinearGradient(0, top0 - a1, 0, top0 + reach * 1.15);
-          gr.addColorStop(0, rgba(col, 0));
-          gr.addColorStop(0.14, rgba(col, 0.42));
-          gr.addColorStop(0.55, rgba(col, 0.16));
-          gr.addColorStop(1, rgba(col, 0));
-          b.fill = gr;
-          b.fillKey = key;
+        const f1 = 0.0042 + li * 0.0006; // radians per px
+        const f2 = f1 * 2.6;
+        const v1 = (0.3 + li * 0.07) * (li % 2 ? -1 : 1); // radians per second: the waves travel along the ribbon, each one its own way
+        const v2 = 0.21 + li * 0.05;
+        g.beginPath();
+        for (let k = 0; k <= AURORA_POINTS; k++) {
+          const x = k * step;
+          const y = y0 + Math.sin(x * f1 - s.t * v1 + ph) * amp + Math.sin(x * f2 + s.t * v2 + ph * 1.7) * amp * 0.45;
+          if (k === 0) g.moveTo(x, y); else g.lineTo(x, y);
         }
         const k0 = on ? 1 : 0.22;
-        g.globalAlpha = k0;
-        g.fillStyle = b.fill;
-        g.beginPath(); // the curtain: between the swaying top edge and the smooth lower edge
-        g.moveTo(0, b.top[0]);
-        for (let k = 0; k < n; k++) g.lineTo(k * cw + cw / 2, b.top[k]);
-        g.lineTo(w, b.top[n - 1]);
-        g.lineTo(w, b.top[n - 1] + b.len[n - 1]);
-        for (let k = n - 1; k >= 0; k--) g.lineTo(k * cw + cw / 2, b.top[k] + b.len[k]);
-        g.lineTo(0, b.top[0] + b.len[0]);
-        g.closePath();
-        g.fill();
-        if (on) { // the rays: thin vertical streaks of light inside the curtain, each its own strength
-          g.strokeStyle = rgba(tint(col, 0.25), 0.07);
-          g.lineWidth = Math.max(1.5, cw * 0.4);
-          g.beginPath();
-          for (let k = 0; k < n; k++) {
-            const strength = 0.35 + 0.65 * hash01(k, li + 11);
-            const x = k * cw + cw / 2;
-            g.moveTo(x, b.top[k]);
-            g.lineTo(x, b.top[k] + b.len[k] * (0.45 + 0.5 * strength));
-          }
+        [[2.8, 0.05], [1.8, 0.09], [1.05, 0.15], [0.42, 0.26]].forEach(([wide, alpha]) => { // soft glow: the same line stroked wide and faint, then narrow and bright
+          g.lineWidth = thick * wide;
+          g.strokeStyle = rgba(col, alpha * k0 * (0.55 + 0.6 * e));
           g.stroke();
-        }
+        });
       }
       g.restore();
     },
