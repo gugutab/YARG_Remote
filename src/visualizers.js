@@ -731,12 +731,15 @@ const ringsViz = (ctx) => ({
 });
 
 // The MIDI equalizer: one equalizer per instrument of the song (all of them, whether or not its fretboard is on screen), each in its own colour. They all
-// hang from the same top edge, but each is taller than the one before (the first instrument has the shortest bars, the last the tallest) and the taller
-// ones are drawn first, behind. The instruments that are on screen are drawn in full, with echoes and a peak cap; the others are a faint, plain
-// version of the same bars. A vocal layer counts the lead and the harmony notes.
+// hang from the same top edge, but each is taller than the one before (the first instrument has the shortest bars, the last the tallest). Each layer is
+// a half-transparent veil over the taller ones behind it, so where bars overlap the colours blend into new ones (green over blue into teal, orange
+// under yellow into gold) and keep their saturation (added together they would wash out to white). The instruments on screen are drawn in full, with echoes and a peak cap; the others are a faint plain version. A vocal layer
+// counts the lead and the harmony notes.
+// Cheap on purpose: each layer is a few paths filled once (not a gradient and a rectangle per bar), and the colour ramp is one gradient per layer,
+// reused for all its bars (the colour follows the depth below the top edge).
 const EQ_MAX_BARS = 96;
 const eqViz = (ctx) => {
-  const bufs = Array.from({ length: 8 }, () => ({ now: new Float32Array(EQ_MAX_BARS), past: new Float32Array(EQ_MAX_BARS), peak: new Float32Array(EQ_MAX_BARS) }));
+  const bufs = Array.from({ length: 8 }, () => ({ now: new Float32Array(EQ_MAX_BARS), past: new Float32Array(EQ_MAX_BARS), peak: new Float32Array(EQ_MAX_BARS), ramp: null, rampKey: '' }));
   const level = (v) => Math.min(1.15, 1 - Math.exp(-v * 1.1));
   return {
     draw(g, s) {
@@ -748,57 +751,62 @@ const eqViz = (ctx) => {
       const bw = w / n;
       const spread = Math.max(3, n / 14); // each note lights a wide soft hill, so the bars fill the whole width
       const lit = layers.slice(0, L).filter((l) => l.shown !== false).length;
-      const echoes = lit <= 2 ? [0.09, 0.2, 0.34] : [0.12, 0.27]; // seconds back: the delayed copies that trail behind the bars
-      const peakSteps = lit <= 2 ? 6 : 4;
+      const echoes = lit <= 2 ? [0.09, 0.2, 0.34] : [0.14];
+      const peakSteps = lit <= 2 ? 6 : 3;
       const heightOf = (li) => h * (L === 1 ? 0.9 : 0.28 + 0.62 * (li / (L - 1))); // the tallest bar of a layer: growing with the layer
-      // the faint ones first (behind everything), then the lit ones; each group from the tallest to the shortest
-      const order = [...Array(L).keys()].sort((a, b) => (layers[a].shown !== false) - (layers[b].shown !== false) || b - a);
       g.save();
-      g.globalCompositeOperation = L > 1 ? 'source-over' : 'lighter'; // (the layers overlap at the top: added together they would turn white)
-      g.font = '600 11px system-ui, sans-serif';
-      g.textBaseline = 'bottom';
+      g.globalCompositeOperation = L > 1 ? 'source-over' : 'lighter';
+      // the faint layers first (behind), then the lit ones; each group from the tallest layer (back) to the shortest (front)
+      const order = [...Array(L).keys()].sort((x, y) => (layers[x].shown !== false) - (layers[y].shown !== false) || y - x);
       for (const li of order) {
         const { kind, events } = layers[li];
         const on = layers[li].shown !== false;
-        const { now, past, peak } = bufs[li];
+        const b = bufs[li];
+        const { now, past, peak } = b;
         const col = layerColor(kind, li, pal);
         const maxH = heightOf(li);
         spectrumAt(events, s.t, n, now, spread);
-        if (on) {
-          peak.fill(0, 0, n); // the highest level over the last 0.5 s, shown as a cap that "falls"
-          for (let k = 0; k <= peakSteps; k++) {
-            spectrumAt(events, s.t - k * 0.1, n, past, spread);
-            for (let b = 0; b < n; b++) peak[b] = Math.max(peak[b], level(past[b]) - k * 0.05);
-          }
-          echoes.forEach((dt, e) => { // trails: the same spectrum a moment earlier, longer and fainter
-            spectrumAt(events, s.t - dt, n, past, spread);
-            g.fillStyle = rgba(col, 0.2 - e * 0.06);
-            for (let b = 0; b < n; b++) {
-              const v = Math.min(1.15, level(past[b]) + 0.03);
-              g.fillRect(b * bw + bw * 0.1, 0, bw * 0.8, v * maxH * (1 + 0.06 * (e + 1)));
-            }
-          });
+        const idleAt = (k) => 0.04 + 0.03 * Math.sin(k * 0.45 + s.beat.pos * 1.3 + li);
+        if (!on) { // an instrument that is not on screen: a faint plain version
+          g.fillStyle = rgba(col, 0.15);
+          g.beginPath();
+          for (let k = 0; k < n; k++) g.rect(k * bw + bw * 0.12, 0, bw * 0.76, Math.min(1.15, level(now[k]) + idleAt(k)) * maxH);
+          g.fill();
+          continue;
         }
-        for (let b = 0; b < n; b++) {
-          const idle = 0.04 + 0.03 * Math.sin(b * 0.45 + s.beat.pos * 1.3 + li);
-          const v = Math.min(1.15, level(now[b]) + idle);
-          const bh = v * maxH;
-          const x = b * bw + bw * 0.12;
-          if (!on) { g.fillStyle = rgba(col, 0.16); g.fillRect(x, 0, bw * 0.76, bh); continue; } // an instrument that is not on screen: a faint plain bar
-          const gr = g.createLinearGradient(0, 0, 0, bh);
-          gr.addColorStop(0, rgba(col, L > 1 ? 0.8 : 0.35));
-          gr.addColorStop(1, rgba(col, 0.95));
-          g.fillStyle = gr;
-          g.fillRect(x, 0, bw * 0.76, bh);
-          g.fillStyle = rgba([255, 255, 255], L > 1 ? 0.55 : 0.85); // the tip glows
-          g.fillRect(x, bh - 3, bw * 0.76, 3);
-          const ph = Math.min(1.15, peak[b] + idle) * maxH; // the peak cap
-          if (ph > bh + 4) { g.fillStyle = rgba(col, 0.9); g.fillRect(x, ph - 2, bw * 0.76, 2); }
+        const key = `${Math.round(maxH)}|${col}|${L}`;
+        if (b.rampKey !== key) { // the colour ramp of this layer: stronger at the top edge, softer towards the tips
+          const gr = g.createLinearGradient(0, 0, 0, maxH);
+          gr.addColorStop(0, rgba(col, L > 1 ? 0.6 : 0.62));
+          gr.addColorStop(1, rgba(col, L > 1 ? 0.5 : 0.38));
+          b.ramp = gr;
+          b.rampKey = key;
         }
-        if (L > 1 && kind) { // the instrument's name at the foot of its tallest bar (brighter when it is on screen)
-          g.fillStyle = rgba(col, on ? 0.95 : 0.4);
-          g.fillText(INSTRUMENT_NAMES[kind] ?? kind, 10, maxH + 14);
+        peak.fill(0, 0, n); // the highest level over the last 0.5 s, shown as a cap that "falls"
+        for (let k = 0; k <= peakSteps; k++) {
+          spectrumAt(events, s.t - k * 0.1, n, past, spread);
+          for (let x = 0; x < n; x++) peak[x] = Math.max(peak[x], level(past[x]) - k * 0.05);
         }
+        echoes.forEach((dt, e) => { // trails: the same spectrum a moment earlier, longer and fainter
+          spectrumAt(events, s.t - dt, n, past, spread);
+          g.fillStyle = rgba(col, 0.16 - e * 0.04);
+          g.beginPath();
+          for (let k = 0; k < n; k++) g.rect(k * bw + bw * 0.1, 0, bw * 0.8, Math.min(1.15, level(past[k]) + 0.03) * maxH * (1 + 0.06 * (e + 1)));
+          g.fill();
+        });
+        g.fillStyle = b.ramp;
+        g.beginPath();
+        for (let k = 0; k < n; k++) g.rect(k * bw + bw * 0.12, 0, bw * 0.76, Math.min(1.15, level(now[k]) + idleAt(k)) * maxH);
+        g.fill();
+        g.fillStyle = rgba(col, 0.9); // the tips and the peak caps, in the layer's colour (one path each)
+        g.beginPath();
+        for (let k = 0; k < n; k++) {
+          const bh = Math.min(1.15, level(now[k]) + idleAt(k)) * maxH;
+          g.rect(k * bw + bw * 0.12, bh - 2, bw * 0.76, 2);
+          const ph = Math.min(1.15, peak[k] + idleAt(k)) * maxH;
+          if (ph > bh + 4) g.rect(k * bw + bw * 0.12, ph - 2, bw * 0.76, 2);
+        }
+        g.fill();
       }
       g.restore();
     },
