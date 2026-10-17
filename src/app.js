@@ -3224,9 +3224,14 @@ function frame(frameTs) {
         // right when the old end would have been heard.
         const ahead = ((player.outputLatency || 0) + 0.01) * player.rate;
         if (shouldWrap(loop, loopPrev, t, ahead)) {
-          player.seek(loop.start); // the audio restarts at once (no scrub)...
+          // The loop restarts one second before its start (the same rewind as after a pause) with the notes of that second drawn disabled, until the song reaches the start.
+          const back = prefs.get('playback.resumeRewind') ? Math.max(0, loop.start - PAUSE_REWIND_SEC) : loop.start;
+          internalSeek = true;
+          player.seek(back); // the audio restarts at once (no scrub)...
+          internalSeek = false;
           pendingSeekDur = 450; // ...and the fretboards rewind with the usual seek animation, a little quicker
-          t = loop.start;
+          t = back;
+          if (back < loop.start) { replay = { from: back, to: loop.start }; highway.replayWindow = replay; } else clearRewind();
         }
       }
       loopPrev = t;
