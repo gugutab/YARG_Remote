@@ -1681,8 +1681,8 @@ export class Highway {
       const P = (u, w) => [hitX + u * c - w * sn, y + u * sn + w * c]; // a point along (u) and across (w) the spike
       for (let q = 0; q < 4; q++) {
         const k = 1 - q * 0.2;
-        const L = len * k;
-        const W = wid * 1.4 * k;
+        const L = len * 0.4 * k; // 60 % shorter than before
+        const W = wid * 2.2 * k; // and thicker
         g.globalAlpha = strength * env * (0.1 + q * 0.09);
         g.beginPath();
         let first = true;
