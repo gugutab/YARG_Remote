@@ -1603,7 +1603,45 @@ export class Highway {
         this.vocalShape(n, prev, x1, bw, y, half, colors[0]);
         g.restore();
       }
+      if (colors && n.time <= t && t <= n.end) this.vocalHitFx(n, prev, t, y, half, colors[1], hitX); // a note sounding at the hit line
     }
+  }
+
+  // The hit zone while a note (the lead's or a harmony's) is sung: a soft halo that breathes on the note, a ring and a few spokes that burst out when it starts
+  // (not for the continuation of a slide), all in the note's colour. Only the notes at the line cost anything.
+  vocalHitFx(n, prev, t, y, half, color, hitX) {
+    const g = this.g;
+    const age = t - n.time;
+    half = Math.max(half, 9) * 1.35; // the notes are thin: the effect is sized for the eye, not for the ribbon
+    g.save();
+    g.fillStyle = color;
+    g.strokeStyle = color;
+    const breathe = 0.5 + 0.5 * Math.sin(t * 11 + n.time * 3); // a steady shimmer: slow enough not to flicker
+    for (const [k, a] of [[3.2, 0.14], [2.3, 0.22], [1.5, 0.34]]) { // the halo: three soft discs
+      g.globalAlpha = a * (0.75 + 0.25 * breathe);
+      g.beginPath();
+      g.arc(hitX, y, half * (k + 0.15 * breathe), 0, Math.PI * 2);
+      g.fill();
+    }
+    if (!(n.slide && prev && !prev.talkie) && age < 0.4) { // the burst at the start of the note
+      const k = age / 0.4;
+      g.globalAlpha = 0.9 * (1 - k);
+      g.lineWidth = Math.max(1.5, half * 0.35 * (1 - k));
+      g.beginPath();
+      g.arc(hitX, y, half * (1.2 + 3.6 * k), 0, Math.PI * 2);
+      g.stroke();
+      g.lineCap = 'round';
+      g.lineWidth = Math.max(1.5, half * 0.25 * (1 - k));
+      g.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const ang = (i * Math.PI) / 4 + 0.4;
+        const from = half * (1.6 + 2.2 * k);
+        g.moveTo(hitX + Math.cos(ang) * from, y + Math.sin(ang) * from);
+        g.lineTo(hitX + Math.cos(ang) * (from + half * 0.9 * (1 - k)), y + Math.sin(ang) * (from + half * 0.9 * (1 - k)));
+      }
+      g.stroke();
+    }
+    g.restore();
   }
 
   // Lowest and highest pitched note of the whole chart (and its harmonies), cached per chart.
