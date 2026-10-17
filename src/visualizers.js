@@ -562,28 +562,34 @@ const auroraViz = (ctx) => {
         const on = layer.shown !== false;
         const m = melodyAt(layer.events, s.t, layerGain(layer.kind), mel[li]);
         const kindColor = layer.fallback === undefined ? layerColor(layer.kind, li, pal) : pal.v[layer.fallback % pal.v.length];
-        const col = mixRgb(tint(kindColor, 0.25), [255, 200, 120], 0.15 * s.sp).map(Math.round);
+        const col = mixRgb(tint(kindColor, 0.1), [255, 200, 120], 0.15 * s.sp).map(Math.round);
         const e = m.energy;
-        const y0 = h * (0.74 - 0.56 * m.pitch); // the melody: high notes are high in the sky
-        const amp = h * (0.025 + 0.085 * e) * (0.8 + 0.4 * s.density);
-        const thick = h * (0.012 + 0.05 * e);
+        const y0 = h * (0.86 - 0.72 * m.pitch) + Math.sin(s.t * 0.17 + li * 1.9) * h * 0.05; // the melody: high notes are high in the sky (the whole height is used), with a slow drift
+        const amp = h * (0.055 + 0.14 * e) * (0.8 + 0.4 * s.density);
+        const thick = h * (0.016 + 0.04 * e);
         const ph = li * 2.3 + song.seed % 7;
         const f1 = 0.0042 + li * 0.0006; // radians per px
         const f2 = f1 * 2.6;
-        const v1 = (0.3 + li * 0.07) * (li % 2 ? -1 : 1); // radians per second: the waves travel along the ribbon, each one its own way
-        const v2 = 0.21 + li * 0.05;
-        g.beginPath();
-        for (let k = 0; k <= AURORA_POINTS; k++) {
-          const x = k * step;
-          const y = y0 + Math.sin(x * f1 - s.t * v1 + ph) * amp + Math.sin(x * f2 + s.t * v2 + ph * 1.7) * amp * 0.45;
-          if (k === 0) g.moveTo(x, y); else g.lineTo(x, y);
-        }
+        const f3 = f1 * 4.3;
+        const v1 = (0.7 + li * 0.15) * (li % 2 ? -1 : 1); // radians per second: the waves travel along the ribbon, each one its own way
+        const v2 = 0.5 + li * 0.1;
+        const v3 = -0.9 - li * 0.08;
         const k0 = on ? 1 : 0.22;
-        [[2.8, 0.05], [1.8, 0.09], [1.05, 0.15], [0.42, 0.26]].forEach(([wide, alpha]) => { // soft glow: the same line stroked wide and faint, then narrow and bright
-          g.lineWidth = thick * wide;
-          g.strokeStyle = rgba(col, alpha * k0 * (0.55 + 0.6 * e));
-          g.stroke();
-        });
+        for (let strand = 0; strand < 3; strand++) { // three strands per instrument, a little apart and out of step: a wide veil instead of a single line
+          const off = (strand - 1) * thick * 2.6;
+          const sph = ph + strand * 1.3;
+          g.beginPath();
+          for (let k = 0; k <= AURORA_POINTS; k++) {
+            const x = k * step;
+            const y = y0 + off + Math.sin(x * f1 - s.t * v1 + sph) * amp + Math.sin(x * f2 + s.t * v2 + sph * 1.7) * amp * 0.5 + Math.sin(x * f3 + s.t * v3 + sph * 0.6) * amp * 0.22;
+            if (k === 0) g.moveTo(x, y); else g.lineTo(x, y);
+          }
+          [[2.6, 0.028], [1.6, 0.05], [0.95, 0.085], [0.4, 0.15]].forEach(([wide, alpha]) => { // soft glow: the same line stroked wide and faint, then narrow and bright
+            g.lineWidth = thick * wide;
+            g.strokeStyle = rgba(col, alpha * k0 * (0.55 + 0.6 * e));
+            g.stroke();
+          });
+        }
       }
       g.restore();
     },
