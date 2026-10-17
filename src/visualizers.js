@@ -241,6 +241,14 @@ export function buildEvents(charts) {
   return { times, ends, pos, count: rows.length, maxLen: Math.min(maxLen, 4) };
 }
 
+// The colour of each instrument's layer (the equalizer): a fixed hue per instrument, so a guitar is always green and the drums orange.
+// `kind` is the pane's icon name (guitar, bass, drum, mic, harmony, keys, rhythm); an unknown one takes a colour from the palette.
+export const INSTRUMENT_COLORS = {
+  guitar: [61, 220, 151], bass: [77, 163, 255], drum: [255, 112, 67], mic: [255, 210, 63], harmony: [255, 170, 80], keys: [179, 107, 255], rhythm: [45, 212, 191],
+};
+export const INSTRUMENT_NAMES = { guitar: 'Guitar', bass: 'Bass', drum: 'Drums', mic: 'Vocals', harmony: 'Harmony', keys: 'Keys', rhythm: 'Rhythm' };
+export const layerColor = (kind, index, palette) => INSTRUMENT_COLORS[kind] ?? palette?.v?.[index % (palette.v.length || 1)] ?? [200, 200, 200];
+
 // First index whose time is at least `t`.
 export function lowerBound(times, t) {
   let lo = 0;
@@ -365,7 +373,7 @@ export function sectionValue(sections, t, index, fn, ramp = 2) {
 
 // All the data the visualizers read, built once per song and chart set (not per frame).
 // song: { title, artist, genre, year, length, bpmRange }; charts: the charts on screen (buildChart results).
-export function buildSongData({ song = {}, charts = [] } = {}) {
+export function buildSongData({ song = {}, charts = [], kinds = [] } = {}) {
   const lanes = charts.filter((c) => c.mode !== 'vocals');
   const vocal = charts.find((c) => c.mode === 'vocals') ?? null;
   const main = lanes[0] ?? vocal ?? charts[0] ?? null;
@@ -382,6 +390,7 @@ export function buildSongData({ song = {}, charts = [] } = {}) {
     sections: main?.sections ?? [],
     density: densityHistogram(timesOf(lanes.length ? lanes : charts), duration),
     events: buildEvents(charts),
+    layers: charts.map((chart, i) => ({ kind: kinds[i] ?? '', events: buildEvents([chart]) })), // one set of events per instrument (the layered equalizer)
     starPower: merged('starPower'),
     solos: merged('solos'),
     vocalNotes: vocal ? vocal.notes : [],
@@ -716,56 +725,72 @@ const ringsViz = (ctx) => ({
   },
 });
 
-const EQ_ECHOES = [0.09, 0.2, 0.34]; // seconds back: the delayed copies that trail behind the bars
+// The MIDI equalizer: one equalizer per instrument, each in its own colour and on its own layer (a baseline lower down for every instrument, the
+// first at the back), so the guitar, the bass, the drums and the voice can be told apart. A bar rises from its layer's baseline with the notes being
+// played, trailing echoes behind it and a peak cap that falls; the layers overlap and glow together.
+const EQ_MAX_BARS = 96;
 const eqViz = (ctx) => {
-  const now = new Float32Array(96);
-  const past = new Float32Array(96);
-  const peak = new Float32Array(96);
+  const bufs = Array.from({ length: 8 }, () => ({ now: new Float32Array(EQ_MAX_BARS), past: new Float32Array(EQ_MAX_BARS), peak: new Float32Array(EQ_MAX_BARS) }));
   const level = (v) => Math.min(1.15, 1 - Math.exp(-v * 1.1));
   return {
     draw(g, s) {
       const { w, h } = s;
       const pal = ctx.song.palette;
-      const n = Math.max(32, Math.min(96, Math.round(w / 16)));
+      const layers = ctx.song.layers?.length ? ctx.song.layers : [{ kind: '', events: ctx.song.events }];
+      const L = Math.min(layers.length, bufs.length);
+      const n = Math.max(32, Math.min(EQ_MAX_BARS, Math.round(w / 16)));
       const bw = w / n;
       const spread = Math.max(3, n / 14); // each note lights a wide soft hill, so the bars fill the whole width
-      const maxH = h * 0.9; // the bars hang from the top edge and reach most of the way down
-      spectrumAt(ctx.song.events, s.t, n, now, spread);
-      peak.fill(0, 0, n); // the highest level over the last 0.5 s, shown as a cap that "falls"
-      for (let k = 0; k <= 5; k++) {
-        spectrumAt(ctx.song.events, s.t - k * 0.1, n, past, spread);
-        for (let b = 0; b < n; b++) peak[b] = Math.max(peak[b], level(past[b]) - k * 0.05);
-      }
+      const echoes = L <= 2 ? [0.09, 0.2, 0.34] : [0.12, 0.27]; // seconds back: the delayed copies that trail behind the bars
+      const peakSteps = L <= 2 ? 6 : 4;
+      const top = L === 1 ? 0.97 : 0.97; // the front layer's baseline (a fraction of the height)
+      const first = L === 1 ? 0.97 : 0.5; // the back layer's baseline
+      const maxH = h * (L === 1 ? 0.8 : 0.46); // the tallest bar of a layer
       g.save();
       g.globalCompositeOperation = 'lighter';
-      const colorAt = (b, a) => { // the palette across the bars, brighter where it is louder
-        const m = b / (n - 1);
-        const c = m < 0.5 ? pal.v[0] : pal.va;
-        return rgba(c, a);
-      };
-      EQ_ECHOES.forEach((dt, e) => { // trails: the same spectrum a moment earlier, longer and fainter
-        spectrumAt(ctx.song.events, s.t - dt, n, past, spread);
-        const a = 0.2 - e * 0.05;
-        for (let b = 0; b < n; b++) {
-          const v = Math.min(1.15, level(past[b]) + 0.03);
-          g.fillStyle = colorAt(b, a);
-          g.fillRect(b * bw + bw * 0.1, 0, bw * 0.8, v * maxH * (1 + 0.06 * (e + 1)));
+      g.font = '600 11px system-ui, sans-serif';
+      g.textBaseline = 'bottom';
+      for (let li = 0; li < L; li++) { // back to front: the first layer has the highest baseline
+        const { kind, events } = layers[li];
+        const { now, past, peak } = bufs[li];
+        const col = layerColor(kind, li, pal);
+        const base = h * (L === 1 ? top : first + (top - first) * (li / (L - 1)));
+        spectrumAt(events, s.t, n, now, spread);
+        peak.fill(0, 0, n); // the highest level over the last 0.5 s, shown as a cap that "falls"
+        for (let k = 0; k <= peakSteps; k++) {
+          spectrumAt(events, s.t - k * 0.1, n, past, spread);
+          for (let b = 0; b < n; b++) peak[b] = Math.max(peak[b], level(past[b]) - k * 0.05);
         }
-      });
-      for (let b = 0; b < n; b++) {
-        const idle = 0.04 + 0.03 * Math.sin(b * 0.45 + s.beat.pos * 1.3);
-        const v = Math.min(1.15, level(now[b]) + idle);
-        const bh = v * maxH;
-        const x = b * bw + bw * 0.12;
-        const gr = g.createLinearGradient(0, 0, 0, bh);
-        gr.addColorStop(0, colorAt(b, 0.35));
-        gr.addColorStop(1, colorAt(b, 0.95));
-        g.fillStyle = gr;
-        g.fillRect(x, 0, bw * 0.76, bh);
-        g.fillStyle = 'rgba(255,255,255,0.85)'; // the tip glows
-        g.fillRect(x, bh - 3, bw * 0.76, 3);
-        const ph = Math.min(1.15, peak[b] + idle) * maxH; // the peak cap
-        if (ph > bh + 4) { g.fillStyle = colorAt(b, 0.9); g.fillRect(x, ph - 2, bw * 0.76, 2); }
+        echoes.forEach((dt, e) => { // trails: the same spectrum a moment earlier, taller and fainter
+          spectrumAt(events, s.t - dt, n, past, spread);
+          const a = 0.2 - e * 0.06;
+          g.fillStyle = rgba(col, a);
+          for (let b = 0; b < n; b++) {
+            const v = Math.min(1.15, level(past[b]) + 0.03);
+            g.fillRect(b * bw + bw * 0.1, base - v * maxH * (1 + 0.06 * (e + 1)), bw * 0.8, v * maxH * (1 + 0.06 * (e + 1)));
+          }
+        });
+        for (let b = 0; b < n; b++) {
+          const idle = 0.04 + 0.03 * Math.sin(b * 0.45 + s.beat.pos * 1.3 + li);
+          const v = Math.min(1.15, level(now[b]) + idle);
+          const bh = v * maxH;
+          const x = b * bw + bw * 0.12;
+          const gr = g.createLinearGradient(0, base - bh, 0, base);
+          gr.addColorStop(0, rgba(col, 0.3));
+          gr.addColorStop(1, rgba(col, 0.9));
+          g.fillStyle = gr;
+          g.fillRect(x, base - bh, bw * 0.76, bh);
+          g.fillStyle = rgba([255, 255, 255], 0.8); // the tip glows
+          g.fillRect(x, base - bh, bw * 0.76, 3);
+          const ph = Math.min(1.15, peak[b] + idle) * maxH; // the peak cap
+          if (ph > bh + 4) { g.fillStyle = rgba(col, 0.9); g.fillRect(x, base - ph, bw * 0.76, 2); }
+        }
+        g.fillStyle = rgba(col, 0.55); // the layer's floor line and its name
+        g.fillRect(0, base, w, 1);
+        if (kind && L > 1) {
+          g.fillStyle = rgba(col, 0.85);
+          g.fillText(INSTRUMENT_NAMES[kind] ?? kind, 10, base - 4);
+        }
       }
       g.restore();
     },
@@ -1167,7 +1192,7 @@ export function createDriver({ getSource }) {
       if (dataKey !== src.key) {
         dataKey = src.key;
         const prev = data;
-        data = buildSongData({ song: src.song, charts: src.charts });
+        data = buildSongData({ song: src.song, charts: src.charts, kinds: src.kinds });
         if (prev && prev.coverKey === src.coverUrl && src.coverUrl) { data.palette = prev.palette; data.coverCanvas = prev.coverCanvas; data.coverKey = prev.coverKey; }
         viz = null;
         if (src.coverUrl && data.coverKey !== src.coverUrl) {

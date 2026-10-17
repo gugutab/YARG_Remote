@@ -174,3 +174,15 @@ test('the registry has the new effects with a swatch and a hint', () => {
     assert.ok(v && v.create && v.swatch && v.hint && v.label);
   }
 });
+
+test('buildSongData builds one layer of events per instrument, with its kind', async () => {
+  const { buildSongData, layerColor, INSTRUMENT_COLORS } = await import('../src/visualizers.js');
+  const mk = (times, lanes = 5) => ({ mode: 'lanes', lanes, notes: times.map((t) => ({ time: t, end: t, lane: 2 })), beats: [], sections: [], duration: 10 });
+  const data = buildSongData({ song: { title: 'T' }, charts: [mk([1, 2, 3]), mk([1.5])], kinds: ['guitar', 'drum'] });
+  assert.equal(data.layers.length, 2);
+  assert.deepEqual(data.layers.map((l) => l.kind), ['guitar', 'drum']);
+  assert.deepEqual(data.layers.map((l) => l.events.count), [3, 1]);
+  assert.equal(data.events.count, 4); // the merged events stay for the other visualizers
+  assert.deepEqual(layerColor('guitar', 0), INSTRUMENT_COLORS.guitar);
+  assert.equal(layerColor('mystery', 1, { v: [[1, 2, 3], [4, 5, 6]] })[0], 4); // an unknown instrument takes a colour from the palette
+});

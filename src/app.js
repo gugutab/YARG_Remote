@@ -2870,6 +2870,7 @@ const vizDriver = createVisualizerDriver({
         key: highway.panes, coverUrl: current.coverUrl,
         song: { title: plainText(current.song.title), artist: plainText(current.song.artist), genre: ini.genre, year: ini.year, length: (Number(ini.song_length) || 0) / 1000, bpmRange: bpmRange(current.midi?.tempos) },
         charts: highway.panes.map((p) => p.chart).filter(Boolean),
+        kinds: highway.panes.filter((p) => p.chart).map((p) => p.icon), // (the instrument of each chart: the equalizer's layers)
       };
     }
     return vizSrc;
