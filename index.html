@@ -25,6 +25,7 @@
       <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 5v14M19 5v14l-10-7z"/></symbol>
       <symbol id="i-next" viewBox="0 0 24 24"><path d="M18 5v14M5 5v14l10-7z"/></symbol>
       <symbol id="i-speed" viewBox="0 0 24 24"><path d="M4.9 18a9 9 0 1 1 14.2 0"/><path d="M12 13l4-5"/><circle cx="12" cy="13" r="1.4"/></symbol>
+      <symbol id="i-library" viewBox="0 0 24 24"><rect x="3.5" y="5" width="4" height="14" rx="1"/><rect x="9.5" y="5" width="4" height="14" rx="1"/><path d="M16.2 6.4l3.6-1 3 12.6-3.6 1z" transform="translate(-1.2 0)"/><path d="M3.5 9h4M9.5 9h4" opacity=".6"/></symbol>
       <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
       <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></symbol>
       <symbol id="i-volume-off" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM16 9.5l5 5M21 9.5l-5 5"/></symbol>
@@ -406,8 +407,8 @@
   <div id="edgeDock" class="edge-dock" hidden>
     <button id="dockHandle" class="dock-handle" type="button" title="Library and settings" aria-label="Library and settings" aria-expanded="false"><svg><use href="#i-chevron"/></svg></button>
     <div class="dock-buttons">
-      <button id="libTab" class="dock-btn" type="button" title="Show the library (L)" aria-label="Show the library"><svg><use href="#i-list"/></svg></button>
-      <button id="settingsTab" class="dock-btn" type="button" title="Settings (,)" aria-label="Settings"><svg><use href="#i-gear"/></svg></button>
+      <button id="libTab" class="dock-btn" type="button" title="Show the library (L)" aria-label="Show the library"><svg><use href="#i-library"/></svg></button>
+      <button id="settingsTab" class="dock-btn" type="button" title="Settings (,)" aria-label="Settings"><svg><use href="#i-sliders"/></svg></button>
     </div>
   </div>
   <div id="settingsPage" class="settings-page" hidden role="dialog" aria-modal="true" aria-label="Settings"></div>
