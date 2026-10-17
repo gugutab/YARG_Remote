@@ -2297,3 +2297,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .icard[data-active="false"] { opacity: .62; }
 .icard[data-active="false"]:hover { opacity: .9; }
 .seg button[data-next="true"] { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
+
+/* The Speed card: an icon instead of the word in front of the slider */
+.card-adjust .row-icon { width: 20px; height: 20px; color: var(--muted); }
+.card-adjust .row { grid-template-columns: 22px 1fr 52px 28px; }
