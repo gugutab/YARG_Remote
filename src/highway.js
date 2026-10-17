@@ -1673,23 +1673,22 @@ export class Highway {
     const R = Math.max(9, half * 1.7);
     // A glint, not a halo: a thin vertical streak of light along the hit line and a shorter horizontal one through the note, crossing in a small bright core, all in
     // the note's colour. Each streak is a few stacked ellipses (wide and faint to narrow and strong), and their lengths shimmer.
-    // A spike is a thin lozenge with concave sides (pinched towards the middle), so the tips end in fine points; a few of them stacked, wide and faint to narrow and strong.
+    // A spike has an arrowhead at each end: straight sides from the tip out to the shoulders (halfway out, the widest part) and back in to a narrow waist at
+    // the middle; a few of them stacked, wide and faint to narrow and strong.
     const spike = (len, wid, strength, rot) => {
       const c = Math.cos(rot);
       const sn = Math.sin(rot);
       const P = (u, w) => [hitX + u * c - w * sn, y + u * sn + w * c]; // a point along (u) and across (w) the spike
-      for (let q = 0; q < 5; q++) {
-        const k = 1 - q * 0.17;
+      for (let q = 0; q < 4; q++) {
+        const k = 1 - q * 0.2;
         const L = len * k;
-        const W = wid * k;
-        g.globalAlpha = strength * env * (0.09 + q * 0.07);
+        const W = wid * 1.4 * k;
+        g.globalAlpha = strength * env * (0.1 + q * 0.09);
         g.beginPath();
-        let p = P(-L, 0);
-        g.moveTo(p[0], p[1]);
-        for (const [tu, tw, cu, cw] of [[0, W, -L * 0.1, W * 0.3], [L, 0, L * 0.1, W * 0.3], [0, -W, L * 0.1, -W * 0.3], [-L, 0, -L * 0.1, -W * 0.3]]) {
-          p = P(tu, tw);
-          const cp = P(cu, cw);
-          g.quadraticCurveTo(cp[0], cp[1], p[0], p[1]);
+        let first = true;
+        for (const [u, w] of [[L, 0], [L * 0.5, W], [L * 0.12, W * 0.16], [-L * 0.12, W * 0.16], [-L * 0.5, W], [-L, 0], [-L * 0.5, -W], [-L * 0.12, -W * 0.16], [L * 0.12, -W * 0.16], [L * 0.5, -W]]) {
+          const p = P(u, w);
+          if (first) { g.moveTo(p[0], p[1]); first = false; } else g.lineTo(p[0], p[1]);
         }
         g.closePath();
         g.fill();
