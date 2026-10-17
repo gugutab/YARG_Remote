@@ -1665,19 +1665,24 @@ export class Highway {
     const R = Math.max(9, half * 1.7);
     // A glint, not a halo: a thin vertical streak of light along the hit line and a shorter horizontal one through the note, crossing in a small bright core, all in
     // the note's colour. Each streak is a few stacked ellipses (wide and faint to narrow and strong), and their lengths shimmer.
-    const streak = (rx, ry, strength) => {
+    const streak = (rx, ry, strength, rot) => {
       for (let q = 0; q < 6; q++) {
         const k = 1 - q * 0.16;
         g.globalAlpha = strength * env * (0.07 + q * 0.05);
         g.beginPath();
-        g.ellipse(hitX, y, rx * k, ry * k, 0, 0, Math.PI * 2);
+        g.ellipse(hitX, y, rx * k, ry * k, rot, 0, Math.PI * 2);
         g.fill();
       }
     };
     g.save();
     g.fillStyle = color;
-    streak(R * 0.55, R * (3.1 + 0.7 * v), 1); // up and down the line
-    streak(R * (2.3 + 0.5 * (1 - v)), R * 0.4, 0.9); // sideways through the note
+    // Four streaks: the upright cross and the same cross turned 45 degrees (shorter, fainter). Each has its own length and angle that wander (slow sines of
+    // different speeds and phases), so the glint is never the same twice and seems to turn and breathe.
+    const wob = (f, ph) => Math.sin(t * f + n.time * 5 + ph);
+    streak(R * 0.55, R * (3.1 + 0.8 * wob(7, 0)), 1, 0.12 * wob(4.3, 1)); // up and down the line
+    streak(R * (2.3 + 0.6 * wob(5.1, 2)), R * 0.4, 0.9, 0.1 * wob(3.7, 3)); // sideways through the note
+    streak(R * 0.42, R * (2.3 + 0.7 * wob(6.2, 4)), 0.7, Math.PI / 4 + 0.2 * wob(3.1, 5)); // the diagonals: the cross turned by 45 degrees
+    streak(R * 0.42, R * (2.3 + 0.7 * wob(5.6, 6)), 0.7, -Math.PI / 4 + 0.2 * wob(4.7, 7));
     g.globalAlpha = (0.35 + 0.2 * v) * env; // the core
     g.beginPath();
     g.arc(hitX, y, R * 0.55, 0, Math.PI * 2);
