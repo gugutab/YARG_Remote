@@ -1670,7 +1670,7 @@ export class Highway {
     y = st.y;
     const g = this.g;
     const v = 0.5 + 0.5 * Math.sin(t * 9 + n.time * 3) * 0.6 + 0.5 * Math.sin(t * 23 + n.time * 7) * 0.4; // 0..1, varying
-    const R = Math.max(9, half * 1.7);
+    const R = Math.max(9, half * 1.7) * (0.3 + 0.7 * env); // scales in and out with the fade
     // A glint, not a halo: a thin vertical streak of light along the hit line and a shorter horizontal one through the note, crossing in a small bright core, all in
     // the note's colour. Each streak is a few stacked ellipses (wide and faint to narrow and strong), and their lengths shimmer.
     // A spike has an arrowhead at each end: straight sides from the tip out to the shoulders (halfway out, the widest part) and back in to a narrow waist at
@@ -1683,7 +1683,7 @@ export class Highway {
         const k = 1 - q * 0.2;
         const L = len * 0.4 * k; // 60 % shorter than before
         const W = wid * 2.2 * k; // and thicker
-        g.globalAlpha = strength * env * (0.1 + q * 0.09);
+        g.globalAlpha = 0.7 * strength * env * (0.1 + q * 0.09); // 30 % more transparent
         g.beginPath();
         let first = true;
         for (const [u, w] of [[L, 0], [L * 0.5, W], [L * 0.12, W * 0.16], [-L * 0.12, W * 0.16], [-L * 0.5, W], [-L, 0], [-L * 0.5, -W], [-L * 0.12, -W * 0.16], [L * 0.12, -W * 0.16], [L * 0.5, -W]]) {
@@ -1708,12 +1708,12 @@ export class Highway {
     spike(R * (2.5 + 0.7 * wob(5.6, 6)), R * 0.4, 0.7, rotB + Math.PI / 2);
     spike(R * (2.0 + 0.6 * wob(6.8, 8)), R * 0.32, 0.55, rotC); // the third cross: shorter, fainter, always turning
     spike(R * (2.0 + 0.6 * wob(5.9, 10)), R * 0.32, 0.55, rotC + Math.PI / 2);
-    g.globalAlpha = (0.35 + 0.2 * v) * env; // the core
+    g.globalAlpha = 0.7 * (0.35 + 0.2 * v) * env; // the core
     g.beginPath();
     g.arc(hitX, y, R * 0.55, 0, Math.PI * 2);
     g.fill();
     g.fillStyle = '#ffffff';
-    g.globalAlpha = (0.55 + 0.25 * v) * env;
+    g.globalAlpha = 0.7 * (0.55 + 0.25 * v) * env;
     g.beginPath();
     g.arc(hitX, y, R * 0.28, 0, Math.PI * 2);
     g.fill();
