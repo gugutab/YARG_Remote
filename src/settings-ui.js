@@ -19,7 +19,8 @@ const icon = (name) => {
   return s;
 };
 
-export function mountSettings({ root, settings, sections, renderers = {}, onOpen = () => {}, onClose = () => {} }) {
+// frame: the window frame controller of `root` (src/windowframe-dom.js): it owns the window's width, edges and open/closed state.
+export function mountSettings({ root, frame, settings, sections, renderers = {}, onOpen = () => {}, onClose = () => {} }) {
   const refreshers = []; // called whenever a setting changes, to bring the controls up to date
   const visibility = []; // { row, item } for `when`
   let query = '';
@@ -28,7 +29,8 @@ export function mountSettings({ root, settings, sections, renderers = {}, onOpen
   const content = el('div', { class: 'sp-content' });
   const search = el('input', { class: 'sp-search', type: 'search', placeholder: 'Search settings', 'aria-label': 'Search settings' });
   const closeBtn = el('button', { class: 'icon lib-close', type: 'button', title: 'Close (Esc)', 'aria-label': 'Close settings', onclick: () => close() }, icon('chevron')); // (the same back arrow as the library's, at the left of the title)
-  root.replaceChildren(
+  for (const k of [...root.children]) if (!k.classList.contains('win-edge')) k.remove(); // (the frame's edge handles stay)
+  root.append(
     el('div', { class: 'sp-head' }, closeBtn, el('h2', { text: 'Settings' }), search),
     el('div', { class: 'sp-body' }, nav, content),
   );
@@ -174,7 +176,8 @@ export function mountSettings({ root, settings, sections, renderers = {}, onOpen
 
   function open(sectionId) {
     onOpen();
-    root.hidden = false;
+    frame.setClosed(false);
+    frame.layout();
     document.body.classList.add('settings-open');
     refresh();
     search.value = '';
@@ -185,8 +188,8 @@ export function mountSettings({ root, settings, sections, renderers = {}, onOpen
     search.focus({ preventScroll: true });
   }
   function close() {
-    if (root.hidden) return;
-    root.hidden = true;
+    if (frame.isClosed()) return;
+    frame.setClosed(true);
     document.body.classList.remove('settings-open');
     onClose();
   }
@@ -195,8 +198,8 @@ export function mountSettings({ root, settings, sections, renderers = {}, onOpen
   refresh();
   // a click outside the window closes it (the dimmed stage around it); menus that live in <body> (custom selects, popovers) are not "outside"
   document.addEventListener('pointerdown', (e) => {
-    if (root.hidden || root.contains(e.target) || e.target.closest?.('.sel-pop, .popover, #settingsTab, #openSettings')) return;
+    if (frame.isClosed() || root.contains(e.target) || e.target.closest?.('.sel-pop, .popover, #settingsTab, #openSettings')) return;
     close();
   });
-  return { open, close, isOpen: () => !root.hidden, refresh };
+  return { open, close, isOpen: () => !frame.isClosed(), refresh };
 }

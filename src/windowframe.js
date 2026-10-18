@@ -14,6 +14,7 @@
 export const CONTENT_MAX = 1400; // the content area never gets narrower than this (same as the :root default of --content-max)
 export const CONTENT_ABS_MAX = 3840; // ... and never wider than 4K
 export const WIN_MARGIN = 12; // the gap between a window and the edge of the screen (--lib-gap)
+export const SETTINGS_MIN_W = 560; // the narrowest the settings window may be made (the nav turns into a row of tabs below 760 px, in CSS)
 export const WIN_BORDER = 2; // a window's own 1 px border, left and right: the panes share the width inside it
 
 // The content area's width: `wanted` clamped between CONTENT_MAX and 4K. (The library asks for more than 1400 when the "Maximum width"

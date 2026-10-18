@@ -24,7 +24,8 @@ import { SECTIONS, buildDefaults, buildValidator, FONT_OPTIONS } from './setting
 import { resolveTheme, applyTheme } from './themes.js';
 import { mountSettings } from './settings-ui.js';
 import { renderThemeStudio, renderDataTools, renderShortcuts } from './settings-custom.js';
-import { WIN_MARGIN, WIN_BORDER, contentMaxFor, roomFor, clampWidth, dragWidth } from './windowframe.js';
+import { WIN_MARGIN, WIN_BORDER, SETTINGS_MIN_W, contentMaxFor } from './windowframe.js';
+import { isPhone, createWidthPref, createWindowFrame } from './windowframe-dom.js';
 import { saveLibrary, loadLibrary, loadThumb, saveThumb, clearThumbs } from './store.js';
 import { filterSongs, parseQuery, rankByRelevance, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, anchorLabel, INSTRUMENTS, hasInstrument } from './songlist.js';
 import { createVirtualList, DEFAULT_CARDS } from './virtuallist.js';
@@ -181,7 +182,7 @@ const store = {
 // The library is a glass window floating over the stage (left). It never takes room from the chart: the stage always spans the whole
 // screen, so opening and closing it resizes nothing. `persist` is false for the automatic closes (a phone, "hide when I pick a song"),
 // so they do not become the saved preference. On a phone it is a full-height drawer with a scrim.
-const narrow = () => window.matchMedia('(max-width: 700px)').matches;
+const narrow = isPhone;
 const libraryOpen = () => !els.app.classList.contains('lib-closed');
 function savePanelState() {
   if (narrow()) return;
@@ -195,13 +196,21 @@ function setLibraryOpen(open, persist = true) {
   syncPanelUi();
   if (persist) savePanelState();
 }
+// The library window's frame (declared early: the startup code below already opens and closes the window). The settings window gets its own
+const winPrefs = createWidthPref(store); // (the width the user chose for the windows, shared with the settings window: store key 'winWidth')
+// The shared window frame of the library: the same controller drives the settings window (src/windowframe-dom.js). `--win-w` goes on .app
+// because --lib-inset (also on .app) reads it; the library keeps its own #edgeL / #edgeR handles.
+const libFrame = createWindowFrame({
+  el: els.library, prefs: winPrefs, container: () => stageEl.clientWidth || window.innerWidth, contentMax: () => contentMax(), minWidth: () => minWinWidth(),
+  relayout: () => layoutWindow(), widthVars: els.app, edges: [els.edgeL, els.edgeR],
+});
 // The library window holds two panes: the list (open unless `lib-closed`) and the song details (`infoOpen`). With the list closed and the
 // details open only the details pane shows (`details-only`: the window stays up); with neither the window is out of the way. Whatever is not
 // shown is `inert` (it is only moved and faded out, not removed), so nothing in it takes focus or clicks.
 function syncWindow() {
   const list = libraryOpen();
   els.app.classList.toggle('details-only', infoOpen && !list);
-  els.library.inert = !list && !infoOpen;
+  libFrame.setClosed(!list && !infoOpen); // (the shared window frame: slides out and fades, inert)
   els.libList.inert = !list;
 }
 // The edge tabs bring a closed library back (the settings tab keeps Settings one click away while the library header, which holds the gear, is hidden).
@@ -209,21 +218,21 @@ let dockTimer = 0; // (the dock's close timer; declared before syncPanelUi first
 // The dock on the left edge is always there (on a phone it gives way while a window is open: the drawer and the settings fill the screen).
 // It shows which windows are open: the Library button (the list and/or the song details) and the Settings button light up, and the handle
 // takes the accent colour; pressing the button of an open window closes it.
-// The settings window is fixed over the whole page; it leaves the player bar visible: the room the bar takes at the top or the bottom of the page
-// is published as --settings-top / --settings-bottom (the bar is not there before a song has played, or when it floats over the stage).
-function syncSettingsInsets() {
+// The windows (the shared frame: library and settings) are fixed over the whole page; they leave the player bar visible: the room the bar takes at
+// the top or the bottom of the page is published as --win-top / --win-bottom (the bar is not there before a song has played, or when it floats over the stage).
+function syncWindowInsets() {
   const bar = document.getElementById('topbar');
   const r = bar.getBoundingClientRect();
   const shown = r.height > 0 && getComputedStyle(bar).display !== 'none' && !els.app.classList.contains('stage-unborn') && !els.app.classList.contains('immersive');
   const bottom = shown && els.app.classList.contains('bar-bottom') ? Math.max(0, Math.round(innerHeight - r.top)) : 0;
   const top = shown && !els.app.classList.contains('bar-bottom') ? Math.max(0, Math.round(r.bottom)) : 0;
   const root = document.documentElement.style;
-  if (root.getPropertyValue('--settings-bottom') !== `${bottom}px`) root.setProperty('--settings-bottom', `${bottom}px`);
-  if (root.getPropertyValue('--settings-top') !== `${top}px`) root.setProperty('--settings-top', `${top}px`);
+  if (root.getPropertyValue('--win-bottom') !== `${bottom}px`) root.setProperty('--win-bottom', `${bottom}px`);
+  if (root.getPropertyValue('--win-top') !== `${top}px`) root.setProperty('--win-top', `${top}px`);
 }
-window.addEventListener('resize', syncSettingsInsets);
-if (typeof ResizeObserver !== 'undefined') new ResizeObserver(syncSettingsInsets).observe(document.getElementById('topbar'));
-new MutationObserver(syncSettingsInsets).observe(els.app, { attributes: true, attributeFilter: ['class'] }); // (bar position, hidden bar, first play)
+window.addEventListener('resize', syncWindowInsets);
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(syncWindowInsets).observe(document.getElementById('topbar'));
+new MutationObserver(syncWindowInsets).observe(els.app, { attributes: true, attributeFilter: ['class'] }); // (bar position, hidden bar, first play)
 let settingsFlag = false; // the settings window is open (set by its onOpen / onClose: the page object itself is created further down)
 const settingsIsOpen = () => settingsFlag;
 function syncPanelUi() {
@@ -344,7 +353,7 @@ const stageEl = document.getElementById('stage');
 // the room the panes may take: the content area (--content-max, centred) between its two margins (the window starts at --lib-left), minus the border
 // The content area is 1400 px, and grows (up to 4K, 3840 px) when the "Maximum width" of the details asks for more than the list and the details fit in 1400.
 const contentMax = () => contentMaxFor(Math.round(libPref()) + prefs.get('details.maxWidth') + 2 * WIN_MARGIN + WIN_BORDER);
-const contentWidth = () => roomFor(stageEl.clientWidth || window.innerWidth, contentMax());
+const contentWidth = () => libFrame.room();
 // the list pane's widest width: all the room, or all but one column for the details while they are open
 const minWinWidth = () => (infoOpen && libraryOpen() ? MIN_LIB_W + INFO_MIN_W : infoOpen ? INFO_MIN_W : MIN_LIB_W); // (the narrowest the window may be made: both panes at their minimum, or the one that is open)
 const maxLibWidth = () => Math.max(MIN_LIB_W, contentWidth() - (infoOpen ? INFO_MIN_W : 0));
@@ -355,7 +364,6 @@ let winTotal = 0; // the panes' total width as last laid out (the window is WIN_
 // the list closed the window is the details pane alone. Phone: the drawer's own CSS sizes everything.
 // Wide mode only: the user's window width (null = the full content width, the window stays centred) and the list's share of the window
 // while the details are open (null = the default split); both are remembered.
-let winPref = Number(store.get('winWidth')) > 0 ? Number(store.get('winWidth')) : null;
 let splitFrac = Number(store.get('splitFrac')) > 0 && Number(store.get('splitFrac')) < 1 ? Number(store.get('splitFrac')) : null;
 // The library window is centred and takes the whole content width at every width above the phone drawer (it used to switch to a narrow sidebar below a 1100 px stage,
 // measured on the stage itself, which a sidebar shrinks: so a window made smaller dropped to a partial width and could not come back).
@@ -365,12 +373,10 @@ function layoutWindow() {
   const wide = wideWindow();
   els.app.classList.toggle('lib-wide', wide);
   document.documentElement.style.setProperty('--content-max', `${contentMax()}px`); // (the CSS side of the content area: where the window starts, how wide the settings may be)
-  if (narrow()) { for (const v of ['--list-w', '--info-w', '--win-w']) style.removeProperty(v); return; }
+  if (narrow()) { for (const v of ['--list-w', '--info-w']) style.removeProperty(v); libFrame.clearWidth(); return; }
   const listOn = libraryOpen();
   if (!listOn && !infoOpen) return; // closed: keep the size it slides out with
-  const fullRoom = contentWidth();
-  const minTotal = minWinWidth();
-  const room = wide ? clampWidth(winPref, minTotal, fullRoom) : fullRoom; // (wide: the window is as wide as the user made it, up to the content width)
+  const room = wide ? libFrame.fit() : contentWidth(); // (wide: the window is as wide as the user made it, up to the content width; libFrame.fit)
   let list = 0;
   let info = 0;
   if (infoOpen) {
@@ -389,7 +395,7 @@ function layoutWindow() {
   winTotal = Math.round(list) + Math.round(info);
   if (listOn) style.setProperty('--list-w', `${Math.round(list)}px`);
   if (infoOpen) style.setProperty('--info-w', `${Math.round(info)}px`);
-  style.setProperty('--win-w', `${winTotal + WIN_BORDER}px`);
+  libFrame.setWidth(winTotal);
 }
 function setLibWidth(px) {
   if (px == null) document.documentElement.style.removeProperty('--lib-w');
@@ -399,7 +405,6 @@ function setLibWidth(px) {
 const savedLibW = Number(store.get('libWidth'));
 if (savedLibW >= MIN_LIB_W && !narrow()) setLibWidth(Math.min(savedLibW, maxLibWidth()));
 layoutWindow();
-window.addEventListener('resize', layoutWindow); // a smaller browser window must not leave the window wider than the screen
 els.splitter.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   els.splitter.setPointerCapture(e.pointerId);
@@ -430,36 +435,6 @@ els.splitter.addEventListener('dblclick', () => {
   setLibWidth(null);
   store.set('libWidth', '');
 });
-// The left and right edges of the window (wide mode): drag to make the window narrower or wider, always centred (each pixel dragged moves both
-// edges); double-click goes back to the full content width.
-for (const edge of [els.edgeL, els.edgeR]) {
-  const sign = edge === els.edgeR ? 1 : -1;
-  let drag = null;
-  edge.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    edge.setPointerCapture(e.pointerId);
-    drag = { x: e.clientX, w: els.library.getBoundingClientRect().width - WIN_BORDER };
-    edge.classList.add('dragging');
-    document.body.classList.add('resizing');
-  });
-  edge.addEventListener('pointermove', (e) => {
-    if (!drag) return;
-    winPref = dragWidth(drag.w, e.clientX - drag.x, sign, minWinWidth(), contentWidth());
-    layoutWindow();
-  });
-  const end = () => {
-    if (!drag) return;
-    drag = null;
-    edge.classList.remove('dragging');
-    document.body.classList.remove('resizing');
-    winPref = Math.round(winTotal);
-    store.set('winWidth', String(winPref));
-  };
-  edge.addEventListener('pointerup', end);
-  edge.addEventListener('pointercancel', end);
-  edge.addEventListener('dblclick', () => { winPref = null; store.set('winWidth', ''); layoutWindow(); });
-}
-
 els.pick.addEventListener('click', pickFolder);
 els.resume.addEventListener('click', reopenFolder);
 els.rescan.addEventListener('click', rescanFolder);
@@ -3634,10 +3609,15 @@ prefs.subscribe((id, value) => {
 });
 reduceQuery.addEventListener?.('change', (e) => { osReduceMotion = e.matches; EFFECTS['ui.animations'](); });
 
+// The settings window is the second window of the shared frame: the same controller as the library's (same width, edges, motion, drawer).
+const settingsFrame = createWindowFrame({
+  el: document.getElementById('settingsPage'), prefs: winPrefs, container: () => stageEl.clientWidth || window.innerWidth, contentMax, minWidth: () => SETTINGS_MIN_W,
+  label: 'Make the settings window narrower or wider',
+});
 const settingsPage = mountSettings({
-  root: document.getElementById('settingsPage'), settings: prefs, sections: SECTIONS,
+  root: document.getElementById('settingsPage'), frame: settingsFrame, settings: prefs, sections: SECTIONS,
   onClose: () => { settingsFlag = false; syncPanelUi(); },
-  onOpen: () => { settingsFlag = true; syncSettingsInsets(); if (libraryOpen()) setLibraryOpen(false, false); if (infoOpen) setInfoOpen(false); syncPanelUi(); }, // (the list first, so it does not grow into the details' room; not remembered: the library comes back as it was at the next start)
+  onOpen: () => { settingsFlag = true; syncWindowInsets(); if (libraryOpen()) setLibraryOpen(false, false); if (infoOpen) setInfoOpen(false); syncPanelUi(); }, // (the list first, so it does not grow into the details' room; not remembered: the library comes back as it was at the next start)
   renderers: {
     'shortcuts.bindings': (host, ctx) => renderShortcuts(host, { ...ctx, notify: setStatus }),
     theme: (host, ctx) => renderThemeStudio(host, { ...ctx, prefersDark: () => darkQuery.matches, notify: setStatus }),

@@ -857,8 +857,7 @@ body.resizing { cursor: col-resize; user-select: none; }
 [data-motion="off"] *, [data-motion="off"] *::before, [data-motion="off"] *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 .info-card, .popover, .icard, .filter-panel, .settings-page .sp-row, .ts-card { border-radius: var(--radius); }
 body.settings-open { overflow: hidden; }
-.settings-page { position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column; background: var(--bg); color: var(--text); }
-.settings-page[hidden] { display: none; }
+.settings-page { z-index: 80; display: flex; flex-direction: column; color: var(--text); container: settings / inline-size; } /* (the frame: .win-frame, see "Window frame" at the end) */
 .sp-head { flex: none; display: flex; align-items: center; gap: 14px; padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
 .sp-head h2 { margin: 0; font-size: 20px; }
 .sp-search { flex: 1; max-width: 420px; margin-left: auto; margin-right: auto; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); color: var(--text); }
@@ -903,9 +902,10 @@ body.settings-open { overflow: hidden; }
 .sp-hex { width: 82px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--text); font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
 .sp-none { display: none; text-align: center; color: var(--muted); padding: 40px 0; }
 .sp-content.empty .sp-none { display: block; }
-@media (max-width: 760px) {
+/* the nav becomes a row of tabs when the WINDOW is narrow (a container query on the settings window: it is resizable, and a drawer on a phone) */
+@container settings (max-width: 760px) {
   .sp-body { flex-direction: column; }
-  .sp-nav { width: auto; flex-direction: row; overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1px solid var(--line); padding: 8px; }
+  .sp-nav { width: auto; flex-direction: row; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; border-right: 0; border-bottom: 1px solid var(--line); padding: 8px; }
   .sp-nav-btn { flex: none; }
   .sp-content { padding: 4px 14px 80px; }
   .sp-row { flex-wrap: wrap; }
@@ -1581,21 +1581,8 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
    Same glass as the player bar: translucent --panel, the blur on ::before. A backdrop-filter / filter on the aside itself would make it
    the containing block of position: fixed descendants (see the top bar). It moves with transform only while it slides (that is also a
    containing block, but nothing fixed is open then); once open, transform is none. */
-.app { --lib-gap: 12px; } /* = WIN_MARGIN in src/windowframe.js (test/css-js-constants.test.js) */
-.library {
-  position: absolute; z-index: 12;
-  top: var(--lib-gap); bottom: var(--lib-gap); left: var(--lib-gap);
-  width: min(var(--win-w, var(--lib-w)), calc(100% - 2 * var(--lib-gap)));
-  display: flex; flex-direction: row; padding: 0; min-height: 0; overflow: hidden; /* two panes side by side: the list and the song details */
-  background: color-mix(in srgb, var(--panel) 78%, transparent);
-  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
-  border-radius: 14px;
-  box-shadow: 0 10px 34px rgba(0, 0, 0, .4);
-  transition: transform .22s ease, opacity .22s ease, visibility 0s;
-}
-.library::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-/* closed = neither pane is shown: the list is closed and so are the details (the details alone keep the window up: .details-only) */
-.app.lib-closed:not(.details-only) .library { transform: translateX(calc(-100% - 2 * var(--lib-gap))); opacity: 0; visibility: hidden; pointer-events: none; box-shadow: none; transition: transform .22s ease, opacity .22s ease, visibility 0s .22s; }
+:root { --lib-gap: 12px; } /* = WIN_MARGIN in src/windowframe.js (test/css-js-constants.test.js) */
+.library { display: flex; flex-direction: row; padding: 0; min-height: 0; } /* two panes side by side: the list and the song details (the window itself: .win-frame) */
 /* the list pane: the old library column */
 .lib-list { position: relative; flex: none; width: var(--list-w, var(--lib-w)); min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 10px; }
 .app.lib-closed .lib-list { display: none; }
@@ -1626,8 +1613,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 
 /* phone: a full-height drawer over everything (the bar included) with a scrim */
 @media (max-width: 700px) {
-  .library { position: fixed; top: 0; bottom: 0; left: 0; z-index: 30; width: calc(100vw - 44px); border-radius: 0 14px 14px 0; border-left: 0; background: color-mix(in srgb, var(--panel) 94%, transparent); }
-  .app.lib-closed:not(.details-only) .library { transform: translateX(-105%); }
+  .library { z-index: 30; }
   .lib-list { width: 100%; }
   /* the details take the whole drawer (the list is hidden) until they close */
   .app.info-open .library { width: 100vw; border-radius: 0; }
@@ -1705,18 +1691,10 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 @media (pointer: coarse) { .end-row { min-height: 52px; } .end-btn, .end-actions .cta { min-height: 44px; } }
 
 /* ---------- Settings as a glass window (same look as the player bar, the library and the end window) ---------- */
-.settings-page {
-  inset: 16px max(16px, calc((100% - 1120px) / 2)); border-radius: 14px; overflow: hidden; background: transparent;
-  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .5), 0 18px 60px rgba(0, 0, 0, .5), inset 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent);
-}
-.settings-page::before { content: ""; position: absolute; inset: 0; z-index: -1; background: color-mix(in srgb, var(--panel) 80%, transparent); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
 .settings-page .sp-head, .settings-page .sp-nav { background: color-mix(in srgb, var(--panel) 30%, transparent); }
 .settings-page .sp-head { border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }
 .settings-page .sp-nav { border-right-color: color-mix(in srgb, var(--line) 70%, transparent); }
 .settings-page .sp-row { background: color-mix(in srgb, var(--panel-2) 55%, transparent); }
-:root[data-motion="on"] .settings-page:not([hidden]) { animation: settings-in .2s ease backwards; /* (no fill-forwards: a lingering animation would make the window a backdrop root and kill the blur) */ }
-@keyframes settings-in { from { opacity: 0; transform: scale(.985); } to { opacity: 1; transform: none; } }
-@media (max-width: 700px) { .settings-page { inset: 0; border-radius: 0; box-shadow: none; } }
 
 /* ---------- Song details: the second pane of the library window ----------
    One glass window (#library: border, shadow and the blur on its ::before) holds the list pane and, when open, this pane to its right,
@@ -1746,11 +1724,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 
 /* ---------- One maximum size for the floating windows: the content area, 1400 px centred (like the player bar) ---------- */
 :root { --content-max: 1400px; } /* (on :root: the settings page lives outside .app) = CONTENT_MAX in src/windowframe.js */
-.app { --lib-left: max(var(--lib-gap), calc((100% - var(--content-max)) / 2)); }
-@media (min-width: 701px) {
-  .library { left: var(--lib-left); max-width: calc(100% - 2 * var(--lib-left)); }
-  .settings-page { inset: 16px max(16px, calc((100% - min(1120px, var(--content-max))) / 2)); }
-}
+:root { --lib-left: max(var(--lib-gap), calc((100% - var(--content-max)) / 2)); }
 
 /* ---------- Details pane: never narrower than one column (layoutWindow in app.js), one-column header, bigger title block ---------- */
 .info-top { align-items: center; padding-block: 10px; }
@@ -1773,8 +1747,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 /* The window's width: the list pane + the details pane (layoutWindow sets --list-w, --info-w and --win-w); it animates, and --lib-inset (what
    the centred stage content keeps clear of) is the window's right edge plus a gap. Not while it is closed. */
 @media (min-width: 701px) {
-  .library { transition: transform .22s ease, opacity .22s ease, width .22s ease; }
-  body.resizing .library { transition: none; }
+  body.resizing .win-frame { transition: none; }
   .app:not(.lib-closed), .app.details-only { --lib-inset: calc(var(--lib-left) + var(--win-w, var(--lib-w)) + var(--lib-gap)); }
 }
 
@@ -1945,19 +1918,6 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
   .app.lib-wide:not(.info-open) #splitter { display: none; }
 }
 
-/* Wide mode: the window is centred whatever its width, and its left and right edges are handles that resize it symmetrically */
-.win-edge { display: none; }
-@media (min-width: 701px) {
-  .app.lib-wide .library { left: max(var(--lib-gap), calc((100% - var(--win-w, 100%)) / 2)); }
-  .app.lib-wide .win-edge { display: block; position: absolute; top: 14px; bottom: 14px; width: 12px; z-index: 7; cursor: ew-resize; touch-action: none; }
-  .win-edge-l { left: 0; }
-  .win-edge-r { right: 0; }
-  .win-edge::after { content: ""; position: absolute; top: 0; bottom: 0; width: 2px; border-radius: 1px; background: transparent; transition: background .15s; }
-  .win-edge-l::after { left: 2px; }
-  .win-edge-r::after { right: 2px; }
-  .win-edge:hover::after, .win-edge.dragging::after { background: var(--accent); }
-  .app.lib-closed:not(.details-only) .win-edge { display: none; }
-}
 
 /* The Listen card while it loads the audio: a spinner ring on the play button */
 .listen .icon.primary { position: relative; }
@@ -1967,12 +1927,6 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 @media (prefers-reduced-motion: reduce) { .listen .icon.primary.loading::after { animation-duration: 2.4s; } }
 
 /* ---------- Library redesign: the settings window's look (dark glass, translucent header strip, raised cards) ---------- */
-.library {
-  background: color-mix(in srgb, var(--panel) 86%, transparent);
-  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .38), 0 18px 60px rgba(0, 0, 0, .5), inset 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent);
-}
-.library::before { backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
-@media (max-width: 700px) { .library { box-shadow: none; } }
 .lib-list { padding: 0; gap: 0; }
 .lib-list > :not(.lib-header):not(.songs-wrap):not(.splitter) { margin-inline: 12px; }
 
@@ -2104,12 +2058,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .edge-dock.has-open::after { display: none; }
 
 /* Open / close: the window glides in from the left edge (where the dock is), grows from 96 % and fades in; closing is the same backwards, a little quicker */
-.library { transform-origin: 0 50%; transition: transform .34s cubic-bezier(.22, 1, .36, 1), opacity .24s ease, visibility 0s, box-shadow .3s ease; }
-.app.lib-closed:not(.details-only) .library { transform: translateX(-36px) scale(.96); transition: transform .24s cubic-bezier(.55, 0, .8, .4), opacity .18s ease, visibility 0s .24s, box-shadow .2s ease; }
-.settings-page { transform-origin: 0 50%; }
-:root[data-motion="on"] .settings-page:not([hidden]) { animation: settings-in .34s cubic-bezier(.22, 1, .36, 1) backwards; }
 @keyframes settings-in { from { opacity: 0; transform: translateX(-36px) scale(.96); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .library, .app.lib-closed:not(.details-only) .library { transition-duration: .01s; } }
 
 /* Song cards: the hovered card gets an accent border and a lighter face (the open one keeps its stronger tint) */
 #songs li.row:hover::after { background: color-mix(in srgb, var(--accent) 9%, var(--panel-2)); border-color: color-mix(in srgb, var(--accent) 65%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
@@ -2166,14 +2115,9 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 #songs li.row.normal .thumb, #songs li.row.large .thumb { border-radius: 9px 5px 5px 9px; }
 
 /* More see-through window: the body of the library and the details lets the stage show (blurred); the headers stay dense so they stand out. */
-.library { background: color-mix(in srgb, var(--panel) 52%, transparent); box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .26), 0 18px 60px rgba(0, 0, 0, .5), inset 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent); }
-.library::before { backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
-@media (max-width: 700px) { .library { box-shadow: none; } }
 .lib-header, .info-top { background: color-mix(in srgb, var(--panel) 90%, transparent); }
 .songs-wrap, .info-scroll { background: none; }
 .library .group-label { background: color-mix(in srgb, var(--panel) 60%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
-.library { background: color-mix(in srgb, var(--panel) 28%, transparent); } /* (over the dark stage this makes the body clearly darker than the dense headers) */
-.library { background: color-mix(in srgb, var(--panel) 50%, transparent); } /* body opacity: 50 % */
 
 /* Cards: a more solid face, and the same 8 px gap between cards in both directions (4 px of the row on each side) */
 #songs li.row::after { inset: 4px; background: color-mix(in srgb, var(--panel-2, var(--panel)) 88%, transparent); }
@@ -2196,7 +2140,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .songs-wrap { background: color-mix(in srgb, var(--panel) 60%, transparent); }
 
 /* Window body: 15 points less transparent (50 % -> 65 % opaque) */
-.library { background: color-mix(in srgb, var(--panel) 65%, transparent); }
 
 /* The search shrinks first when the header gets tight: the side groups and the search may all be narrower than their content */
 @media (min-width: 701px) {
@@ -2304,11 +2247,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 
 /* The library window keeps its gap to the bottom of the stage again (--lib-gap, as on the other sides) */
 
-/* The settings window leaves the player bar visible: app.js (syncSettingsInsets) sets how much of the screen the bar takes at the top or at the bottom */
-@media (min-width: 701px) {
-  .settings-page { top: calc(var(--settings-top, 0px) + 16px); bottom: calc(var(--settings-bottom, 0px) + 16px); }
-}
-
 /* A live stage (the song on it goes on while the details of another are browsed): its controls that need that song's chart are switched off */
 .app.live-stage .pane-tag, .app.live-stage #loopBtn, .app.live-stage #sectionBtn, .app.live-stage #back, .app.live-stage #forward { pointer-events: none; opacity: .45; }
 
@@ -2355,3 +2293,47 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* The side handle (library / settings) is glass in both states, like the player bar and the windows: a translucent panel over a blur of the stage. */
 .edge-dock { background: color-mix(in srgb, var(--panel) 72%, transparent); -webkit-backdrop-filter: blur(14px) saturate(1.1); backdrop-filter: blur(14px) saturate(1.1); box-shadow: 0 6px 20px rgba(0, 0, 0, .25); }
 .edge-dock.open { background: color-mix(in srgb, var(--panel) 78%, transparent); -webkit-backdrop-filter: blur(16px) saturate(1.1); backdrop-filter: blur(16px) saturate(1.1); box-shadow: 0 8px 26px rgba(0, 0, 0, .4); }
+
+/* ---------- Window frame (src/windowframe.js, src/windowframe-dom.js): ONE look and one set of rules for the floating windows ----------
+   The library (#library, with .win-frame in index.html) and the settings (#settingsPage, .win-frame set by app.js) are both windows of this
+   frame: glass (body, blur on ::before, border, radius, shadow with the stage dim), centred at --win-w (set by the controller: the library's
+   layout, or the settings' own width = the user's width between its minimum and the content area), the gaps to the screen (--lib-gap) plus the
+   room the player bar takes (--win-top / --win-bottom, published by syncWindowInsets in app.js), the two edge handles (.win-edge) and the
+   open/close motion (`.win-closed`: slides out to the left, where the dock is, and fades). At <= 700 px it is the full-height drawer.
+   Never put backdrop-filter / filter on the window itself (the blur is its ::before): they make it the containing block of fixed popovers.
+   Per-window rules (z-index, the panes inside) stay with each window. */
+.win-frame {
+  position: fixed; box-sizing: border-box; min-height: 0; overflow: hidden;
+  top: calc(var(--win-top, 0px) + var(--lib-gap)); bottom: calc(var(--win-bottom, 0px) + var(--lib-gap));
+  left: max(var(--lib-gap), calc((100% - var(--win-w, 100%)) / 2));
+  width: min(var(--win-w, var(--lib-w, 100%)), calc(100% - 2 * var(--lib-gap)));
+  max-width: calc(100% - 2 * var(--lib-left));
+  background: color-mix(in srgb, var(--panel) 65%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .26), 0 18px 60px rgba(0, 0, 0, .5), inset 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent);
+  transform-origin: 0 50%;
+  transition: transform .34s cubic-bezier(.22, 1, .36, 1), opacity .24s ease, visibility 0s, box-shadow .3s ease; /* open: glides in from the left edge, grows from 96 % and fades in */
+}
+.win-frame::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+/* closed: the same motion backwards, a little quicker (hidden = visibility, so the content keeps its size and the virtual list keeps measuring) */
+.win-frame.win-closed { transform: translateX(-36px) scale(.96); opacity: 0; visibility: hidden; pointer-events: none; box-shadow: none; transition: transform .24s cubic-bezier(.55, 0, .8, .4), opacity .18s ease, visibility 0s .24s, box-shadow .2s ease; }
+@media (prefers-reduced-motion: reduce) { .win-frame, .win-frame.win-closed { transition-duration: .01s; } }
+/* the edge handles: the window's left and right edges resize it symmetrically (not on the phone drawer) */
+.win-edge { display: none; }
+@media (min-width: 701px) {
+  .win-frame .win-edge { display: block; position: absolute; top: 14px; bottom: 14px; width: 12px; z-index: 7; cursor: ew-resize; touch-action: none; }
+  .win-edge-l { left: 0; }
+  .win-edge-r { right: 0; }
+  .win-edge::after { content: ""; position: absolute; top: 0; bottom: 0; width: 2px; border-radius: 1px; background: transparent; transition: background .15s; }
+  .win-edge-l::after { left: 2px; }
+  .win-edge-r::after { right: 2px; }
+  .win-edge:hover::after, .win-edge.dragging::after { background: var(--accent); }
+  .win-frame.win-closed .win-edge { display: none; }
+}
+/* phone: the full-height drawer (a 44 px strip of the background stays visible and tappable at the right: the library has the scrim there) */
+@media (max-width: 700px) {
+  .win-frame { top: 0; bottom: 0; left: 0; width: calc(100vw - 44px); max-width: none; border-radius: 0 14px 14px 0; border-left: 0; background: color-mix(in srgb, var(--panel) 94%, transparent); box-shadow: none; }
+  .win-frame.win-closed { transform: translateX(-105%); }
+  .settings-page:not(.win-closed) { box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .5); } /* (no scrim element outside .app: the dim is the shadow) */
+}

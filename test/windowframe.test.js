@@ -37,3 +37,20 @@ test('dragWidth moves both edges: 2*dx, clamped', () => {
   assert.equal(dragWidth(1000, 500, 1, 560, 1398), 1398);
   assert.equal(dragWidth(1000, -500, 1, 560, 1398), 560);
 });
+
+test('createWidthPref: reads the stored width, writes on set, peek does not write', async () => {
+  const { createWidthPref } = await import('../src/windowframe-dom.js');
+  const data = { winWidth: '900' };
+  const store = { get: (k) => data[k] ?? null, set: (k, v) => { data[k] = v; } };
+  const p = createWidthPref(store);
+  assert.equal(p.get(), 900);
+  p.peek(700.4);
+  assert.equal(p.get(), 700);
+  assert.equal(data.winWidth, '900');
+  p.set(700.4);
+  assert.equal(data.winWidth, '700');
+  p.set(null);
+  assert.equal(p.get(), null);
+  assert.equal(data.winWidth, '');
+  assert.equal(createWidthPref({ get: () => '', set() {} }).get(), null);
+});
