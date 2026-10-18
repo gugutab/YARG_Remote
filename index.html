@@ -215,9 +215,13 @@
         <div id="loading" class="loading" hidden role="status" aria-live="polite"></div>
         <button id="stagePlay" class="stage-play cta" type="button" hidden><svg><use href="#i-play"/></svg><span>Play</span></button>
         <div id="songInfo" class="song-info" aria-hidden="true">
-          <div class="si-title" id="siTitle"></div>
-          <div class="si-artist" id="siArtist"></div>
-          <div class="si-details" id="siDetails"></div>
+          <img id="siCover" class="si-cover" alt="" hidden>
+          <div class="si-main">
+            <div class="si-title" id="siTitle"></div>
+            <div class="si-artist" id="siArtist"></div>
+            <div class="si-details" id="siDetails"></div>
+          </div>
+          <div class="si-insts" id="siInsts"></div>
         </div>
         <div id="pausePanel" class="pause-panel" role="dialog" aria-label="Quick settings" aria-hidden="true">
           <div class="pp-row"><span class="pp-name">Speed</span>

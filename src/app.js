@@ -43,7 +43,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'barHide', 'metronomeBtn', 'mixerVal', 'speedVal', 'stagePlay', 'songInfo', 'pausePanel', 'ppSlower', 'ppFaster', 'ppSpeed', 'ppMetronome', 'ppVolume', 'ppVolVal', 'ppResume', 'siTitle', 'siArtist', 'siDetails', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'barHide', 'metronomeBtn', 'mixerVal', 'speedVal', 'stagePlay', 'songInfo', 'siCover', 'siInsts', 'pausePanel', 'ppSlower', 'ppFaster', 'ppSpeed', 'ppMetronome', 'ppVolume', 'ppVolVal', 'ppResume', 'siTitle', 'siArtist', 'siDetails', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
   'endScreen', 'endCover', 'endTitle', 'endArtist', 'endAgain', 'endSearch', 'endCards', 'endNextBox', 'endNext',
@@ -2359,6 +2359,19 @@ function showSongInfo(hideMs) {
   els.siTitle.textContent = l.title;
   els.siArtist.textContent = l.artist;
   els.siDetails.replaceChildren(...l.details.map((d) => Object.assign(document.createElement('div'), { textContent: d })));
+  els.siCover.hidden = !current.coverUrl;
+  if (current.coverUrl) els.siCover.src = current.coverUrl;
+  // the instruments on screen with their difficulty (Expert...) and the song's own level for them (the pips of the cards)
+  els.siInsts.replaceChildren(...(current.screen || []).map((it) => {
+    const row = document.createElement('div');
+    row.className = 'si-inst';
+    const level = instrumentLevel(song, { base: it.base });
+    const pips = level === null || level === undefined ? '' : `<span class="mini-pips" title="Level ${level}">${Array.from({ length: 6 }, (_, k) => `<i${k < level ? ' class="on"' : ''}></i>`).join('')}</span>`;
+    row.innerHTML = `<svg><use href="#i-${it.icon}"/></svg><span class="si-inst-name"></span><span class="si-inst-diff"></span>${pips}`;
+    row.querySelector('.si-inst-name').textContent = it.name;
+    row.querySelector('.si-inst-diff').textContent = it.diffLabel || '';
+    return row;
+  }));
   infoShownFor = song;
   els.songInfo.classList.add('show');
   scheduleInfoHide(hideMs);

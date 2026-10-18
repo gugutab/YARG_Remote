@@ -2260,18 +2260,38 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 
 /* ================= Song information overlay (src/startinfo.js): fades in at the start of a song, out a few seconds later ================= */
 .song-info {
-  position: absolute; z-index: 5; top: 12%; left: calc(50% + var(--lib-inset, 0px) / 2); transform: translateX(-50%); max-width: min(560px, 86%); padding: 14px 22px; text-align: center;
+  position: absolute; z-index: 5; top: 12%; left: calc(50% + var(--lib-inset, 0px) / 2); transform: translateX(-50%); width: max-content; max-width: min(640px, 90%);
+  display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "cover main" "insts insts"; align-items: center; gap: 12px 18px; padding: 16px 22px; text-align: left;
   background: color-mix(in srgb, var(--panel) 70%, transparent); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius: 14px;
   box-shadow: 0 10px 34px rgba(0, 0, 0, .35); color: var(--text); pointer-events: none; opacity: 0; visibility: hidden; transition: opacity .5s ease, visibility 0s linear .5s;
 }
 .song-info.show { opacity: 1; visibility: visible; transition: opacity .5s ease; }
 .song-info.show.under-panel { opacity: 0; }
 .song-info::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-.si-title { font-size: 20px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
-.si-artist { font-size: 15px; margin-top: 2px; overflow-wrap: anywhere; }
-.si-details { margin-top: 6px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.si-cover { grid-area: cover; width: 96px; height: 96px; object-fit: cover; border-radius: 10px; box-shadow: 0 4px 14px rgba(0, 0, 0, .4); }
+.si-main { grid-area: main; min-width: 0; }
+.si-title { font-size: 22px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.si-artist { font-size: 16px; margin-top: 2px; overflow-wrap: anywhere; }
+.si-details { margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.5; display: flex; flex-wrap: wrap; gap: 2px 14px; }
 .si-details div { overflow-wrap: anywhere; }
 .si-details:empty { display: none; }
+.si-insts { grid-area: insts; display: flex; flex-wrap: wrap; gap: 8px 16px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.si-insts:empty { display: none; }
+.si-inst { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; }
+.si-inst svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
+.si-inst-diff { color: var(--accent); font-weight: 600; }
+.si-inst .mini-pips { margin-left: 2px; }
+/* A wide stage: the cover grows and the instruments sit in a column to the right of the text (the horizontal room is used instead of stacking) */
+@media (min-width: 1100px) {
+  .song-info { width: min(1000px, 84%); max-width: none; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "cover main insts"; gap: 22px 32px; padding: 22px 32px; }
+  .si-cover { width: 150px; height: 150px; border-radius: 12px; }
+  .si-title { font-size: 30px; }
+  .si-artist { font-size: 19px; }
+  .si-details { font-size: 14px; }
+  .si-insts { flex-direction: column; flex-wrap: nowrap; align-self: stretch; justify-content: center; gap: 10px; padding: 0 0 0 28px; border-top: 0; border-left: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+  .si-inst { font-size: 15px; }
+  .si-inst svg { width: 22px; height: 22px; }
+}
 
 /* ================= Quick settings while paused (setting playback.pausePanel): glass like the song information, fades in 0.3 s after the pause ================= */
 .pause-panel {
