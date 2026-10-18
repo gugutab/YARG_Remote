@@ -204,10 +204,15 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       el.setAttribute('role', 'presentation');
       return { el, timer: 0 };
     }
-    const song = item.song;
-    el.className = `row ${mode}` + (song === activeSong ? ' active' : '') + (firstCol ? ' first-col' : '');
-    el.style.height = `${rowH}px`;
-    el.style.setProperty('--row-h', `${rowH}px`); // (the large card's art fills the card: its size follows the row)
+    return buildCard(item.song, mode, rowH, el, firstCol, (entry) => rows.get(index) === entry, onSelect);
+  }
+
+  // The card of one song (the library's row, also used by the end-of-song window): `m` the card style, `h` its height, `alive(entry)` tells the thumbnail
+  // loader whether the card is still wanted, `pick(song)` what a click does.
+  function buildCard(song, m, h, el, firstCol, alive, pick, perLine = chipsPerLine()) {
+    el.className = `row ${m}` + (song === activeSong ? ' active' : '') + (firstCol ? ' first-col' : '');
+    el.style.height = `${h}px`;
+    el.style.setProperty('--row-h', `${h}px`); // (the large card's art fills the card: its size follows the row)
     el.setAttribute('role', 'option');
     el.setAttribute('aria-selected', String(song === activeSong));
     const d = describe(song);
@@ -228,7 +233,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       if (at < txt.length) node.append(txt.slice(at));
       return node;
     };
-    if (mode === 'compact') { // one line: Title - Artist (· pack)
+    if (m === 'compact') { // one line: Title - Artist (· pack)
       const c = cards.compact;
       const line = document.createElement('span');
       line.className = 'song-line';
@@ -250,7 +255,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       }
       el.append(line);
       el.title = `${text(song.title)} — ${text(song.artist)}${d.pack ? ` · ${d.pack}` : ''}`;
-      el.addEventListener('click', () => onSelect(song));
+      el.addEventListener('click', () => pick(song));
       return { el, timer: 0 };
     }
     if (cards.thumbs) {
@@ -283,7 +288,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       }
       return icons;
     };
-    if (mode === 'normal') {
+    if (m === 'normal') {
       const n = cards.normal;
       if (n.pack && d.pack) { // the pack at the top right, next to the title
         const top = document.createElement('span');
@@ -323,7 +328,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       if (l.instruments && d.instruments.length) {
         const insts = document.createElement('span');
         insts.className = 'song-insts';
-        insts.style.setProperty('--per', String(evenPerRow(d.instruments.length, chipsPerLine()))); // 4 chips with room for 3: 2 + 2
+        insts.style.setProperty('--per', String(evenPerRow(d.instruments.length, perLine))); // 4 chips with room for 3: 2 + 2
         for (const i of d.instruments) {
           const chip = document.createElement('span');
           chip.className = 'inst';
@@ -336,17 +341,17 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       }
       if (bottom.childElementCount) textBox.append(bottom);
     }
-    el.addEventListener('click', () => onSelect(song));
+    el.addEventListener('click', () => pick(song));
     const entry = { el, timer: 0 };
     const cached = thumbs.peek(song);
     const img = el.querySelector('img');
-    const show = (url) => { if (url && img && rows.get(index) === entry) { img.src = url; img.hidden = false; } };
+    const show = (url) => { if (url && img && alive(entry)) { img.src = url; img.hidden = false; } };
     if (!img) return entry; // thumbnails are switched off
     if (cached) { img.src = cached; img.hidden = false; } // already in memory: show it right away (the row is not in the map yet)
     else {
       entry.timer = setTimeout(() => {
         entry.timer = 0;
-        thumbs.get(song, () => rows.get(index) === entry).then(show);
+        thumbs.get(song, () => alive(entry)).then(show);
       }, THUMB_DELAY_MS);
     }
     return entry;
@@ -582,6 +587,14 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
 
   let highlightTerms = [];
   return {
+    // One song card in the current card style, for other windows (the end-of-song suggestions): a stand-alone <li> (not positioned like the list's rows)
+    // whose click calls `pick(song)`; the thumbnail loads like in the list.
+    cardFor(song, pick) {
+      const el = document.createElement('li');
+      const entry = buildCard(song, mode, rowH, el, false, () => true, pick, 6); // (the instrument chips of a large card: one line, the window's cards are wide)
+      el.classList.add('end-card-row');
+      return entry.el;
+    },
     setCards(next) { // what the cards show / how big: rebuild the visible rows (the list keeps its place)
       cards = next;
       rowH = cardHeight(mode, cards);

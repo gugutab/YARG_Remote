@@ -2504,36 +2504,8 @@ function endCard(it) {
 }
 
 function endRow(song, reason) {
-  const li = document.createElement('li');
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'end-row';
-  b.innerHTML = '<span class="end-thumb"></span><span class="end-row-text"><strong></strong><span class="end-row-artist"></span></span><span class="end-insts"></span>';
-  b.querySelector('strong').textContent = plainText(song.title);
-  b.querySelector('.end-row-artist').textContent = plainText(song.artist);
-  // the instruments the song has (instead of the reason text, which stays in the tooltip)
-  const insts = b.querySelector('.end-insts');
-  for (const id of INSTRUMENTS.filter((i) => hasInstrument(song, i))) {
-    const ic = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    ic.innerHTML = `<use href="#i-${FILTER_ICONS[id]}"/>`;
-    ic.setAttribute('aria-label', INSTRUMENT_NAMES[id]);
-    insts.append(ic);
-  }
-  b.title = `${plainText(song.title)} - ${plainText(song.artist)}${reason ? ` (${reason})` : ''}`;
-  const thumb = b.querySelector('.end-thumb');
-  const put = (url) => {
-    if (!url) return;
-    const img = new Image();
-    img.alt = '';
-    // (the list's LRU can revoke this URL while the end window stays open: ask for the thumbnail again, once)
-    img.addEventListener('error', () => { thumbs.get(song).then((again) => { if (again && again !== url) img.src = again; }); }, { once: true });
-    img.src = url;
-    thumb.replaceChildren(img);
-  };
-  const cached = thumbs.peek(song);
-  if (cached) put(cached); else thumbs.get(song).then(put);
-  b.addEventListener('click', () => playNext(song));
-  li.append(b);
+  const li = list.cardFor(song, (picked) => playNext(picked)); // the library's own song card (its style and what it shows)
+  li.title = `${plainText(song.title)} - ${plainText(song.artist)}${reason ? ` (${reason})` : ''}`;
   return li;
 }
 

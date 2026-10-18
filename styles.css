@@ -85,10 +85,10 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 #songs { position: relative; list-style: none; margin: 0; padding: 0; overflow: auto; flex: 1; min-height: 0; }
 #songs li { position: absolute; left: 0; box-sizing: border-box; }
 #songs li.spacer { position: static; pointer-events: none; }
-#songs li.row { display: flex; align-items: center; gap: 10px; padding: 6px 0 6px 6px; border-bottom: 1px solid var(--line); cursor: pointer; }
-#songs li.row:hover { background: var(--panel-2); }
-#songs li.row.active { background: var(--panel-2); }
-#songs li.row.active::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); z-index: 1; } /* drawn over the thumbnail: the rows have no horizontal padding */
+:is(#songs, #endNext) li.row { display: flex; align-items: center; gap: 10px; padding: 6px 0 6px 6px; border-bottom: 1px solid var(--line); cursor: pointer; }
+:is(#songs, #endNext) li.row:hover { background: var(--panel-2); }
+:is(#songs, #endNext) li.row.active { background: var(--panel-2); }
+:is(#songs, #endNext) li.row.active::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); z-index: 1; } /* drawn over the thumbnail: the rows have no horizontal padding */
 #songs li.divider { display: flex; align-items: center; padding: 0 10px; font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--accent); background: var(--bg); border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .group-label { position: absolute; z-index: 2; top: 0; left: 0; right: 0; height: 26px; display: flex; align-items: center; padding: 0 10px; box-sizing: border-box; font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--accent); background: var(--bg); border-bottom: 1px solid var(--line); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .thumb { flex: none; width: 42px; height: 42px; border-radius: 6px; background: var(--panel-2); overflow: hidden; }
@@ -659,15 +659,15 @@ button.icon.stage-btn.style-btn { top: 54px; }
 .view-seg button[aria-pressed="true"] { color: var(--accent-text, #fff); }
 
 /* Card styles of the song list (row heights live in virtuallist.js ROW_HEIGHTS) */
-#songs li.row.compact { padding: 0 0 0 6px; }
+:is(#songs, #endNext) li.row.compact { padding: 0 0 0 6px; }
 .song-line { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .song-line .song-title, .song-line .song-artist { display: inline; font-size: 13px; }
 .song-line .song-artist { font-weight: 400; }
-#songs li.row.large { gap: 12px; padding: 8px 0 8px 6px; align-items: flex-start; }
-#songs li.row.large .thumb { width: 92px; height: 92px; border-radius: 8px; }
-#songs li.row.large .song-text { flex: 1; gap: 2px; padding-top: 1px; }
-#songs li.row.large .song-title { font-size: 15px; }
-#songs li.row.large .song-artist { font-size: 13px; }
+:is(#songs, #endNext) li.row.large { gap: 12px; padding: 8px 0 8px 6px; align-items: flex-start; }
+:is(#songs, #endNext) li.row.large .thumb { width: 92px; height: 92px; border-radius: 8px; }
+:is(#songs, #endNext) li.row.large .song-text { flex: 1; gap: 2px; padding-top: 1px; }
+:is(#songs, #endNext) li.row.large .song-title { font-size: 15px; }
+:is(#songs, #endNext) li.row.large .song-artist { font-size: 13px; }
 .song-meta { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .song-insts { display: grid; grid-template-columns: repeat(var(--per, 6), max-content); gap: 3px 10px; margin-top: 4px; } /* --per: instruments per line, set by virtuallist.js */
 .inst { display: inline-flex; align-items: center; gap: 3px; color: var(--muted); }
@@ -762,7 +762,7 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 .song-icons { display: flex; gap: 5px; flex: none; margin-left: auto; padding-right: 4px; }
 .song-icons { gap: 6px; align-items: center; }
 .song-icons .inst svg { width: 15px; height: 15px; } /* with the pack name above, the icons fill the height of the right side */
-#songs li.row.normal .song-text { flex: 1; }
+:is(#songs, #endNext) li.row.normal .song-text { flex: 1; }
 
 /* Round 60: on large screens the album image of the detail screen is twice as big (160 -> 320 px) */
 @media (min-width: 1800px) {
@@ -822,7 +822,7 @@ button.icon.stage-btn.fret-btn svg { width: 16px; height: 16px; }
 
 /* Several columns (the wide library): each card takes 1/--cols of the width left of the rail; headers take all of it */
 #songs { --cols: 1; }
-#songs li.row { right: auto; left: calc((100% - var(--rail-w)) / var(--cols) * var(--col, 0)); width: calc((100% - var(--rail-w)) / var(--cols)); }
+:is(#songs, #endNext) li.row { right: auto; left: calc((100% - var(--rail-w)) / var(--cols) * var(--col, 0)); width: calc((100% - var(--rail-w)) / var(--cols)); }
 #songs li.divider { right: auto; left: 0; width: calc(100% - var(--rail-w)); }
 #songs.multi li.row { border-right: 1px solid var(--line); }
 
@@ -938,8 +938,8 @@ body.settings-open { overflow: hidden; }
 .sp-group { margin: 16px 0 2px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .sp-group[hidden] { display: none; }
 /* cards: sizes follow the card settings (--card-scale, --card-icon are set on the list) */
-#songs li.row:not(.large) .thumb { width: calc(42px * var(--card-scale, 1)); height: calc(42px * var(--card-scale, 1)); }
-#songs li.row.large .thumb { width: calc(92px * var(--card-scale, 1)); height: calc(92px * var(--card-scale, 1)); }
+:is(#songs, #endNext) li.row:not(.large) .thumb { width: calc(42px * var(--card-scale, 1)); height: calc(42px * var(--card-scale, 1)); }
+:is(#songs, #endNext) li.row.large .thumb { width: calc(92px * var(--card-scale, 1)); height: calc(92px * var(--card-scale, 1)); }
 .song-icons .inst svg, .song-insts .inst svg { width: var(--card-icon, 15px); height: var(--card-icon, 15px); }
 .songs-wrap.no-rail { --rail-w: 8px; }
 .songs-wrap.no-rail .rail { display: none; }
@@ -1963,13 +1963,13 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 /* The list: song cards (the row keeps its box; the card is drawn inside it, so the virtual list's geometry is unchanged) */
 .songs-wrap { border-top: 0; margin-left: 0; margin-right: 0; }
 #songs { padding: 0; }
-#songs li.row { border: 0 !important; background: none !important; isolation: isolate; padding-left: 12px; padding-right: 10px; }
-#songs li.row::after { content: ""; position: absolute; z-index: -1; inset: 3px 4px; border-radius: 12px; background: color-mix(in srgb, var(--panel-2) 78%, transparent); border: 1px solid color-mix(in srgb, var(--line) 55%, transparent); transition: background .12s, border-color .12s; pointer-events: none; }
-#songs li.row:hover::after { background: color-mix(in srgb, var(--panel-2) 90%, transparent); border-color: var(--line); }
-#songs li.row.active::after { background: color-mix(in srgb, var(--accent) 16%, var(--panel-2)); border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
-#songs li.row.active::before { display: none; }
-#songs li.row.compact { padding-left: 14px; }
-#songs li.row .thumb { border-radius: 8px; }
+:is(#songs, #endNext) li.row { border: 0 !important; background: none !important; isolation: isolate; padding-left: 12px; padding-right: 10px; }
+:is(#songs, #endNext) li.row::after { content: ""; position: absolute; z-index: -1; inset: 3px 4px; border-radius: 12px; background: color-mix(in srgb, var(--panel-2) 78%, transparent); border: 1px solid color-mix(in srgb, var(--line) 55%, transparent); transition: background .12s, border-color .12s; pointer-events: none; }
+:is(#songs, #endNext) li.row:hover::after { background: color-mix(in srgb, var(--panel-2) 90%, transparent); border-color: var(--line); }
+:is(#songs, #endNext) li.row.active::after { background: color-mix(in srgb, var(--accent) 16%, var(--panel-2)); border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
+:is(#songs, #endNext) li.row.active::before { display: none; }
+:is(#songs, #endNext) li.row.compact { padding-left: 14px; }
+:is(#songs, #endNext) li.row .thumb { border-radius: 8px; }
 #songs li.divider { background: none; border-bottom: 0; padding: 0 14px; gap: 10px; font-size: 11px; color: var(--accent); }
 #songs li.divider::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, var(--line) 80%, transparent); }
 .library .group-label { background: color-mix(in srgb, var(--panel) 92%, transparent); border-bottom: 0; padding: 0 14px; }
@@ -1977,7 +1977,7 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 .library #status { margin: 0 12px 8px; }
 .songs-wrap { padding-left: 8px; } /* the cards line up with the header's padding */
 .library .group-label { left: 8px; }
-#songs li.row.large, #songs li.row.normal { padding-left: 12px; padding-right: 10px; }
+:is(#songs, #endNext) li.row.large, :is(#songs, #endNext) li.row.normal { padding-left: 12px; padding-right: 10px; }
 
 #songs mark.hit { background: color-mix(in srgb, var(--accent) 32%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; margin: 0 -1px; }
 
@@ -1988,40 +1988,40 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 /* Library list: the sub-headers line up with the card edge; the cards have the same gap (6 px) all round */
 #songs li.divider, .library .group-label { padding-left: 4px; padding-right: 4px; }
 .library .group-label { left: 8px; right: var(--rail-w); }
-#songs li.row.normal, #songs li.row.large { padding-left: 10px; padding-right: 10px; }
-#songs li.row.compact { padding-left: 12px; padding-right: 10px; }
+:is(#songs, #endNext) li.row.normal, :is(#songs, #endNext) li.row.large { padding-left: 10px; padding-right: 10px; }
+:is(#songs, #endNext) li.row.compact { padding-left: 12px; padding-right: 10px; }
 .song-top { align-items: baseline; }
 .song-packtag { margin-top: 0; padding-right: 0; }
 .song-icons { padding-right: 0; }
 
 /* Cards: small (compact) gets 2 px more inner margin; medium (normal) has its art flush with the card, 46 px, and the text split between the top and the bottom */
-#songs li.row.compact { padding-left: 14px; padding-right: 12px; }
-#songs li.row.normal { padding: 4px 10px 4px 5px; gap: 12px; } /* 3 px inset + 1 px border: the art touches the card's edge */
-#songs li.row.normal .thumb { width: calc(46px * var(--card-scale, 1)); height: calc(46px * var(--card-scale, 1)); border-radius: 11px 6px 6px 11px; }
-#songs li.row.normal .song-text { align-self: stretch; justify-content: space-between; padding: 3px 0; gap: 0; }
-#songs li.row.normal .song-top { align-items: baseline; }
-#songs li.row.normal .song-sub { margin-top: auto; }
+:is(#songs, #endNext) li.row.compact { padding-left: 14px; padding-right: 12px; }
+:is(#songs, #endNext) li.row.normal { padding: 4px 10px 4px 5px; gap: 12px; } /* 3 px inset + 1 px border: the art touches the card's edge */
+:is(#songs, #endNext) li.row.normal .thumb { width: calc(46px * var(--card-scale, 1)); height: calc(46px * var(--card-scale, 1)); border-radius: 11px 6px 6px 11px; }
+:is(#songs, #endNext) li.row.normal .song-text { align-self: stretch; justify-content: space-between; padding: 3px 0; gap: 0; }
+:is(#songs, #endNext) li.row.normal .song-top { align-items: baseline; }
+:is(#songs, #endNext) li.row.normal .song-sub { margin-top: auto; }
 
 /* Medium: art 50 px; the pack tag's top lines up with the title's top. Large: the art fills the card's height, flush like the medium one */
-#songs li.row.normal .thumb { width: calc(50px * var(--card-scale, 1)); height: calc(50px * var(--card-scale, 1)); }
-#songs li.row.normal .song-top { align-items: flex-start; }
-#songs li.row.normal .song-packtag { line-height: 1.35; }
-#songs li.row.large { padding: 4px 10px 4px 5px; gap: 12px; align-items: stretch; }
-#songs li.row.large .thumb { width: calc(var(--row-h) - 8px); height: calc(var(--row-h) - 8px); border-radius: 11px 6px 6px 11px; }
-#songs li.row.large .song-text { padding: 7px 0; }
+:is(#songs, #endNext) li.row.normal .thumb { width: calc(50px * var(--card-scale, 1)); height: calc(50px * var(--card-scale, 1)); }
+:is(#songs, #endNext) li.row.normal .song-top { align-items: flex-start; }
+:is(#songs, #endNext) li.row.normal .song-packtag { line-height: 1.35; }
+:is(#songs, #endNext) li.row.large { padding: 4px 10px 4px 5px; gap: 12px; align-items: stretch; }
+:is(#songs, #endNext) li.row.large .thumb { width: calc(var(--row-h) - 8px); height: calc(var(--row-h) - 8px); border-radius: 11px 6px 6px 11px; }
+:is(#songs, #endNext) li.row.large .song-text { padding: 7px 0; }
 
 /* Medium: bigger instrument icons and more room on the top, bottom and right for everything inside */
-#songs li.row.normal { padding-right: 14px; }
-#songs li.row.normal .song-text { padding: 5px 0; }
-#songs li.row.normal .song-icons .inst svg { width: calc(var(--card-icon, 15px) + 3px); height: calc(var(--card-icon, 15px) + 3px); }
-#songs li.row.normal .song-icons { gap: 7px; }
+:is(#songs, #endNext) li.row.normal { padding-right: 14px; }
+:is(#songs, #endNext) li.row.normal .song-text { padding: 5px 0; }
+:is(#songs, #endNext) li.row.normal .song-icons .inst svg { width: calc(var(--card-icon, 15px) + 3px); height: calc(var(--card-icon, 15px) + 3px); }
+:is(#songs, #endNext) li.row.normal .song-icons { gap: 7px; }
 /* Large: the length at the title's right corner, the pack and the instruments at the bottom of the card */
-#songs li.row.large .song-top { align-items: baseline; gap: 10px; }
+:is(#songs, #endNext) li.row.large .song-top { align-items: baseline; gap: 10px; }
 .song-len { flex: none; color: var(--muted); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
-#songs li.row.large .song-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
-#songs li.row.large .song-insts { margin-top: 0; }
-#songs li.row.large { padding-right: 12px; }
-#songs li.row.large .song-text { padding: 3px 0 7px; }
+:is(#songs, #endNext) li.row.large .song-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
+:is(#songs, #endNext) li.row.large .song-insts { margin-top: 0; }
+:is(#songs, #endNext) li.row.large { padding-right: 12px; }
+:is(#songs, #endNext) li.row.large .song-text { padding: 3px 0 7px; }
 
 .song-packtag.short { flex: none; max-width: none; } /* a short pack code is never cut: the title gives way */
 
@@ -2030,7 +2030,7 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 .song-meta[hidden] { display: none; }
 
 .song-top { gap: 8px; } /* (fitPacks reads this gap) */
-#songs li.row.normal .song-top .song-title { min-width: 0; } /* the title is what gives way (ellipsis) when even the short code leaves it too little */
+:is(#songs, #endNext) li.row.normal .song-top .song-title { min-width: 0; } /* the title is what gives way (ellipsis) when even the short code leaves it too little */
 
 /* ---------- The dock stays on the left edge; it shows which windows are open ---------- */
 body.details-open .edge-dock { display: flex; } /* (it used to hide while the details were open) */
@@ -2061,8 +2061,8 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 @keyframes settings-in { from { opacity: 0; transform: translateX(-36px) scale(.96); } to { opacity: 1; transform: none; } }
 
 /* Song cards: the hovered card gets an accent border and a lighter face (the open one keeps its stronger tint) */
-#songs li.row:hover::after { background: color-mix(in srgb, var(--accent) 9%, var(--panel-2)); border-color: color-mix(in srgb, var(--accent) 65%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
-#songs li.row.active:hover::after { border-color: var(--accent); }
+:is(#songs, #endNext) li.row:hover::after { background: color-mix(in srgb, var(--accent) 9%, var(--panel-2)); border-color: color-mix(in srgb, var(--accent) 65%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
+:is(#songs, #endNext) li.row.active:hover::after { border-color: var(--accent); }
 
 .lib-close svg { transform: rotate(90deg); } /* the dock handle's chevron, pointing left: the same kind of arrow as the handle */
 /* Library title: more room between "Library" and the count, and a line box tall enough for the descenders (the overflow clip cut them) */
@@ -2076,9 +2076,9 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 
 /* Tone pass: three clear steps. Header (dark strip) < content (lighter layer) < cards (raised, panel-2). The sticky group label matches the content. */
 .songs-wrap, .info-scroll { background: color-mix(in srgb, var(--panel-2) 38%, transparent); }
-#songs li.row::after { background: color-mix(in srgb, var(--panel-2) 94%, transparent); border-color: color-mix(in srgb, var(--line) 80%, transparent); }
-#songs li.row:hover::after { background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }
-#songs li.row.active::after { background: color-mix(in srgb, var(--accent) 20%, var(--panel-2)); }
+:is(#songs, #endNext) li.row::after { background: color-mix(in srgb, var(--panel-2) 94%, transparent); border-color: color-mix(in srgb, var(--line) 80%, transparent); }
+:is(#songs, #endNext) li.row:hover::after { background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }
+:is(#songs, #endNext) li.row.active::after { background: color-mix(in srgb, var(--accent) 20%, var(--panel-2)); }
 .library .group-label { background: color-mix(in srgb, var(--panel-2) 38%, var(--panel)); }
 .info-card { background: color-mix(in srgb, var(--panel-2) 94%, transparent); border-color: color-mix(in srgb, var(--line) 80%, transparent); }
 
@@ -2108,11 +2108,11 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 }
 
 /* Song cards in the style of the end-of-song window's buttons (.end-row): 10 px corners, translucent raised face, hairline border, accent wash on hover */
-#songs li.row::after { border-radius: 10px; background: color-mix(in srgb, var(--panel-2, var(--panel)) 60%, transparent); border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); box-shadow: none; }
-#songs li.row:hover::after { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: color-mix(in srgb, var(--line) 80%, transparent); box-shadow: none; }
-#songs li.row.active::after { background: color-mix(in srgb, var(--accent) 24%, transparent); border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
-#songs li.row.active:hover::after { border-color: var(--accent); }
-#songs li.row.normal .thumb, #songs li.row.large .thumb { border-radius: 9px 5px 5px 9px; }
+:is(#songs, #endNext) li.row::after { border-radius: 10px; background: color-mix(in srgb, var(--panel-2, var(--panel)) 60%, transparent); border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); box-shadow: none; }
+:is(#songs, #endNext) li.row:hover::after { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: color-mix(in srgb, var(--line) 80%, transparent); box-shadow: none; }
+:is(#songs, #endNext) li.row.active::after { background: color-mix(in srgb, var(--accent) 24%, transparent); border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
+:is(#songs, #endNext) li.row.active:hover::after { border-color: var(--accent); }
+:is(#songs, #endNext) li.row.normal .thumb, :is(#songs, #endNext) li.row.large .thumb { border-radius: 9px 5px 5px 9px; }
 
 /* More see-through window: the body of the library and the details lets the stage show (blurred); the headers stay dense so they stand out. */
 .lib-header, .info-top { background: color-mix(in srgb, var(--panel) 90%, transparent); }
@@ -2120,18 +2120,18 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .library .group-label { background: color-mix(in srgb, var(--panel) 60%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 
 /* Cards: a more solid face, and the same 8 px gap between cards in both directions (4 px of the row on each side) */
-#songs li.row::after { inset: 4px; background: color-mix(in srgb, var(--panel-2, var(--panel)) 88%, transparent); }
-#songs li.row:hover::after { background: color-mix(in srgb, var(--accent) 18%, color-mix(in srgb, var(--panel-2) 88%, transparent)); }
-#songs li.row.active::after { background: color-mix(in srgb, var(--accent) 26%, color-mix(in srgb, var(--panel-2) 88%, transparent)); }
-#songs li.row.normal { padding: 5px 14px 5px 5px; }
-#songs li.row.large { padding: 5px 12px 5px 5px; }
-#songs li.row.compact { padding: 4px 12px 4px 14px; }
-#songs li.row.large .thumb { width: calc(var(--row-h) - 10px); height: calc(var(--row-h) - 10px); }
+:is(#songs, #endNext) li.row::after { inset: 4px; background: color-mix(in srgb, var(--panel-2, var(--panel)) 88%, transparent); }
+:is(#songs, #endNext) li.row:hover::after { background: color-mix(in srgb, var(--accent) 18%, color-mix(in srgb, var(--panel-2) 88%, transparent)); }
+:is(#songs, #endNext) li.row.active::after { background: color-mix(in srgb, var(--accent) 26%, color-mix(in srgb, var(--panel-2) 88%, transparent)); }
+:is(#songs, #endNext) li.row.normal { padding: 5px 14px 5px 5px; }
+:is(#songs, #endNext) li.row.large { padding: 5px 12px 5px 5px; }
+:is(#songs, #endNext) li.row.compact { padding: 4px 12px 4px 14px; }
+:is(#songs, #endNext) li.row.large .thumb { width: calc(var(--row-h) - 10px); height: calc(var(--row-h) - 10px); }
 
 /* Cards at 80 % opacity: the song cards and the details' cards (info cards and the instrument cards) */
-#songs li.row::after { background: color-mix(in srgb, var(--panel-2, var(--panel)) 80%, transparent); }
-#songs li.row:hover::after { background: color-mix(in srgb, var(--accent) 18%, color-mix(in srgb, var(--panel-2) 80%, transparent)); }
-#songs li.row.active::after { background: color-mix(in srgb, var(--accent) 26%, color-mix(in srgb, var(--panel-2) 80%, transparent)); }
+:is(#songs, #endNext) li.row::after { background: color-mix(in srgb, var(--panel-2, var(--panel)) 80%, transparent); }
+:is(#songs, #endNext) li.row:hover::after { background: color-mix(in srgb, var(--accent) 18%, color-mix(in srgb, var(--panel-2) 80%, transparent)); }
+:is(#songs, #endNext) li.row.active::after { background: color-mix(in srgb, var(--accent) 26%, color-mix(in srgb, var(--panel-2) 80%, transparent)); }
 .info-card, #info .icard { background: color-mix(in srgb, var(--panel-2) 80%, transparent); }
 
 /* Pinned and in-list sub-headers: a touch larger; the pinned one starts a little further left; the list scroll area has the pinned label's background (60 % panel). */
@@ -2231,7 +2231,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 
 
 /* The selected card's outline is drawn over the album art too (medium and large cards have the art flush against the card's edge) */
-#songs li.row.active.normal::before, #songs li.row.active.large::before {
+:is(#songs, #endNext) li.row.active.normal::before, :is(#songs, #endNext) li.row.active.large::before {
   content: ""; display: block; position: absolute; inset: 4px; z-index: 2; border-radius: 10px; pointer-events: none;
   border: 1px solid color-mix(in srgb, var(--accent) 70%, transparent); background: none; width: auto; left: 4px; top: 4px; bottom: 4px;
 }
@@ -2365,3 +2365,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
   .sc-list { max-width: none; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; } /* the shortcuts list: two columns too */
   .sc-group { grid-column: 1 / -1; }
 }
+
+/* The end-of-song suggestions use the library's own song cards (list.cardFor): they share the card rules above through :is(#songs, #endNext); here they sit in a plain grid, not positioned like the list's rows */
+#endNext > li.row { position: relative; left: auto; right: auto; width: auto; margin: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+#endNext { grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr)); }
