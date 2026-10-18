@@ -925,9 +925,9 @@ body.settings-open { overflow: hidden; }
 .ts-del { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: rgba(0, 0, 0, .55); color: #fff; cursor: pointer; line-height: 1; }
 .ts-h { margin: 18px 0 2px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .ts-sub { margin: 0 0 8px; color: var(--muted); font-size: 12px; }
-.ts-editor { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px 18px; }
+.ts-editor { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 8px 18px; }
 .ts-color { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-.ts-color span { flex: 1; }
+.ts-color span { flex: 0 0 128px; } /* the swatch and the hex sit right after the name, not at the far end of a wide column */
 .ts-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
 .ts-name { flex: 1; min-width: 140px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--text); }
 .ts-actions select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--text); }
