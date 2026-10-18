@@ -2345,12 +2345,12 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* Settings on a wide window: the 860 px reading column is lifted and each section's rows flow in as many columns as fit (440 px minimum each);
    the custom editors (themes, shortcuts, tools) keep the whole width. A container query on the settings window, so it follows the window's width. */
 @container settings (min-width: 1000px) {
-  .sp-content { padding-inline: 36px; }
-  .sp-content > * { max-width: none; }
+  .sp-content { padding-inline: 56px; }
+  .sp-content > * { max-width: 1160px; } /* (the content column stays at a readable width: the rest is margin, centred) */
   /* two columns, never more: the rows are cards of one grid; text on the left, the control on the right; a wide control (a slider, four or more options)
      takes a second line of the card so the text keeps its room and every card has the same rhythm */
   .sp-section-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; align-items: stretch; }
-  .sp-row-custom { grid-column: 1 / -1; }
+  .sp-row-custom, .sp-group { grid-column: 1 / -1; } /* (the sub-section headings span both columns: the cards below start on a fresh line) */
   .sp-row:not(.sp-row-custom) { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 16px; row-gap: 10px; min-height: 64px; padding: 12px 16px; }
   .sp-row:not(.sp-row-custom) .sp-ctl { min-width: 0; max-width: 100%; justify-self: end; }
   .sp-row:not(.sp-row-custom):has(.sp-range), .sp-row:not(.sp-row-custom):has(.sp-seg button:nth-child(4)) { grid-template-columns: minmax(0, 1fr); }
