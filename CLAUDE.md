@@ -407,3 +407,5 @@ Only checked by synthetic test, headless run or code reading:
 - The dock handle (`.edge-dock`) is glass in both states: panel at 72 % (78 % open) with a 14-16 px backdrop blur (override block at the end of styles.css).
 - The library window is in wide mode (`lib-wide`: centred, full content width, draggable edges) at every width above the phone drawer (>= 701 px); it used to need a 1100 px stage, so shrinking the browser to ~1098 px dropped it to a partial-width sidebar.
 - Crossing the phone breakpoint (700 px) no longer closes the library: open stays open as the drawer (and back); only a phone load starts with it closed.
+- The library window has its own z-index (12; 30 as the phone drawer) because `.win-frame` has none: without it the stage overlays (load screen 11, end screen 6, stage Play 5) painted over it. The settings window sets its own (80).
+- Settings on a wide window (container query `settings`, >= 1000 px): no 860 px column; each section's rows flow in a grid of `minmax(440px, 1fr)` columns, custom editors (`.sp-row-custom`) span the whole width.

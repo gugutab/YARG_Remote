@@ -2337,3 +2337,25 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
   .win-frame.win-closed { transform: translateX(-105%); }
   .settings-page:not(.win-closed) { box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .5); } /* (no scrim element outside .app: the dim is the shadow) */
 }
+
+/* The library window keeps its place above the stage overlays (load screen 11, end screen 6, ...): .win-frame has no z-index of its own (the settings window sets its own) */
+.library.win-frame { z-index: 12; }
+@media (max-width: 700px) { .library.win-frame { z-index: 30; } }
+
+/* Settings on a wide window: the 860 px reading column is lifted and each section's rows flow in as many columns as fit (440 px minimum each);
+   the custom editors (themes, shortcuts, tools) keep the whole width. A container query on the settings window, so it follows the window's width. */
+@container settings (min-width: 1000px) {
+  .sp-content { padding-inline: 36px; }
+  .sp-content > * { max-width: none; }
+  .sp-section-body { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 8px 12px; align-items: stretch; }
+  .sp-row-custom { grid-column: 1 / -1; }
+  .sp-row:not(.sp-row-custom) { flex-wrap: wrap; row-gap: 8px; }
+  .sp-row:not(.sp-row-custom) .sp-text { flex: 1 1 190px; }
+  .sp-row:not(.sp-row-custom) .sp-ctl { margin-left: auto; }
+  .sp-range input { width: 130px; }
+  .sp-row:not(.sp-row-custom) .sp-ctl { min-width: 0; max-width: 100%; }
+  .sp-seg { display: flex; max-width: 100%; }
+  .sp-seg button { flex: 1 1 auto; min-width: 0; padding: 6px 8px; }
+  .sc-list { max-width: none; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); column-gap: 32px; } /* the shortcuts list: columns too */
+  .sc-group { grid-column: 1 / -1; }
+}
