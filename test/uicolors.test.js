@@ -30,3 +30,16 @@ test('theme mode derives from the theme, custom from the picked colour', () => {
   assert.notEqual(v.harmony[1], v.harmony[2]);
   assert.equal(countdownColors('theme', '', theme).text, theme.text);
 });
+
+test('the lyric colours are the Dark theme ones in every theme and with any picked colour', () => {
+  const light = { accent: '#d33682', text: '#111111', muted: '#666666', panel: '#ffffff' };
+  const a = vocalColors('theme', '', theme);
+  const b = vocalColors('theme', '', light);
+  const c = vocalColors('custom', '#e08a1e', light);
+  assert.deepEqual(a.lyrics, b.lyrics);
+  assert.deepEqual(a.lyrics, c.lyrics);
+  assert.deepEqual(a.lyrics2, c.lyrics2);
+  assert.equal(a.present, c.present);
+  assert.equal(a.lyrics[0], '#e6edf3');
+  assert.notEqual(a.lead, b.lead); // the notes still follow the theme
+});

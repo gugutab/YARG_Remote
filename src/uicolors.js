@@ -63,6 +63,12 @@ export function countdownColors(mode, custom, theme) {
   };
 }
 
+// The colours of the lyrics never follow the theme or the picked colour (a light theme must not turn the words dark): they are always the ones the dark theme gives.
+const DARK_THEME = { accent: '#2f80ed', text: '#e6edf3', muted: '#8b949e', panel: '#161b22' };
+const DARK_LIGHT = mixHex(DARK_THEME.accent, '#ffffff', 0.4);
+const LYRICS = [DARK_THEME.text, DARK_LIGHT, mixHex(DARK_THEME.muted, DARK_THEME.panel, 0.45)];
+const LYRICS2 = [mixHex(DARK_THEME.text, DARK_THEME.accent, 0.45), mixHex(DARK_THEME.accent, DARK_THEME.text, 0.25), mixHex(DARK_THEME.muted, DARK_THEME.panel, 0.6)];
+
 export function vocalColors(mode, custom, theme) {
   if (mode === 'classic' || !theme) return CLASSIC_VOCAL;
   const accent = accentOf(mode, custom, theme);
@@ -71,9 +77,9 @@ export function vocalColors(mode, custom, theme) {
     lead: accent,
     leadLit: light,
     harmony: { 1: shiftHue(accent, 40), 2: shiftHue(accent, -40), 3: mixHex(shiftHue(accent, 80), '#ffffff', 0.3) },
-    lyrics: [theme.text, light, mixHex(theme.muted, theme.panel, 0.45)],
-    lyrics2: [mixHex(theme.text, accent, 0.45), mixHex(accent, theme.text, 0.25), mixHex(theme.muted, theme.panel, 0.6)],
-    present: light,
+    lyrics: LYRICS,
+    lyrics2: LYRICS2,
+    present: DARK_LIGHT,
     frame: accent,
     perc: { glow: accent, ring: mixHex(accent, '#ffffff', 0.7), ball: theme.text, lit: accent },
   };
