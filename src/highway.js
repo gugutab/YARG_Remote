@@ -6,7 +6,6 @@ import {
   GUITAR_LANE_COLORS, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, LYRIC_RAMP_STOPS,
   KICK_COLOR,
   OPEN_COLOR,
-  HARMONY_COLORS,
   KICK_BAR_HALF_H,
   DOUBLE_KICK_GAP,
   TAP_COLOR,
@@ -46,10 +45,10 @@ import {
 export { firstVisibleIndex } from './gfx.js';
 import { renderLanes3D } from './highway3d.js';
 import { buildKaraokeLines, karaokeAt, syllableProgress } from './karaoke.js';
+import { countdownColors, vocalColors, mixHex } from './uicolors.js';
 import { waitCountdowns, countdownAt, countdownAlpha, measureStarts, measuresLeft, COUNTDOWN_HIDE_SEC } from './countdown.js';
 
 const RECT_WIDEN_2D = 1.18;
-const VOCAL_LEAD = '#5b8def'; // lead vocal notes
 // (a loop, not Math.max(...spread): a spread of >~120k notes throws a RangeError)
 function longestNote(notes) {
   let m = 0;
@@ -78,8 +77,6 @@ let VOC_TOP = 0;
 let VOC_BOTTOM = 0;
 const vocX = (time) => VOC_HIT_X + (time - VOC_T) * VOC_PPS;
 const vocY = (p) => VOC_BOTTOM - ((p - VOC_LO) / (VOC_HI - VOC_LO)) * (VOC_BOTTOM - VOC_TOP);
-const LYRIC_COLORS = ['#ffffff', '#13f0a6', '#595959']; // [future, present, past]
-const LYRIC_COLORS_2 = ['#9fe3d0', '#2fd9c4', '#4b6b66'];
 const fontStrings = new Map(); // size -> '600 <size>px system-ui'
 const lyricFont = (size) => {
   let f = fontStrings.get(size);
@@ -123,6 +120,8 @@ export class Highway {
     this.paneRects = []; // where each chart is drawn this frame: { key, label, icon, x, y, w, h }
     this.sheets = []; // the lyric sheets on screen this frame: { x, y, w, h, step, hits, state } (canvas coordinates)
     this._countdowns = true; // show the wait countdowns
+    this.cdColors = countdownColors('classic'); // the colours of the wait countdowns and of the vocal view (app.js sets them from the theme and the settings: setUiColors)
+    this.vocColors = vocalColors('classic');
     this.countdownUnit = 'measures'; // the number in the countdown: 'measures' (YARG's default) or 'seconds'
     this.loopEnd = null; // while a loop runs: the notes after its end are disabled (the loop never plays them)
     this.replayWindow = null; // { from, to }: the stretch replayed after a pause (rewind): its notes are drawn disabled
@@ -661,6 +660,14 @@ export class Highway {
     return REST_BOARD_MIN + (1 - REST_BOARD_MIN) * (this.curPane ? this.restFade(this.curPane, t, appearIn) : 1);
   }
 
+  setUiColors(countdown, vocal) {
+    this.cdColors = countdown;
+    this.vocColors = vocal;
+    this.leadColors = null; // (the caches of shades of the vocal colours)
+    this.harmonyColorCache = null;
+    this.invalidate();
+  }
+
   countdownState(pane, t, lyrics = false) {
     if (!this.countdowns) return null;
     if (lyrics) pane.countdownsLyrics ??= waitCountdowns(pane.chart, { percussion: false }); // karaoke: percussion hits are no singing
@@ -691,17 +698,18 @@ export class Highway {
     g.globalAlpha *= c.dim ?? countdownAlpha(c); // eases in at the start of the gap and out before the notes return (YARG's fade)
     g.beginPath();
     g.arc(cx, cy, r, 0, Math.PI * 2);
-    g.fillStyle = 'rgba(8,11,16,0.72)';
+    const cc = this.cdColors;
+    g.fillStyle = withAlpha(cc.fill, cc.fillAlpha);
     g.fill();
     g.lineWidth = Math.max(3, r * 0.1);
-    g.strokeStyle = 'rgba(255,255,255,0.14)';
+    g.strokeStyle = withAlpha(cc.track, cc.trackAlpha);
     g.stroke();
     g.beginPath(); // what is left of the gap
     g.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (c.remaining / c.total));
-    g.strokeStyle = c.dim ? '#7d8590' : urgent ? '#13f0a6' : '#6cb6ff'; // past and future countdowns are all grey
+    g.strokeStyle = c.dim ? cc.dimRing : urgent ? cc.urgent : cc.ring; // past and future countdowns are all grey
     g.lineCap = 'round';
     g.stroke();
-    g.fillStyle = c.dim ? '#8b949e' : urgent ? '#13f0a6' : '#ffffff';
+    g.fillStyle = c.dim ? cc.dimText : urgent ? cc.urgentText : cc.text;
     g.font = `700 ${Math.round(r * 1.05)}px system-ui`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
@@ -786,7 +794,7 @@ export class Highway {
         g.beginPath();
         g.rect(x, cy - sz, sw * p, sz * 2);
         g.clip();
-        g.fillStyle = '#13f0a6';
+        g.fillStyle = this.vocColors.present;
         g.fillText(syl.text, x, cy);
         g.restore();
       }
@@ -992,7 +1000,7 @@ export class Highway {
         else g.rect(bx, by, bw, bh);
         g.fill();
         g.lineWidth = hot ? 1.5 : 1;
-        g.strokeStyle = hot ? '#9fd0ff' : 'rgba(108,182,255,0.6)';
+        g.strokeStyle = hot ? this.vocColors.leadLit : withAlpha(this.vocColors.frame, 0.6);
         g.stroke();
         g.fillStyle = hot ? '#ffffff' : '#cfe6ff';
         g.fillRect(bx + 11, by + bh / 2 - 5, 2, 10); // the jump-to icon: a triangle running to a bar
@@ -1042,7 +1050,7 @@ export class Highway {
       else g.rect(bx, by, bw, bh);
       g.fill();
       g.lineWidth = hotB ? 1.5 : 1;
-      g.strokeStyle = hotB ? '#9fd0ff' : 'rgba(108,182,255,0.7)';
+      g.strokeStyle = hotB ? this.vocColors.leadLit : withAlpha(this.vocColors.frame, 0.7);
       g.stroke();
       g.fillStyle = hotB ? '#ffffff' : '#cfe6ff';
       const cx = bx + bw / 2;
@@ -1082,7 +1090,7 @@ export class Highway {
       g.fillStyle = 'rgba(230,237,243,0.8)';
       g.fillRect(rx + 1, yOf(sec.start), rw - 2, Math.max(2, yOf(sec.end) - yOf(sec.start)));
     }
-    g.fillStyle = '#13f0a6';
+    g.fillStyle = this.vocColors.present;
     for (const row of rows) { // entries: the singing starts after a rest
       if (row.type === 'cd') g.fillRect(rx - 7, Math.round(yOf(row.gap.end)), 6, 2);
     }
@@ -1475,10 +1483,10 @@ export class Highway {
     const harmonies = chart.harmonies;
     for (let i = 0; harmonies && i < harmonies.length; i++) {
       const harmony = harmonies[i];
-      const base = HARMONY_COLORS[harmony.part] || HARMONY_COLORS[1];
+      const base = this.vocColors.harmony[harmony.part] || this.vocColors.harmony[1];
       this.vocalNotes(harmony.notes, t, ahead, behind, harmHalf, this.harmonyColors(harmony.part, base), hitX); // the part past the hit line is lit, like the lead's
     }
-    this.vocalNotes(chart.notes, t, ahead, behind, leadHalf, (this.leadColors ??= [tintWhite(VOCAL_LEAD, 0.6), VOCAL_LEAD]), hitX); // lit: a lighter shade of the note's own colour
+    this.vocalNotes(chart.notes, t, ahead, behind, leadHalf, (this.leadColors ??= [tintWhite(this.vocColors.lead, 0.6), this.vocColors.lead]), hitX); // lit: a lighter shade of the note's own colour
 
     // percussion: a drum-head marker per hit, in the vertical middle of the chart; a hit flashes when it crosses the line and
     // then dims as it scrolls off.
@@ -1495,8 +1503,8 @@ export class Highway {
       if (past > 0 && past < PERC_HOLD) {
         const fade = 1 - k;
         const glow = g.createRadialGradient(x, percussionY, r * 0.4, x, percussionY, r * (2.2 + k));
-        glow.addColorStop(0, `rgba(108,182,255,${0.55 * fade})`);
-        glow.addColorStop(1, 'rgba(108,182,255,0)');
+        glow.addColorStop(0, withAlpha(this.vocColors.perc.glow, 0.55 * fade));
+        glow.addColorStop(1, withAlpha(this.vocColors.perc.glow, 0));
         g.fillStyle = glow;
         g.beginPath();
         g.arc(x, percussionY, r * (2.2 + k), 0, Math.PI * 2);
@@ -1507,7 +1515,7 @@ export class Highway {
           g.beginPath();
           g.arc(x, percussionY, r * (1 + q * grow), 0, Math.PI * 2);
           g.lineWidth = width * (1 - q) + 0.5;
-          g.strokeStyle = `rgba(191,233,255,${0.9 * (1 - q)})`;
+          g.strokeStyle = withAlpha(this.vocColors.perc.ring, 0.9 * (1 - q));
           g.stroke();
         }
         g.lineCap = 'round';
@@ -1519,7 +1527,7 @@ export class Highway {
           g.moveTo(x + Math.cos(a) * from, percussionY + Math.sin(a) * from);
           g.lineTo(x + Math.cos(a) * to, percussionY + Math.sin(a) * to);
           g.lineWidth = 3 * fade + 0.5;
-          g.strokeStyle = `rgba(191,233,255,${0.9 * fade})`;
+          g.strokeStyle = withAlpha(this.vocColors.perc.ring, 0.9 * fade);
           g.stroke();
         }
       }
@@ -1527,7 +1535,7 @@ export class Highway {
       const lit = past > 0 && past < PERC_HOLD ? 1 - past / PERC_HOLD : 0; // and flashes from blue-white back to white
       g.beginPath();
       g.arc(x, percussionY, r * pop, 0, Math.PI * 2);
-      g.fillStyle = lit > 0 ? `rgb(${Math.round(230 - 122 * lit)},${Math.round(237 - 55 * lit)},255)` : '#e6edf3';
+      g.fillStyle = lit > 0 ? mixHex(this.vocColors.perc.ball, this.vocColors.perc.lit, lit) : this.vocColors.perc.ball;
       g.fill();
       g.beginPath();
       g.arc(x, percussionY, r * 0.5 * pop, 0, Math.PI * 2);
@@ -1540,8 +1548,8 @@ export class Highway {
     // lyrics under the notes, each at its start time
     g.textAlign = 'left';
     g.textBaseline = 'middle';
-    this.lyricRow(second && chart.lyrics1?.length ? chart.lyrics1 : chart.lyrics, lyricY, fontSize, LYRIC_COLORS, t, behind, ahead); // with a second line, the first one is the lead's own words
-    if (second) this.lyricRow(chart.lyrics2, secondY, secondSize, LYRIC_COLORS_2, t, behind, ahead); // the other voices, above the chart
+    this.lyricRow(second && chart.lyrics1?.length ? chart.lyrics1 : chart.lyrics, lyricY, fontSize, this.vocColors.lyrics, t, behind, ahead); // with a second line, the first one is the lead's own words
+    if (second) this.lyricRow(chart.lyrics2, secondY, secondSize, this.vocColors.lyrics2, t, behind, ahead); // the other voices, above the chart
     g.textBaseline = 'alphabetic';
   }
 

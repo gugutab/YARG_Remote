@@ -4,6 +4,7 @@ import { DIFFICULTIES, EXTENDED_DRUM_LANES, instrumentOptions, availableDifficul
 import { MultiTrackPlayer } from './player.js';
 import { Metronome } from './metronome.js';
 import { Highway } from './highway.js';
+import { countdownColors, vocalColors } from './uicolors.js';
 import { createErrorGate } from './errorgate.js';
 import { PerfMeter } from './perf.js';
 import { createPerfOverlay, PERF_MODES } from './perf-overlay.js';
@@ -156,6 +157,14 @@ function motionPref(id) {
   return v && osReduceMotion && prefs.isDefault(id) && !motionTouched.has(id) ? false : v;
 }
 let themeStage = '#0d1117';
+let themeUi = { accent: '#2f80ed', text: '#e6edf3', muted: '#8b949e', panel: '#161b22' }; // the active theme's colours the vocal view and the countdowns derive from
+// The colours of the wait countdowns and the vocal view: the theme's (default), the classic fixed ones, or from a colour the user picked.
+function applyUiColors() {
+  highway.setUiColors(
+    countdownColors(prefs.get('highway.countdownColors'), prefs.get('highway.countdownColor'), themeUi),
+    vocalColors(prefs.get('highway.vocalColors'), prefs.get('highway.vocalColor'), themeUi),
+  );
+}
 // The stage colour: the theme's, or the one picked in the visualizer menu / settings.
 function applyStage() {
   highway.setBackground(prefs.get('highway.stageColorOn') ? prefs.get('highway.stageColor') : themeStage);
@@ -164,7 +173,9 @@ function applyThemeSetting() {
   const theme = resolveTheme({ preset: prefs.get('theme.preset'), overrides: prefs.get('theme.overrides'), saved: prefs.get('theme.saved') }, darkQuery.matches);
   applyTheme(theme);
   themeStage = theme.vars.stage;
+  themeUi = { accent: theme.vars.accent, text: theme.vars.text, muted: theme.vars.muted, panel: theme.vars.panel };
   applyStage();
+  applyUiColors();
   try { // read by the inline script in index.html before the first paint
     const css = {};
     for (const k of ['--bg', '--panel', '--panel-2', '--line', '--text', '--muted', '--accent', '--accent-text', '--stage', '--stage-rgb', 'color-scheme']) css[k] = document.documentElement.style.getPropertyValue(k);
@@ -3562,6 +3573,10 @@ const EFFECTS = {
   'audio.metronomeSound': (v) => metronome.setSound(v),
   'highway.lyricsAbove': (v) => { highway.sheetPeek = v / 100; },
   'highway.countdown': (v) => { highway.countdowns = v; },
+  'highway.countdownColors': applyUiColors,
+  'highway.countdownColor': applyUiColors,
+  'highway.vocalColors': applyUiColors,
+  'highway.vocalColor': applyUiColors,
   'highway.countdownUnit': (v) => { highway.countdownUnit = v; highway.invalidate(); },
   'highway.vocalView': (v) => { if (highway.vocalView !== v) setVocalView(v); },
   'highway.paneMin': (v) => highway.setPaneMin(v),
