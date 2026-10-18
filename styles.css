@@ -2351,3 +2351,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .pp-toggle[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 26%, transparent); color: var(--accent); }
 .pp-resume { justify-self: center; display: inline-flex; align-items: center; gap: 6px; }
 .pp-resume svg { width: 16px; height: 16px; }
+
+/* The side handle (library / settings) is glass in both states, like the player bar and the windows: a translucent panel over a blur of the stage. */
+.edge-dock { background: color-mix(in srgb, var(--panel) 72%, transparent); -webkit-backdrop-filter: blur(14px) saturate(1.1); backdrop-filter: blur(14px) saturate(1.1); box-shadow: 0 6px 20px rgba(0, 0, 0, .25); }
+.edge-dock.open { background: color-mix(in srgb, var(--panel) 78%, transparent); -webkit-backdrop-filter: blur(16px) saturate(1.1); backdrop-filter: blur(16px) saturate(1.1); box-shadow: 0 8px 26px rgba(0, 0, 0, .4); }
