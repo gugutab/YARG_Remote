@@ -126,7 +126,7 @@ export function mountSettings({ root, frame, settings, sections, renderers = {},
     const body = el('div', { class: 'sp-section-body' }, rowsAndGroups);
     const sec = el('section', { class: 'sp-section', id: `sp-sec-${section.id}` }, el('h3', {}, icon(section.icon), section.title), section.description ? el('p', { class: 'sp-desc', text: section.description }) : null, body);
     content.append(sec);
-    const link = el('button', { type: 'button', class: 'sp-nav-btn', onclick: () => { search.value = ''; applyQuery(''); sec.scrollIntoView({ block: 'start', behavior: 'smooth' }); } }, icon(section.icon), el('span', { text: section.title }));
+    const link = el('button', { type: 'button', class: 'sp-nav-btn', onclick: () => { search.value = ''; applyQuery(''); pinned = sec; markCurrent(sec); sec.scrollIntoView({ block: 'start', behavior: 'smooth' }); } }, icon(section.icon), el('span', { text: section.title }));
     nav.append(link);
     sectionEls.push({ section, sec, link });
   }
@@ -167,12 +167,19 @@ export function mountSettings({ root, frame, settings, sections, renderers = {},
   settings.subscribe(refresh);
 
   // The active section in the list follows the scrolling.
+  // A section the user picked in the list (or opened on) stays the current one until the user scrolls by hand: the last sections cannot always reach the top of
+  // the page (the content ends first), so the scroll position alone would never select them. At the very bottom, with nothing picked, the last section is current.
+  let pinned = null;
+  const markCurrent = (cur) => { for (const s of sectionEls) s.link.setAttribute('aria-current', String(s.sec === cur)); };
   content.addEventListener('scroll', () => {
+    if (pinned && !pinned.hidden) { markCurrent(pinned); return; }
     const top = content.getBoundingClientRect().top;
     let current = sectionEls[0];
     for (const s of sectionEls) if (!s.sec.hidden && s.sec.getBoundingClientRect().top - top < 80) current = s;
-    for (const s of sectionEls) s.link.setAttribute('aria-current', String(s === current));
+    if (content.scrollTop + content.clientHeight >= content.scrollHeight - 2) for (const s of sectionEls) if (!s.sec.hidden) current = s;
+    markCurrent(current.sec);
   }, { passive: true });
+  for (const type of ['wheel', 'touchstart', 'keydown', 'pointerdown']) content.addEventListener(type, () => { pinned = null; }, { passive: true });
 
   function open(sectionId) {
     onOpen();
@@ -182,7 +189,8 @@ export function mountSettings({ root, frame, settings, sections, renderers = {},
     refresh();
     search.value = '';
     applyQuery('');
-    if (sectionId) document.getElementById(`sp-sec-${sectionId}`)?.scrollIntoView({ block: 'start' });
+    pinned = null;
+    if (sectionId) { const target = document.getElementById(`sp-sec-${sectionId}`); pinned = sectionEls.find((s) => s.sec === target)?.sec ?? null; target?.scrollIntoView({ block: 'start' }); }
     else content.scrollTop = 0;
     content.dispatchEvent(new Event('scroll'));
     search.focus({ preventScroll: true });
