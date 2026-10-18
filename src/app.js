@@ -360,8 +360,9 @@ let winTotal = 0; // the panes' total width as last laid out (the window is WIN_
 // while the details are open (null = the default split); both are remembered.
 let winPref = Number(store.get('winWidth')) > 0 ? Number(store.get('winWidth')) : null;
 let splitFrac = Number(store.get('splitFrac')) > 0 && Number(store.get('splitFrac')) < 1 ? Number(store.get('splitFrac')) : null;
-const LARGE_STAGE_W = 1100; // from this stage width the library window is centred and takes the whole content width
-const wideWindow = () => !narrow() && (stageEl.clientWidth || window.innerWidth) >= LARGE_STAGE_W;
+// The library window is centred and takes the whole content width at every width above the phone drawer (it used to switch to a narrow sidebar below a 1100 px stage,
+// measured on the stage itself, which a sidebar shrinks: so a window made smaller dropped to a partial width and could not come back).
+const wideWindow = () => !narrow();
 function layoutWindow() {
   const style = els.app.style;
   const wide = wideWindow();
