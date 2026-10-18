@@ -2503,6 +2503,7 @@ function endCard(it) {
   return card;
 }
 
+list.bindTip(els.endNext); // the instrument icons of the suggestions show the same hover tip (name and difficulty) as in the library
 function endRow(song, reason) {
   const li = list.cardFor(song, (picked) => playNext(picked)); // the library's own song card (its style and what it shows)
   li.title = `${plainText(song.title)} - ${plainText(song.artist)}${reason ? ` (${reason})` : ''}`;

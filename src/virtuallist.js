@@ -170,7 +170,9 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
   tip.hidden = true;
   document.body.append(tip);
   const hideTip = () => { tip.hidden = true; };
-  scroller.addEventListener('mouseover', (e) => {
+  // (also bound to other windows that show the cards: see bindTip)
+  const bindTip = (root) => {
+  root.addEventListener('mouseover', (e) => {
     const ic = e.target.closest?.('.song-icons .inst');
     if (!ic) return;
     const level = ic.dataset.level === '' ? null : Number(ic.dataset.level);
@@ -183,8 +185,10 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
     tip.style.left = `${Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8)}px`;
     tip.style.top = `${r.top - tip.offsetHeight - 6 < 8 ? r.bottom + 6 : r.top - tip.offsetHeight - 6}px`; // above, or below near the top edge
   });
-  scroller.addEventListener('mouseout', (e) => { if (e.target.closest?.('.song-icons .inst')) hideTip(); });
-  scroller.addEventListener('scroll', hideTip, { passive: true });
+  root.addEventListener('mouseout', (e) => { if (e.target.closest?.('.song-icons .inst')) hideTip(); });
+  root.addEventListener('scroll', hideTip, { passive: true });
+  };
+  bindTip(scroller);
 
   const spacer = document.createElement('li');
   spacer.className = 'spacer';
@@ -589,6 +593,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
   return {
     // One song card in the current card style, for other windows (the end-of-song suggestions): a stand-alone <li> (not positioned like the list's rows)
     // whose click calls `pick(song)`; the thumbnail loads like in the list.
+    bindTip, // the hover tip of the instrument icons (name and difficulty) for another container of cards
     cardFor(song, pick) {
       const el = document.createElement('li');
       const entry = buildCard(song, mode, rowH, el, false, () => true, pick, 6); // (the instrument chips of a large card: one line, the window's cards are wide)
