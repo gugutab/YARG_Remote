@@ -247,9 +247,10 @@ function syncPanelUi() {
   syncWindow();
   syncPanelUi();
 })();
-// Entering the phone layout closes the drawer (it would cover the screen).
-window.matchMedia('(max-width: 700px)').addEventListener('change', (e) => {
-  if (e.matches) setLibraryOpen(false, false);
+// Entering or leaving the phone layout keeps the library as it is (open stays open: it becomes the side drawer, and a drawer left open stays open on the way back).
+window.matchMedia('(max-width: 700px)').addEventListener('change', () => {
+  syncWindow();
+  layoutWindow();
   syncPanelUi();
 });
 // Minimizing the library (its back arrow, or L while the list is open) closes the details with it: the window goes away as a whole.
