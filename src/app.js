@@ -2434,14 +2434,14 @@ const PLAY_TITLES = { play: els.play.title, npPlay: els.npPlay.title };
 function syncPlayButton() {
   const playing = player.playing || !!startDone || !!loopWait; // (the start delay shows the playing state)
   const restart = ended && !playing; // at the end of the song the play button restarts it
-  const icon = playing ? '#i-pause' : restart ? '#i-restart' : '#i-play';
+  const icon = playing ? '#i-pause' : restart ? '#i-replay' : '#i-play';
   const detailIcon = playing && !backgroundAudio() ? '#i-pause' : '#i-play'; // (the Listen card: the sound of another song is not its)
   els.play.querySelector('use').setAttribute('href', icon);
   els.play.setAttribute('aria-label', playing ? 'Pause' : restart ? 'Restart' : 'Play');
   els.play.title = restart ? 'Restart (Space)' : PLAY_TITLES.play;
   els.npPlay.querySelector('use').setAttribute('href', detailIcon);
   els.npPlay.title = restart ? 'Restart' : PLAY_TITLES.npPlay;
-  els.infoPlay.querySelector('use').setAttribute('href', restart ? '#i-restart' : '#i-play');
+  els.infoPlay.querySelector('use').setAttribute('href', restart ? '#i-replay' : '#i-play');
   els.infoPlay.querySelector('span').textContent = restart ? 'Restart' : 'Play';
   setImmersive();
 }
