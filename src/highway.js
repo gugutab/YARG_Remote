@@ -667,10 +667,18 @@ export class Highway {
     else pane.countdowns ??= waitCountdowns(pane.chart);
     const c = countdownAt(lyrics ? pane.countdownsLyrics : pane.countdowns, t);
     if (!c || c.remaining <= COUNTDOWN_HIDE_SEC) return null; // (YARG hides it 1.5 s before the notes: faded out by 1 s)
+    let label;
     if (this.countdownUnit === 'measures') {
       pane.measureStarts ??= measureStarts(pane.chart.beats);
-      c.label = measuresLeft(pane.measureStarts, t, t + c.remaining);
-    }
+      label = measuresLeft(pane.measureStarts, t, t + c.remaining);
+    } else label = Math.ceil(c.remaining);
+    // The number only counts down while the song plays: a clock that wobbles by a few ms around a measure (or second) boundary (the start of a playback, a seek
+    // settling) must not make it flip between two values every frame. Within the same countdown and a small step in time it never goes up.
+    const prev = pane.cdLabel;
+    const end = t + c.remaining;
+    if (prev && Math.abs(prev.end - end) < 0.05 && t >= prev.t - 0.3 && t <= prev.t + 1) label = Math.min(label, prev.label);
+    pane.cdLabel = { end, t, label };
+    c.label = label;
     return c;
   }
 
