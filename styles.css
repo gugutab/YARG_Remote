@@ -2347,15 +2347,18 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 @container settings (min-width: 1000px) {
   .sp-content { padding-inline: 36px; }
   .sp-content > * { max-width: none; }
-  .sp-section-body { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 8px 12px; align-items: stretch; }
+  /* two columns, never more: the rows are cards of one grid; text on the left, the control on the right; a wide control (a slider, four or more options)
+     takes a second line of the card so the text keeps its room and every card has the same rhythm */
+  .sp-section-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; align-items: stretch; }
   .sp-row-custom { grid-column: 1 / -1; }
-  .sp-row:not(.sp-row-custom) { flex-wrap: wrap; row-gap: 8px; }
-  .sp-row:not(.sp-row-custom) .sp-text { flex: 1 1 190px; }
-  .sp-row:not(.sp-row-custom) .sp-ctl { margin-left: auto; }
-  .sp-range input { width: 130px; }
-  .sp-row:not(.sp-row-custom) .sp-ctl { min-width: 0; max-width: 100%; }
+  .sp-row:not(.sp-row-custom) { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 16px; row-gap: 10px; min-height: 64px; padding: 12px 16px; }
+  .sp-row:not(.sp-row-custom) .sp-ctl { min-width: 0; max-width: 100%; justify-self: end; }
+  .sp-row:not(.sp-row-custom):has(.sp-range), .sp-row:not(.sp-row-custom):has(.sp-seg button:nth-child(4)) { grid-template-columns: minmax(0, 1fr); }
+  .sp-row:not(.sp-row-custom):has(.sp-range) .sp-ctl, .sp-row:not(.sp-row-custom):has(.sp-seg button:nth-child(4)) .sp-ctl { justify-self: stretch; }
+  .sp-range { flex: 1; }
+  .sp-range input { flex: 1; width: auto; min-width: 0; }
   .sp-seg { display: flex; max-width: 100%; }
-  .sp-seg button { flex: 1 1 auto; min-width: 0; padding: 6px 8px; }
-  .sc-list { max-width: none; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); column-gap: 32px; } /* the shortcuts list: columns too */
+  .sp-seg button { flex: 1 1 auto; min-width: 0; padding: 6px 10px; }
+  .sc-list { max-width: none; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; } /* the shortcuts list: two columns too */
   .sc-group { grid-column: 1 / -1; }
 }
