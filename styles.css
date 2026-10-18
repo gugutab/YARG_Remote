@@ -2322,12 +2322,15 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* the edge handles: the window's left and right edges resize it symmetrically (not on the phone drawer) */
 .win-edge { display: none; }
 @media (min-width: 701px) {
-  .win-frame .win-edge { display: block; position: absolute; top: 14px; bottom: 14px; width: 12px; z-index: 7; cursor: ew-resize; touch-action: none; }
-  .win-edge-l { left: 0; }
-  .win-edge-r { right: 0; }
+  /* the handles sit 2 px outside the window (over its border and the 2 px outside it), so they no longer cover the scrollbars at the inner edge: the frame clips
+     with overflow: clip and a clip margin, so the part that sticks out is not cut off */
+  .win-frame { overflow: clip; overflow-clip-margin: 8px; }
+  .win-frame .win-edge { display: block; position: absolute; top: 14px; bottom: 14px; width: 10px; z-index: 7; cursor: ew-resize; touch-action: none; }
+  .win-edge-l { left: -7px; }
+  .win-edge-r { right: -7px; }
   .win-edge::after { content: ""; position: absolute; top: 0; bottom: 0; width: 2px; border-radius: 1px; background: transparent; transition: background .15s; }
-  .win-edge-l::after { left: 2px; }
-  .win-edge-r::after { right: 2px; }
+  .win-edge-l::after { left: 6px; }
+  .win-edge-r::after { right: 6px; }
   .win-edge:hover::after, .win-edge.dragging::after { background: var(--accent); }
   .win-frame.win-closed .win-edge { display: none; }
 }
