@@ -9,16 +9,17 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 const css = read('styles.css');
 const app = read('src/app.js');
 const claudeMd = read('CLAUDE.md');
+const frame = read('src/windowframe.js');
 const constant = (name) => {
-  const m = new RegExp(`^const ${name} = (\\d+)`, 'm').exec(app);
-  assert.ok(m, `${name} not found in src/app.js`);
+  const m = new RegExp(`^(?:export )?const ${name} = (\\d+)`, 'm').exec(`${app}\n${frame}`);
+  assert.ok(m, `${name} not found in src/app.js or src/windowframe.js`);
   return Number(m[1]);
 };
 
-test('LIB_MARGIN is --lib-gap', () => {
+test('WIN_MARGIN is --lib-gap', () => {
   const m = /--lib-gap:\s*(\d+)px/.exec(css);
   assert.ok(m, '--lib-gap not found in styles.css');
-  assert.equal(Number(m[1]), constant('LIB_MARGIN'));
+  assert.equal(Number(m[1]), constant('WIN_MARGIN'));
 });
 
 test('CONTENT_MAX is the default --content-max', () => {

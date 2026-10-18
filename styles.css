@@ -1581,7 +1581,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
    Same glass as the player bar: translucent --panel, the blur on ::before. A backdrop-filter / filter on the aside itself would make it
    the containing block of position: fixed descendants (see the top bar). It moves with transform only while it slides (that is also a
    containing block, but nothing fixed is open then); once open, transform is none. */
-.app { --lib-gap: 12px; } /* = LIB_MARGIN in src/app.js (test/css-js-constants.test.js) */
+.app { --lib-gap: 12px; } /* = WIN_MARGIN in src/windowframe.js (test/css-js-constants.test.js) */
 .library {
   position: absolute; z-index: 12;
   top: var(--lib-gap); bottom: var(--lib-gap); left: var(--lib-gap);
@@ -1745,7 +1745,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .app.viz-glass .bg-glass { display: block; }
 
 /* ---------- One maximum size for the floating windows: the content area, 1400 px centred (like the player bar) ---------- */
-:root { --content-max: 1400px; } /* (on :root: the settings page lives outside .app) = CONTENT_MAX in src/app.js */
+:root { --content-max: 1400px; } /* (on :root: the settings page lives outside .app) = CONTENT_MAX in src/windowframe.js */
 .app { --lib-left: max(var(--lib-gap), calc((100% - var(--content-max)) / 2)); }
 @media (min-width: 701px) {
   .library { left: var(--lib-left); max-width: calc(100% - 2 * var(--lib-left)); }

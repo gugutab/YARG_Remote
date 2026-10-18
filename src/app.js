@@ -24,6 +24,7 @@ import { SECTIONS, buildDefaults, buildValidator, FONT_OPTIONS } from './setting
 import { resolveTheme, applyTheme } from './themes.js';
 import { mountSettings } from './settings-ui.js';
 import { renderThemeStudio, renderDataTools, renderShortcuts } from './settings-custom.js';
+import { WIN_MARGIN, WIN_BORDER, contentMaxFor, roomFor, clampWidth, dragWidth } from './windowframe.js';
 import { saveLibrary, loadLibrary, loadThumb, saveThumb, clearThumbs } from './store.js';
 import { filterSongs, parseQuery, rankByRelevance, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, anchorLabel, INSTRUMENTS, hasInstrument } from './songlist.js';
 import { createVirtualList, DEFAULT_CARDS } from './virtuallist.js';
@@ -338,19 +339,14 @@ els.npPreview.addEventListener('change', async () => {
 // The handle on the list pane's right edge (the window's right edge, or the divider while the details are open): drag to resize the LIST pane
 // (remembered; the window grows with it while the details are open); double-click restores the default width. The stage keeps its size either way. The window leaves the same margin on the right as on the left.
 const MIN_LIB_W = 300; // the list pane's minimum
-const CONTENT_MAX = 1400; // the content area never gets narrower than this (--content-max is set from contentMax(), see layoutWindow); same as the :root default in styles.css (test/css-js-constants.test.js)
-const LIB_MARGIN = 12; // keep in step with --lib-gap in styles.css (guarded by test/css-js-constants.test.js)
 const INFO_MIN_W = 380; // the details pane never gets narrower than one column of cards; same as the .info width fallback in styles.css (test/css-js-constants.test.js)
 const stageEl = document.getElementById('stage');
-const WIN_BORDER = 2; // the window's own 1 px border, left and right: the panes share the width inside it
 // the room the panes may take: the content area (--content-max, centred) between its two margins (the window starts at --lib-left), minus the border
 // The content area is 1400 px, and grows (up to 4K, 3840 px) when the "Maximum width" of the details asks for more than the list and the details fit in 1400.
-const contentMax = () => Math.min(3840, Math.max(CONTENT_MAX, Math.round(libPref()) + prefs.get('details.maxWidth') + 2 * LIB_MARGIN + WIN_BORDER));
-const contentWidth = () => {
-  const w = stageEl.clientWidth || window.innerWidth;
-  return Math.max(0, w - 2 * Math.max(LIB_MARGIN, (w - contentMax()) / 2) - WIN_BORDER);
-};
+const contentMax = () => contentMaxFor(Math.round(libPref()) + prefs.get('details.maxWidth') + 2 * WIN_MARGIN + WIN_BORDER);
+const contentWidth = () => roomFor(stageEl.clientWidth || window.innerWidth, contentMax());
 // the list pane's widest width: all the room, or all but one column for the details while they are open
+const minWinWidth = () => (infoOpen && libraryOpen() ? MIN_LIB_W + INFO_MIN_W : infoOpen ? INFO_MIN_W : MIN_LIB_W); // (the narrowest the window may be made: both panes at their minimum, or the one that is open)
 const maxLibWidth = () => Math.max(MIN_LIB_W, contentWidth() - (infoOpen ? INFO_MIN_W : 0));
 const libPref = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lib-w')) || MIN_LIB_W; // the list width the user chose (or the default)
 let winTotal = 0; // the panes' total width as last laid out (the window is WIN_BORDER wider)
@@ -373,8 +369,8 @@ function layoutWindow() {
   const listOn = libraryOpen();
   if (!listOn && !infoOpen) return; // closed: keep the size it slides out with
   const fullRoom = contentWidth();
-  const minTotal = infoOpen && listOn ? MIN_LIB_W + INFO_MIN_W : infoOpen ? INFO_MIN_W : MIN_LIB_W;
-  const room = wide && winPref ? Math.min(fullRoom, Math.max(minTotal, winPref)) : fullRoom; // (wide: the window is as wide as the user made it, up to the content width)
+  const minTotal = minWinWidth();
+  const room = wide ? clampWidth(winPref, minTotal, fullRoom) : fullRoom; // (wide: the window is as wide as the user made it, up to the content width)
   let list = 0;
   let info = 0;
   if (infoOpen) {
@@ -448,7 +444,7 @@ for (const edge of [els.edgeL, els.edgeR]) {
   });
   edge.addEventListener('pointermove', (e) => {
     if (!drag) return;
-    winPref = Math.round(drag.w + 2 * sign * (e.clientX - drag.x));
+    winPref = dragWidth(drag.w, e.clientX - drag.x, sign, minWinWidth(), contentWidth());
     layoutWindow();
   });
   const end = () => {
