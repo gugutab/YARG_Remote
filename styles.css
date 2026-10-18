@@ -2369,3 +2369,12 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* The end-of-song suggestions use the library's own song cards (list.cardFor): they share the card rules above through :is(#songs, #endNext); here they sit in a plain grid, not positioned like the list's rows */
 #endNext > li.row { position: relative; left: auto; right: auto; width: auto; margin: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 #endNext { grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr)); }
+
+/* The frame clips with overflow: clip + a clip margin (so the resize handles can stick out), which does not round the corners of what is inside: the panes
+   round their own outer corners (13 px = the frame's 14 px radius minus its 1 px border) so a header or list background never shows square corners. */
+.library > .lib-list { border-radius: 13px 0 0 13px; overflow: clip; }
+.library > .info { border-radius: 0 13px 13px 0; overflow: clip; }
+.app:not(.info-open) .library > .lib-list { border-radius: 13px; }
+.app.details-only .library > .info { border-radius: 13px; }
+.settings-page > .sp-head { border-radius: 13px 13px 0 0; }
+.settings-page > .sp-body { border-radius: 0 0 13px 13px; overflow: clip; }
