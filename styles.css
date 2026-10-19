@@ -2669,3 +2669,4 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .tp-segs .seg { display: flex; }
 .tp-segs .seg button { flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .tp-segs .seg svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; }
+.pm-range output { white-space: nowrap; }
