@@ -2733,3 +2733,4 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* the pause / start screen's tiles: a grid of equal columns (--icols, from layoutPicker in app.js) instead of free-growing flex items */
 .song-info.paused .si-picker { display: grid; grid-template-columns: repeat(var(--icols, 4), minmax(0, 1fr)); gap: 10px; }
 .si-picker .icard, .si-picker .icard[data-key="drums"] { min-width: 0; flex: none; }
+.tile-tool { gap: 3px; }

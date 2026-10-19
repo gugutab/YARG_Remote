@@ -3166,7 +3166,7 @@ function buildTileTools(group) {
     const b = tool(icon, title, () => openTilePop(b, `${group.label} ${title.toLowerCase()}`, paneRange(group, name, min, max, step, def, fmt, paint)));
     const paint = () => {
       const v = highway.paneOpt(group.key, name);
-      text(b, fmt(v));
+      text(b, name === 'delay' && Math.abs(v) < 0.005 ? '' : fmt(v)); // (no label for a delay of 0)
       b.dataset.mod = String(Math.abs(v - def()) > 1e-9);
     };
     paint();
