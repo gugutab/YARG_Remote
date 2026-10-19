@@ -43,7 +43,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'barHide', 'metronomeBtn', 'mixerVal', 'speedVal', 'stagePlay', 'songInfo', 'siCover', 'siInsts', 'siPicker', 'siPlay', 'pausePanel', 'ppSlower', 'ppFaster', 'ppSpeed', 'ppMetronome', 'ppVolume', 'ppVolVal', 'ppResume', 'siTitle', 'siArtist', 'siDetails', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'barHide', 'metronomeBtn', 'mixerVal', 'speedVal', 'stagePlay', 'songInfo', 'siCover', 'siInsts', 'siPicker', 'siPlay', 'pauseDim', 'pausePanel', 'ppSlower', 'ppFaster', 'ppSpeed', 'ppMetronome', 'ppVolume', 'ppVolVal', 'ppResume', 'siTitle', 'siArtist', 'siDetails', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
   'endScreen', 'endCover', 'endTitle', 'endArtist', 'endAgain', 'endSearch', 'endCards', 'endNextBox', 'endNext',
@@ -3526,19 +3526,21 @@ let piDismissed = false;
 function syncPauseInfo() {
   const want = pausePanelWanted({
     enabled: prefs.get('playback.pauseInfo') && !prefs.get('playback.pausePanel'), pausedByUser: pausedAt !== null, playing: player.playing, ready,
-    waiting: !!(startDone || resumeTimer || loopWait), listen: listenMode, background: backgroundAudio(), liveStage: !!liveStage, ended, hidden: document.hidden, focusLost,
-    overlayOpen: infoOpen || (typeof settingsPage !== 'undefined' && settingsPage.isOpen()), infoVisible: false, dismissed: piDismissed,
+    waiting: !!(startDone || resumeTimer || loopWait), listen: listenMode, background: backgroundAudio(), liveStage: !!liveStage, ended, hidden: false, focusLost: false, // (it stays up when the window loses focus)
+    overlayOpen: libraryOpen() || infoOpen || (typeof settingsPage !== 'undefined' && settingsPage.isOpen()), infoVisible: false, dismissed: piDismissed, // (the library, the details or the settings take its place)
   });
   if (pausedAt === null) piDismissed = false; // (the Esc applies to this pause only)
   if (want && !pauseInfoShown) {
     pauseInfoShown = true;
     showSongInfo(null); // (no timer: it stays until the sound resumes)
     els.songInfo.classList.add('paused');
+    els.pauseDim.classList.add('show');
     els.songInfo.setAttribute('aria-hidden', 'false');
     fillInfoInsts(); // (now with the picker)
   } else if (!want && pauseInfoShown) {
     pauseInfoShown = false;
     els.songInfo.classList.remove('paused');
+    els.pauseDim.classList.remove('show');
     els.songInfo.setAttribute('aria-hidden', 'true');
     els.siPicker.replaceChildren();
     hideSongInfo();

@@ -2405,3 +2405,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .app.details-only .library > .info { border-radius: 13px; }
 .settings-page > .sp-head { border-radius: 13px 13px 0 0; }
 .settings-page > .sp-body { border-radius: 0 0 13px 13px; overflow: clip; }
+
+/* While the song is paused with its information window up, the stage goes darker (the player bar below it is not part of the stage and stays as it is) */
+.pause-dim { position: absolute; inset: 0; z-index: 4; background: rgba(0, 0, 0, .55); pointer-events: none; opacity: 0; visibility: hidden; transition: opacity .35s ease, visibility 0s linear .35s; }
+.pause-dim.show { opacity: 1; visibility: visible; transition: opacity .35s ease; }
