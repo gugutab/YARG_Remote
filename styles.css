@@ -2530,5 +2530,5 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .song-info.show.under-panel { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .song-info, .song-info.show { transition-duration: .01s; } }
 
-/* The instrument tiles of the start / pause screen are at least 162 px wide (12 px more than before): narrower windows wrap them to a second row instead */
-.si-picker .icard { flex: 1 1 162px; min-width: 162px; }
+/* The instrument tiles of the start / pause screen are at least 174 px wide (12 px more than the 162 px before): narrower windows wrap them to a second row instead */
+.si-picker .icard { flex: 1 1 174px; min-width: 174px; }
