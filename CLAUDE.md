@@ -463,3 +463,4 @@ Only checked by synthetic test, headless run or code reading:
 - The difficulty selector of the tiles is a single row of four buttons (when a label would be cut, `diffSegObserver` first shrinks the unselected buttons to E/M/H/X (`.abbr`, `setDiffLabel`) and only then goes 2 x 2 (`.two-rows`)).
 - The start/pause screen's tiles are a grid of equal columns (`layoutPicker`, `--icols` via `evenPerRow`, min 190 px per tile): all tiles the same width, rows balanced (2 + 2 rather than 3 + 1).
 - Tile tool buttons: the chart delay button shows no label while the delay is 0; icon-to-label gap is 3 px.
+- The tile tool row never wraps (no 2 x 2 any more): the chips shrink and cut their value with an ellipsis.

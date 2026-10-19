@@ -2677,9 +2677,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* at most two lines: when the four buttons no longer fit side by side, they go two by two */
 .icard-tools { flex-wrap: nowrap; }
 .tile-tool { min-width: 0; padding: 0 4px; }
-@container itile (max-width: 212px) {
-  .icard-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 .tile-tool[aria-expanded="true"], .tile-tool[aria-expanded="true"][data-mod="true"] { background: var(--si-fill, var(--accent)); color: #fff; }
 /* the tile's content stays at the top; only the tool row sits at the bottom */
 .si-picker .icard-top + .seg, :is(.icards, .pc-cards) .icard-top + .seg, .icards .icard-top + .seg { margin-top: 0; }
@@ -2734,3 +2731,8 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .song-info.paused .si-picker { display: grid; grid-template-columns: repeat(var(--icols, 4), minmax(0, 1fr)); gap: 10px; }
 .si-picker .icard, .si-picker .icard[data-key="drums"] { min-width: 0; flex: none; }
 .tile-tool { gap: 3px; }
+
+/* the tool row is always one line: the chips shrink (padding, then the value is cut) instead of wrapping */
+.icard-tools { display: flex !important; flex-wrap: nowrap; }
+.tile-tool { overflow: hidden; padding: 0 6px; }
+.tile-tool .tt-val { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
