@@ -1367,6 +1367,7 @@ function vocalViewSeg() {
     b.dataset.vocal = value;
     b.textContent = label;
     b.setAttribute('aria-pressed', String(highway.vocalView === value));
+    b.dataset.next = String(highway.vocalView === value); // (an instrument that is off shows its choice dimmed, like the type and difficulty)
     b.addEventListener('click', (e) => { e.stopPropagation(); setVocalView(value); });
     modes.append(b);
   }
@@ -2315,6 +2316,7 @@ els.seekbox.addEventListener('pointerleave', () => { if (!loopDrag) hideSeekTip(
 // through the skipped stretch for as long as the fretboards take to get there (see scrub.js), then plays on. Paused, or with the
 // animation off, it is immediate.
 function seekTo(t) {
+  if (loop && (t < loop.start - 1e-6 || t > loop.end + 1e-6)) setLoop(null); // a seek out of the loop ends it (the playhead is free again)
   // Optionally the seek lands PAUSE_REWIND_SEC early, as a resume from a pause does: the notes of that second are drawn disabled until the song reaches the target.
   if (ready && !loop && prefs.get('playback.seekRewind') && t > 0.05) {
     const back = Math.max(0, t - PAUSE_REWIND_SEC);
@@ -2823,7 +2825,7 @@ els.viewChoice.addEventListener('click', (e) => {
 // ---------- Vocal view: notes with lyrics, or karaoke (the lyrics alone) ----------
 function setVocalView(view) {
   highway.setVocalView(view);
-  for (const b of document.querySelectorAll('[data-vocal]')) b.setAttribute('aria-pressed', String(b.dataset.vocal === view)); // (also the tiles' selectors)
+  for (const b of document.querySelectorAll('[data-vocal]')) { b.setAttribute('aria-pressed', String(b.dataset.vocal === view)); if ('next' in b.dataset) b.dataset.next = String(b.dataset.vocal === view); } // (also the tiles' selectors)
   if (prefs.get('highway.vocalView') !== view) prefs.set('highway.vocalView', view);
 }
 setVocalView(prefs.get('highway.vocalView'));
