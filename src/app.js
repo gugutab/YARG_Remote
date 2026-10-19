@@ -1328,6 +1328,15 @@ function renderPickers() {
 }
 
 // The instrument cards (on/off switches with the difficulty and mode buttons): in the details and in the song window shown while paused.
+// The difficulty selector is one row of four; it goes to two rows only when a label would be cut (an ellipsis), checked whenever its width changes.
+const diffSegObserver = new ResizeObserver((entries) => {
+  for (const { target: seg, contentRect } of entries) {
+    if (seg._w === Math.round(contentRect.width)) continue; // (a height change from the class below must not run this again)
+    seg._w = Math.round(contentRect.width);
+    seg.classList.remove('two-rows');
+    if ([...seg.children].some((b) => b.scrollWidth > b.clientWidth)) seg.classList.add('two-rows');
+  }
+});
 // The Notes / Karaoke selector of a vocal tile (the same look as the drum type selector); it follows the global vocal view.
 function vocalViewSeg() {
   const modes = document.createElement('div');
@@ -1440,6 +1449,7 @@ function buildInstrumentCard(group, menu = null) {
     if (!vocal) {
       const seg = document.createElement('div');
       seg.className = 'seg seg-diffs';
+      diffSegObserver.observe(seg);
       for (const d of diffs) {
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -2989,6 +2999,7 @@ function fillChooser(el, key) {
     if (ins.mode !== 'vocals') {
       const seg = document.createElement('div');
       seg.className = 'seg seg-diffs';
+      diffSegObserver.observe(seg);
       for (const d of diffs) {
         const b = document.createElement('button');
         b.type = 'button';

@@ -2718,6 +2718,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* the difficulty selector in one row of four (2 x 2 only on very narrow tiles) */
 .si-picker .seg-diffs, :is(.icards, .pc-cards) .seg-diffs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .si-picker .seg-diffs button, :is(.icards, .pc-cards) .seg-diffs button { height: 32px; font-size: 12.5px; padding: 0 2px; overflow: hidden; text-overflow: ellipsis; }
-@container itile (max-width: 212px) {
-  .si-picker .seg-diffs, :is(.icards, .pc-cards) .seg-diffs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+/* two rows only when a label would be cut: the class is set by diffSegObserver (app.js) */
+.si-picker .seg-diffs.two-rows, :is(.icards, .pc-cards) .seg-diffs.two-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.seg-diffs.two-rows button { height: 34px; }
