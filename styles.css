@@ -2684,3 +2684,10 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* the tile's content stays at the top; only the tool row sits at the bottom */
 .si-picker .icard-top + .seg, :is(.icards, .pc-cards) .icard-top + .seg, .icards .icard-top + .seg { margin-top: 0; }
 .si-picker .icard-tools, :is(.icards, .pc-cards) .icard-tools, .icard-top + .icard-tools { margin-top: auto; }
+/* the tool row as chips: no dark tray like the type / difficulty selectors, each tool a rounded outline pill */
+.icard-tools { background: transparent; padding: 0; gap: 6px; border-radius: 0; }
+.tile-tool { height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .16); background: transparent; }
+.tile-tool:hover:not(:disabled) { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .28); }
+.tile-tool[data-mod="true"] { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.tile-tool[aria-expanded="true"], .tile-tool[aria-expanded="true"][data-mod="true"] { border-color: transparent; }
+.tile-tool[aria-expanded="true"]:hover:not(:disabled) { background: var(--si-fill, var(--accent)); color: #fff; border-color: transparent; }
