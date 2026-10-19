@@ -2670,3 +2670,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .tp-segs .seg button { flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .tp-segs .seg svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; }
 .pm-range output { white-space: nowrap; }
+/* tool buttons: the value to the right of the icon; the row wraps when the tile is narrow */
+.icard-tools { flex-wrap: wrap; }
+.tile-tool { flex: 1 1 auto; flex-direction: row; gap: 5px; height: 30px; padding: 0 8px; }
+.tile-tool .tt-val:empty { display: none; }
