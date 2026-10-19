@@ -1,9 +1,13 @@
 // Drawing constants and helpers shared by the 2D and 3D highway renderers.
 export const GUITAR_LANE_COLORS = ['#79d304', '#ff1d23', '#ffe900', '#00bfff', '#ff8400']; // YARG.Core ColorProfile.Defaults.cs
-export const KICK_COLOR = '#f2861e';
+export const KICK_COLOR = '#ff8400'; // YARG's 4-lane kick (the 5-lane one is KICK_COLOR_5)
+export const KICK_COLOR_5 = '#e63fff'; // YARG's 5-lane kick (purple)
+export const STAR_POWER_GOLD = '#ffd700'; // the metal of a star power note in YARG
+export const STAR_POWER_BAND = 'rgba(255,176,0,0.13)'; // the track under a star power phrase (YARG: gold-orange overlay)
+export const SOLO_BAND = 'rgba(0,150,220,0.12)'; // ...and a solo (YARG: cyan-blue overlay)
 export const OPEN_COLOR = '#c800ff'; // YARG's open-note purple
 export const STAR_POWER_NOTE = '#ffffff'; // YARG draws notes inside a star power phrase in the star power colour
-export const HARMONY_COLORS = { 1: '#3fbf9f', 2: '#2fa8a8', 3: '#8fd6c4' }; // harmony parts 1..3, behind the lead
+export const HARMONY_COLORS = { 1: '#00ccff', 2: '#ff8500', 3: '#ffdb00' }; // YARG's harmony parts: cyan, orange, yellow // harmony parts 1..3, behind the lead
 export const KICK_BAR_HALF_H = 6; // pedal bar is 12 px tall at rest
 export const DOUBLE_KICK_GAP = 4; // px between the two bars of a double kick
 export const TAP_COLOR = '#b25cff';
@@ -18,7 +22,7 @@ export const ROLL_COLORS = {
 };
 // Drum fill (activation phrase) and big rock ending bands, one colour per chart.fills kind; kept faint under the notes.
 export const FILL_COLORS = {
-  fill: 'rgba(178,92,255,0.13)',
+  fill: 'rgba(40,200,90,0.13)', // YARG draws the drum fill overlay in green
   bre: 'rgba(255,80,80,0.15)',
 };
 export const FADE_SEC = 0.25; // how long a note takes to fade out after the hit line

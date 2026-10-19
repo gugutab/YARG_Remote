@@ -5,6 +5,10 @@ import { sanitizeSizes, fitWidths } from './panesizes.js';
 import {
   GUITAR_LANE_COLORS, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, LYRIC_RAMP_STOPS,
   KICK_COLOR,
+  KICK_COLOR_5,
+  STAR_POWER_GOLD,
+  STAR_POWER_BAND,
+  SOLO_BAND,
   OPEN_COLOR,
   KICK_BAR_HALF_H,
   DOUBLE_KICK_GAP,
@@ -1245,8 +1249,8 @@ export class Highway {
     const boardK = this.restBoard(t, ahead - ENTRY_MARGIN_SEC);
     g.globalAlpha = boardK;
     // star power / solo bands
-    this.fillSpans(chart.starPower, t, ahead, x0, laneW * chart.lanes, h, 'rgba(60,160,255,0.12)');
-    this.fillSpans(chart.solos, t, ahead, x0, laneW * chart.lanes, h, 'rgba(255,190,60,0.10)');
+    this.fillSpans(chart.starPower, t, ahead, x0, laneW * chart.lanes, h, STAR_POWER_BAND);
+    this.fillSpans(chart.solos, t, ahead, x0, laneW * chart.lanes, h, SOLO_BAND);
     // drum fills / big rock endings (YARG activation phrases and BRE), a faint band under the notes
     for (let i = 0; i < FILL_KINDS.length; i++) {
       this.fillSpans(spansOfKind(chart, chart.fills, 'kind', FILL_KINDS[i]), t, ahead, x0, laneW * chart.lanes, h, FILL_COLORS[FILL_KINDS[i]]);
@@ -1263,8 +1267,8 @@ export class Highway {
       if (b.time > t + ahead) continue;
       const y = laneY(b.time);
       if (y > h) continue; // already below the screen; lines above the top are clipped by the canvas
-      g.fillStyle = b.measure ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)';
-      g.fillRect(x0, y, laneW * chart.lanes, b.measure ? 2 : 1);
+      g.fillStyle = b.measure ? 'rgba(255,255,255,0.35)' : b.strong ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.12)'; // measure, strong beat (the middle of an even measure), weak beat
+      g.fillRect(x0, y, laneW * chart.lanes, b.measure ? 2 : b.strong ? 1.5 : 1);
     }
 
     // lane guides
@@ -1327,7 +1331,7 @@ export class Highway {
       const full = laneW * chart.lanes;
       const height = KICK_BAR_HALF_H * 2 * (1 + 0.4 * k);
       g.globalAlpha = 1 - k;
-      g.fillStyle = tintWhite(n.open ? OPEN_COLOR : KICK_COLOR, k);
+      g.fillStyle = tintWhite(n.open ? OPEN_COLOR : chart.drumKind === 'five' ? KICK_COLOR_5 : KICK_COLOR, k);
       // double kick: a second bar stacked above the first
       g.fillRect(x0, cy + 0 - height / 2, full, height);
       if (n.doubleKick) g.fillRect(x0, cy + -(height + DOUBLE_KICK_GAP) - height / 2, full, height);
@@ -1391,7 +1395,7 @@ export class Highway {
       g.fill();
       // accent: same size, with a thicker outline in a darker shade of the note's colour
       g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH : n.sp ? 4 : 2;
-      g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : n.sp ? colors[n.lane] : 'rgba(0,0,0,0.5)'; // star power keeps the lane colour as its outline
+      g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : n.sp ? STAR_POWER_GOLD : 'rgba(0,0,0,0.5)'; // star power: the white body with a gold outline, as YARG's white notes with gold metal
       g.stroke();
       if (n.hopo) { // guitar HOPO: a white dot in the head
         g.beginPath();

@@ -46,7 +46,7 @@ const CLASSIC_COUNTDOWN = {
   track: '#ffffff', trackAlpha: 0.14, dimRing: '#7d8590', dimText: '#8b949e',
 };
 const CLASSIC_VOCAL = {
-  lead: '#5b8def', leadLit: '#9fd0ff', harmony: { 1: '#3fbf9f', 2: '#2fa8a8', 3: '#8fd6c4' },
+  lead: '#5b8def', leadLit: '#9fd0ff', harmony: { 1: '#00ccff', 2: '#ff8500', 3: '#ffdb00' }, // YARG's harmony colours
   lyrics: ['#ffffff', '#13f0a6', '#595959'], lyrics2: ['#9fe3d0', '#2fd9c4', '#4b6b66'],
   present: '#13f0a6', frame: '#6cb6ff', perc: { glow: '#6cb6ff', ring: '#bfe9ff', ball: '#e6edf3', lit: '#6cb6ff' },
 };

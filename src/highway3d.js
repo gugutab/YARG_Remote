@@ -2,7 +2,7 @@
 // so it stays light enough for phones. Only the lane instruments (guitar, bass, keys, drums) have a highway;
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
-  GUITAR_LANE_COLORS, KICK_COLOR, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
+  GUITAR_LANE_COLORS, KICK_COLOR, KICK_COLOR_5, STAR_POWER_GOLD, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
   ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
@@ -23,6 +23,8 @@ const easeOut = (x) => 1 - (1 - x) ** 3;
 const TAIL_RIGHT = new Float64Array(2 * 21); // scratch for taperedStrip
 const FLASH = new Float64Array(16); // scratch of renderLanes3D: the light of each pad
 const FILL_KINDS = Object.keys(FILL_COLORS);
+const STAR_POWER_BAND_3D = 'rgba(255,176,0,0.17)'; // (the 3D bands are a little denser than the 2D ones)
+const SOLO_BAND_3D = 'rgba(0,150,220,0.15)';
 const ROLL_TYPES = Object.keys(ROLL_COLORS);
 const HOPO_DOT = 'rgba(255,255,255,0.9)'; // the alpha of a HOPO dot while its note has not been hit yet (0.9 * (1 - 0))
 
@@ -123,8 +125,8 @@ export function renderLanes3D(hw, t, w, h) {
     quad(g, ROAD_NEAR, ROAD_END, i - half, i + 1 - half);
     g.fill();
   }
-  span(g, chart.starPower, 'rgba(60,160,255,0.16)', half);
-  span(g, chart.solos, 'rgba(255,190,60,0.13)', half);
+  span(g, chart.starPower, STAR_POWER_BAND_3D, half);
+  span(g, chart.solos, SOLO_BAND_3D, half);
   for (let i = 0; i < FILL_KINDS.length; i++) span(g, spansOfKind(chart, chart.fills, 'kind', FILL_KINDS[i]), FILL_COLORS[FILL_KINDS[i]], half);
   for (let i = 0; i < ROLL_TYPES.length; i++) span(g, spansOfKind(chart, chart.rolls, 'type', ROLL_TYPES[i]), ROLL_COLORS[ROLL_TYPES[i]], half);
 
@@ -154,8 +156,9 @@ export function renderLanes3D(hw, t, w, h) {
     if (b.time < t || b.time > t + windowSec) continue;
     const d = depth(b.time);
     const p = scaleAt(d);
-    g.fillStyle = b.measure ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.14)';
-    g.fillRect(PCX + -half * PLANE * p, PVY + (PHIT - PVY) * p - (b.measure ? 1.5 : 0.5) * p, roadW * p, (b.measure ? 3 : 1) * p);
+    g.fillStyle = b.measure ? 'rgba(255,255,255,0.4)' : b.strong ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.14)';
+    const bh = b.measure ? 3 : b.strong ? 2 : 1;
+    g.fillRect(PCX + -half * PLANE * p, PVY + (PHIT - PVY) * p - (bh / 2) * p, roadW * p, bh * p);
   }
 
   g.globalAlpha = 1;
@@ -209,7 +212,7 @@ export function renderLanes3D(hw, t, w, h) {
     const kx = Math.max(0, past) / FADE_SEC;
     const e = easeOut(kx);
     const d = depth(n.time);
-    const base = n.open ? OPEN_COLOR : KICK_COLOR;
+    const base = n.open ? OPEN_COLOR : chart.drumKind === 'five' ? KICK_COLOR_5 : KICK_COLOR;
     const far = Math.min(1, (1 - d) / FADE_IN);
     const alpha = far * (1 - e * e); // stays solid for a moment, then drops
     const thick = BAR_DEPTH * (1 - 0.55 * e); // the bar thins as it is "consumed"
@@ -344,7 +347,7 @@ export function renderLanes3D(hw, t, w, h) {
     g.fillStyle = body;
     g.fill();
     g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH * p : Math.max(1, (n.sp ? 4.5 : 1.5) * p);
-    g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : n.sp ? colors[n.lane] : 'rgba(0,0,0,0.5)';
+    g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : n.sp ? STAR_POWER_GOLD : 'rgba(0,0,0,0.5)';
     g.stroke();
     if (n.hopo) {
       g.beginPath();

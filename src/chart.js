@@ -379,6 +379,19 @@ function isCymbal(spans, offset, tick) {
 
 export { displayLyric }; // lyric text as shown (vocals.js)
 
+// Marks the strong beats (YARG's BeatlineType.Strong): the beat in the middle of a measure with an even number of beats (the 3rd of 4/4). The other
+// beats are weak; the measure lines are the beats with `measure`. Works on `beats` in place.
+export function markStrongBeats(beats) {
+  let start = 0;
+  for (let i = 1; i <= beats.length; i++) {
+    if (i < beats.length && !beats[i].measure) continue;
+    const len = i - start;
+    if (len >= 4 && len % 2 === 0) beats[start + len / 2].strong = true;
+    start = i;
+  }
+  return beats;
+}
+
 function commonParts(midi, track, toSec, settings = chartSettings({}, midi.division, midi.source), mode = 'guitar') {
   const spans = (pitch) => spansOf(track.notes.filter((n) => n.pitch === pitch), toSec);
   const beatTrack = midi.tracks.find((t) => t.name.toUpperCase() === 'BEAT');
@@ -389,6 +402,7 @@ function commonParts(midi, track, toSec, settings = chartSettings({}, midi.divis
     : [];
   // No BEAT track notes: build the grid from the tempo map and time signatures, as YARG does (SyncTrack.FinishLoading).
   if (beats.length === 0) beats = generateBeats(midi, toSec);
+  markStrongBeats(beats);
   const eventsTrack = midi.tracks.find((t) => t.name.toUpperCase() === 'EVENTS');
   const sections = eventsTrack
     ? eventsTrack.texts
