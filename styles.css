@@ -2268,7 +2268,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .song-info.show { opacity: 1; visibility: visible; transition: opacity .5s ease; }
 .song-info.show.under-panel { opacity: 0; }
 .song-info::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-.si-cover { grid-area: cover; width: 96px; height: 96px; object-fit: cover; border-radius: 10px; box-shadow: 0 4px 14px rgba(0, 0, 0, .4); }
+.si-cover { grid-area: cover; width: 116px; height: 116px; object-fit: cover; border-radius: 10px; box-shadow: 0 4px 14px rgba(0, 0, 0, .4); }
 .si-main { grid-area: main; min-width: 0; }
 .si-title { font-size: 22px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
 .si-artist { font-size: 16px; margin-top: 2px; overflow-wrap: anywhere; }
@@ -2291,7 +2291,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* A wide stage: the cover grows and the instruments sit in a column to the right of the text (the horizontal room is used instead of stacking) */
 @media (min-width: 1100px) {
   .song-info { width: min(1000px, 84%); max-width: none; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "cover main insts" "picker picker picker"; gap: 22px 32px; padding: 22px 32px; }
-  .si-cover { width: 150px; height: 150px; border-radius: 12px; }
+  .si-cover { width: 184px; height: 184px; border-radius: 12px; }
   .si-title { font-size: 30px; }
   .si-artist { font-size: 19px; }
   .si-details { font-size: 14px; }

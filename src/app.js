@@ -2374,19 +2374,18 @@ function showSongInfo(hideMs) {
   els.songInfo.classList.add('show');
   scheduleInfoHide(hideMs);
 }
-// The instruments on screen with their difficulty (Expert...) and the song's level pips (read only), and, while the window is the paused one, the same instrument
+// All the instruments of the song with the song's level pips (read only: no difficulty, the cards below choose it), and, while the window is the paused one, the same instrument
 // cards as the song details below them (on/off, mode and difficulty buttons).
 function fillInfoInsts() {
   if (!current) return;
   const song = current.song;
-  els.siInsts.replaceChildren(...(current.screen || []).map((it) => {
+  els.siInsts.replaceChildren(...instrumentGroups().map((g) => { // every instrument the song has (not only the ones on screen), without a difficulty
     const row = document.createElement('div');
     row.className = 'si-inst';
-    const level = instrumentLevel(song, { base: it.base });
+    const level = instrumentLevel(song, { base: g.chosen.base });
     const pips = level === null || level === undefined ? '' : `<span class="mini-pips" title="Level ${level}">${Array.from({ length: 6 }, (_, k) => `<i${k < level ? ' class="on"' : ''}></i>`).join('')}</span>`;
-    row.innerHTML = `<svg><use href="#i-${it.icon}"/></svg><span class="si-inst-name"></span><span class="si-inst-diff"></span>${pips}`;
-    row.querySelector('.si-inst-name').textContent = it.name;
-    row.querySelector('.si-inst-diff').textContent = it.diffLabel || '';
+    row.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[g.chosen.base] || 'music'}"/></svg><span class="si-inst-name"></span>${pips}`;
+    row.querySelector('.si-inst-name').textContent = g.label;
     return row;
   }));
   if (els.songInfo.classList.contains('paused')) els.siPicker.replaceChildren(...buildInstrumentCards());
