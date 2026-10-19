@@ -480,3 +480,4 @@ Only checked by synthetic test, headless run or code reading:
 - The star power band under the notes is off by default (setting `highway.starPowerBand`, Highway section); star power notes keep their white body and gold outline either way.
 - The drum fill band (green) is off by default too (setting `highway.fillBand`); the BRE band is always drawn.
 - BRE band: every lane is tinted in its own note colour and pulses (`breAlpha` in gfx.js: a wave across the lanes plus a speed per lane, smooth sines in an alpha range of 0.07-0.30), in the 2D and 3D views.
+- While the bottom bar is held back (`stage-held`) and the pause dim shows, the bar's slot is painted with the same dim (the bar's children stay hidden).

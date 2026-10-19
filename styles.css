@@ -2757,3 +2757,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .met-pop .met-volume { display: grid; grid-template-columns: auto minmax(0, 1fr) 40px; align-items: center; gap: 8px; }
 .met-pop .met-volume output { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
 .met-pop .met-volume > span { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+/* While the bottom bar is held back (loading, the start screen) its slot is dimmed like the rest of the stage, instead of showing the plain page behind it */
+.app.stage-held:has(.pause-dim.show) #topbar { visibility: visible; }
+.app.stage-held:has(.pause-dim.show) #topbar > * { visibility: hidden; }
+.app.stage-held:has(.pause-dim.show) #topbar::after { content: ""; position: absolute; inset: -4px 0 0 0; z-index: 20; background: rgba(0, 0, 0, .68); pointer-events: none; } /* the same dim as .pause-dim over the stage */
