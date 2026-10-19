@@ -3130,10 +3130,20 @@ document.addEventListener('pointerdown', (e) => { if (!tilePop.hidden && !tilePo
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !tilePop.hidden) { e.stopPropagation(); closeTilePop(); } }, true);
 window.addEventListener('resize', closeTilePop);
 
+// The values on the tool chips lose their unit (the last character: s, x, %) before the row would cut them with an ellipsis.
+const tileToolsObserver = new ResizeObserver((entries) => { for (const { target } of entries) fitTileTools(target); });
+function fitTileTools(row) {
+  const vals = [...row.querySelectorAll('.tile-tool')].map((b) => [b.querySelector('.tt-val'), b.dataset.full ?? '']);
+  const cut = () => [...row.children].some((b) => b.scrollWidth > b.clientWidth || (b.querySelector('.tt-val')?.scrollWidth ?? 0) > (b.querySelector('.tt-val')?.clientWidth ?? 0));
+  for (const [el, full] of vals) el.textContent = full;
+  if (!row.isConnected || !row.clientWidth || !cut()) return;
+  for (const [el, full] of vals) if (/\D$/.test(full)) el.textContent = full.slice(0, -1);
+}
 function buildTileTools(group) {
   const vocal = group.chosen.mode === 'vocals';
   const row = document.createElement('div');
   row.className = 'icard-tools';
+  tileToolsObserver.observe(row);
   // A button: the icon with its current value under it (for the sliders), opening a small window.
   const tool = (icon, title, onClick) => {
     const b = document.createElement('button');
@@ -3146,7 +3156,7 @@ function buildTileTools(group) {
     row.append(b);
     return b;
   };
-  const text = (b, v) => { b.querySelector('.tt-val').textContent = v; };
+  const text = (b, v) => { b.dataset.full = v; fitTileTools(row); };
   const membersNow = () => stemStates.filter((st) => stemGroup(st.stem.label) === group.key);
   const volText = () => {
     const owner = groupList.find((g) => g.members[0] && stemGroup(g.members[0].stem.label) === group.key) ?? membersNow()[0];
