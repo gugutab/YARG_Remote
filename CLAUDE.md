@@ -465,3 +465,4 @@ Only checked by synthetic test, headless run or code reading:
 - Tile tool buttons: the chart delay button shows no label while the delay is 0; icon-to-label gap is 3 px.
 - The tile tool row never wraps (no 2 x 2 any more): the chips shrink and cut their value with an ellipsis.
 - The tool chips drop the unit of their value (last character: s, x, %) before an ellipsis would appear (`fitTileTools`, re-run when the row's width changes; the full text is in `data-full`).
+- Tool chips: when they do not fit, the gap between them shrinks from 6 px to 2 px first (`fitTileTools`), then the units go, then the ellipsis.

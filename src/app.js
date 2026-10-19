@@ -3130,13 +3130,18 @@ document.addEventListener('pointerdown', (e) => { if (!tilePop.hidden && !tilePo
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !tilePop.hidden) { e.stopPropagation(); closeTilePop(); } }, true);
 window.addEventListener('resize', closeTilePop);
 
-// The values on the tool chips lose their unit (the last character: s, x, %) before the row would cut them with an ellipsis.
+// When the tool chips do not fit: the gaps between them shrink (6 px down to 2 px), then the values lose their unit (the last character: s, x, %), and only then an ellipsis cuts them.
 const tileToolsObserver = new ResizeObserver((entries) => { for (const { target } of entries) fitTileTools(target); });
 function fitTileTools(row) {
   const vals = [...row.querySelectorAll('.tile-tool')].map((b) => [b.querySelector('.tt-val'), b.dataset.full ?? '']);
   const cut = () => [...row.children].some((b) => b.scrollWidth > b.clientWidth || (b.querySelector('.tt-val')?.scrollWidth ?? 0) > (b.querySelector('.tt-val')?.clientWidth ?? 0));
   for (const [el, full] of vals) el.textContent = full;
+  row.style.gap = '';
   if (!row.isConnected || !row.clientWidth || !cut()) return;
+  for (let gap = 5; gap >= 2; gap--) { // first the space between the chips goes down to 2 px
+    row.style.gap = `${gap}px`;
+    if (!cut()) return;
+  }
   for (const [el, full] of vals) if (/\D$/.test(full)) el.textContent = full.slice(0, -1);
 }
 function buildTileTools(group) {
