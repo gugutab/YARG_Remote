@@ -467,3 +467,4 @@ Only checked by synthetic test, headless run or code reading:
 - The tool chips drop the unit of their value (last character: s, x, %) before an ellipsis would appear (`fitTileTools`, re-run when the row's width changes; the full text is in `data-full`).
 - Tool chips: when they do not fit, the gap between them shrinks from 6 px to 2 px first (`fitTileTools`), then the units go, then the ellipsis.
 - Tool chip values never get an ellipsis (text-overflow: clip); they only lose the unit.
+- When the chips drop their units, the icon-to-value gap also goes from 3 px to 1 px (`.units-cut`).

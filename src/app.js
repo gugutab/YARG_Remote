@@ -3137,12 +3137,14 @@ function fitTileTools(row) {
   const cut = () => [...row.children].some((b) => b.scrollWidth > b.clientWidth || (b.querySelector('.tt-val')?.scrollWidth ?? 0) > (b.querySelector('.tt-val')?.clientWidth ?? 0));
   for (const [el, full] of vals) el.textContent = full;
   row.style.gap = '';
+  row.classList.remove('units-cut');
   if (!row.isConnected || !row.clientWidth || !cut()) return;
   for (let gap = 5; gap >= 2; gap--) { // first the space between the chips goes down to 2 px
     row.style.gap = `${gap}px`;
     if (!cut()) return;
   }
   for (const [el, full] of vals) if (/\D$/.test(full)) el.textContent = full.slice(0, -1);
+  row.classList.add('units-cut'); // (and the icon moves 2 px closer to its value)
 }
 function buildTileTools(group) {
   const vocal = group.chosen.mode === 'vocals';
