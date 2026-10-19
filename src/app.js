@@ -1369,11 +1369,29 @@ function buildInstrumentCard(group, menu = null) {
     else {
       const rm = document.createElement('button');
       rm.type = 'button';
-      rm.className = 'icard-remove';
-      rm.title = menu.onlyOne ? 'It is the only instrument on screen: choose another one' : 'Remove instrument';
-      rm.setAttribute('aria-label', 'Remove instrument');
-      rm.innerHTML = '<svg><use href="#i-x"/></svg>';
-      rm.addEventListener('click', (e) => { e.stopPropagation(); menu.onRemove(); });
+      rm.className = 'icard-remove icard-more';
+      rm.title = 'Instrument actions';
+      rm.setAttribute('aria-label', 'Instrument actions');
+      rm.setAttribute('aria-haspopup', 'menu');
+      rm.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
+      rm.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const list = document.createElement('div');
+        list.className = 'ctx-list';
+        list.setAttribute('role', 'menu');
+        for (const act of menu.actions) {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = `ctx-item${act.danger ? ' danger' : ''}`;
+          item.setAttribute('role', 'menuitem');
+          item.textContent = act.label;
+          item.disabled = !act.enabled;
+          if (act.title) item.title = act.title;
+          item.addEventListener('click', () => { closeTilePop(); act.run(); });
+          list.append(item);
+        }
+        openTilePop(rm, null, list);
+      });
       top.append(rm);
     }
     card.append(top);
@@ -3047,8 +3065,8 @@ function openTilePop(btn, title, content) {
   if (same) return;
   const label = document.createElement('b');
   label.className = 'tp-title';
-  label.textContent = title;
-  tilePop.replaceChildren(label, content);
+  label.textContent = title ?? '';
+  tilePop.replaceChildren(...(title ? [label, content] : [content]));
   tilePop.hidden = false;
   tilePopBtn = btn;
   btn.setAttribute('aria-expanded', 'true');
@@ -3160,24 +3178,15 @@ function buildPaneMenu() {
   syncMenuView();
   // Only the vocal view (notes / karaoke) stays as its own section: the view and note shape of the lanes are in the tile's tools.
   for (const g of els.paneMenu.querySelectorAll('[data-needs]')) g.hidden = g.dataset.needs === 'lanes' ? true : ins.mode !== 'vocals';
-  // The menu is the instrument's tile, like the one of the start screen and the details; its corner button removes the instrument.
-  host.append(buildInstrumentCard(group, { onlyOne: !canClose, onRemove: () => { if (canClose) { closePane(group); els.paneMenu.hidden = true; } else swapPane(group); } }));
+  // The menu is the instrument's tile, like the one of the start screen and the details; its corner button opens a context menu: swap, remove, add.
   const free = hiddenGroups().length - current.choosers.length; // instruments with no slot yet
-  const row = els.paneMenuActions; // at the end of the menu: swap, add and remove
-  row.replaceChildren();
-  for (const [label, enabled, onClick, cls] of [
-    ['Swap instrument', hiddenGroups().length > 0, () => swapPane(group), 'chip-btn'],
-    ['Add instrument', free > 0, addPane, 'chip-btn'],
- // the only one on screen: it goes, and the cards to choose another take its place
-  ]) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = cls;
-    b.textContent = label;
-    b.disabled = !enabled;
-    b.addEventListener('click', onClick);
-    row.append(b);
-  }
+  const actions = [
+    { label: 'Swap instrument', enabled: hiddenGroups().length > 0, run: () => swapPane(group) },
+    { label: 'Remove instrument', enabled: true, danger: true, title: canClose ? '' : 'It is the only instrument on screen: choose another one', run: () => { if (canClose) { closePane(group); els.paneMenu.hidden = true; } else swapPane(group); } },
+    { label: 'Add instrument', enabled: free > 0, run: addPane },
+  ];
+  host.append(buildInstrumentCard(group, { actions }));
+  els.paneMenuActions.replaceChildren();
 }
 
 // ---------- Several fretboards: swipe (or drag) sideways to bring the next one into view when they do not all fit ----------
