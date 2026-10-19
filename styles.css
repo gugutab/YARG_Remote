@@ -2644,3 +2644,18 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 :is(.icards, .pc-cards) .icard-top .icard-head { overflow: visible; padding-right: 3px; }
 .icards .icard { min-width: 0; }
 .icards .seg button { padding-inline: 2px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* The tool row at the bottom of the instrument tiles (volume, neck speed, chart delay, 2D / 3D, circles / rectangles) and its small slider window */
+.icard-tools { display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: rgba(0, 0, 0, .3); }
+.icard-top + .icard-tools { margin-top: auto; }
+.tile-tool { flex: 1 1 0; min-width: 0; height: 30px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: #9a8d87; cursor: pointer; padding: 0; }
+.tile-tool svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tile-tool:hover:not(:disabled) { background: rgba(255, 255, 255, .1); color: var(--text); }
+.tile-tool[aria-expanded="true"] { background: var(--si-fill, var(--accent)); color: #fff; }
+.tile-tool[data-mod="true"] { color: var(--accent); }
+.tile-tool:disabled { opacity: .35; cursor: default; }
+.tile-tool:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tile-pop { position: fixed; z-index: 80; width: 260px; max-width: calc(100vw - 16px); padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+.tile-pop[hidden] { display: none; }
+.tile-pop .tp-title { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.tile-pop .pm-range { display: grid; grid-template-columns: minmax(0, 1fr) 46px 28px; gap: 4px; align-items: center; }

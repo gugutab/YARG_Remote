@@ -1403,6 +1403,7 @@ function buildInstrumentCards() {
       }
       card.append(seg);
     }
+    card.append(buildTileTools(group));
     return card;
   });
 }
@@ -2949,6 +2950,7 @@ function fillChooser(el, key) {
       }
       card.append(seg);
     }
+    card.append(buildTileTools(group));
     cards.append(card);
   }
   if (!cards.children.length) cards.textContent = 'Every instrument of this song is on screen.';
@@ -2978,6 +2980,117 @@ function menuVolume(group) {
   if (grouped) renderGroup(grouped);
   menuMixViews = owners.map((owner, i) => ({ owner, added: owner.views.slice(before[i]) }));
   return wrap;
+}
+
+// A slider with a reset button, for an option that belongs to one window only (see Highway.setPaneOpt). `onChange` runs after every change.
+function paneRange(group, name, min, max, step, def, fmtValue, onChange) {
+  const box = document.createElement('div');
+  box.className = 'pm-range';
+  box.innerHTML = '<input type="range"><output></output><button class="icon small-icon reset" type="button" title="Reset" aria-label="Reset"><svg><use href="#i-reset"/></svg></button>';
+  const input = box.querySelector('input');
+  const out = box.querySelector('output');
+  const reset = box.querySelector('button');
+  Object.assign(input, { min, max, step });
+  input.setAttribute('aria-label', name === 'neck' ? 'Neck speed' : 'Chart delay');
+  const paint = () => {
+    const v = highway.paneOpt(group.key, name);
+    input.value = v;
+    out.textContent = fmtValue(v);
+    reset.disabled = Math.abs(v - def()) < 1e-9;
+    paintRange(input, def());
+    onChange?.();
+  };
+  input.addEventListener('input', () => { highway.setPaneOpt(group.key, name, Number(input.value)); paint(); });
+  reset.addEventListener('click', () => { highway.clearPaneOpt(group.key, name); paint(); });
+  paint();
+  return box;
+}
+const NECK_FMT = (v) => `${v.toFixed(1)}×`;
+const DELAY_FMT = (v) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)} s`;
+
+// The row of tools at the bottom of an instrument tile: volume, neck speed and chart delay open a small slider window; the view (2D / 3D) and the
+// note shape (circles / rectangles) switch on the spot. All of them belong to that instrument's fretboard only (pane options and the stem volume).
+const tilePop = document.createElement('div');
+tilePop.className = 'popover tile-pop';
+tilePop.hidden = true;
+document.body.append(tilePop);
+let tilePopBtn = null;
+function closeTilePop() {
+  if (tilePop.hidden) return;
+  tilePop.hidden = true;
+  tilePop.replaceChildren();
+  dropMenuMixViews(); // (the volume rows registered themselves as views of the stems)
+  tilePopBtn?.setAttribute('aria-expanded', 'false');
+  tilePopBtn = null;
+}
+function openTilePop(btn, title, content) {
+  const same = tilePopBtn === btn;
+  closeTilePop();
+  if (same) return;
+  const label = document.createElement('b');
+  label.className = 'tp-title';
+  label.textContent = title;
+  tilePop.replaceChildren(label, content);
+  tilePop.hidden = false;
+  tilePopBtn = btn;
+  btn.setAttribute('aria-expanded', 'true');
+  const r = btn.getBoundingClientRect();
+  const w = tilePop.offsetWidth;
+  const h = tilePop.offsetHeight;
+  const left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 8));
+  const below = r.bottom + 6 + h <= window.innerHeight - 8;
+  tilePop.style.left = `${left}px`;
+  tilePop.style.top = `${below ? r.bottom + 6 : Math.max(8, r.top - 6 - h)}px`;
+}
+document.addEventListener('pointerdown', (e) => { if (!tilePop.hidden && !tilePop.contains(e.target) && !tilePopBtn?.contains(e.target)) closeTilePop(); }, true);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !tilePop.hidden) { e.stopPropagation(); closeTilePop(); } }, true);
+window.addEventListener('resize', closeTilePop);
+
+function buildTileTools(group) {
+  const vocal = group.chosen.mode === 'vocals';
+  const row = document.createElement('div');
+  row.className = 'icard-tools';
+  const tool = (icon, title, onClick) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tile-tool';
+    b.title = title;
+    b.setAttribute('aria-label', title);
+    b.innerHTML = `<svg><use href="#i-${icon}"/></svg>`;
+    b.addEventListener('click', (e) => { e.stopPropagation(); onClick(b); });
+    row.append(b);
+    return b;
+  };
+  const volume = tool('volume', 'Volume', (b) => {
+    const content = menuVolume(group);
+    if (content) openTilePop(b, `${group.label} volume`, content);
+  });
+  volume.disabled = !stemStates.some((st) => stemGroup(st.stem.label) === group.key);
+  const modified = (b, name, def) => { b.dataset.mod = String(Math.abs(highway.paneOpt(group.key, name) - def()) > 1e-9); };
+  const neck = tool('speed', 'Neck speed', (b) => openTilePop(b, `${group.label} neck speed`, paneRange(group, 'neck', 0.5, 3, 0.1, () => highway.neck, NECK_FMT, () => modified(b, 'neck', () => highway.neck))));
+  const delay = tool('clock', 'Chart delay', (b) => openTilePop(b, `${group.label} chart delay`, paneRange(group, 'delay', -1, 1, 0.05, () => 0, DELAY_FMT, () => modified(b, 'delay', () => 0))));
+  modified(neck, 'neck', () => highway.neck);
+  modified(delay, 'delay', () => 0);
+  if (!vocal) {
+    const view = tool('view-normal', '', () => {
+      highway.setPaneOpt(group.key, 'view', highway.paneOpt(group.key, 'view') === '3d' ? '2d' : '3d');
+      paintViewTools();
+    });
+    const shape = tool('circle', '', () => {
+      highway.setPaneOpt(group.key, 'noteStyle', highway.paneOpt(group.key, 'noteStyle') === 'rect' ? 'round' : 'rect');
+      paintViewTools();
+    });
+    const paintViewTools = () => {
+      const v = highway.paneOpt(group.key, 'view');
+      const n = highway.paneOpt(group.key, 'noteStyle');
+      view.querySelector('use').setAttribute('href', v === '3d' ? '#i-cube' : '#i-view-normal');
+      view.title = view.ariaLabel = v === '3d' ? 'View: 3D (click for 2D)' : 'View: 2D (click for 3D)';
+      shape.querySelector('use').setAttribute('href', n === 'rect' ? '#i-shapes' : '#i-circle');
+      shape.title = shape.ariaLabel = n === 'rect' ? 'Notes: rectangles (click for circles)' : 'Notes: circles (click for rectangles)';
+    };
+    paintViewTools();
+  }
+  return row;
 }
 
 function buildPaneMenu() {
@@ -3030,30 +3143,9 @@ function buildPaneMenu() {
   }
   const volume = menuVolume(group); // the volume of this instrument's track (or tracks), like the Stem volume card
   if (volume) part('Volume', volume);
-  // A slider with a reset button, for an option that belongs to this window only (see Highway.setPaneOpt).
-  const optRange = (name, min, max, step, def, fmtValue) => {
-    const box = document.createElement('div');
-    box.className = 'pm-range';
-    box.innerHTML = '<input type="range"><output></output><button class="icon small-icon reset" type="button" title="Reset" aria-label="Reset"><svg><use href="#i-reset"/></svg></button>';
-    const input = box.querySelector('input');
-    const out = box.querySelector('output');
-    const reset = box.querySelector('button');
-    Object.assign(input, { min, max, step });
-    input.setAttribute('aria-label', name === 'neck' ? 'Neck speed' : 'Chart delay');
-    const paint = () => {
-      const v = highway.paneOpt(group.key, name);
-      input.value = v;
-      out.textContent = fmtValue(v);
-      reset.disabled = Math.abs(v - def()) < 1e-9;
-      paintRange(input, def());
-    };
-    input.addEventListener('input', () => { highway.setPaneOpt(group.key, name, Number(input.value)); paint(); });
-    reset.addEventListener('click', () => { highway.clearPaneOpt(group.key, name); paint(); });
-    paint();
-    return box;
-  };
-  part('Neck speed', optRange('neck', 0.5, 3, 0.1, () => highway.neck, (v) => `${v.toFixed(1)}×`));
-  part('Chart delay', optRange('delay', -1, 1, 0.05, () => 0, (v) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)} s`));
+  const optRange = (name, min, max, step, def, fmtValue) => paneRange(group, name, min, max, step, def, fmtValue);
+  part('Neck speed', optRange('neck', 0.5, 3, 0.1, () => highway.neck, NECK_FMT));
+  part('Chart delay', optRange('delay', -1, 1, 0.05, () => 0, DELAY_FMT));
   const free = hiddenGroups().length - current.choosers.length; // instruments with no slot yet
   const row = els.paneMenuActions; // at the end of the menu: swap, add and remove
   row.replaceChildren();
