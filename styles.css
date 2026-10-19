@@ -2744,3 +2744,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .icard-tools.units-cut .tile-tool { padding-left: 4px; }
 .icard-tools.units-cut .tile-tool:has(.tt-val:not(:empty)) { padding-left: 2px; }
 .tile-tool .tt-val { padding-right: 2px; margin-right: -2px; }
+/* The stage menu of an instrument is only the tile: no window behind it, and the tile is not clickable there */
+#paneMenu.pane-menu { background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 0; gap: 0; overflow: visible; }
+.pm-tile .icard, .pm-tile .icard:hover, .pm-tile .icard[data-active="true"], .pm-tile .icard[data-active="true"]:hover { cursor: default; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); box-shadow: 0 8px 24px rgba(0, 0, 0, .45); }
