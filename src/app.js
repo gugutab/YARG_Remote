@@ -3006,7 +3006,10 @@ function paneRange(group, name, min, max, step, def, fmtValue, onChange) {
   return box;
 }
 const NECK_FMT = (v) => `${v.toFixed(1)}×`;
-const DELAY_FMT = (v) => `${v < -1e-9 ? '-' : ''}${Math.abs(v).toFixed(2)}s`; // (no plus sign, the unit joined to the number)
+const DELAY_FMT = (v) => { // 0 -> "0s", 0.35 -> ".35s", -0.4 -> "-.4s"
+  const n = Math.abs(v) < 0.005 ? '0' : Math.abs(v).toFixed(2).replace(/0+$/, '').replace(/\.$/, '').replace(/^0\./, '.');
+  return `${v < -0.005 ? '-' : ''}${n}s`;
+};
 
 // The row of tools at the bottom of an instrument tile: volume, neck speed and chart delay open a small slider window; the view (2D / 3D) and the
 // note shape (circles / rectangles) switch on the spot. All of them belong to that instrument's fretboard only (pane options and the stem volume).
@@ -3089,7 +3092,7 @@ function buildTileTools(group) {
   optTool('speed', 'Neck speed', 'neck', 0.5, 3, 0.1, () => highway.neck, NECK_FMT);
   optTool('clock', 'Chart delay', 'delay', -1, 1, 0.05, () => 0, DELAY_FMT);
   if (!vocal) { // the view (2D / 3D) and the note shape (circles / rectangles) share one window
-    const view = tool('layers', 'Fretboard view', (b) => {
+    const view = tool('eye', 'Fretboard view', (b) => {
       const box = document.createElement('div');
       box.className = 'tp-segs';
       const seg = (name, items) => {
@@ -3116,7 +3119,6 @@ function buildTileTools(group) {
     const paintView = () => {
       const v = highway.paneOpt(group.key, 'view');
       const n = highway.paneOpt(group.key, 'noteStyle');
-      text(view, v === '3d' ? '3D' : '2D');
       view.title = view.ariaLabel = `View: ${v === '3d' ? '3D' : '2D'}, notes as ${n === 'rect' ? 'rectangles' : 'circles'}`;
     };
     paintView();
