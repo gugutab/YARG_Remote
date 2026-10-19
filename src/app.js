@@ -1328,6 +1328,21 @@ function renderPickers() {
 }
 
 // The instrument cards (on/off switches with the difficulty and mode buttons): in the details and in the song window shown while paused.
+// The Notes / Karaoke selector of a vocal tile (the same look as the drum type selector); it follows the global vocal view.
+function vocalViewSeg() {
+  const modes = document.createElement('div');
+  modes.className = 'seg seg-modes vocal-modes';
+  for (const [value, label] of [['track', 'Notes'], ['karaoke', 'Karaoke']]) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.vocal = value;
+    b.textContent = label;
+    b.setAttribute('aria-pressed', String(highway.vocalView === value));
+    b.addEventListener('click', (e) => { e.stopPropagation(); setVocalView(value); });
+    modes.append(b);
+  }
+  return modes;
+}
 function buildInstrumentCards() {
   return instrumentGroups().map((group) => buildInstrumentCard(group));
 }
@@ -1421,6 +1436,7 @@ function buildInstrumentCard(group, menu = null) {
       }
       card.append(modes);
     }
+    if (vocal) card.append(vocalViewSeg());
     if (!vocal) {
       const seg = document.createElement('div');
       seg.className = 'seg seg-diffs';
@@ -2777,7 +2793,7 @@ els.viewChoice.addEventListener('click', (e) => {
 // ---------- Vocal view: notes with lyrics, or karaoke (the lyrics alone) ----------
 function setVocalView(view) {
   highway.setVocalView(view);
-  for (const b of els.vocalChoice.querySelectorAll('[data-vocal]')) b.setAttribute('aria-pressed', String(b.dataset.vocal === view));
+  for (const b of document.querySelectorAll('[data-vocal]')) b.setAttribute('aria-pressed', String(b.dataset.vocal === view)); // (also the tiles' selectors)
   if (prefs.get('highway.vocalView') !== view) prefs.set('highway.vocalView', view);
 }
 setVocalView(prefs.get('highway.vocalView'));
@@ -2969,6 +2985,7 @@ function fillChooser(el, key) {
       }
       card.append(modes);
     }
+    if (ins.mode === 'vocals') card.append(vocalViewSeg());
     if (ins.mode !== 'vocals') {
       const seg = document.createElement('div');
       seg.className = 'seg seg-diffs';
@@ -3177,13 +3194,13 @@ function buildPaneMenu() {
   const canClose = group.pinned || groups.some((g) => g.pinned);
   syncMenuView();
   // Only the vocal view (notes / karaoke) stays as its own section: the view and note shape of the lanes are in the tile's tools.
-  for (const g of els.paneMenu.querySelectorAll('[data-needs]')) g.hidden = g.dataset.needs === 'lanes' ? true : ins.mode !== 'vocals';
+  for (const g of els.paneMenu.querySelectorAll('[data-needs]')) g.hidden = true; // (the vocal view is in the vocal tile)
   // The menu is the instrument's tile, like the one of the start screen and the details; its corner button opens a context menu: swap, remove, add.
   const free = hiddenGroups().length - current.choosers.length; // instruments with no slot yet
   const actions = [
+    { label: 'Add instrument', enabled: free > 0, run: addPane },
     { label: 'Swap instrument', enabled: hiddenGroups().length > 0, run: () => swapPane(group) },
     { label: 'Remove instrument', enabled: true, danger: true, title: canClose ? '' : 'It is the only instrument on screen: choose another one', run: () => { if (canClose) { closePane(group); els.paneMenu.hidden = true; } else swapPane(group); } },
-    { label: 'Add instrument', enabled: free > 0, run: addPane },
   ];
   host.append(buildInstrumentCard(group, { actions }));
   els.paneMenuActions.replaceChildren();
