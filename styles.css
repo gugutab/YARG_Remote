@@ -2517,3 +2517,8 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 @media (max-width: 1099px) {
   .song-info.paused .si-play { justify-self: stretch; width: 100%; margin: 0; }
 }
+
+/* the window keeps its content while it fades out and is not clickable meanwhile; the draining overlay of the Play button sits above its fill */
+.song-info.closing { pointer-events: none; }
+.si-play.counting::after { z-index: 1; }
+.si-play .si-play-in { z-index: 2; }

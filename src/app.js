@@ -2346,7 +2346,7 @@ async function togglePlay() {
       showStartScreen('hold');
       const clicked = await waitForPlay();
       if (startCancelled) { syncPlayButton(); return; }
-      if (clicked) { endStartScreen(); hideSongInfo(); current.startShown = true; await player.play(); syncPlayButton(); return; } // the Play button: start at once
+      if (clicked) { fadeOutInfo(); current.startShown = true; await player.play(); syncPlayButton(); return; } // the Play button: start at once
     }
     const plan = startPlan({
       fresh: isFreshStart({ position: player.currentTime(), resumed: pausedAt !== null, loop: !!loop, background: listenMode || backgroundAudio(), ended }),
@@ -2387,6 +2387,7 @@ function showSongInfo(hideMs) {
   // the instruments on screen with their difficulty (Expert...) and the song's own level for them (the pips of the cards)
   fillInfoInsts();
   infoShownFor = song;
+  els.songInfo.classList.remove('closing');
   els.songInfo.classList.add('show');
   scheduleInfoHide(hideMs);
 }
@@ -2474,6 +2475,30 @@ function skipStartWait() { // the Play button of the start screen: start now
   startDone(); // (not a cancel: startAfterDelay goes on to play)
   return true;
 }
+// The song window goes away with a fade: it keeps its full content and layout for the fade (0.5 s) and is only reset afterwards (resetting it at once showed the
+// old small overlay while it faded).
+let infoCleanupTimer = 0;
+function fadeOutInfo() {
+  startScreenOn = false;
+  pauseInfoShown = false;
+  clearTimeout(infoTimer);
+  infoTimer = 0;
+  els.songInfo.classList.add('closing'); // (not clickable while it fades)
+  els.songInfo.classList.remove('show');
+  els.pauseDim.classList.remove('show');
+  clearTimeout(infoCleanupTimer);
+  infoCleanupTimer = setTimeout(() => {
+    infoCleanupTimer = 0;
+    els.songInfo.classList.remove('closing');
+    if (els.songInfo.classList.contains('show') || startScreenOn || pauseInfoShown) return; // (shown again meanwhile)
+    els.siPlay.classList.remove('counting', 'loading');
+    els.siPlay.disabled = false;
+    els.siPlayText.textContent = 'Play';
+    els.songInfo.classList.remove('paused', 'starting');
+    els.songInfo.setAttribute('aria-hidden', 'true');
+    els.siPicker.replaceChildren();
+  }, 650);
+}
 function hideSongInfo() {
   clearTimeout(infoTimer);
   infoTimer = 0;
@@ -2495,8 +2520,8 @@ async function startAfterDelay(plan) {
   await wait;
   startDone = null;
   if (startCancelled) { syncPlayButton(); return; }
-  endStartScreen();
-  scheduleInfoHide(plan.hideMs);
+  if (plan.screen && plan.hideMs === 0) fadeOutInfo(); // the start screen fades out as the song starts
+  else { endStartScreen(); scheduleInfoHide(plan.hideMs); }
   await player.play();
   syncPlayButton();
 }
@@ -3628,12 +3653,7 @@ function syncPauseInfo() {
   } else if (!want && pauseInfoShown && startScreenOn) {
     pauseInfoShown = false; // (the start screen has taken the window over)
   } else if (!want && pauseInfoShown) {
-    pauseInfoShown = false;
-    els.songInfo.classList.remove('paused');
-    els.pauseDim.classList.remove('show');
-    els.songInfo.setAttribute('aria-hidden', 'true');
-    els.siPicker.replaceChildren();
-    hideSongInfo();
+    fadeOutInfo();
   }
 }
 let pausePanelShown = false;
