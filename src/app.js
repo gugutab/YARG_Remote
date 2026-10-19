@@ -1870,6 +1870,29 @@ function onRangeWheel(e) {
   el.dispatchEvent(new Event('input', { bubbles: true }));
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }
+// The other sliders (settings, the pause panel, the visualizer menu, the Listen card) get the same custom look: they are painted here, whatever sets their value
+// (an input event, a script assigning .value, a new min / max).
+const GENERIC_RANGE = '.sp-range input[type=range], .pp-row input[type=range], .viz-level input[type=range], .listen input[type=range], .now-playing input[type=range]';
+function paintGenericRange(el) {
+  if (!el.matches?.(GENERIC_RANGE)) return;
+  const min = Number(el.min || 0);
+  const span = Number(el.max || 100) - min || 1;
+  el.style.setProperty('--p', String(Math.min(1, Math.max(0, (Number(el.value) - min) / span))));
+}
+const rangeValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+Object.defineProperty(HTMLInputElement.prototype, 'value', { ...rangeValue, set(v) { rangeValue.set.call(this, v); if (this.type === 'range') paintGenericRange(this); } });
+document.addEventListener('input', (e) => { if (e.target.type === 'range') paintGenericRange(e.target); }, true);
+function paintGenericIn(root) {
+  if (root.matches?.('input[type=range]')) paintGenericRange(root);
+  root.querySelectorAll?.('input[type=range]').forEach(paintGenericRange);
+}
+paintGenericIn(document.body);
+new MutationObserver((records) => {
+  for (const r of records) {
+    if (r.type === 'attributes') paintGenericRange(r.target);
+    else for (const n of r.addedNodes) if (n.nodeType === 1) paintGenericIn(n);
+  }
+}).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['min', 'max'] });
 const wheelBound = new WeakSet();
 function bindRangeWheel(root) {
   const list = root.matches?.('input[type=range]') ? [root] : [];
