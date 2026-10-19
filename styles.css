@@ -2674,3 +2674,9 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .icard-tools { flex-wrap: wrap; }
 .tile-tool { flex: 1 1 auto; flex-direction: row; gap: 5px; height: 30px; padding: 0 8px; }
 .tile-tool .tt-val:empty { display: none; }
+/* at most two lines: when the four buttons no longer fit side by side, they go two by two */
+.icard-tools { flex-wrap: nowrap; }
+.tile-tool { min-width: 0; padding: 0 4px; }
+@container itile (max-width: 212px) {
+  .icard-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
