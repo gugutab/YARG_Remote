@@ -13,10 +13,10 @@ test('fresh start only from the very beginning, not resumes, loops, background o
 });
 
 test('overlay lines: title, artist, then album, year, genre without empties', () => {
-  const l = overlayLines({ title: '<b>Highway Star</b>', artist: 'Deep Purple', album: 'Machine Head', ini: { year: '1972', genre: '' } });
+  const l = overlayLines({ title: '<b>Highway Star</b>', artist: 'Deep Purple', album: 'Machine Head', ini: { year: '1972', genre: '', song_length: '253000' } });
   assert.equal(l.title, 'Highway Star');
   assert.equal(l.artist, 'Deep Purple');
-  assert.deepEqual(l.details, ['Machine Head', '1972']);
+  assert.deepEqual(l.details, ['Machine Head', '1972', '4:13']);
   assert.deepEqual(l.credits, []);
   const c = overlayLines({ title: 'x', artist: 'y', ini: { charter: 'Harmonix' }, folder: 'Rock Band 1' });
   assert.ok(c.credits.some((r) => r.label === 'Charter' && r.value === 'Harmonix'));

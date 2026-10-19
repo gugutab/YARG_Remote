@@ -2522,3 +2522,10 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .song-info.closing { pointer-events: none; }
 .si-play.counting::after { z-index: 1; }
 .si-play .si-play-in { z-index: 2; }
+
+/* The song window enters and leaves like the library and settings windows: it slides in from the left (36 px) growing from 96 %, fading in; leaving is the same motion
+   backwards, a little quicker. (It is centred with translateX(-50%), which the motion keeps.) */
+.song-info { transform: translateX(calc(-50% - 36px)) scale(.96); transform-origin: 0 50%; transition: transform .24s cubic-bezier(.55, 0, .8, .4), opacity .18s ease, visibility 0s linear .24s; }
+.song-info.show { transform: translateX(-50%); transition: transform .34s cubic-bezier(.22, 1, .36, 1), opacity .24s ease, visibility 0s; }
+.song-info.show.under-panel { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .song-info, .song-info.show { transition-duration: .01s; } }
