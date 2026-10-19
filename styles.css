@@ -2532,3 +2532,11 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 
 /* The instrument tiles of the start / pause screen are at least 174 px wide (12 px more than the 162 px before): narrower windows wrap them to a second row instead */
 .si-picker .icard { flex: 1 1 174px; min-width: 174px; }
+
+/* "lanes" becomes "ln" in the drum type selector when the tile is narrow (the container query is on the tile) */
+.ln-abbr { display: none; }
+.si-picker .icard { container-type: inline-size; container-name: itile; }
+@container itile (max-width: 244px) {
+  .ln-full { display: none; }
+  .ln-abbr { display: inline; }
+}

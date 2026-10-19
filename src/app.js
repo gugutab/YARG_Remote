@@ -1388,7 +1388,12 @@ function buildInstrumentCards() {
       for (const o of group.options) {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.textContent = o.modeLabel ?? o.label;
+        const label = o.modeLabel ?? o.label;
+        const parts = /^(.*?)lanes$/.exec(label); // "4 lanes" / "Pro 7 lanes": "lanes" may shrink to "ln" in a narrow tile (CSS container query on .si-picker)
+        if (parts) {
+          btn.setAttribute('aria-label', label);
+          btn.append(parts[1], Object.assign(document.createElement('span'), { className: 'ln-full', textContent: 'lanes' }), Object.assign(document.createElement('span'), { className: 'ln-abbr', textContent: 'ln', title: 'lanes' }));
+        } else btn.textContent = label;
         btn.setAttribute('aria-pressed', String(on && o.id === group.chosen.id));
         if (!on && o.id === group.chosen.id) btn.dataset.next = 'true'; // the type a click on the card will use
         btn.addEventListener('click', (e) => {

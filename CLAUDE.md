@@ -439,3 +439,4 @@ Only checked by synthetic test, headless run or code reading:
 - Song window: the details line also shows the song length after the genre (`overlayLines().details`: album, year, genre, length); it enters and leaves with the motion of the library and settings windows (36 px from the left, 96 % to 100 %, 0.34 s in / 0.24 s out, same easing curves).
 - Instrument tiles of the start/pause screen: minimum width 162 px (flex-basis 162 px).
 - Instrument tiles of the start/pause screen: minimum width raised again to 174 px.
+- Drum type selector: "4 lanes" / "Pro 7 lanes" show "4 ln" / "Pro 7 ln" when the instrument tile of the start/pause screen has less than 245 px of content width (the full labels need about that much on one line) (`.ln-full` / `.ln-abbr`, container query `itile`); the button keeps the full label as its aria-label.
