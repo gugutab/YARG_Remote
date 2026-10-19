@@ -2329,6 +2329,7 @@ async function togglePlay() {
     player.pause();
   } else {
     if ((infoOpen || !ready) && libraryOpen()) setLibraryOpen(false, false); // Play from the details (or the first Play of a song) gets the library out of the chart's way
+    if (current) current.started = true; // (the pre-start pause screen goes: this song is being played)
     const loading = ensureAudio(); // (starts the load first: closing the details must not release the held stage before it)
     if (infoOpen) setInfoOpen(false); // starting from the details goes to the chart
     if (!(await loading)) return; // the first Play loads the audio behind the loading screen
@@ -3555,9 +3556,12 @@ els.metronomeBtn.addEventListener('click', () => prefs.set('audio.metronome', !p
 // resumes, on a seek, on Esc (until the next pause) or when a blocker appears.
 let pauseInfoShown = false;
 let piDismissed = false;
+// Also before the song was ever played (a link to a song opens it paused at the start): the same screen, with its Play button, until the first Play.
+const preStartScreen = () => !!chart && !!current && !current.started && !startDone && !ended && !listenMode && player.currentTime() < 0.5;
 function syncPauseInfo() {
+  const pre = preStartScreen();
   const want = pausePanelWanted({
-    enabled: prefs.get('playback.pauseInfo') && !prefs.get('playback.pausePanel'), pausedByUser: pausedAt !== null, playing: player.playing, ready,
+    enabled: prefs.get('playback.pauseInfo') && !prefs.get('playback.pausePanel'), pausedByUser: pausedAt !== null || pre, playing: player.playing, ready: ready || pre,
     waiting: !!(startDone || resumeTimer || loopWait), listen: listenMode, background: backgroundAudio(), liveStage: !!liveStage, ended, hidden: false, focusLost: false, // (it stays up when the window loses focus)
     overlayOpen: libraryOpen() || infoOpen || (typeof settingsPage !== 'undefined' && settingsPage.isOpen()), infoVisible: false, dismissed: piDismissed, // (the library, the details or the settings take its place)
   });
