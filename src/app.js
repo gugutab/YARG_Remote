@@ -1352,24 +1352,6 @@ function buildInstrumentCards() {
     const top = document.createElement('div');
     top.className = 'icard-top';
     top.append(head);
-    const expanded = current.expandedStats.has(group.key);
-    if (chosen) {
-      const info = document.createElement('button');
-      info.type = 'button';
-      info.className = 'icon small-icon icard-info';
-      info.title = 'Chart details';
-      info.setAttribute('aria-label', `Chart details for ${ins.label}`);
-      info.setAttribute('aria-expanded', String(expanded));
-      info.innerHTML = '<svg><use href="#i-info"/></svg>';
-      info.addEventListener('click', (e) => { // only shows or hides the counts; it does not select the instrument
-        e.stopPropagation();
-        const open = card.querySelector('.kv.mini').hidden;
-        card.querySelector('.kv.mini').hidden = !open;
-        info.setAttribute('aria-expanded', String(open));
-        current.expandedStats[open ? 'add' : 'delete'](group.key);
-      });
-      top.append(info);
-    }
     const level = instrumentLevel(current.song, ins);
     if (level !== null) {
       const pips = document.createElement('span');
@@ -1420,13 +1402,6 @@ function buildInstrumentCards() {
         seg.append(btn);
       }
       card.append(seg);
-    }
-    if (chosen) {
-      const dl = document.createElement('dl');
-      dl.className = 'kv mini';
-      dl.hidden = !expanded; // the counts hide behind the info button
-      dl.replaceChildren(...kv(cardStats(ins, chosen)));
-      card.append(dl);
     }
     return card;
   });

@@ -2639,3 +2639,4 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 :is(.icards, .pc-cards) .icard[data-active="true"]:hover { background: color-mix(in srgb, var(--accent) 20%, var(--panel)); }
 :is(.icards, .pc-cards) .icard[data-active="false"]:hover { background: rgba(255, 255, 255, .08); }
 :is(.icards, .pc-cards) .icard { container-type: inline-size; container-name: itile; }
+.icards { align-items: stretch; } .icards .icard-top + .seg { margin-top: auto; }
