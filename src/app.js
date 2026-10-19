@@ -1328,13 +1328,22 @@ function renderPickers() {
 }
 
 // The instrument cards (on/off switches with the difficulty and mode buttons): in the details and in the song window shown while paused.
-// The difficulty selector is one row of four; it goes to two rows only when a label would be cut (an ellipsis), checked whenever its width changes.
+// The difficulty selector is one row of four. When a label would be cut (an ellipsis) the buttons that are not selected shrink to their initial
+// first; only if that is not enough does it go to two rows. Checked whenever its width changes.
+const DIFF_ABBR = { Easy: 'E', Medium: 'M', Hard: 'H', Expert: 'X' }; // (Expert is X: Easy already took the E)
+function setDiffLabel(btn, label) {
+  btn.setAttribute('aria-label', label);
+  btn.replaceChildren(Object.assign(document.createElement('span'), { className: 'd-full', textContent: label }), Object.assign(document.createElement('span'), { className: 'd-abbr', textContent: DIFF_ABBR[label] ?? label[0] }));
+}
 const diffSegObserver = new ResizeObserver((entries) => {
   for (const { target: seg, contentRect } of entries) {
-    if (seg._w === Math.round(contentRect.width)) continue; // (a height change from the class below must not run this again)
+    if (seg._w === Math.round(contentRect.width)) continue; // (a height change from the classes below must not run this again)
     seg._w = Math.round(contentRect.width);
-    seg.classList.remove('two-rows');
-    if ([...seg.children].some((b) => b.scrollWidth > b.clientWidth)) seg.classList.add('two-rows');
+    const clipped = () => [...seg.children].some((b) => b.scrollWidth > b.clientWidth);
+    seg.classList.remove('abbr', 'two-rows');
+    if (!clipped()) continue;
+    seg.classList.add('abbr');
+    if (clipped()) seg.classList.replace('abbr', 'two-rows');
   }
 });
 // The Notes / Karaoke selector of a vocal tile (the same look as the drum type selector); it follows the global vocal view.
@@ -1453,7 +1462,7 @@ function buildInstrumentCard(group, menu = null) {
       for (const d of diffs) {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.textContent = d.label;
+        setDiffLabel(btn, d.label);
         btn.setAttribute('aria-pressed', String(on && d.id === chosen?.id));
         if (!on && d.id === chosen?.id) btn.dataset.next = 'true'; // the difficulty a click on the card will use
         btn.addEventListener('click', (e) => { e.stopPropagation(); pickDifficulty(group, ins, d.id); });
@@ -3003,7 +3012,7 @@ function fillChooser(el, key) {
       for (const d of diffs) {
         const b = document.createElement('button');
         b.type = 'button';
-        b.textContent = d.label;
+        setDiffLabel(b, d.label);
         b.setAttribute('aria-pressed', String(d.id === chosen?.id));
         if (d.id === chosen?.id) b.dataset.next = 'true';
         b.addEventListener('click', () => pickInto(chooser, group, ins, d.id));

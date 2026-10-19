@@ -2721,3 +2721,11 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* two rows only when a label would be cut: the class is set by diffSegObserver (app.js) */
 .si-picker .seg-diffs.two-rows, :is(.icards, .pc-cards) .seg-diffs.two-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .seg-diffs.two-rows button { height: 34px; }
+
+/* the difficulty buttons that are not selected shrink to their initial before the selector goes to two rows (diffSegObserver) */
+.seg-diffs .d-abbr { display: none; }
+.seg-diffs.abbr { display: flex; }
+.seg-diffs.abbr button { flex: 0 0 30px; min-width: 0; }
+.seg-diffs.abbr button[aria-pressed="true"], .seg-diffs.abbr button[data-next="true"] { flex: 1 1 auto; }
+.seg-diffs.abbr button:not([aria-pressed="true"]):not([data-next="true"]) .d-full { display: none; }
+.seg-diffs.abbr button:not([aria-pressed="true"]):not([data-next="true"]) .d-abbr { display: inline; }
