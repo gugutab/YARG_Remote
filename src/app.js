@@ -1271,7 +1271,7 @@ const diffFor = (ins) => {
 };
 
 // The instrument cards are laid out in even rows: with room for 3 columns, 4 cards are 2 + 2, not 3 + 1.
-const ICARD_MIN_W = 170;
+const ICARD_MIN_W = 180;
 const ICARD_GAP = 10;
 function layoutInstrumentCards() {
   const box = els.instrumentCards;
