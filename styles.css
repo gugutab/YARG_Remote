@@ -2281,6 +2281,16 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .si-inst svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
 .si-inst-diff { color: var(--accent); font-weight: 600; }
 .si-inst .mini-pips { margin-left: 2px; }
+/* paused: the window is a control surface: the Play button and the instruments as on/off buttons */
+.si-play { display: none; margin-top: 12px; padding: 8px 18px; }
+.song-info.paused { pointer-events: auto; }
+.song-info.paused .si-play { display: inline-flex; }
+.si-inst { background: none; border: 1px solid transparent; color: var(--text); font: inherit; padding: 5px 9px; border-radius: 9px; cursor: default; }
+.song-info.paused .si-inst { cursor: pointer; border-color: color-mix(in srgb, var(--line) 80%, transparent); }
+.song-info.paused .si-inst:hover { background: var(--panel-2); }
+.si-inst[aria-pressed="false"] { opacity: .45; }
+.song-info.paused .si-inst[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 16%, transparent); border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
+.si-inst[aria-pressed="true"] svg { color: var(--accent); }
 /* A wide stage: the cover grows and the instruments sit in a column to the right of the text (the horizontal room is used instead of stacking) */
 @media (min-width: 1100px) {
   .song-info { width: min(1000px, 84%); max-width: none; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "cover main insts"; gap: 22px 32px; padding: 22px 32px; }

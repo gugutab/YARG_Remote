@@ -43,7 +43,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'barHide', 'metronomeBtn', 'mixerVal', 'speedVal', 'stagePlay', 'songInfo', 'siCover', 'siInsts', 'pausePanel', 'ppSlower', 'ppFaster', 'ppSpeed', 'ppMetronome', 'ppVolume', 'ppVolVal', 'ppResume', 'siTitle', 'siArtist', 'siDetails', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'barHide', 'metronomeBtn', 'mixerVal', 'speedVal', 'stagePlay', 'songInfo', 'siCover', 'siInsts', 'siPlay', 'pausePanel', 'ppSlower', 'ppFaster', 'ppSpeed', 'ppMetronome', 'ppVolume', 'ppVolVal', 'ppResume', 'siTitle', 'siArtist', 'siDetails', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
   'endScreen', 'endCover', 'endTitle', 'endArtist', 'endAgain', 'endSearch', 'endCards', 'endNextBox', 'endNext',
@@ -1480,6 +1480,7 @@ function updateChart() {
   }
   for (const c of current.choosers) if (c.at === null) items.push({ chooser: true, key: `choose:${c.id}` }); // an added one goes last
   current.screen = items.filter((x) => !x.chooser); // what is on screen, for the end-of-song window
+  if (els.songInfo.classList.contains('show')) fillInfoInsts(); // (the song window lists every instrument and whether it is on)
   if (liveStage) { // the stage is another song's: these details only choose what will go there
     renderPickers();
     renderLoadState();
@@ -2362,20 +2363,42 @@ function showSongInfo(hideMs) {
   els.siCover.hidden = !current.coverUrl;
   if (current.coverUrl) els.siCover.src = current.coverUrl;
   // the instruments on screen with their difficulty (Expert...) and the song's own level for them (the pips of the cards)
-  els.siInsts.replaceChildren(...(current.screen || []).map((it) => {
-    const row = document.createElement('div');
-    row.className = 'si-inst';
-    const level = instrumentLevel(song, { base: it.base });
-    const pips = level === null || level === undefined ? '' : `<span class="mini-pips" title="Level ${level}">${Array.from({ length: 6 }, (_, k) => `<i${k < level ? ' class="on"' : ''}></i>`).join('')}</span>`;
-    row.innerHTML = `<svg><use href="#i-${it.icon}"/></svg><span class="si-inst-name"></span><span class="si-inst-diff"></span>${pips}`;
-    row.querySelector('.si-inst-name').textContent = it.name;
-    row.querySelector('.si-inst-diff').textContent = it.diffLabel || '';
-    return row;
-  }));
+  fillInfoInsts();
   infoShownFor = song;
   els.songInfo.classList.add('show');
   scheduleInfoHide(hideMs);
 }
+// Every instrument of the song as an on/off button (the same switches as the details cards: isOn / turnOn / turnOff): its icon, name, the difficulty it uses and the
+// song's level pips; pressed = its fretboard is on screen. Only clickable while the window is the paused one (CSS: .song-info.paused).
+function fillInfoInsts() {
+  if (!current) return;
+  const song = current.song;
+  els.siInsts.replaceChildren(...instrumentGroups().map((g) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'si-inst';
+    b.dataset.key = g.key;
+    const on = isOn(g);
+    b.setAttribute('aria-pressed', String(on));
+    const level = instrumentLevel(song, { base: g.chosen.base });
+    const pips = level === null || level === undefined ? '' : `<span class="mini-pips" title="Level ${level}">${Array.from({ length: 6 }, (_, k) => `<i${k < level ? ' class="on"' : ''}></i>`).join('')}</span>`;
+    const diff = g.chosen.mode === 'vocals' ? '' : diffFor(g.chosen).chosen?.label ?? '';
+    b.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[g.chosen.base] || 'music'}"/></svg><span class="si-inst-name"></span><span class="si-inst-diff"></span>${pips}`;
+    b.querySelector('.si-inst-name').textContent = g.label;
+    b.querySelector('.si-inst-diff').textContent = diff;
+    b.title = `${g.label}: ${on ? 'on' : 'off'} (click to turn it ${on ? 'off' : 'on'})`;
+    return b;
+  }));
+}
+els.siInsts.addEventListener('click', (e) => {
+  const b = e.target.closest('.si-inst');
+  if (!b || !current || !els.songInfo.classList.contains('paused')) return;
+  const g = instrumentGroups().find((x) => x.key === b.dataset.key);
+  if (!g) return;
+  if (isOn(g)) turnOff(g); else turnOn(g, g.chosen);
+  fillInfoInsts();
+});
+els.siPlay.addEventListener('click', () => togglePlay());
 function scheduleInfoHide(ms) {
   clearTimeout(infoTimer);
   infoTimer = 0;
@@ -3264,6 +3287,7 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (e.code === 'Escape') {
+    if (pauseInfoShown && !pausePanelShown && popovers.every(([, pop]) => pop.hidden)) { piDismissed = true; syncPauseInfo(); return; } // the paused song window closes (the song stays paused)
     if (pausePanelShown && popovers.every(([, pop]) => pop.hidden)) { ppDismissed = true; syncPausePanel(); return; } // the quick settings close (the song stays paused); an open popover/menu goes first
     if (endShown && popovers.every(([, pop]) => pop.hidden)) { endDismissed = true; syncEndScreen(); els.play.focus({ preventScroll: true }); return; } // the end window goes, the fretboards come back
     if (popovers.every(([, pop]) => pop.hidden) && infoOpen) setInfoOpen(false); // details -> chart
@@ -3363,6 +3387,7 @@ function guarded(part, fn) {
 function frame(frameTs) {
   requestAnimationFrame(frame); // first, so nothing below can end the loop
   guarded('pause panel', syncPausePanel);
+  guarded('pause info', syncPauseInfo);
   const frameStart = performance.now();
   if (frameTs) player.frameNow = frameTs; // the clock of this animation frame (vsync aligned)
   let drawMs = 0;
@@ -3500,6 +3525,30 @@ els.metronomeBtn.addEventListener('click', () => prefs.set('audio.metronome', !p
 // Quick settings while paused (setting playback.pausePanel; rules in practice.js `pausePanelWanted`). The panel fades in 0.3 s after the user pauses and
 // goes when the sound resumes, a seek (it clears `pausedAt`), a wait starts, Esc (stays closed until the next pause) or any other blocker; it reuses the
 // bar's own functions (stepSpeed, the metronome setting, masterState/applyStem, togglePlay) and keeps no state of its own.
+// The song information window while paused (setting playback.pauseInfo): the same window as at the start of a song, now with a Play button and the instruments as
+// on/off buttons. It follows the same rules as the quick settings panel (pausePanelWanted) and gives way to that panel when it is enabled; it goes when the sound
+// resumes, on a seek, on Esc (until the next pause) or when a blocker appears.
+let pauseInfoShown = false;
+let piDismissed = false;
+function syncPauseInfo() {
+  const want = pausePanelWanted({
+    enabled: prefs.get('playback.pauseInfo') && !prefs.get('playback.pausePanel'), pausedByUser: pausedAt !== null, playing: player.playing, ready,
+    waiting: !!(startDone || resumeTimer || loopWait), listen: listenMode, background: backgroundAudio(), liveStage: !!liveStage, ended, hidden: document.hidden, focusLost,
+    overlayOpen: infoOpen || (typeof settingsPage !== 'undefined' && settingsPage.isOpen()), infoVisible: false, dismissed: piDismissed,
+  });
+  if (pausedAt === null) piDismissed = false; // (the Esc applies to this pause only)
+  if (want && !pauseInfoShown) {
+    pauseInfoShown = true;
+    showSongInfo(null); // (no timer: it stays until the sound resumes)
+    els.songInfo.classList.add('paused');
+    els.songInfo.setAttribute('aria-hidden', 'false');
+  } else if (!want && pauseInfoShown) {
+    pauseInfoShown = false;
+    els.songInfo.classList.remove('paused');
+    els.songInfo.setAttribute('aria-hidden', 'true');
+    hideSongInfo();
+  }
+}
 let pausePanelShown = false;
 let ppDismissed = false;
 let ppTimer = 0;
