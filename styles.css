@@ -2740,3 +2740,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .icard-tools.units-cut .tile-tool { gap: 1px; }
 .tile-tool { padding: 0 4px; }
 .icard-tools.units-cut .tile-tool { padding-left: 2px; }
+/* the 2 px smaller left padding only for chips that have a value (the ones without a label keep their padding); the value's visible area is 2 px wider at the right */
+.icard-tools.units-cut .tile-tool { padding-left: 4px; }
+.icard-tools.units-cut .tile-tool:has(.tt-val:not(:empty)) { padding-left: 2px; }
+.tile-tool .tt-val { padding-right: 2px; margin-right: -2px; }

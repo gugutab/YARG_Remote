@@ -469,3 +469,4 @@ Only checked by synthetic test, headless run or code reading:
 - Tool chip values never get an ellipsis (text-overflow: clip); they only lose the unit.
 - When the chips drop their units, the icon-to-value gap also goes from 3 px to 1 px (`.units-cut`).
 - Tool chips: 4 px side padding (was 6) and, once the units are dropped, 2 px on the left; the cut test measures the text with a Range (fractional widths) so a label is never clipped at its right edge.
+- Tool chips: the reduced left padding after dropping units only applies to chips with a value; the value's clip box is 2 px wider at the right (padding-right 2 px, margin-right -2 px).
