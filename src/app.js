@@ -3992,6 +3992,7 @@ const EFFECTS = {
   'highway.visualizerOpacity': () => { applyVizOpacity(); syncVizPop(); },
   'highway.visualizerBlur': () => { applyVizGlass(); syncVizPop(); },
   'highway.trackOpacity': (v) => { highway.trackOpacity = v / 100; },
+  'highway.starPowerBand': (v) => { highway.starPowerBand = !!v; },
   'highway.stageColorOn': () => { applyStage(); syncVizPop(); },
   'highway.stageColor': () => { applyStage(); syncVizPop(); },
   'ui.barPosition': (v) => { els.app.classList.toggle('bar-bottom', v !== 'top'); closePopovers(); },
