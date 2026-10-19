@@ -143,6 +143,7 @@ export class Highway {
     this.weightScratch = [];
     this.rectPool = []; // the objects of paneRects
     this.vocalView = 'track'; // 'track' (notes + lyrics) or 'karaoke' (the lyrics alone)
+    this._fillBand = false; // the green band during a drum fill (setting highway.fillBand, off by default; the big rock ending band always shows)
     this._starPowerBand = false; // the gold band under a star power phrase (setting highway.starPowerBand, off by default)
     this._trackOpacity = 0.75; // how opaque the board of a fretboard is (setting highway.trackOpacity)
     this.visualizer = null; // (g, w, h, t, bgRgb) => draws the shared background behind every pane, or null (src/visualizers.js)
@@ -156,6 +157,8 @@ export class Highway {
   set sheetPeek(v) { this._sheetPeek = v; this.invalidate(); }
   get delay() { return this._delay; }
   set delay(v) { this._delay = v; this.invalidate(); }
+  get fillBand() { return this._fillBand; }
+  set fillBand(v) { this._fillBand = v; this.invalidate(); }
   get starPowerBand() { return this._starPowerBand; }
   set starPowerBand(v) { this._starPowerBand = v; this.invalidate(); }
   get trackOpacity() { return this._trackOpacity; }
@@ -1256,6 +1259,7 @@ export class Highway {
     this.fillSpans(chart.solos, t, ahead, x0, laneW * chart.lanes, h, SOLO_BAND);
     // drum fills / big rock endings (YARG activation phrases and BRE), a faint band under the notes
     for (let i = 0; i < FILL_KINDS.length; i++) {
+      if (FILL_KINDS[i] === 'fill' && !this.fillBand) continue;
       this.fillSpans(spansOfKind(chart, chart.fills, 'kind', FILL_KINDS[i]), t, ahead, x0, laneW * chart.lanes, h, FILL_COLORS[FILL_KINDS[i]]);
     }
     // drum rolls: one band per roll type (kick roll, tremolo lane, trill lane)

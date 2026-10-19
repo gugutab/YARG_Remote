@@ -127,7 +127,7 @@ export function renderLanes3D(hw, t, w, h) {
   }
   if (hw.starPowerBand) span(g, chart.starPower, STAR_POWER_BAND_3D, half);
   span(g, chart.solos, SOLO_BAND_3D, half);
-  for (let i = 0; i < FILL_KINDS.length; i++) span(g, spansOfKind(chart, chart.fills, 'kind', FILL_KINDS[i]), FILL_COLORS[FILL_KINDS[i]], half);
+  for (let i = 0; i < FILL_KINDS.length; i++) if (FILL_KINDS[i] !== 'fill' || hw.fillBand) span(g, spansOfKind(chart, chart.fills, 'kind', FILL_KINDS[i]), FILL_COLORS[FILL_KINDS[i]], half);
   for (let i = 0; i < ROLL_TYPES.length; i++) span(g, spansOfKind(chart, chart.rolls, 'type', ROLL_TYPES[i]), ROLL_COLORS[ROLL_TYPES[i]], half);
 
   // lane dividers and rails
