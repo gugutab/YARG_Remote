@@ -17,6 +17,9 @@ test('overlay lines: title, artist, then album, year, genre without empties', ()
   assert.equal(l.title, 'Highway Star');
   assert.equal(l.artist, 'Deep Purple');
   assert.deepEqual(l.details, ['Machine Head', '1972']);
+  assert.deepEqual(l.credits, []);
+  const c = overlayLines({ title: 'x', artist: 'y', ini: { charter: 'Harmonix' }, folder: 'Rock Band 1' });
+  assert.ok(c.credits.some((r) => r.label === 'Charter' && r.value === 'Harmonix'));
 });
 
 test('start plan', () => {

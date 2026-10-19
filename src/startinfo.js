@@ -12,13 +12,14 @@ export function isFreshStart({ position, resumed = false, loop = false, backgrou
   return position < FRESH_START_SEC && !resumed && !loop && !background && !ended;
 }
 
-// The overlay's lines: { title, artist, details: [album, year, genre] } (empty values left out).
+// The overlay's lines: { title, artist, details: [album, year, genre], credits: [{ label, value }] (the pack and the charter) } (empty values left out).
 export function overlayLines(song) {
   const rows = Object.fromEntries(metaRows(song).map((r) => [r.key, r.value]));
   return {
     title: plainText(song.title) || 'Untitled',
     artist: plainText(song.artist),
     details: ['album', 'year', 'genre'].map((k) => rows[k]).filter(Boolean),
+    credits: [['pack', 'Pack'], ['charter', 'Charter']].filter(([k]) => rows[k]).map(([k, label]) => ({ label, value: rows[k] })),
   };
 }
 
