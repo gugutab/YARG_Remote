@@ -2409,3 +2409,10 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* While the song is paused with its information window up, the stage goes darker (the player bar below it is not part of the stage and stays as it is) */
 .pause-dim { position: absolute; inset: 0; z-index: 4; background: rgba(0, 0, 0, .55); pointer-events: none; opacity: 0; visibility: hidden; transition: opacity .35s ease, visibility 0s linear .35s; }
 .pause-dim.show { opacity: 1; visibility: visible; transition: opacity .35s ease; }
+
+/* The paused window has no static instrument list (the instrument cards below say it all) and is narrower */
+.song-info.paused .si-insts { display: none; }
+@media (min-width: 1100px) {
+  .song-info.paused { width: min(940px, 90%); grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "cover main" "picker picker"; }
+}
+.si-picker .icard-info { display: none; } /* (the chart details button needs room the four cards in one row do not have) */
