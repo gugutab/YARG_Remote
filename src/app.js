@@ -1329,15 +1329,19 @@ function renderPickers() {
 
 // The instrument cards (on/off switches with the difficulty and mode buttons): in the details and in the song window shown while paused.
 function buildInstrumentCards() {
-  // Vocal parts have a single chart: no difficulty buttons.
-  return instrumentGroups().map((group) => {
+  return instrumentGroups().map((group) => buildInstrumentCard(group));
+}
+// One instrument tile. `menu`: it is the content of the stage menu of that instrument ({ onRemove }): always on, a remove button where the dot is, no click on the tile.
+function buildInstrumentCard(group, menu = null) {
+  {
+    // Vocal parts have a single chart: no difficulty buttons.
     const ins = group.chosen; // the option this card stands for (for drums: the chosen mode)
     const { diffs, chosen } = diffFor(ins);
     const vocal = ins.mode === 'vocals';
     const card = document.createElement('div');
     card.className = 'icard';
     card.dataset.key = group.key;
-    const on = isOn(group);
+    const on = menu ? true : isOn(group);
     card.dataset.active = String(on); // (lit when its fretboard is on screen)
     card.dataset.pinned = 'false';
 
@@ -1361,7 +1365,17 @@ function buildInstrumentCards() {
       top.append(pips);
     }
     // The whole card selects the instrument (with its remembered mode and difficulty); the buttons stop the click.
-    card.addEventListener('click', () => { if (on) turnOff(group); else turnOn(group, ins, undefined); }); // (the buttons stop the click)
+    if (!menu) card.addEventListener('click', () => { if (on) turnOff(group); else turnOn(group, ins, undefined); }); // (the buttons stop the click)
+    else {
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'icard-remove';
+      rm.title = menu.onlyOne ? 'It is the only instrument on screen: choose another one' : 'Remove instrument';
+      rm.setAttribute('aria-label', 'Remove instrument');
+      rm.innerHTML = '<svg><use href="#i-x"/></svg>';
+      rm.addEventListener('click', (e) => { e.stopPropagation(); menu.onRemove(); });
+      top.append(rm);
+    }
     card.append(top);
 
     if (group.options.length > 1) { // drum mode selector, same look as the difficulty one
@@ -1405,7 +1419,7 @@ function buildInstrumentCards() {
     }
     card.append(buildTileTools(group));
     return card;
-  });
+  }
 }
 
 els.infoPopMore.addEventListener('click', () => { closePopovers(); setInfoOpen(true); });
@@ -3142,64 +3156,25 @@ function buildPaneMenu() {
   const group = groups.find((g) => g.key === menuKey);
   if (!group) { els.paneMenu.hidden = true; return; }
   const ins = group.chosen;
-  const { diffs, chosen } = diffFor(ins);
-  const part = (title, node) => {
-    const box = document.createElement('div');
-    box.className = 'fp-group';
-    const label = document.createElement('span');
-    label.className = 'fp-label';
-    label.textContent = title;
-    box.append(label, node);
-    host.append(box);
-  };
-  const seg = (items, pressed, onPick) => {
-    const box = document.createElement('div');
-    box.className = 'seg fret-seg';
-    for (const item of items) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = item.label;
-      b.setAttribute('aria-pressed', String(pressed(item)));
-      b.addEventListener('click', () => onPick(item));
-      box.append(b);
-    }
-    return box;
-  };
   const canClose = group.pinned || groups.some((g) => g.pinned);
   syncMenuView();
-  for (const g of els.paneMenu.querySelectorAll('[data-needs]')) g.hidden = g.dataset.needs === 'lanes' ? ins.mode === 'vocals' : ins.mode !== 'vocals'; // this window's own options
-  const head = document.createElement('div');
-  head.className = 'pm-head';
-  head.innerHTML = `<svg class="pm-icon"><use href="#i-${INSTRUMENT_ICON[ins.base] || 'music'}"/></svg><b></b>`;
-  head.querySelector('b').textContent = group.label;
-  host.append(head);
-  if (ins.mode !== 'vocals' && diffs.length) part('Difficulty', seg(diffs, (d) => d.id === chosen?.id, (d) => pickDifficulty(group, ins, d.id)));
-  if (group.options.length > 1) { // the type: 4 lanes / Pro / Pro 7 lanes, Vocals / Harmony
-    part('Type', seg(group.options.map((o) => ({ label: o.modeLabel ?? o.label, option: o })), (m) => m.option.id === ins.id, (m) => {
-      current.modeChoice[group.key] = m.option.id;
-      if (group.pinned) updateChart(); // a fretboard shown next to the active one stays in place
-      else selectInstrument(m.option.id, diffFor(m.option).chosen?.id);
-    }));
-  }
-  const volume = menuVolume(group); // the volume of this instrument's track (or tracks), like the Stem volume card
-  if (volume) part('Volume', volume);
-  const optRange = (name, min, max, step, def, fmtValue) => paneRange(group, name, min, max, step, def, fmtValue);
-  part('Neck speed', optRange('neck', 0.5, 3, 0.1, () => highway.neck, NECK_FMT));
-  part('Chart delay', optRange('delay', -1, 1, 0.05, () => 0, DELAY_FMT));
+  // Only the vocal view (notes / karaoke) stays as its own section: the view and note shape of the lanes are in the tile's tools.
+  for (const g of els.paneMenu.querySelectorAll('[data-needs]')) g.hidden = g.dataset.needs === 'lanes' ? true : ins.mode !== 'vocals';
+  // The menu is the instrument's tile, like the one of the start screen and the details; its corner button removes the instrument.
+  host.append(buildInstrumentCard(group, { onlyOne: !canClose, onRemove: () => { if (canClose) { closePane(group); els.paneMenu.hidden = true; } else swapPane(group); } }));
   const free = hiddenGroups().length - current.choosers.length; // instruments with no slot yet
   const row = els.paneMenuActions; // at the end of the menu: swap, add and remove
   row.replaceChildren();
   for (const [label, enabled, onClick, cls] of [
     ['Swap instrument', hiddenGroups().length > 0, () => swapPane(group), 'chip-btn'],
     ['Add instrument', free > 0, addPane, 'chip-btn'],
-    ['Remove instrument', true, () => { if (canClose) { closePane(group); els.paneMenu.hidden = true; } else swapPane(group); }, 'chip-btn pm-remove'], // the only one on screen: it goes, and the cards to choose another take its place
+ // the only one on screen: it goes, and the cards to choose another take its place
   ]) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = cls;
     b.textContent = label;
     b.disabled = !enabled;
-    if (label.startsWith('Remove') && !canClose) b.title = 'It is the only instrument on screen: choose another one';
     b.addEventListener('click', onClick);
     row.append(b);
   }

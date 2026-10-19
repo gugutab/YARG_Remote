@@ -2691,3 +2691,16 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .tile-tool[data-mod="true"] { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 .tile-tool[aria-expanded="true"], .tile-tool[aria-expanded="true"][data-mod="true"] { border-color: transparent; }
 .tile-tool[aria-expanded="true"]:hover:not(:disabled) { background: var(--si-fill, var(--accent)); color: #fff; border-color: transparent; }
+
+/* The stage menu of an instrument is its tile: wider than the old menu, the corner button removes the instrument */
+.pane-menu { width: min(272px, calc(100vw - 16px)); }
+.pm-tile { --icols: 1; display: block; }
+.pm-tile .icard { min-height: 0; }
+.icard-top { position: relative; }
+.icard-remove { position: absolute; top: 2px; right: 0; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+.icard-remove svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.icard-remove:hover { background: rgba(255, 90, 90, .18); color: #ff8a8a; }
+.icard-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pane-menu .pm-actions { display: flex; gap: 6px; }
+.pane-menu .pm-actions .chip-btn { flex: 1 1 0; }
+.pm-tile .icard-dot { display: none; }
