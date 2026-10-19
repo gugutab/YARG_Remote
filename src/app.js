@@ -1631,6 +1631,7 @@ function buildMixer(stems) {
   applyStem(masterState);
   groupList.forEach(renderGroup);
   stemStates.forEach(applyStem);
+  queueMicrotask(() => refreshTileVolumes()); // (the tiles' volume buttons wait for the stems)
 }
 
 // A long press on a mute button solos what it stands for (mutes everything else); on the only audible one it restores all.
@@ -3066,18 +3067,20 @@ function buildTileTools(group) {
     return b;
   };
   const text = (b, v) => { b.querySelector('.tt-val').textContent = v; };
-  const members = stemStates.filter((st) => stemGroup(st.stem.label) === group.key);
+  const membersNow = () => stemStates.filter((st) => stemGroup(st.stem.label) === group.key);
   const volText = () => {
-    const owner = groupList.find((g) => g.members[0] && stemGroup(g.members[0].stem.label) === group.key) ?? members[0];
+    const owner = groupList.find((g) => g.members[0] && stemGroup(g.members[0].stem.label) === group.key) ?? membersNow()[0];
     return !owner ? '' : owner.muted ? 'Off' : `${Math.round(owner.value * 100)}%`;
   };
   const volume = tool('volume', 'Volume', (b) => {
     const content = menuVolume(group);
     if (content) openTilePop(b, `${group.label} volume`, content);
   });
-  volume.disabled = !members.length;
-  text(volume, volText());
-  volume.refresh = () => text(volume, volText());
+  volume.refresh = () => { // (the stems may load after the tile was built: a song opened by a link)
+    volume.disabled = !membersNow().length;
+    text(volume, volText());
+  };
+  volume.refresh();
   tileVolumeRefresh.add(volume);
   const optTool = (icon, title, name, min, max, step, def, fmt) => {
     const b = tool(icon, title, () => openTilePop(b, `${group.label} ${title.toLowerCase()}`, paneRange(group, name, min, max, step, def, fmt, paint)));
