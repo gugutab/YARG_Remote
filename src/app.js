@@ -2340,6 +2340,12 @@ async function togglePlay() {
       loopHeld = false;
       if (loop) { wrapLoop(); loopPrev = null; }
     }
+    if (startScreenOn && !document.hasFocus()) { // the load finished while the browser has no focus: do not count down to the autostart behind its back
+      showStartScreen('hold');
+      const clicked = await waitForFocusOrPlay();
+      if (startCancelled) { syncPlayButton(); return; }
+      if (clicked) { endStartScreen(); hideSongInfo(); current.startShown = true; await player.play(); syncPlayButton(); return; } // the Play button: start at once
+    }
     const plan = startPlan({
       fresh: isFreshStart({ position: player.currentTime(), resumed: pausedAt !== null, loop: !!loop, background: listenMode || backgroundAudio(), ended }),
       delay: prefs.get('playback.startDelay'), overlayOn: prefs.get('playback.songInfoOverlay'), keep: prefs.get('playback.keepSongInfo'), firstOfSong: !current.startShown,
@@ -2409,11 +2415,13 @@ let startScreenOn = false;
 // `sec` null: the audio is still loading, the Play button is a loader (text and spinner); a number: it is loaded, the button is Play and drains over `sec`.
 function showStartScreen(sec) {
   startScreenOn = true;
+  const hold = sec === 'hold'; // loaded, but the browser has no focus: the Play button is ready, the count starts when the page is focused
   const loading = sec == null;
   els.siPlay.classList.toggle('loading', loading);
   els.siPlay.disabled = loading;
   els.siPlay.classList.remove('counting');
   if (loading) els.siPlayText.textContent = '0%';
+  else if (hold) els.siPlayText.textContent = 'Play';
   else {
     els.siPlayText.textContent = 'Play';
     els.songInfo.style.setProperty('--si-ms', `${sec * 1000}ms`);
@@ -2437,10 +2445,23 @@ function endStartScreen() {
   els.pauseDim.classList.remove('show');
   els.siPicker.replaceChildren();
 }
+// Waits until the page gets the focus (resolves false: the count may begin), or until the screen's Play button is pressed (true), or the wait is cancelled.
+let holdClicked = false;
+function waitForFocusOrPlay() {
+  startCancelled = false;
+  holdClicked = false;
+  return new Promise((resolve) => {
+    const onFocus = () => finish(false);
+    const finish = (clicked) => { window.removeEventListener('focus', onFocus); startDone = null; resolve(clicked); };
+    window.addEventListener('focus', onFocus, { once: true });
+    startDone = () => finish(holdClicked); // (the Play button or a cancel resolves it too)
+  });
+}
 function skipStartWait() { // the Play button of the start screen: start now
   if (!startDone) return false;
   clearTimeout(startTimer);
   startTimer = 0;
+  holdClicked = true; // (only read by the focus hold)
   startDone(); // (not a cancel: startAfterDelay goes on to play)
   return true;
 }
