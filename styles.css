@@ -2564,4 +2564,4 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 
 /* The top of the title lines up with the top of the cover: no padding above the text block, and the title's own half-leading is pulled back so the capitals start at the cover's edge */
 .song-info.paused .si-main { padding-top: 0; }
-.song-info.paused .si-title { margin-top: -0.27em; line-height: 1.1; }
+.song-info.paused .si-title { margin-top: calc(-0.27em + 4px); line-height: 1.1; }
