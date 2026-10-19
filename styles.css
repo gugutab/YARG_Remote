@@ -2558,3 +2558,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
   .song-info.paused .si-head-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "cover main" "play play"; }
   .song-info.paused .si-head-row .si-play { justify-self: stretch; width: 100%; margin: 0; }
 }
+
+/* Long titles break into lines of about the same length instead of one long line and a short last one */
+.si-title { text-wrap: balance; }
