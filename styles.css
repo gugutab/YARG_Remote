@@ -2640,3 +2640,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 :is(.icards, .pc-cards) .icard[data-active="false"]:hover { background: rgba(255, 255, 255, .08); }
 :is(.icards, .pc-cards) .icard { container-type: inline-size; container-name: itile; }
 .icards { align-items: stretch; } .icards .icard-top + .seg { margin-top: auto; }
+/* the on/off dot's halo is not clipped by the tile head; the details tiles may get narrow (the selectors shrink with them) */
+:is(.icards, .pc-cards) .icard-top .icard-head { overflow: visible; padding-right: 3px; }
+.icards .icard { min-width: 0; }
+.icards .seg button { padding-inline: 2px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
