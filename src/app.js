@@ -2321,6 +2321,7 @@ async function togglePlay() {
   }
   if (loopWait) { rememberPause(); cancelLoopWait(); loopHeld = true; return; } // Play (pause) pressed during the loop restart delay: a user pause at the loop end (the panel shows, Play resumes with the wrap)
   if (resumeTimer) { cancelResumeRewind(); syncPlayButton(); return; } // Play pressed again during the rewind: stay paused
+  if (holdActive) { skipStartWait(); return; } // the screen is waiting for Play (no focus when it loaded): the bar's Play starts the song
   if (startDone) { cancelStartWait(); syncPlayButton(); return; } // Play (pause) pressed during the start delay: stay at the start
   if (player.playing && !backgroundAudio()) {
     rememberPause();
@@ -2340,9 +2341,9 @@ async function togglePlay() {
       loopHeld = false;
       if (loop) { wrapLoop(); loopPrev = null; }
     }
-    if (startScreenOn && !document.hasFocus()) { // the load finished while the browser has no focus: do not count down to the autostart behind its back
+    if (startScreenOn && !document.hasFocus()) { // the load finished while the browser has no focus: no autostart
       showStartScreen('hold');
-      const clicked = await waitForFocusOrPlay();
+      const clicked = await waitForPlay();
       if (startCancelled) { syncPlayButton(); return; }
       if (clicked) { endStartScreen(); hideSongInfo(); current.startShown = true; await player.play(); syncPlayButton(); return; } // the Play button: start at once
     }
@@ -2445,16 +2446,16 @@ function endStartScreen() {
   els.pauseDim.classList.remove('show');
   els.siPicker.replaceChildren();
 }
-// Waits until the page gets the focus (resolves false: the count may begin), or until the screen's Play button is pressed (true), or the wait is cancelled.
+// The load finished without the browser having the focus: no autostart at all (not even when the focus comes back); the screen waits with its Play button ready.
+// Resolves true when Play is pressed (the screen's button or the bar's), false when the wait is cancelled.
 let holdClicked = false;
-function waitForFocusOrPlay() {
+let holdActive = false;
+function waitForPlay() {
   startCancelled = false;
   holdClicked = false;
+  holdActive = true;
   return new Promise((resolve) => {
-    const onFocus = () => finish(false);
-    const finish = (clicked) => { window.removeEventListener('focus', onFocus); startDone = null; resolve(clicked); };
-    window.addEventListener('focus', onFocus, { once: true });
-    startDone = () => finish(holdClicked); // (the Play button or a cancel resolves it too)
+    startDone = () => { holdActive = false; startDone = null; resolve(holdClicked); };
   });
 }
 function skipStartWait() { // the Play button of the start screen: start now
@@ -3602,9 +3603,12 @@ function syncPauseInfo() {
     overlayOpen: libraryOpen() || infoOpen || (typeof settingsPage !== 'undefined' && settingsPage.isOpen()), infoVisible: false, dismissed: piDismissed, // (the library, the details or the settings take its place)
   });
   if (pausedAt === null) piDismissed = false; // (the Esc applies to this pause only)
-  if (want && pre && !current.kicked && prefs.get('playback.linkAutoplay') && prefs.get('playback.songInfoOverlay') && navigator.userActivation?.hasBeenActive) {
-    current.kicked = true; // opened from a link and the page has had a click or key: load the audio now, count 3 s and start
-    togglePlay();
+  if (want && pre && !current.kicked) { // decided when the song opens (a short grace for the browser to report the activation): a click or key later (to give the page the focus, say) must not start it
+    current.preAt ??= performance.now();
+    if (prefs.get('playback.linkAutoplay') && prefs.get('playback.songInfoOverlay') && navigator.userActivation?.hasBeenActive) {
+      current.kicked = true; // opened from a link and the page has had a click or key: load the audio now, count 3 s and start
+      togglePlay();
+    } else if (performance.now() - current.preAt > 1500) current.kicked = true; // no activation by now: it waits for Play
   }
   if (want && !pauseInfoShown) {
     pauseInfoShown = true;
