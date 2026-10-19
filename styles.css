@@ -2436,3 +2436,65 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .si-play svg, .si-play span { position: relative; z-index: 1; }
 .si-play.loading::before { margin-right: 0; flex: none; }
 .si-play span { min-width: 3ch; text-align: center; font-variant-numeric: tabular-nums; }
+
+/* ================= The start / pause screen after the "Seletor de Instrumentos" design =================
+   A header row (cover, title block, the Play button on the right), a hairline, then one row of instrument tiles: the name with an on/off dot, the song's level
+   bar under it, and at the bottom the type and difficulty selectors. The Play button loads like a progress bar and then becomes the Play button. */
+.song-info { --si-fill: color-mix(in srgb, var(--accent) 88%, #000); --si-dim-fill: color-mix(in srgb, var(--accent) 30%, transparent); --si-dim-accent: color-mix(in srgb, var(--accent) 45%, transparent); }
+.song-info.paused { width: min(1100px, 94%); max-width: none; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "cover main play" "picker picker picker"; gap: 24px 32px; padding: 28px 24px 24px; align-items: start; }
+.song-info.paused .si-cover { width: 184px; height: 184px; border-radius: 20px; box-shadow: none; }
+.song-info.paused .si-main { padding-top: 8px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.song-info.paused .si-title { font-size: 38px; line-height: 1.1; margin: 0; }
+.song-info.paused .si-artist { font-size: 22px; margin: 0; }
+.song-info.paused .si-details { font-size: 15px; gap: 0 20px; margin: 0; }
+
+/* the Play button: 176 x 60, on the right of the header */
+.si-play { grid-area: play; align-self: center; margin: 0 8px 0 0; display: none; position: relative; overflow: hidden; width: 176px; height: 60px; padding: 0; border: 0; border-radius: 12px;
+  font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; color: #fff; background: var(--si-fill); transition: background .3s; }
+.song-info.paused .si-play { display: flex; align-items: center; justify-content: center; }
+.si-play .si-fill { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--p, 1) * 100%); background: var(--si-fill); transition: width .1s linear; min-width: 0; }
+.si-play .si-play-in { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; }
+.si-play .si-play-in svg { width: 16px; height: 16px; }
+.si-play #siPlayText { min-width: 0; }
+.si-play.loading { background: rgba(255, 255, 255, .09); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); opacity: 1; cursor: default; }
+.si-play.loading .si-play-in svg { display: none; }
+.si-play.loading::before { content: none; }
+.si-play:hover:not(:disabled) { filter: brightness(1.15); }
+
+/* the instrument tiles */
+.song-info.paused .si-picker { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; padding: 24px 0 0; border-top: 1px solid rgba(255, 255, 255, .09); }
+.si-picker .icard { box-sizing: border-box; flex: 1 1 150px; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1.5px solid rgba(255, 255, 255, .09); border-radius: 12px; background: rgba(255, 255, 255, .03); box-shadow: none; }
+.si-picker .icard[data-key="drums"] { flex-grow: 1.3; }
+.si-picker .icard[data-active="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); box-shadow: none; }
+.si-picker .icard-top { display: flex; flex-wrap: wrap; gap: 10px; }
+.si-picker .icard-top .icard-head { width: 100%; height: 28px; padding: 0; font-size: 17px; font-weight: 700; color: var(--muted); gap: 8px; }
+.si-picker .icard-head[aria-pressed="true"] { color: var(--accent); }
+.si-picker .icard-name { flex: 0 1 auto; white-space: nowrap; }
+.si-picker .icard-dot { margin-left: auto; flex: none; box-sizing: border-box; width: 10px; height: 10px; border-radius: 50%; background: transparent; border: 1.5px solid #7d716b; }
+.si-picker .icard[data-active="true"] .icard-dot { background: var(--accent); border: 0; box-shadow: 0 0 0 3px var(--si-dim-fill); }
+.icard-dot { display: none; } .si-picker .icard-dot { display: block; }
+/* the song's level bar moves under the name, full width */
+.si-picker .icard-top .pips { order: 3; width: 100%; margin: 0; display: flex; gap: 3px; }
+.si-picker .pips i { flex: 1 1 0; width: auto; height: 6px; border-radius: 2px; background: rgba(255, 255, 255, .12); }
+.si-picker .pips i.on { background: var(--si-dim-accent); }
+.si-picker .icard[data-active="true"] .pips i.on { background: var(--accent); }
+/* the selectors at the bottom of the tile: type (drums, vocals) and difficulty (a 2 x 2 grid) */
+.si-picker .icard-top + .seg { margin-top: auto; }
+.si-picker .seg { display: flex; gap: 2px; padding: 3px; border: 0; border-radius: 9px; background: rgba(0, 0, 0, .3); }
+.si-picker .seg-diffs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.si-picker .seg button { height: 32px; padding: 0 6px; border: 0; border-radius: 7px; font-size: 13px; font-weight: 600; white-space: nowrap; background: transparent; color: #9a8d87; flex: 1 1 auto; min-width: 0; }
+.si-picker .seg-diffs button { height: 34px; padding: 0; font-size: 14px; }
+.si-picker .icard[data-active="true"] .seg button { color: #d3c5bf; }
+.si-picker .icard[data-active="true"] .seg button[aria-pressed="true"] { background: var(--si-fill); color: #fff; }
+.si-picker .icard[data-active="false"] .seg button[data-next="true"] { background: var(--si-dim-fill); color: #d8c9c3; }
+.si-picker .seg button:hover:not(:disabled), .si-picker .icard-head:hover { filter: brightness(1.15); }
+.si-picker .icard:hover { border-color: inherit; }
+.si-picker .icard[data-active="false"]:hover { border-color: rgba(255, 255, 255, .2); }
+
+@media (max-width: 1099px) {
+  .song-info.paused { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "cover main" "play play" "picker picker"; }
+  .song-info.paused .si-cover { width: 120px; height: 120px; }
+  .song-info.paused .si-title { font-size: 26px; }
+  .song-info.paused .si-artist { font-size: 18px; }
+  .si-play { justify-self: center; margin: 0; }
+}

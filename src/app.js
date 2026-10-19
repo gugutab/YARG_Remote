@@ -1081,7 +1081,7 @@ function renderLoadState() {
   els.loadScreen.hidden = true; // (the loading window is replaced by the start screen: its Play button is the loader)
   if (screen) {
     if (!startScreenOn && current && !infoOpen) { showSongInfo(null); showStartScreen(null); } // (a load that nobody opened the screen for)
-    if (startScreenOn && els.siPlay.classList.contains('loading')) els.siPlayText.textContent = `${Math.round(fraction * 100)}%`;
+    if (startScreenOn && els.siPlay.classList.contains('loading')) { els.siPlayText.textContent = `${Math.round(fraction * 100)}%`; els.siPlay.style.setProperty('--p', String(fraction)); }
   } else if (state === 'error') endStartScreen();
   else if (state === 'ready' && startScreenOn && !startDone && current && !current.started) endStartScreen(); // loaded with nobody pressing Play (a link without autostart): the pre-start screen takes the window back, its Play button ready
   const overlay = !infoOpen && !screen && state === 'error';
@@ -1336,6 +1336,7 @@ function buildInstrumentCards() {
     const vocal = ins.mode === 'vocals';
     const card = document.createElement('div');
     card.className = 'icard';
+    card.dataset.key = group.key;
     const on = isOn(group);
     card.dataset.active = String(on); // (lit when its fretboard is on screen)
     card.dataset.pinned = 'false';
@@ -1344,7 +1345,7 @@ function buildInstrumentCards() {
     head.type = 'button';
     head.className = 'icard-head';
     head.setAttribute('aria-pressed', String(on));
-    head.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[ins.base] || 'music'}"/></svg><span class="icard-name"></span>`;
+    head.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[ins.base] || 'music'}"/></svg><span class="icard-name"></span><span class="icard-dot" aria-hidden="true"></span>`; // (the dot: the pause screen's on/off mark)
     head.querySelector('.icard-name').textContent = group.label;
 
     // title row: [icon + name] [info button] ...... [level pips]
@@ -1383,7 +1384,7 @@ function buildInstrumentCards() {
 
     if (group.options.length > 1) { // drum mode selector, same look as the difficulty one
       const modes = document.createElement('div');
-      modes.className = 'seg';
+      modes.className = 'seg seg-modes';
       for (const o of group.options) {
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -1403,7 +1404,7 @@ function buildInstrumentCards() {
     }
     if (!vocal) {
       const seg = document.createElement('div');
-      seg.className = 'seg';
+      seg.className = 'seg seg-diffs';
       for (const d of diffs) {
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -2421,9 +2422,10 @@ function showStartScreen(sec) {
   els.siPlay.classList.toggle('loading', loading);
   els.siPlay.disabled = loading;
   els.siPlay.classList.remove('counting');
-  if (loading) els.siPlayText.textContent = '0%';
-  else if (hold) els.siPlayText.textContent = 'Play';
+  if (loading) { els.siPlayText.textContent = '0%'; els.siPlay.style.setProperty('--p', '0'); }
+  else if (hold) { els.siPlayText.textContent = 'Play'; els.siPlay.style.setProperty('--p', '1'); }
   else {
+    els.siPlay.style.setProperty('--p', '1');
     els.siPlayText.textContent = 'Play';
     els.songInfo.style.setProperty('--si-ms', `${sec * 1000}ms`);
     void els.siPlay.offsetWidth; // (restarts the drain animation)
