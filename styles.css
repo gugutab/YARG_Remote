@@ -2659,3 +2659,13 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .tile-pop[hidden] { display: none; }
 .tile-pop .tp-title { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
 .tile-pop .pm-range { display: grid; grid-template-columns: minmax(0, 1fr) 46px 28px; gap: 4px; align-items: center; }
+
+/* tool buttons with a value: the icon above, the value (volume, neck, delay, view) under it */
+.tile-tool { flex-direction: column; gap: 1px; height: 44px; align-content: center; }
+.tile-tool { display: flex; align-items: center; justify-content: center; }
+.tile-tool svg { width: 16px; height: 16px; }
+.tile-tool .tt-val { font-size: 11px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tp-segs { display: flex; flex-direction: column; gap: 8px; }
+.tp-segs .seg { display: flex; }
+.tp-segs .seg button { flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.tp-segs .seg svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; }

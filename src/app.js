@@ -3050,48 +3050,84 @@ function buildTileTools(group) {
   const vocal = group.chosen.mode === 'vocals';
   const row = document.createElement('div');
   row.className = 'icard-tools';
+  // A button: the icon with its current value under it (for the sliders), opening a small window.
   const tool = (icon, title, onClick) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'tile-tool';
     b.title = title;
     b.setAttribute('aria-label', title);
-    b.innerHTML = `<svg><use href="#i-${icon}"/></svg>`;
+    b.innerHTML = `<svg><use href="#i-${icon}"/></svg><span class="tt-val"></span>`;
     b.addEventListener('click', (e) => { e.stopPropagation(); onClick(b); });
     row.append(b);
     return b;
+  };
+  const text = (b, v) => { b.querySelector('.tt-val').textContent = v; };
+  const members = stemStates.filter((st) => stemGroup(st.stem.label) === group.key);
+  const volText = () => {
+    const owner = groupList.find((g) => g.members[0] && stemGroup(g.members[0].stem.label) === group.key) ?? members[0];
+    return !owner ? '' : owner.muted ? 'Off' : `${Math.round(owner.value * 100)}%`;
   };
   const volume = tool('volume', 'Volume', (b) => {
     const content = menuVolume(group);
     if (content) openTilePop(b, `${group.label} volume`, content);
   });
-  volume.disabled = !stemStates.some((st) => stemGroup(st.stem.label) === group.key);
-  const modified = (b, name, def) => { b.dataset.mod = String(Math.abs(highway.paneOpt(group.key, name) - def()) > 1e-9); };
-  const neck = tool('speed', 'Neck speed', (b) => openTilePop(b, `${group.label} neck speed`, paneRange(group, 'neck', 0.5, 3, 0.1, () => highway.neck, NECK_FMT, () => modified(b, 'neck', () => highway.neck))));
-  const delay = tool('clock', 'Chart delay', (b) => openTilePop(b, `${group.label} chart delay`, paneRange(group, 'delay', -1, 1, 0.05, () => 0, DELAY_FMT, () => modified(b, 'delay', () => 0))));
-  modified(neck, 'neck', () => highway.neck);
-  modified(delay, 'delay', () => 0);
-  if (!vocal) {
-    const view = tool('view-normal', '', () => {
-      highway.setPaneOpt(group.key, 'view', highway.paneOpt(group.key, 'view') === '3d' ? '2d' : '3d');
-      paintViewTools();
+  volume.disabled = !members.length;
+  text(volume, volText());
+  volume.refresh = () => text(volume, volText());
+  tileVolumeRefresh.add(volume);
+  const optTool = (icon, title, name, min, max, step, def, fmt) => {
+    const b = tool(icon, title, () => openTilePop(b, `${group.label} ${title.toLowerCase()}`, paneRange(group, name, min, max, step, def, fmt, paint)));
+    const paint = () => {
+      const v = highway.paneOpt(group.key, name);
+      text(b, fmt(v));
+      b.dataset.mod = String(Math.abs(v - def()) > 1e-9);
+    };
+    paint();
+    return b;
+  };
+  optTool('speed', 'Neck speed', 'neck', 0.5, 3, 0.1, () => highway.neck, NECK_FMT);
+  optTool('clock', 'Chart delay', 'delay', -1, 1, 0.05, () => 0, DELAY_FMT);
+  if (!vocal) { // the view (2D / 3D) and the note shape (circles / rectangles) share one window
+    const view = tool('cube', 'Fretboard view', (b) => {
+      const box = document.createElement('div');
+      box.className = 'tp-segs';
+      const seg = (name, items) => {
+        const el = document.createElement('div');
+        el.className = 'seg fret-seg';
+        for (const [value, label, icon] of items) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.innerHTML = `<svg><use href="#i-${icon}"/></svg>`;
+          btn.append(label);
+          btn.setAttribute('aria-pressed', String(highway.paneOpt(group.key, name) === value));
+          btn.addEventListener('click', () => {
+            highway.setPaneOpt(group.key, name, value);
+            for (const o of el.children) o.setAttribute('aria-pressed', String(o === btn));
+            paintView();
+          });
+          el.append(btn);
+        }
+        return el;
+      };
+      box.append(seg('view', [['2d', '2D', 'view-normal'], ['3d', '3D', 'cube']]), seg('noteStyle', [['round', 'Circles', 'circle'], ['rect', 'Rectangles', 'shapes']]));
+      openTilePop(b, `${group.label} view`, box);
     });
-    const shape = tool('circle', '', () => {
-      highway.setPaneOpt(group.key, 'noteStyle', highway.paneOpt(group.key, 'noteStyle') === 'rect' ? 'round' : 'rect');
-      paintViewTools();
-    });
-    const paintViewTools = () => {
+    const paintView = () => {
       const v = highway.paneOpt(group.key, 'view');
       const n = highway.paneOpt(group.key, 'noteStyle');
-      view.querySelector('use').setAttribute('href', v === '3d' ? '#i-cube' : '#i-view-normal');
-      view.title = view.ariaLabel = v === '3d' ? 'View: 3D (click for 2D)' : 'View: 2D (click for 3D)';
-      shape.querySelector('use').setAttribute('href', n === 'rect' ? '#i-shapes' : '#i-circle');
-      shape.title = shape.ariaLabel = n === 'rect' ? 'Notes: rectangles (click for circles)' : 'Notes: circles (click for rectangles)';
+      view.querySelector('use').setAttribute('href', n === 'rect' ? '#i-shapes' : '#i-circle');
+      text(view, v === '3d' ? '3D' : '2D');
+      view.title = view.ariaLabel = `View: ${v === '3d' ? '3D' : '2D'}, notes as ${n === 'rect' ? 'rectangles' : 'circles'}`;
     };
-    paintViewTools();
+    paintView();
   }
   return row;
 }
+const tileVolumeRefresh = new Set(); // the volume buttons of the tiles on screen: they show the level, which the small window (or the mixer) can change
+const refreshTileVolumes = () => setTimeout(() => { for (const b of tileVolumeRefresh) { if (b.isConnected) b.refresh(); else tileVolumeRefresh.delete(b); } }, 0);
+document.addEventListener('input', refreshTileVolumes, true);
+document.addEventListener('click', refreshTileVolumes, true);
 
 function buildPaneMenu() {
   const host = els.paneMenuDyn;
