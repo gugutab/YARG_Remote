@@ -2729,3 +2729,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .seg-diffs.abbr button[aria-pressed="true"], .seg-diffs.abbr button[data-next="true"] { flex: 1 1 auto; }
 .seg-diffs.abbr button:not([aria-pressed="true"]):not([data-next="true"]) .d-full { display: none; }
 .seg-diffs.abbr button:not([aria-pressed="true"]):not([data-next="true"]) .d-abbr { display: inline; }
+
+/* the pause / start screen's tiles: a grid of equal columns (--icols, from layoutPicker in app.js) instead of free-growing flex items */
+.song-info.paused .si-picker { display: grid; grid-template-columns: repeat(var(--icols, 4), minmax(0, 1fr)); gap: 10px; }
+.si-picker .icard, .si-picker .icard[data-key="drums"] { min-width: 0; flex: none; }

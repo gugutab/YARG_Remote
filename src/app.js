@@ -1280,6 +1280,17 @@ function layoutInstrumentCards() {
   box.style.setProperty('--icols', String(evenPerRow(n, fit)));
 }
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(layoutInstrumentCards).observe(els.instrumentCards);
+// The start / pause screen's tiles: the same even rows, every tile the same width (4 tiles: 4, or 2 + 2, never 3 + 1).
+const PICKER_MIN_W = 190;
+function layoutPicker() {
+  const box = els.siPicker;
+  const n = box.children.length;
+  if (!n || !box.clientWidth) return;
+  const fit = Math.max(1, Math.floor((box.clientWidth + ICARD_GAP) / (PICKER_MIN_W + ICARD_GAP)));
+  box.style.setProperty('--icols', String(evenPerRow(n, fit)));
+}
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(layoutPicker).observe(els.siPicker);
+new MutationObserver(layoutPicker).observe(els.siPicker, { childList: true });
 
 // Several fretboards at once: a card (or menu row) can be pinned to show next to the active instrument.
 // An instrument card is an on/off switch: on = its fretboard is on screen. Turning one on uses the difficulty it had last (diffChoice, kept from
