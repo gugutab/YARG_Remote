@@ -456,3 +456,4 @@ Only checked by synthetic test, headless run or code reading:
 - Tile tool buttons show the value to the right of the icon and the row goes two by two (at most two lines) on narrow tiles (container query).
 - The tiles' volume button is enabled (and its value filled) when the mixer is built (`buildMixer` -> `refreshTileVolumes`), not only when the tile is: a song opened by a link builds the tiles before the stems are known.
 - Tile tool buttons: the open one is a solid accent fill with white icon and value, also when its value is modified (accent text).
+- Tiles: the pips, type and difficulty selectors stay at the top of the tile; only the tool row is pushed to the bottom (`margin-top: auto`).

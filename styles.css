@@ -2681,3 +2681,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
   .icard-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .tile-tool[aria-expanded="true"], .tile-tool[aria-expanded="true"][data-mod="true"] { background: var(--si-fill, var(--accent)); color: #fff; }
+/* the tile's content stays at the top; only the tool row sits at the bottom */
+.si-picker .icard-top + .seg, :is(.icards, .pc-cards) .icard-top + .seg, .icards .icard-top + .seg { margin-top: 0; }
+.si-picker .icard-tools, :is(.icards, .pc-cards) .icard-tools, .icard-top + .icard-tools { margin-top: auto; }
