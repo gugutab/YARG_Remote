@@ -2738,3 +2738,5 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .tile-tool .tt-val { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tile-tool .tt-val { text-overflow: clip; }
 .icard-tools.units-cut .tile-tool { gap: 1px; }
+.tile-tool { padding: 0 4px; }
+.icard-tools.units-cut .tile-tool { padding-left: 2px; }

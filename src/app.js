@@ -3134,7 +3134,11 @@ window.addEventListener('resize', closeTilePop);
 const tileToolsObserver = new ResizeObserver((entries) => { for (const { target } of entries) fitTileTools(target); });
 function fitTileTools(row) {
   const vals = [...row.querySelectorAll('.tile-tool')].map((b) => [b.querySelector('.tt-val'), b.dataset.full ?? '']);
-  const cut = () => [...row.children].some((b) => b.scrollWidth > b.clientWidth || (b.querySelector('.tt-val')?.scrollWidth ?? 0) > (b.querySelector('.tt-val')?.clientWidth ?? 0));
+  const textW = (el) => { const r = document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect().width; };
+  const cut = () => [...row.children].some((b) => { // (fractional widths: a text a hair wider than its box is cut at the edge even when scrollWidth rounds it away)
+    const v = b.querySelector('.tt-val');
+    return b.scrollWidth > b.clientWidth || (v && v.textContent && textW(v) > v.getBoundingClientRect().width + 0.05);
+  });
   for (const [el, full] of vals) el.textContent = full;
   row.style.gap = '';
   row.classList.remove('units-cut');
