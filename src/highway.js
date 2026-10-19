@@ -994,7 +994,7 @@ export class Highway {
         g.translate(bx + bw / 2 - (1 - k) * 10, by + bh / 2); // comes in from the left, growing
         g.scale(0.82 + 0.18 * k, 0.82 + 0.18 * k);
         g.translate(-(bx + bw / 2), -(by + bh / 2));
-        g.fillStyle = hot ? 'rgba(58,92,140,0.98)' : 'rgba(30,40,55,0.95)';
+        g.fillStyle = hot ? this.jumpColors().fillHot : this.jumpColors().fill;
         g.beginPath();
         if (g.roundRect) g.roundRect(bx, by, bw, bh, 13);
         else g.rect(bx, by, bw, bh);
@@ -1002,7 +1002,7 @@ export class Highway {
         g.lineWidth = hot ? 1.5 : 1;
         g.strokeStyle = hot ? this.vocColors.leadLit : withAlpha(this.vocColors.frame, 0.6);
         g.stroke();
-        g.fillStyle = hot ? '#ffffff' : '#cfe6ff';
+        g.fillStyle = hot ? '#ffffff' : this.jumpColors().icon;
         g.fillRect(bx + 11, by + bh / 2 - 5, 2, 10); // the jump-to icon: a triangle running to a bar
         g.beginPath();
         g.moveTo(bx + 16, by + bh / 2 - 5);
@@ -1044,7 +1044,7 @@ export class Highway {
       g.translate(bx + bw / 2 + (1 - k) * 10, by + bh / 2); // comes in from the right, growing
       g.scale(0.82 + 0.18 * k, 0.82 + 0.18 * k);
       g.translate(-(bx + bw / 2), -(by + bh / 2));
-      g.fillStyle = hotB ? 'rgba(58,92,140,0.98)' : 'rgba(30,40,55,0.95)';
+      g.fillStyle = hotB ? this.jumpColors().fillHot : this.jumpColors().fill;
       g.beginPath();
       if (g.roundRect) g.roundRect(bx, by, bw, bh, 17);
       else g.rect(bx, by, bw, bh);
@@ -1052,7 +1052,7 @@ export class Highway {
       g.lineWidth = hotB ? 1.5 : 1;
       g.strokeStyle = hotB ? this.vocColors.leadLit : withAlpha(this.vocColors.frame, 0.7);
       g.stroke();
-      g.fillStyle = hotB ? '#ffffff' : '#cfe6ff';
+      g.fillStyle = hotB ? '#ffffff' : this.jumpColors().icon;
       const cx = bx + bw / 2;
       const cy = by + bh / 2;
       g.fillRect(cx - 8, cy - 7, 2.5, 14); // the jump-to icon: a triangle running to a bar
@@ -1065,6 +1065,16 @@ export class Highway {
       g.restore();
       if (wantBtn && k > 0.5) sheet.button = { x: x0 + bx, y: y0 + by, w: bw, h: bh };
     }
+  }
+
+  // The colours of the sheet's two buttons (jump to the next lines, Autoscroll): dark fill tinted with the vocal frame colour (the theme's accent), the icon its light shade.
+  jumpColors() {
+    const vc = this.vocColors;
+    if (this._jumpFor !== vc) {
+      this._jumpFor = vc;
+      this._jump = { fill: withAlpha(mixHex('#141a24', vc.frame, 0.2), 0.95), fillHot: withAlpha(mixHex('#141a24', vc.frame, 0.5), 0.98), icon: vc.leadLit };
+    }
+    return this._jump;
   }
 
   // The rail at the right edge of a sheet: the whole song top to bottom, like a seek bar you cannot touch. Shows how far the

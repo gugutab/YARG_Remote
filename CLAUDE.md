@@ -473,3 +473,4 @@ Only checked by synthetic test, headless run or code reading:
 - The stage menu of an instrument is just the tile (no popover window around it, not clickable, fixed lit look).
 - The bottom bar's metronome button opens a window (`#metronomePop`: On/Off, volume, sound; `syncMetPop`) instead of toggling; the M key, the pause panel button and the settings still toggle it, and the button keeps `aria-pressed` for the on state.
 - Lyrics: only the unsung words and the dim ones keep the dark theme's colours in every theme; the sung part (karaoke fill, lit syllables, `present`) is the accent-derived light colour (theme or picked one) instead of a fixed blue (`vocalColors` in uicolors.js).
+- The lyric sheet's two buttons (jump to the next lines and Autoscroll) take their colours from the vocal frame colour (the theme's accent): `Highway.jumpColors()`.
