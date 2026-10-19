@@ -2715,3 +2715,9 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .ctx-item:hover:not(:disabled) { background: rgba(255, 255, 255, .1); }
 .ctx-item.danger { color: #ff8a8a; }
 .ctx-item:disabled { opacity: .4; cursor: default; }
+/* the difficulty selector in one row of four (2 x 2 only on very narrow tiles) */
+.si-picker .seg-diffs, :is(.icards, .pc-cards) .seg-diffs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.si-picker .seg-diffs button, :is(.icards, .pc-cards) .seg-diffs button { height: 32px; font-size: 12.5px; padding: 0 2px; overflow: hidden; text-overflow: ellipsis; }
+@container itile (max-width: 212px) {
+  .si-picker .seg-diffs, :is(.icards, .pc-cards) .seg-diffs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
