@@ -2536,7 +2536,10 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* "lanes" becomes "ln" in the drum type selector when the tile is narrow (the container query is on the tile) */
 .ln-abbr { display: none; }
 .si-picker .icard { container-type: inline-size; container-name: itile; }
-@container itile (max-width: 244px) {
+@container itile (max-width: 244px) { /* first the type buttons tighten (smaller text, less padding) so the full labels still fit */
+  .seg-modes button { font-size: 12px; padding: 0 3px; }
+}
+@container itile (max-width: 205px) { /* only a really narrow tile gets "ln" */
   .ln-full { display: none; }
   .ln-abbr { display: inline; }
 }
