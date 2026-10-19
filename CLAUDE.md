@@ -455,3 +455,4 @@ Only checked by synthetic test, headless run or code reading:
 - Chart delay is shown without a plus sign and with the unit attached (`.35s`, `-.4s`, `0s`; `DELAY_FMT`); the tile's view button is a fixed eye icon without text.
 - Tile tool buttons show the value to the right of the icon and the row goes two by two (at most two lines) on narrow tiles (container query).
 - The tiles' volume button is enabled (and its value filled) when the mixer is built (`buildMixer` -> `refreshTileVolumes`), not only when the tile is: a song opened by a link builds the tiles before the stems are known.
+- Tile tool buttons: the open one is a solid accent fill with white icon and value, also when its value is modified (accent text).
