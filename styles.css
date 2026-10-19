@@ -2429,3 +2429,10 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .si-play.loading::before { content: ""; width: 14px; height: 14px; margin-right: 8px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .35); border-top-color: #fff; animation: si-spin .8s linear infinite; }
 @keyframes si-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .si-play.loading::before { animation-duration: 2.4s; } }
+
+/* The Play / loading button of the start screen keeps one size (Play, the percentage and the spinner all fit) and its content is centred */
+.si-play { width: 124px; height: 40px; padding: 0; justify-content: center; align-items: center; gap: 8px; text-align: center; }
+.song-info.paused .si-play { display: inline-flex; }
+.si-play svg, .si-play span { position: relative; z-index: 1; }
+.si-play.loading::before { margin-right: 0; flex: none; }
+.si-play span { min-width: 3ch; text-align: center; font-variant-numeric: tabular-nums; }

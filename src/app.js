@@ -1081,7 +1081,7 @@ function renderLoadState() {
   els.loadScreen.hidden = true; // (the loading window is replaced by the start screen: its Play button is the loader)
   if (screen) {
     if (!startScreenOn && current && !infoOpen) { showSongInfo(null); showStartScreen(null); } // (a load that nobody opened the screen for)
-    if (startScreenOn && els.siPlay.classList.contains('loading')) els.siPlayText.textContent = `Loading… ${Math.round(fraction * 100)}%`;
+    if (startScreenOn && els.siPlay.classList.contains('loading')) els.siPlayText.textContent = `${Math.round(fraction * 100)}%`;
   } else if (state === 'error') endStartScreen();
   else if (state === 'ready' && startScreenOn && !startDone && current && !current.started) endStartScreen(); // loaded with nobody pressing Play (a link without autostart): the pre-start screen takes the window back, its Play button ready
   const overlay = !infoOpen && !screen && state === 'error';
@@ -2413,7 +2413,7 @@ function showStartScreen(sec) {
   els.siPlay.classList.toggle('loading', loading);
   els.siPlay.disabled = loading;
   els.siPlay.classList.remove('counting');
-  if (loading) els.siPlayText.textContent = 'Loading…';
+  if (loading) els.siPlayText.textContent = '0%';
   else {
     els.siPlayText.textContent = 'Play';
     els.songInfo.style.setProperty('--si-ms', `${sec * 1000}ms`);
