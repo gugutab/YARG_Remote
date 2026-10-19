@@ -2539,7 +2539,22 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 @container itile (max-width: 244px) { /* first the type buttons tighten (smaller text, less padding) so the full labels still fit */
   .seg-modes button { font-size: 12px; padding: 0 3px; }
 }
-@container itile (max-width: 205px) { /* only a really narrow tile gets "ln" */
+@container itile (max-width: 215px) {
+  .seg-modes button { font-size: 11px; padding: 0 2px; }
+}
+@container itile (max-width: 190px) { /* only a really narrow tile gets "ln" */
   .ln-full { display: none; }
   .ln-abbr { display: inline; }
+}
+
+/* The header row (cover, title block, Play) is its own container: the Play button sits to the right of the title while there is room and goes below it, full width,
+   only when there is not (the old rule was a fixed window width). While the window is not the pause screen the wrapper disappears (display: contents). */
+.song-info:not(.paused) .si-head, .song-info:not(.paused) .si-head-row { display: contents; }
+.song-info.paused { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "picker"; }
+.song-info.paused .si-head { grid-area: head; container-type: inline-size; container-name: sihead; }
+.song-info.paused .si-head-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "cover main play"; gap: 24px 32px; align-items: start; }
+.song-info.paused .si-head-row .si-play { width: 176px; justify-self: end; margin: 0 8px 0 0; } /* (beside the title: the fixed size, whatever the window width) */
+@container sihead (max-width: 760px) {
+  .song-info.paused .si-head-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "cover main" "play play"; }
+  .song-info.paused .si-head-row .si-play { justify-self: stretch; width: 100%; margin: 0; }
 }

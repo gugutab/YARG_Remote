@@ -215,14 +215,18 @@
         <button id="stagePlay" class="stage-play cta" type="button" hidden><svg><use href="#i-play"/></svg><span>Play</span></button>
         <div id="pauseDim" class="pause-dim" aria-hidden="true"></div>
         <div id="songInfo" class="song-info" aria-hidden="true">
-          <img id="siCover" class="si-cover" alt="" hidden>
-          <div class="si-main">
-            <div class="si-title" id="siTitle"></div>
-            <div class="si-artist" id="siArtist"></div>
-            <div class="si-details" id="siDetails"></div>
-            <div class="si-credits" id="siCredits"></div>
+          <div class="si-head">
+            <div class="si-head-row">
+              <img id="siCover" class="si-cover" alt="" hidden>
+              <div class="si-main">
+                <div class="si-title" id="siTitle"></div>
+                <div class="si-artist" id="siArtist"></div>
+                <div class="si-details" id="siDetails"></div>
+                <div class="si-credits" id="siCredits"></div>
+              </div>
+              <button id="siPlay" class="cta si-play" type="button"><span class="si-fill" aria-hidden="true"></span><span class="si-play-in"><svg aria-hidden="true"><use href="#i-play"/></svg><span id="siPlayText">Play</span></span></button>
+            </div>
           </div>
-          <button id="siPlay" class="cta si-play" type="button"><span class="si-fill" aria-hidden="true"></span><span class="si-play-in"><svg aria-hidden="true"><use href="#i-play"/></svg><span id="siPlayText">Play</span></span></button>
           <div class="si-insts" id="siInsts"></div>
           <div class="si-picker icards" id="siPicker" aria-label="Instruments"></div>
         </div>
