@@ -390,3 +390,15 @@ export function fadeGradient(g, y0, y1, stops) {
 let baseAlpha = -1;
 let baseStyle = '';
 export const boardBase = (a) => (a === baseAlpha ? baseStyle : (baseStyle = `rgba(0,0,0,${(baseAlpha = a)})`));
+
+// The big rock ending (BRE) band of a lane: the lane's own colour, pulsing at different speeds in every lane with a wave that runs across the lanes
+// (frantic, but made of smooth sines in a narrow alpha range, so it does not flash). `t` in seconds; the result is an alpha in [BRE_ALPHA_MIN, BRE_ALPHA_MAX].
+export const BRE_ALPHA_MIN = 0.07;
+export const BRE_ALPHA_MAX = 0.3;
+export function breAlpha(t, lane, lanes) {
+  const wave = 0.5 + 0.5 * Math.sin(2 * Math.PI * 1.8 * t - (lane / Math.max(1, lanes)) * 2 * Math.PI); // a chase across the lanes, 1.8 times a second
+  const fast = 0.5 + 0.5 * Math.sin(2 * Math.PI * (2.4 + 0.3 * lane) * t + lane * 1.7); // each lane at its own speed
+  const slow = 0.5 + 0.5 * Math.sin(2 * Math.PI * 0.7 * t + lane * 2.3);
+  const mix = 0.5 * wave + 0.3 * fast + 0.2 * slow; // 0..1
+  return BRE_ALPHA_MIN + (BRE_ALPHA_MAX - BRE_ALPHA_MIN) * mix;
+}

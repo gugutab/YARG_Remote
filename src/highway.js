@@ -28,6 +28,7 @@ import {
   tintWhite,
   darken,
   withAlpha,
+  breAlpha,
   firstIndexAtOrAfter,
   exitTime,
   heldAmount,
@@ -1260,7 +1261,11 @@ export class Highway {
     // drum fills / big rock endings (YARG activation phrases and BRE), a faint band under the notes
     for (let i = 0; i < FILL_KINDS.length; i++) {
       if (FILL_KINDS[i] === 'fill' && !this.fillBand) continue;
-      this.fillSpans(spansOfKind(chart, chart.fills, 'kind', FILL_KINDS[i]), t, ahead, x0, laneW * chart.lanes, h, FILL_COLORS[FILL_KINDS[i]]);
+      const spans = spansOfKind(chart, chart.fills, 'kind', FILL_KINDS[i]);
+      if (FILL_KINDS[i] === 'bre') { // the big rock ending: every lane in its own colour, pulsing (see breAlpha)
+        const cols = chart.laneColors || GUITAR_LANE_COLORS;
+        for (let l = 0; l < chart.lanes; l++) this.fillSpans(spans, t, ahead, x0 + l * laneW, laneW, h, withAlpha(cols[l] || cols[0], breAlpha(t, l, chart.lanes)));
+      } else this.fillSpans(spans, t, ahead, x0, laneW * chart.lanes, h, FILL_COLORS[FILL_KINDS[i]]);
     }
     // drum rolls: one band per roll type (kick roll, tremolo lane, trill lane)
     for (let i = 0; i < ROLL_TYPES.length; i++) {

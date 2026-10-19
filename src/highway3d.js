@@ -2,7 +2,7 @@
 // so it stays light enough for phones. Only the lane instruments (guitar, bass, keys, drums) have a highway;
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
-  GUITAR_LANE_COLORS, KICK_COLOR, KICK_COLOR_5, STAR_POWER_GOLD, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
+  GUITAR_LANE_COLORS, breAlpha, KICK_COLOR, KICK_COLOR_5, STAR_POWER_GOLD, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
   ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
@@ -78,14 +78,14 @@ function taperedStrip(g, d0, d1, mid, wl, dRef) {
   g.closePath();
 }
 // Bands (star power, solo, fills, rolls) that run along the road, to the end of the board.
-function span(g, spans, color, half) {
+function span(g, spans, color, xl, xr) { // xl..xr: the lane range in lane units (-half..half is the whole road)
   g.fillStyle = color;
   if (!spans) return;
   for (let i = 0; i < spans.length; i++) {
     const s = spans[i];
     if ((s.end - PT) / PSEC < ROAD_NEAR || s.start > PT + PSEC) continue;
     const near = Math.max(ROAD_NEAR, Math.min(1, (s.start - PT) / PSEC)); // the band goes on past the hit line, to the end of the board
-    quad(g, near, depth(s.end), -half, half);
+    quad(g, near, depth(s.end), xl, xr);
     g.fill();
   }
 }
@@ -125,10 +125,17 @@ export function renderLanes3D(hw, t, w, h) {
     quad(g, ROAD_NEAR, ROAD_END, i - half, i + 1 - half);
     g.fill();
   }
-  if (hw.starPowerBand) span(g, chart.starPower, STAR_POWER_BAND_3D, half);
-  span(g, chart.solos, SOLO_BAND_3D, half);
-  for (let i = 0; i < FILL_KINDS.length; i++) if (FILL_KINDS[i] !== 'fill' || hw.fillBand) span(g, spansOfKind(chart, chart.fills, 'kind', FILL_KINDS[i]), FILL_COLORS[FILL_KINDS[i]], half);
-  for (let i = 0; i < ROLL_TYPES.length; i++) span(g, spansOfKind(chart, chart.rolls, 'type', ROLL_TYPES[i]), ROLL_COLORS[ROLL_TYPES[i]], half);
+  if (hw.starPowerBand) span(g, chart.starPower, STAR_POWER_BAND_3D, -half, half);
+  span(g, chart.solos, SOLO_BAND_3D, -half, half);
+  for (let i = 0; i < FILL_KINDS.length; i++) {
+    if (FILL_KINDS[i] === 'fill' && !hw.fillBand) continue;
+    const spans = spansOfKind(chart, chart.fills, 'kind', FILL_KINDS[i]);
+    if (FILL_KINDS[i] === 'bre') { // the big rock ending: every lane in its own colour, pulsing (breAlpha)
+      const cols = chart.laneColors || GUITAR_LANE_COLORS;
+      for (let l = 0; l < lanes; l++) span(g, spans, withAlpha(cols[l] || cols[0], breAlpha(t, l, lanes)), -half + l, -half + l + 1);
+    } else span(g, spans, FILL_COLORS[FILL_KINDS[i]], -half, half);
+  }
+  for (let i = 0; i < ROLL_TYPES.length; i++) span(g, spansOfKind(chart, chart.rolls, 'type', ROLL_TYPES[i]), ROLL_COLORS[ROLL_TYPES[i]], -half, half);
 
   // lane dividers and rails
   g.lineWidth = 1;
