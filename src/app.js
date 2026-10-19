@@ -2344,6 +2344,7 @@ async function togglePlay() {
       delay: prefs.get('playback.startDelay'), overlayOn: prefs.get('playback.songInfoOverlay'), keep: prefs.get('playback.keepSongInfo'), firstOfSong: infoShownFor !== current?.song,
     });
     if (plan.show) showSongInfo(plan.delay > 0 ? null : plan.hideMs);
+    if (plan.screen) showStartScreen(plan.delay);
     if (plan.delay > 0) { await startAfterDelay(plan); return; } // (the sound starts itself when the wait is over)
     await player.play();
   }
@@ -2390,16 +2391,47 @@ function fillInfoInsts() {
   }));
   if (els.songInfo.classList.contains('paused')) els.siPicker.replaceChildren(...buildInstrumentCards());
 }
-els.siPlay.addEventListener('click', () => togglePlay());
+els.siPlay.addEventListener('click', () => { if (!skipStartWait()) togglePlay(); });
 function scheduleInfoHide(ms) {
   clearTimeout(infoTimer);
   infoTimer = 0;
   if (ms == null || prefs.get('playback.keepSongInfo')) return;
   infoTimer = setTimeout(() => { infoTimer = 0; els.songInfo.classList.remove('show'); }, ms);
 }
+// The start screen: the first play of a song shows the pause screen (the song window with the instrument cards, the stage darkened) for START_SCREEN_SEC; its
+// Play button drains as the time runs out and starts the song at once when pressed; when the time is up the song starts by itself.
+let startScreenOn = false;
+function showStartScreen(sec) {
+  startScreenOn = true;
+  els.songInfo.style.setProperty('--si-ms', `${sec * 1000}ms`);
+  els.siPlay.classList.remove('counting');
+  void els.siPlay.offsetWidth; // (restarts the drain animation)
+  els.siPlay.classList.add('counting');
+  els.songInfo.classList.add('paused', 'starting');
+  els.songInfo.setAttribute('aria-hidden', 'false');
+  els.pauseDim.classList.add('show');
+  fillInfoInsts();
+}
+function endStartScreen() {
+  if (!startScreenOn) return;
+  startScreenOn = false;
+  els.siPlay.classList.remove('counting');
+  els.songInfo.classList.remove('paused', 'starting');
+  els.songInfo.setAttribute('aria-hidden', 'true');
+  els.pauseDim.classList.remove('show');
+  els.siPicker.replaceChildren();
+}
+function skipStartWait() { // the Play button of the start screen: start now
+  if (!startDone) return false;
+  clearTimeout(startTimer);
+  startTimer = 0;
+  startDone(); // (not a cancel: startAfterDelay goes on to play)
+  return true;
+}
 function hideSongInfo() {
   clearTimeout(infoTimer);
   infoTimer = 0;
+  endStartScreen();
   els.songInfo.classList.remove('show');
 }
 function cancelStartWait() {
@@ -2417,6 +2449,7 @@ async function startAfterDelay(plan) {
   await wait;
   startDone = null;
   if (startCancelled) { syncPlayButton(); return; }
+  endStartScreen();
   scheduleInfoHide(plan.hideMs);
   await player.play();
   syncPlayButton();

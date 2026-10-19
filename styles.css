@@ -2416,3 +2416,9 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
   .song-info.paused { width: min(940px, 90%); grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "cover main" "picker picker"; }
 }
 .si-picker .icard-info { display: none; } /* (the chart details button needs room the four cards in one row do not have) */
+
+/* The Play button of the start screen drains over the start time (--si-ms): a lighter layer shrinks to the right until the song starts */
+.si-play { position: relative; overflow: hidden; }
+.si-play.counting::after { content: ""; position: absolute; inset: 0; background: rgba(255, 255, 255, .3); transform-origin: right center; animation: si-count var(--si-ms, 3s) linear forwards; pointer-events: none; }
+@keyframes si-count { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+.song-info.starting .si-insts { display: none; }

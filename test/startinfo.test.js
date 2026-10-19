@@ -21,10 +21,11 @@ test('overlay lines: title, artist, then album, year, genre without empties', ()
 
 test('start plan', () => {
   const base = { fresh: true, delay: 0, overlayOn: true, keep: false, firstOfSong: true };
-  assert.deepEqual(startPlan(base), { delay: 0, show: true, hideMs: 4000 });
+  assert.deepEqual(startPlan(base), { delay: 3, show: true, screen: true, hideMs: 0 }); // the first play of a song: the 3 s start screen
+  assert.deepEqual(startPlan({ ...base, delay: 5 }), { delay: 5, show: true, screen: true, hideMs: 0 }); // a longer start delay wins
   assert.deepEqual(startPlan({ ...base, firstOfSong: false }), { delay: 0, show: false, hideMs: 4000 });
   assert.deepEqual(startPlan({ ...base, delay: 2, firstOfSong: false }), { delay: 2, show: true, hideMs: 3000 });
   assert.deepEqual(startPlan({ ...base, delay: 2, overlayOn: false }), { delay: 2, show: false, hideMs: 3000 });
-  assert.deepEqual(startPlan({ ...base, keep: true }), { delay: 0, show: true, hideMs: null });
+  assert.deepEqual(startPlan({ ...base, keep: true }), { delay: 3, show: true, screen: true, hideMs: null });
   assert.deepEqual(startPlan({ ...base, fresh: false, delay: 2 }), { delay: 0, show: false, hideMs: null });
 });
