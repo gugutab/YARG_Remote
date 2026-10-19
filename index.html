@@ -168,7 +168,10 @@
           </div>
               
           
-          <button id="metronomeBtn" class="icon" type="button" title="Metronome (M)" aria-label="Metronome" aria-pressed="false"><svg><use href="#i-metronome"/></svg></button>
+          <div class="pop-wrap">
+            <button id="metronomeBtn" class="icon" type="button" title="Metronome (M)" aria-label="Metronome" aria-pressed="false" aria-expanded="false"><svg><use href="#i-metronome"/></svg></button>
+            <div class="popover met-pop" id="metronomePop" hidden></div>
+          </div>
           <button id="loopBtn" class="icon" type="button" title="Loop the current section (R)" aria-label="Loop" aria-pressed="false"><svg><use href="#i-loop"/></svg></button>
           <div class="pop-wrap" id="vizWrap">
             <button id="visualizerBtn" class="icon" type="button" title="Background visualizer (G)" aria-label="Background visualizer" aria-expanded="false"><svg><use href="#i-visualizer"/></svg></button>

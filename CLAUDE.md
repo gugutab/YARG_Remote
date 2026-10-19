@@ -471,3 +471,4 @@ Only checked by synthetic test, headless run or code reading:
 - Tool chips: 4 px side padding (was 6) and, once the units are dropped, 2 px on the left; the cut test measures the text with a Range (fractional widths) so a label is never clipped at its right edge.
 - Tool chips: the reduced left padding after dropping units only applies to chips with a value; the value's clip box is 2 px wider at the right (padding-right 2 px, margin-right -2 px).
 - The stage menu of an instrument is just the tile (no popover window around it, not clickable, fixed lit look).
+- The bottom bar's metronome button opens a window (`#metronomePop`: On/Off, volume, sound; `syncMetPop`) instead of toggling; the M key, the pause panel button and the settings still toggle it, and the button keeps `aria-pressed` for the on state.

@@ -2747,3 +2747,13 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* The stage menu of an instrument is only the tile: no window behind it, and the tile is not clickable there */
 #paneMenu.pane-menu { background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 0; gap: 0; overflow: visible; }
 .pm-tile .icard, .pm-tile .icard:hover, .pm-tile .icard[data-active="true"], .pm-tile .icard[data-active="true"]:hover { cursor: default; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); box-shadow: 0 8px 24px rgba(0, 0, 0, .45); }
+
+/* the metronome window of the bottom bar */
+.met-pop { width: min(260px, calc(100vw - 16px)); display: flex; flex-direction: column; gap: 10px; }
+.met-pop[hidden] { display: none; }
+.met-pop .fp-group { display: flex; flex-direction: column; gap: 4px; }
+.met-pop .seg { display: flex; }
+.met-pop .seg button { flex: 1 1 0; }
+.met-pop .met-volume { display: grid; grid-template-columns: auto minmax(0, 1fr) 40px; align-items: center; gap: 8px; }
+.met-pop .met-volume output { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
+.met-pop .met-volume > span { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }

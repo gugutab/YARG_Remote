@@ -3820,7 +3820,45 @@ function paintMetronome(on) {
   els.metronomeBtn.setAttribute('aria-pressed', String(on));
   els.metronomeBtn.title = on ? 'Metronome off (M)' : 'Metronome (M)';
 }
-els.metronomeBtn.addEventListener('click', () => prefs.set('audio.metronome', !prefs.get('audio.metronome')));
+// The bar's metronome button opens a small window with the metronome options (the M key and the pause panel still toggle it).
+const metPop = document.getElementById('metronomePop');
+{
+  const title = document.createElement('div');
+  title.className = 'pop-title';
+  title.textContent = 'Metronome';
+  const seg = (label, items, pref) => {
+    const box = document.createElement('div');
+    box.className = 'fp-group';
+    box.innerHTML = `<span class="fp-label"></span><div class="seg fret-seg" role="group"></div>`;
+    box.querySelector('.fp-label').textContent = label;
+    const group = box.querySelector('.seg');
+    for (const [value, text] of items) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.value = String(value);
+      b.textContent = text;
+      b.addEventListener('click', () => prefs.set(pref, value));
+      group.append(b);
+    }
+    return box;
+  };
+  const volume = document.createElement('label');
+  volume.className = 'pp-row met-volume';
+  volume.innerHTML = '<span>Volume</span><input type="range" min="0" max="100" step="5" aria-label="Metronome volume"><output></output>';
+  volume.querySelector('input').addEventListener('input', (e) => prefs.set('audio.metronomeVolume', Number(e.target.value)));
+  metPop.replaceChildren(title, seg('Status', [[true, 'On'], [false, 'Off']], 'audio.metronome'), volume, seg('Sound', [['click', 'Click'], ['woodblock', 'Woodblock'], ['beep', 'Beep']], 'audio.metronomeSound'));
+}
+function syncMetPop() {
+  const state = { 'audio.metronome': prefs.get('audio.metronome'), 'audio.metronomeSound': prefs.get('audio.metronomeSound') };
+  const prefOf = (b) => (b.closest('.fp-group') === metPop.querySelectorAll('.fp-group')[0] ? 'audio.metronome' : 'audio.metronomeSound');
+  for (const b of metPop.querySelectorAll('.seg button')) b.setAttribute('aria-pressed', String(String(state[prefOf(b)]) === b.dataset.value));
+  const vol = prefs.get('audio.metronomeVolume');
+  metPop.querySelector('input').value = vol;
+  metPop.querySelector('output').textContent = `${vol}%`;
+}
+popovers.push([els.metronomeBtn, metPop]);
+registerPopover(els.metronomeBtn, metPop);
+syncMetPop();
 // Quick settings while paused (setting playback.pausePanel; rules in practice.js `pausePanelWanted`). The panel fades in 0.3 s after the user pauses and
 // goes when the sound resumes, a seek (it clears `pausedAt`), a wait starts, Esc (stays closed until the next pause) or any other blocker; it reuses the
 // bar's own functions (stepSpeed, the metronome setting, masterState/applyStem, togglePlay) and keeps no state of its own.
@@ -3913,9 +3951,9 @@ function stepSpeed(dir) {
   flashNote(`Speed ${SETTING_FORMAT.speed(v)}`);
 }
 const EFFECTS = {
-  'audio.metronome': (v) => { metronome.setEnabled(v); paintMetronome(v); },
-  'audio.metronomeVolume': (v) => metronome.setVolume(v),
-  'audio.metronomeSound': (v) => metronome.setSound(v),
+  'audio.metronome': (v) => { metronome.setEnabled(v); paintMetronome(v); syncMetPop(); },
+  'audio.metronomeVolume': (v) => { metronome.setVolume(v); syncMetPop(); },
+  'audio.metronomeSound': (v) => { metronome.setSound(v); syncMetPop(); },
   'highway.lyricsAbove': (v) => { highway.sheetPeek = v / 100; },
   'highway.countdown': (v) => { highway.countdowns = v; },
   'highway.countdownColors': applyUiColors,
