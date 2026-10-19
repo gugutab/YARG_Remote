@@ -2373,6 +2373,7 @@ function cancelResumeRewind() {
 async function rewindBeforePlay() {
   const at = replay?.to ?? pausedAt;
   if (at === null || !prefs.get('playback.resumeRewind') || loop || listenMode || ended) return false;
+  if (rewindLimit === -Infinity) return false; // (no pause point: a seek that already landed early (seekRewind) plays on from there; Math.max(0, -Infinity) used to send it to 0)
   const target = Math.max(0, rewindLimit);
   const now = player.currentTime();
   if (now - target < 0.05 || target >= at) { return false; }

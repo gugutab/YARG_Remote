@@ -475,3 +475,4 @@ Only checked by synthetic test, headless run or code reading:
 - Lyrics: only the unsung words and the dim ones keep the dark theme's colours in every theme; the sung part (karaoke fill, lit syllables, `present`) is the accent-derived light colour (theme or picked one) instead of a fixed blue (`vocalColors` in uicolors.js).
 - The lyric sheet's two buttons (jump to the next lines and Autoscroll) take their colours from the vocal frame colour (the theme's accent): `Highway.jumpColors()`.
 - A seek that lands outside the A-B loop ends the loop (`seekTo`; the loop's own wrap and `rewindIntoLoop` stay inside). The Notes/Karaoke selector of an instrument tile that is off shows its choice dimmed through `data-next`, like the type and difficulty.
+- Bug fixed: with `playback.seekRewind` on, a seek while paused followed by Play jumped to 0 (`rewindBeforePlay` took `Math.max(0, rewindLimit)` with no pause limit); now it plays on from the early landing point.
