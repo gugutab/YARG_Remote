@@ -2498,3 +2498,12 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
   .song-info.paused .si-artist { font-size: 18px; }
   .si-play { justify-self: center; margin: 0; }
 }
+
+/* Start / pause screen: a larger play icon, a smoother loading fill, and a hover on the instrument tiles that changes the background only (the border stays) */
+.si-play .si-play-in svg { width: 26px; height: 26px; }
+.si-play .si-fill { transition: width .6s cubic-bezier(.22, 1, .36, 1); will-change: width; }
+.si-picker .icard, .si-picker .icard:hover { transition: background .18s ease; }
+.si-picker .icard[data-active="true"], .si-picker .icard[data-active="true"]:hover { border-color: var(--accent); }
+.si-picker .icard[data-active="false"], .si-picker .icard[data-active="false"]:hover { border-color: rgba(255, 255, 255, .09); }
+.si-picker .icard[data-active="true"]:hover { background: color-mix(in srgb, var(--accent) 20%, var(--panel)); }
+.si-picker .icard[data-active="false"]:hover { background: rgba(255, 255, 255, .08); }
