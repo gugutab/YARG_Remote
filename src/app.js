@@ -43,7 +43,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'barHide', 'metronomeBtn', 'mixerVal', 'speedVal', 'stagePlay', 'songInfo', 'siCover', 'siInsts', 'siPlay', 'pausePanel', 'ppSlower', 'ppFaster', 'ppSpeed', 'ppMetronome', 'ppVolume', 'ppVolVal', 'ppResume', 'siTitle', 'siArtist', 'siDetails', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'barHide', 'metronomeBtn', 'mixerVal', 'speedVal', 'stagePlay', 'songInfo', 'siCover', 'siInsts', 'siPicker', 'siPlay', 'pausePanel', 'ppSlower', 'ppFaster', 'ppSpeed', 'ppMetronome', 'ppVolume', 'ppVolVal', 'ppResume', 'siTitle', 'siArtist', 'siDetails', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
   'endScreen', 'endCover', 'endTitle', 'endArtist', 'endAgain', 'endSearch', 'endCards', 'endNextBox', 'endNext',
@@ -1324,8 +1324,15 @@ function renderPickers() {
   if (activeId) current.diffChoice[activeId] = els.difficulty.value;
   const activeIns = currentInstrument();
   if (activeIns) current.modeChoice[activeIns.base === 'drums' ? 'drums' : activeIns.mode === 'vocals' ? 'vocals' : activeIns.id] = activeIns.id; // the mode a merged card remembers
+  els.instrumentCards.replaceChildren(...buildInstrumentCards());
+  layoutInstrumentCards();
+  if (els.songInfo.classList.contains('paused')) fillInfoInsts(); // (the paused song window shows the same cards)
+}
+
+// The instrument cards (on/off switches with the difficulty and mode buttons): in the details and in the song window shown while paused.
+function buildInstrumentCards() {
   // Vocal parts have a single chart: no difficulty buttons.
-  els.instrumentCards.replaceChildren(...instrumentGroups().map((group) => {
+  return instrumentGroups().map((group) => {
     const ins = group.chosen; // the option this card stands for (for drums: the chosen mode)
     const { diffs, chosen } = diffFor(ins);
     const vocal = ins.mode === 'vocals';
@@ -1418,8 +1425,7 @@ function renderPickers() {
       card.append(dl);
     }
     return card;
-  }));
-  layoutInstrumentCards();
+  });
 }
 
 els.infoPopMore.addEventListener('click', () => { closePopovers(); setInfoOpen(true); });
@@ -2368,36 +2374,23 @@ function showSongInfo(hideMs) {
   els.songInfo.classList.add('show');
   scheduleInfoHide(hideMs);
 }
-// Every instrument of the song as an on/off button (the same switches as the details cards: isOn / turnOn / turnOff): its icon, name, the difficulty it uses and the
-// song's level pips; pressed = its fretboard is on screen. Only clickable while the window is the paused one (CSS: .song-info.paused).
+// The instruments on screen with their difficulty (Expert...) and the song's level pips (read only), and, while the window is the paused one, the same instrument
+// cards as the song details below them (on/off, mode and difficulty buttons).
 function fillInfoInsts() {
   if (!current) return;
   const song = current.song;
-  els.siInsts.replaceChildren(...instrumentGroups().map((g) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'si-inst';
-    b.dataset.key = g.key;
-    const on = isOn(g);
-    b.setAttribute('aria-pressed', String(on));
-    const level = instrumentLevel(song, { base: g.chosen.base });
+  els.siInsts.replaceChildren(...(current.screen || []).map((it) => {
+    const row = document.createElement('div');
+    row.className = 'si-inst';
+    const level = instrumentLevel(song, { base: it.base });
     const pips = level === null || level === undefined ? '' : `<span class="mini-pips" title="Level ${level}">${Array.from({ length: 6 }, (_, k) => `<i${k < level ? ' class="on"' : ''}></i>`).join('')}</span>`;
-    const diff = g.chosen.mode === 'vocals' ? '' : diffFor(g.chosen).chosen?.label ?? '';
-    b.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[g.chosen.base] || 'music'}"/></svg><span class="si-inst-name"></span><span class="si-inst-diff"></span>${pips}`;
-    b.querySelector('.si-inst-name').textContent = g.label;
-    b.querySelector('.si-inst-diff').textContent = diff;
-    b.title = `${g.label}: ${on ? 'on' : 'off'} (click to turn it ${on ? 'off' : 'on'})`;
-    return b;
+    row.innerHTML = `<svg><use href="#i-${it.icon}"/></svg><span class="si-inst-name"></span><span class="si-inst-diff"></span>${pips}`;
+    row.querySelector('.si-inst-name').textContent = it.name;
+    row.querySelector('.si-inst-diff').textContent = it.diffLabel || '';
+    return row;
   }));
+  if (els.songInfo.classList.contains('paused')) els.siPicker.replaceChildren(...buildInstrumentCards());
 }
-els.siInsts.addEventListener('click', (e) => {
-  const b = e.target.closest('.si-inst');
-  if (!b || !current || !els.songInfo.classList.contains('paused')) return;
-  const g = instrumentGroups().find((x) => x.key === b.dataset.key);
-  if (!g) return;
-  if (isOn(g)) turnOff(g); else turnOn(g, g.chosen);
-  fillInfoInsts();
-});
 els.siPlay.addEventListener('click', () => togglePlay());
 function scheduleInfoHide(ms) {
   clearTimeout(infoTimer);
@@ -3542,10 +3535,12 @@ function syncPauseInfo() {
     showSongInfo(null); // (no timer: it stays until the sound resumes)
     els.songInfo.classList.add('paused');
     els.songInfo.setAttribute('aria-hidden', 'false');
+    fillInfoInsts(); // (now with the picker)
   } else if (!want && pauseInfoShown) {
     pauseInfoShown = false;
     els.songInfo.classList.remove('paused');
     els.songInfo.setAttribute('aria-hidden', 'true');
+    els.siPicker.replaceChildren();
     hideSongInfo();
   }
 }
