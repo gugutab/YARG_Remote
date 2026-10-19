@@ -43,7 +43,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'barHide', 'metronomeBtn', 'mixerVal', 'speedVal', 'stagePlay', 'songInfo', 'siCover', 'siInsts', 'siPicker', 'siPlay', 'pauseDim', 'pausePanel', 'ppSlower', 'ppFaster', 'ppSpeed', 'ppMetronome', 'ppVolume', 'ppVolVal', 'ppResume', 'siTitle', 'siArtist', 'siDetails', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'barHide', 'metronomeBtn', 'mixerVal', 'speedVal', 'stagePlay', 'songInfo', 'siCover', 'siInsts', 'siPicker', 'siPlay', 'siPlayText', 'pauseDim', 'pausePanel', 'ppSlower', 'ppFaster', 'ppSpeed', 'ppMetronome', 'ppVolume', 'ppVolVal', 'ppResume', 'siTitle', 'siArtist', 'siDetails', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
   'endScreen', 'endCover', 'endTitle', 'endArtist', 'endAgain', 'endSearch', 'endCards', 'endNextBox', 'endNext',
@@ -1078,14 +1078,12 @@ function renderLoadState() {
   if (listenLoading) els.npTime.textContent = text;
   els.npSeek.max = String(player.duration || 1);
   const screen = !!audioLoad && !audioLoad.listen && state === 'loading';
-  els.loadScreen.hidden = !screen;
+  els.loadScreen.hidden = true; // (the loading window is replaced by the start screen: its Play button is the loader)
   if (screen) {
-    els.lsTitle.textContent = `${plainText(current.song.title)} — ${plainText(current.song.artist)}`;
-    els.lsBar.style.width = `${Math.round(fraction * 100)}%`;
-    els.lsText.textContent = text;
-    els.lsCover.src = current?.coverUrl || '';
-    els.lsCover.hidden = !current?.coverUrl;
-  }
+    if (!startScreenOn && current && !infoOpen) { showSongInfo(null); showStartScreen(null); } // (a load that nobody opened the screen for)
+    if (startScreenOn && els.siPlay.classList.contains('loading')) els.siPlayText.textContent = `Loading… ${Math.round(fraction * 100)}%`;
+  } else if (state === 'error') endStartScreen();
+  else if (state === 'ready' && startScreenOn && !startDone && current && !current.started) endStartScreen(); // loaded with nobody pressing Play (a link without autostart): the pre-start screen takes the window back, its Play button ready
   const overlay = !infoOpen && !screen && state === 'error';
   els.loading.hidden = !overlay;
   if (overlay) els.loading.textContent = text;
@@ -2330,6 +2328,8 @@ async function togglePlay() {
   } else {
     if ((infoOpen || !ready) && libraryOpen()) setLibraryOpen(false, false); // Play from the details (or the first Play of a song) gets the library out of the chart's way
     if (current) current.started = true; // (the pre-start pause screen goes: this song is being played)
+    const firstScreen = !current.startShown && prefs.get('playback.songInfoOverlay') && !ready; // the start screen comes with the first load of a song
+    if (firstScreen && isFreshStart({ position: 0, resumed: pausedAt !== null, loop: !!loop, background: listenMode || backgroundAudio(), ended }) && !infoOpen) { showSongInfo(null); showStartScreen(null); }
     const loading = ensureAudio(); // (starts the load first: closing the details must not release the held stage before it)
     if (infoOpen) setInfoOpen(false); // starting from the details goes to the chart
     if (!(await loading)) return; // the first Play loads the audio behind the loading screen
@@ -2342,10 +2342,10 @@ async function togglePlay() {
     }
     const plan = startPlan({
       fresh: isFreshStart({ position: player.currentTime(), resumed: pausedAt !== null, loop: !!loop, background: listenMode || backgroundAudio(), ended }),
-      delay: prefs.get('playback.startDelay'), overlayOn: prefs.get('playback.songInfoOverlay'), keep: prefs.get('playback.keepSongInfo'), firstOfSong: infoShownFor !== current?.song,
+      delay: prefs.get('playback.startDelay'), overlayOn: prefs.get('playback.songInfoOverlay'), keep: prefs.get('playback.keepSongInfo'), firstOfSong: !current.startShown,
     });
     if (plan.show) showSongInfo(plan.delay > 0 ? null : plan.hideMs);
-    if (plan.screen) showStartScreen(plan.delay);
+    if (plan.screen) { current.startShown = true; showStartScreen(plan.delay); }
     if (plan.delay > 0) { await startAfterDelay(plan); return; } // (the sound starts itself when the wait is over)
     await player.play();
   }
@@ -2392,7 +2392,11 @@ function fillInfoInsts() {
   }));
   if (els.songInfo.classList.contains('paused')) els.siPicker.replaceChildren(...buildInstrumentCards());
 }
-els.siPlay.addEventListener('click', () => { if (!skipStartWait()) togglePlay(); });
+els.siPlay.addEventListener('click', () => {
+  if (skipStartWait()) return;
+  if (ready && !startScreenOn && current && !current.started) current.startShown = true; // Play pressed on the idle pre-start screen (audio loaded): start now, no 3 s count
+  togglePlay();
+});
 function scheduleInfoHide(ms) {
   clearTimeout(infoTimer);
   infoTimer = 0;
@@ -2402,12 +2406,20 @@ function scheduleInfoHide(ms) {
 // The start screen: the first play of a song shows the pause screen (the song window with the instrument cards, the stage darkened) for START_SCREEN_SEC; its
 // Play button drains as the time runs out and starts the song at once when pressed; when the time is up the song starts by itself.
 let startScreenOn = false;
+// `sec` null: the audio is still loading, the Play button is a loader (text and spinner); a number: it is loaded, the button is Play and drains over `sec`.
 function showStartScreen(sec) {
   startScreenOn = true;
-  els.songInfo.style.setProperty('--si-ms', `${sec * 1000}ms`);
+  const loading = sec == null;
+  els.siPlay.classList.toggle('loading', loading);
+  els.siPlay.disabled = loading;
   els.siPlay.classList.remove('counting');
-  void els.siPlay.offsetWidth; // (restarts the drain animation)
-  els.siPlay.classList.add('counting');
+  if (loading) els.siPlayText.textContent = 'Loading…';
+  else {
+    els.siPlayText.textContent = 'Play';
+    els.songInfo.style.setProperty('--si-ms', `${sec * 1000}ms`);
+    void els.siPlay.offsetWidth; // (restarts the drain animation)
+    els.siPlay.classList.add('counting');
+  }
   els.songInfo.classList.add('paused', 'starting');
   els.songInfo.setAttribute('aria-hidden', 'false');
   els.pauseDim.classList.add('show');
@@ -2416,7 +2428,10 @@ function showStartScreen(sec) {
 function endStartScreen() {
   if (!startScreenOn) return;
   startScreenOn = false;
-  els.siPlay.classList.remove('counting');
+  pauseInfoShown = false; // (the pause screen sync shows its own again if it is still wanted)
+  els.siPlay.classList.remove('counting', 'loading');
+  els.siPlay.disabled = false;
+  els.siPlayText.textContent = 'Play';
   els.songInfo.classList.remove('paused', 'starting');
   els.songInfo.setAttribute('aria-hidden', 'true');
   els.pauseDim.classList.remove('show');
@@ -2524,7 +2539,7 @@ async function restartSong() {
   player.seek(loop ? loop.start : 0);
   // from the beginning it is a fresh Play: the start delay and the info overlay apply (not when it restarts a loop)
   const plan = startPlan({
-    fresh: !loop, delay: prefs.get('playback.startDelay'), overlayOn: prefs.get('playback.songInfoOverlay'), keep: prefs.get('playback.keepSongInfo'), firstOfSong: infoShownFor !== current?.song,
+    fresh: !loop, delay: prefs.get('playback.startDelay'), overlayOn: prefs.get('playback.songInfoOverlay'), keep: prefs.get('playback.keepSongInfo'), firstOfSong: !current.startShown,
   });
   if (plan.show) showSongInfo(plan.delay > 0 ? null : plan.hideMs);
   if (plan.delay > 0) { await startAfterDelay(plan); return; }
@@ -3566,6 +3581,10 @@ function syncPauseInfo() {
     overlayOpen: libraryOpen() || infoOpen || (typeof settingsPage !== 'undefined' && settingsPage.isOpen()), infoVisible: false, dismissed: piDismissed, // (the library, the details or the settings take its place)
   });
   if (pausedAt === null) piDismissed = false; // (the Esc applies to this pause only)
+  if (want && pre && !current.kicked && prefs.get('playback.linkAutoplay') && prefs.get('playback.songInfoOverlay') && navigator.userActivation?.hasBeenActive) {
+    current.kicked = true; // opened from a link and the page has had a click or key: load the audio now, count 3 s and start
+    togglePlay();
+  }
   if (want && !pauseInfoShown) {
     pauseInfoShown = true;
     showSongInfo(null); // (no timer: it stays until the sound resumes)
@@ -3573,6 +3592,8 @@ function syncPauseInfo() {
     els.pauseDim.classList.add('show');
     els.songInfo.setAttribute('aria-hidden', 'false');
     fillInfoInsts(); // (now with the picker)
+  } else if (!want && pauseInfoShown && startScreenOn) {
+    pauseInfoShown = false; // (the start screen has taken the window over)
   } else if (!want && pauseInfoShown) {
     pauseInfoShown = false;
     els.songInfo.classList.remove('paused');

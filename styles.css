@@ -2422,3 +2422,10 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .si-play.counting::after { content: ""; position: absolute; inset: 0; background: rgba(255, 255, 255, .3); transform-origin: right center; animation: si-count var(--si-ms, 3s) linear forwards; pointer-events: none; }
 @keyframes si-count { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 .song-info.starting .si-insts { display: none; }
+
+/* The Play button of the start screen while the audio loads: a spinner in front of the progress text, not clickable */
+.si-play.loading { opacity: .85; cursor: progress; }
+.si-play.loading svg { display: none; }
+.si-play.loading::before { content: ""; width: 14px; height: 14px; margin-right: 8px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .35); border-top-color: #fff; animation: si-spin .8s linear infinite; }
+@keyframes si-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .si-play.loading::before { animation-duration: 2.4s; } }
