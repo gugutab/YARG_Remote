@@ -2604,3 +2604,38 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* The pane menu's slider rows: the slider column may shrink (the range input's own minimum width pushed the reset button out of the menu and made it scroll sideways) */
 .pane-menu .pm-range { grid-template-columns: minmax(0, 1fr) 46px 28px; gap: 4px; }
 .pane-menu .pm-range input[type="range"] { width: 100%; min-width: 0; }
+
+/* ================= The instrument tiles everywhere =================
+   The start / pause screen's tile design (dot, level bar under the name, type and difficulty selectors at the bottom) also applies to the instrument cards of the
+   song details (.icards) and to the stage's "Choose an instrument" slots (.pc-cards). Generated from the .si-picker rules above, minus their sizing. */
+:root { --si-fill: color-mix(in srgb, var(--accent) 88%, #000); --si-dim-fill: color-mix(in srgb, var(--accent) 30%, transparent); --si-dim-accent: color-mix(in srgb, var(--accent) 45%, transparent); }
+:is(.icards, .pc-cards) .icard-dot { display: block; }
+:is(.icards, .pc-cards) .icard { box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1.5px solid rgba(255, 255, 255, .09); border-radius: 12px; background: rgba(255, 255, 255, .03); box-shadow: none; }
+:is(.icards, .pc-cards) .icard[data-active="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); box-shadow: none; }
+:is(.icards, .pc-cards) .icard-top { display: flex; flex-wrap: wrap; gap: 10px; }
+:is(.icards, .pc-cards) .icard-top .icard-head { width: 100%; height: 28px; padding: 0; font-size: 17px; font-weight: 700; color: var(--muted); gap: 8px; }
+:is(.icards, .pc-cards) .icard-head[aria-pressed="true"] { color: var(--accent); }
+:is(.icards, .pc-cards) .icard-name { flex: 0 1 auto; white-space: nowrap; }
+:is(.icards, .pc-cards) .icard-dot { margin-left: auto; flex: none; box-sizing: border-box; width: 10px; height: 10px; border-radius: 50%; background: transparent; border: 1.5px solid #7d716b; }
+:is(.icards, .pc-cards) .icard[data-active="true"] .icard-dot { background: var(--accent); border: 0; box-shadow: 0 0 0 3px var(--si-dim-fill); }
+:is(.icards, .pc-cards) .icard-top .pips { order: 3; width: 100%; margin: 0; display: flex; gap: 3px; }
+:is(.icards, .pc-cards) .pips i { flex: 1 1 0; width: auto; height: 6px; border-radius: 2px; background: rgba(255, 255, 255, .12); }
+:is(.icards, .pc-cards) .pips i.on { background: var(--si-dim-accent); }
+:is(.icards, .pc-cards) .icard[data-active="true"] .pips i.on { background: var(--accent); }
+:is(.icards, .pc-cards) .icard-top + .seg { margin-top: auto; }
+:is(.icards, .pc-cards) .seg { display: flex; gap: 2px; padding: 3px; border: 0; border-radius: 9px; background: rgba(0, 0, 0, .3); }
+:is(.icards, .pc-cards) .seg-diffs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+:is(.icards, .pc-cards) .seg button { height: 32px; padding: 0 6px; border: 0; border-radius: 7px; font-size: 13px; font-weight: 600; white-space: nowrap; background: transparent; color: #9a8d87; flex: 1 1 auto; min-width: 0; }
+:is(.icards, .pc-cards) .seg-diffs button { height: 34px; padding: 0; font-size: 14px; }
+:is(.icards, .pc-cards) .icard[data-active="true"] .seg button { color: #d3c5bf; }
+:is(.icards, .pc-cards) .icard[data-active="true"] .seg button[aria-pressed="true"] { background: var(--si-fill); color: #fff; }
+:is(.icards, .pc-cards) .icard[data-active="false"] .seg button[data-next="true"] { background: var(--si-dim-fill); color: #d8c9c3; }
+:is(.icards, .pc-cards) .seg button:hover:not(:disabled), :is(.icards, .pc-cards) .icard-head:hover { filter: brightness(1.15); }
+:is(.icards, .pc-cards) .icard:hover { border-color: inherit; }
+:is(.icards, .pc-cards) .icard[data-active="false"]:hover { border-color: rgba(255, 255, 255, .2); }
+:is(.icards, .pc-cards) .icard, :is(.icards, .pc-cards) .icard:hover { transition: background .18s ease; }
+:is(.icards, .pc-cards) .icard[data-active="true"], :is(.icards, .pc-cards) .icard[data-active="true"]:hover { border-color: var(--accent); }
+:is(.icards, .pc-cards) .icard[data-active="false"], :is(.icards, .pc-cards) .icard[data-active="false"]:hover { border-color: rgba(255, 255, 255, .09); }
+:is(.icards, .pc-cards) .icard[data-active="true"]:hover { background: color-mix(in srgb, var(--accent) 20%, var(--panel)); }
+:is(.icards, .pc-cards) .icard[data-active="false"]:hover { background: rgba(255, 255, 255, .08); }
+:is(.icards, .pc-cards) .icard { container-type: inline-size; container-name: itile; }

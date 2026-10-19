@@ -2926,21 +2926,35 @@ function fillChooser(el, key) {
     const { diffs, chosen } = diffFor(ins);
     const card = document.createElement('div');
     card.className = 'icard';
+    card.dataset.key = group.key;
+    card.dataset.active = 'false'; // (not on screen: the tile of an instrument that can be added)
     const top = document.createElement('button');
     top.type = 'button';
     top.className = 'icard-head';
-    top.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[ins.base] || 'music'}"/></svg><span class="icard-name"></span>`;
+    top.innerHTML = `<svg><use href="#i-${INSTRUMENT_ICON[ins.base] || 'music'}"/></svg><span class="icard-name"></span><span class="icard-dot" aria-hidden="true"></span>`;
     top.querySelector('.icard-name').textContent = group.label;
     top.addEventListener('click', () => pickInto(chooser, group, ins, chosen?.id));
-    card.append(top);
+    const row = document.createElement('div'); // the name with the song's level bar under it, like the details cards
+    row.className = 'icard-top';
+    row.append(top);
+    const level = instrumentLevel(current.song, ins);
+    if (level !== null) {
+      const pips = document.createElement('span');
+      pips.className = 'pips';
+      pips.title = `Level ${level} of 6`;
+      pips.replaceChildren(...Array.from({ length: 6 }, (_, i) => Object.assign(document.createElement('i'), { className: i < level ? 'on' : '' })));
+      row.append(pips);
+    }
+    card.append(row);
     if (group.options.length > 1) { // the type
       const modes = document.createElement('div');
-      modes.className = 'seg';
+      modes.className = 'seg seg-modes';
       for (const o of group.options) {
         const b = document.createElement('button');
         b.type = 'button';
         b.textContent = o.modeLabel ?? o.label;
         b.setAttribute('aria-pressed', String(o.id === ins.id));
+        if (o.id === ins.id) b.dataset.next = 'true';
         b.addEventListener('click', () => { chooser.modes[group.key] = o.id; fillChooser(el, key); });
         modes.append(b);
       }
@@ -2948,12 +2962,13 @@ function fillChooser(el, key) {
     }
     if (ins.mode !== 'vocals') {
       const seg = document.createElement('div');
-      seg.className = 'seg';
+      seg.className = 'seg seg-diffs';
       for (const d of diffs) {
         const b = document.createElement('button');
         b.type = 'button';
         b.textContent = d.label;
         b.setAttribute('aria-pressed', String(d.id === chosen?.id));
+        if (d.id === chosen?.id) b.dataset.next = 'true';
         b.addEventListener('click', () => pickInto(chooser, group, ins, d.id));
         seg.append(b);
       }
