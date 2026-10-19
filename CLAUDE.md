@@ -472,3 +472,4 @@ Only checked by synthetic test, headless run or code reading:
 - Tool chips: the reduced left padding after dropping units only applies to chips with a value; the value's clip box is 2 px wider at the right (padding-right 2 px, margin-right -2 px).
 - The stage menu of an instrument is just the tile (no popover window around it, not clickable, fixed lit look).
 - The bottom bar's metronome button opens a window (`#metronomePop`: On/Off, volume, sound; `syncMetPop`) instead of toggling; the M key, the pause panel button and the settings still toggle it, and the button keeps `aria-pressed` for the on state.
+- Lyrics: only the unsung words and the dim ones keep the dark theme's colours in every theme; the sung part (karaoke fill, lit syllables, `present`) is the accent-derived light colour (theme or picked one) instead of a fixed blue (`vocalColors` in uicolors.js).
