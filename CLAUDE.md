@@ -437,3 +437,4 @@ Only checked by synthetic test, headless run or code reading:
 - The pack / charter line of the song window shows only the values (no labels; the hover title says which is which).
 - Song window fade-out: `fadeOutInfo()` removes `show` and keeps the content, layout (`paused`, `starting`) and picker for the 0.5 s fade, resetting them after 650 ms (`closing` class: not clickable) — it used to reset at once and showed the old small overlay while fading. The Play button's drain overlay (`::after`, z-index 1) now paints above its progress fill (it was hidden under it after the redesign).
 - Song window: the details line also shows the song length after the genre (`overlayLines().details`: album, year, genre, length); it enters and leaves with the motion of the library and settings windows (36 px from the left, 96 % to 100 %, 0.34 s in / 0.24 s out, same easing curves).
+- Instrument tiles of the start/pause screen: minimum width 162 px (flex-basis 162 px).
