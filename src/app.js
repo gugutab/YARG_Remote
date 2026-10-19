@@ -2378,8 +2378,8 @@ function showSongInfo(hideMs) {
   els.siDetails.replaceChildren(...l.details.map((d) => Object.assign(document.createElement('div'), { textContent: d })));
   els.siCredits.replaceChildren(...l.credits.map((r) => { // a second line: the pack and the charter
     const item = document.createElement('div');
-    const label = Object.assign(document.createElement('span'), { className: 'si-credit-label', textContent: r.label });
-    item.append(label, document.createTextNode(` ${r.value}`));
+    item.textContent = r.value; // (no labels: the pack and the charter are told apart by the pack's name itself)
+    item.title = r.label;
     return item;
   }));
   els.siCover.hidden = !current.coverUrl;

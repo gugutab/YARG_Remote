@@ -2512,7 +2512,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .si-credits { display: flex; flex-wrap: wrap; gap: 2px 20px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
 .si-credits:empty { display: none; }
 .si-credits div { overflow-wrap: anywhere; }
-.si-credit-label { margin-right: 4px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .75; }
 .song-info:not(.paused) .si-credits { font-size: 13px; margin-top: 2px; }
 /* the Play button below the information (narrow windows) takes the whole width of the window */
 @media (max-width: 1099px) {
