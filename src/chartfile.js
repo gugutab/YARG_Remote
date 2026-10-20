@@ -244,19 +244,39 @@ function buildInstrument(def, sections) {
 // "lyric " prefix, phrase_start / phrase_end). A lyric becomes a talkie note up to the next lyric (at most a beat).
 function buildEvents(lines, resolution) {
   const events = { name: 'EVENTS', notes: [], texts: [], lyrics: [], sysex: [], tempos: [], timeSignatures: [] };
-  const lyrics = [];
-  const phrases = [];
-  let phraseStart = null;
+  const allLyrics = [];
+  const marks = []; // { tick, start, end } per tick that has phrase_start and/or phrase_end
+  let maxTick = 0;
   for (const e of sortedEvents(lines)) {
     if (e.type[0] !== 'E') continue;
+    maxTick = Math.max(maxTick, e.tick);
     const text = eventText(e.body);
-    if (text.startsWith('lyric ') || text === 'lyric') lyrics.push({ tick: e.tick, text: text.slice(6) });
-    else if (text === 'phrase_start') phraseStart = e.tick;
-    else if (text === 'phrase_end') {
-      if (phraseStart !== null) phrases.push({ tick: phraseStart, endTick: e.tick });
-      phraseStart = null;
+    if (text.startsWith('lyric ') || text === 'lyric') allLyrics.push({ tick: e.tick, text: text.slice(6) });
+    else if (text === 'phrase_start' || text === 'phrase_end') {
+      let m = marks[marks.length - 1];
+      if (!m || m.tick !== e.tick) marks.push((m = { tick: e.tick, start: false, end: false }));
+      if (text === 'phrase_start') m.start = true;
+      else m.end = true;
     } else events.texts.push({ tick: e.tick, text });
   }
+  // TextEvents.ConvertToPhrases: a phrase_start inside an open phrase ends it there and opens the next one (many charts
+  // only write phrase_start), an unterminated phrase runs to the end of the song, and lyrics outside every phrase are
+  // dropped (pending events between phrases are cleared).
+  const phrases = [];
+  let open = null;
+  for (const m of marks) {
+    if (m.start && m.end) {
+      phrases.push({ tick: open ?? m.tick, endTick: m.tick });
+      open = open === null ? null : m.tick;
+    } else if (open === null) {
+      if (m.start) open = m.tick;
+    } else {
+      phrases.push({ tick: open, endTick: m.tick });
+      open = m.start ? m.tick : null;
+    }
+  }
+  if (open !== null) phrases.push({ tick: open, endTick: maxTick + 1 });
+  const lyrics = allLyrics.filter((l) => phrases.some((p) => l.tick >= p.tick && l.tick <= p.endTick));
   let vocals = null;
   if (lyrics.length) {
     vocals = { name: 'PART VOCALS', notes: [], texts: [], lyrics: [], sysex: [], tempos: [], timeSignatures: [] };

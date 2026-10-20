@@ -148,6 +148,20 @@ test('events: sections, end marker, lyrics and phrases', () => {
   assert.deepEqual(vocals.lyrics.map((l) => l.text), ['Hel-', 'lo']);
 });
 
+test('events: phrase_start without phrase_end closes the open phrase (TextEvents.ConvertToPhrases)', () => {
+  // Many charts only write phrase_start; the old reader kept only start..end pairs and lost every other lyric.
+  const midi = parseChart(chartText({
+    events: ['  0 = E "lyric gone"', '  192 = E "phrase_start"', '  192 = E "lyric one"', '  384 = E "phrase_start"',
+      '  480 = E "lyric two"', '  768 = E "phrase_start"', '  768 = E "phrase_end"', '  864 = E "lyric three"',
+      '  1152 = E "phrase_start"', '  1248 = E "lyric four"'].join('\n'),
+    extra: section('ExpertSingle', ['  0 = N 0 0']),
+  }));
+  const phrases = midi.tracks.find((t) => t.name === 'PART VOCALS').notes.filter((n) => n.pitch === 105);
+  assert.deepEqual(phrases.map((p) => [p.tick, p.endTick]), [[192, 384], [384, 768], [768, 1152], [1152, 1249]]);
+  const vocals = buildChart(midi, ins('vocals'), EXPERT);
+  assert.deepEqual(vocals.lyrics.map((l) => l.text), ['one', 'two', 'three', 'four']); // 'gone' is outside every phrase
+});
+
 test('GHL, co-op and unknown sections are skipped; a missing [Song] is an error', () => {
   const midi = parseChart(chartText({ extra: section('ExpertGHLGuitar', ['  0 = N 0 0']) + section('ExpertDoubleGuitar', ['  0 = N 0 0']) }));
   assert.deepEqual(instrumentOptions(midi), []);
