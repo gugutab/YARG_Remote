@@ -28,6 +28,32 @@ const SOLO_BAND_3D = 'rgba(0,150,220,0.15)';
 const ROLL_TYPES = Object.keys(ROLL_COLORS);
 const HOPO_DOT = 'rgba(255,255,255,0.9)'; // the alpha of a HOPO dot while its note has not been hit yet (0.9 * (1 - 0))
 
+// The metal edge under a cymbal disc (rectangular style): one vertical gradient from 0 to 1 per variant (plain, star power), built once.
+const discEdges = [null, null];
+function discEdgeGradient(g, sp) {
+  const i = sp ? 1 : 0;
+  if (!discEdges[i]) {
+    const edge = g.createLinearGradient(0, 0, 0, 1);
+    const m = sp ? ['#f0d060', '#a37c00', '#3d2e00'] : ['#d4dae1', '#7f8893', '#30353b'];
+    edge.addColorStop(0, m[0]);
+    edge.addColorStop(0.45, m[1]);
+    edge.addColorStop(0.75, m[2]);
+    edge.addColorStop(1, sp ? 'rgba(61,46,0,0.35)' : 'rgba(48,53,59,0.35)'); // the metal fades into the road at the bottom: depth
+    discEdges[i] = edge;
+  }
+  return discEdges[i];
+}
+// A stand-in for the context that `noteShape` draws its outline into, mapping y to (y - y0) * k: the outline is added under the gradient's
+// translate(0, y0) + scale(1, 1 / k) in those unit coordinates, so it lands on the same pixels (filling a path added before the transform
+// changes would rasterize its edges a little differently).
+const unitY = {
+  g: null, y0: 0, k: 1,
+  moveTo(x, y) { this.g.moveTo(x, (y - this.y0) * this.k); },
+  lineTo(x, y) { this.g.lineTo(x, (y - this.y0) * this.k); },
+  closePath() { this.g.closePath(); },
+  ellipse(x, y, rx, ry, rot, a0, a1) { this.g.ellipse(x, (y - this.y0) * this.k, rx, ry * this.k, rot, a0, a1); },
+};
+
 // The projection of the current call. These were closures made inside renderLanes3D on every frame (and every pane); as plain functions
 // over a few module variables nothing is allocated, and the engine can inline them into the note loops.
 let PK = 0; // 1 / FAR_SCALE - 1
@@ -358,18 +384,25 @@ export function renderLanes3D(hw, t, w, h) {
     // thickness: a thin darker edge underneath the top face (no cast shadow; all of it moves, grows and fades with the note)
     const th = Math.max(0.5, rx * (disc ? 0.27 : 0.21)); // (a little thicker in the rectangular style)
     const headStyle = disc ? 'round' : n.cymbal ? 'tri' : hw.noteStyle; // cymbals: a disc in the rectangular style, else a rounded triangle
-    g.beginPath();
-    noteShape(g, x, y + th, rx, ry, headStyle, y + th - vy);
     if (disc) { // the rectangular style: the edge under the disc is metal like the caps (not a dark shade of the colour)
-      const edge = g.createLinearGradient(0, y + ry * 0.4, 0, y + th + ry);
-      const m = n.sp ? ['#f0d060', '#a37c00', '#3d2e00'] : ['#d4dae1', '#7f8893', '#30353b'];
-      edge.addColorStop(0, m[0]);
-      edge.addColorStop(0.45, m[1]);
-      edge.addColorStop(0.75, m[2]);
-      edge.addColorStop(1, n.sp ? 'rgba(61,46,0,0.35)' : 'rgba(48,53,59,0.35)'); // the metal fades into the road at the bottom: depth
-      g.fillStyle = edge;
-    } else g.fillStyle = darken(n.tap && !n.sp ? TAP_COLOR : colors[n.lane], 0.45); // the edge keeps the plain lane colour (no star power overlay)
-    g.fill();
+      const y0 = y + ry * 0.4; // the gradient runs from y0 down to y + th + ry: a unit gradient (0..1) under that translate and scale
+      const span = y + th + ry - y0;
+      g.save();
+      g.translate(0, y0);
+      g.scale(1, span);
+      g.beginPath();
+      unitY.g = g; unitY.y0 = y0; unitY.k = 1 / span;
+      noteShape(unitY, x, y + th, rx, ry, headStyle, y + th - vy);
+      unitY.g = null;
+      g.fillStyle = discEdgeGradient(g, n.sp);
+      g.fill();
+      g.restore();
+    } else {
+      g.beginPath();
+      noteShape(g, x, y + th, rx, ry, headStyle, y + th - vy);
+      g.fillStyle = darken(n.tap && !n.sp ? TAP_COLOR : colors[n.lane], 0.45); // the edge keeps the plain lane colour (no star power overlay)
+      g.fill();
+    }
     g.beginPath();
     noteShape(g, x, y, rx, ry, headStyle, y - vy);
     g.fillStyle = body;

@@ -707,21 +707,40 @@ export function drawYNote(g, x, y, hw, hh, n, laneColor, bodyColor, taper = 0, s
 
 // A cymbal in the rectangular style, after YARG's cymbal model: a chrome disc with a coloured cone in the middle (an accent has a white ring, a ghost a dark centre with
 // a coloured ring). Call it with the disc's outline (an ellipse of half sizes rx / ry at x, y) as the current path.
+// Its gradients are built once in unit space (radius 1) and drawn under a scale, with the path added after the scale in unit coordinates (adding it
+// before the scale and filling under it rasterizes the edges a little differently in Chromium; this way the pixels are the same as before).
+let cymbalGrads = null; // { chrome: [plain, gold], cone }
+function cymbalGradients(g) {
+  if (!cymbalGrads) {
+    const chrome = (c) => {
+      const gr = g.createRadialGradient(0, 0, 0, 0, 0, 1);
+      [0, 0.6, 0.88, 1].forEach((o, i) => gr.addColorStop(o, c[i]));
+      return gr;
+    };
+    const cone = g.createRadialGradient(-0.25, -0.3, 0, 0, 0, 1);
+    cone.addColorStop(0, 'rgba(255,255,255,0.6)');
+    cone.addColorStop(1, 'rgba(0,0,0,0.12)');
+    cymbalGrads = { chrome: [chrome(['#eef2f6', '#9aa3ad', '#e3e9f0', '#2e3237']), chrome(['#fff0a0', '#b88a00', '#ffe27a', '#3d2e00'])], cone };
+  }
+  return cymbalGrads;
+}
+// Fills a circle of radius `r` at the current origin with a unit-space gradient scaled by `s`.
+function fillCircleScaled(g, gradient, r, s) {
+  g.save();
+  g.scale(s, s);
+  g.beginPath();
+  g.arc(0, 0, r / s, 0, Math.PI * 2);
+  g.fillStyle = gradient;
+  g.fill();
+  g.restore();
+}
 export function drawCymbalFace(g, x, y, rx, ry, n, laneColor) {
+  const grads = cymbalGradients(g);
   g.save();
   g.clip();
   g.translate(x, y);
   g.scale(1, ry / rx); // work in a circle of radius rx, the ellipse comes from this scale
-  const gold = n.sp;
-  const chrome = g.createRadialGradient(0, 0, 0, 0, 0, rx);
-  chrome.addColorStop(0, gold ? '#fff0a0' : '#eef2f6');
-  chrome.addColorStop(0.6, gold ? '#b88a00' : '#9aa3ad');
-  chrome.addColorStop(0.88, gold ? '#ffe27a' : '#e3e9f0');
-  chrome.addColorStop(1, gold ? '#3d2e00' : '#2e3237');
-  g.fillStyle = chrome;
-  g.beginPath();
-  g.arc(0, 0, rx + 1, 0, Math.PI * 2);
-  g.fill();
+  fillCircleScaled(g, grads.chrome[n.sp ? 1 : 0], rx + 1, rx);
   if (n.accent) { // the white ring
     g.strokeStyle = '#ffffff';
     g.lineWidth = rx * 0.14;
@@ -741,11 +760,7 @@ export function drawCymbalFace(g, x, y, rx, ry, n, laneColor) {
   } else { // the cone: the colour with a light top
     g.fillStyle = laneColor;
     g.fill();
-    const cone = g.createRadialGradient(-inner * 0.25, -inner * 0.3, 0, 0, 0, inner);
-    cone.addColorStop(0, 'rgba(255,255,255,0.6)');
-    cone.addColorStop(1, 'rgba(0,0,0,0.12)');
-    g.fillStyle = cone;
-    g.fill();
+    fillCircleScaled(g, grads.cone, inner, inner);
   }
   g.restore();
 }
