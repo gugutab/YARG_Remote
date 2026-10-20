@@ -217,6 +217,16 @@ export function fillTailHalo(g, color, cx, half, reach, yTop, yBot, strength, wi
 const tailHaloGradients = new Map(); // colour -> [{ half, reach, lin, rad }]
 let tailHaloCount = 0;
 
+// Motion blur samples per frame (app.js blurSampleCount): halved after a blurred frame slower than BLUR_SLOW_MS, one more after one faster than
+// BLUR_FAST_MS; a gap over 100 ms is not a run of blurred frames (the next jump starts from the count learnt before).
+export const BLUR_MAX_SAMPLES = 8;
+const BLUR_SLOW_MS = 25; // (under 40 fps)
+const BLUR_FAST_MS = 18;
+export function adaptBlurSamples(n, gapMs) {
+  if (!(gapMs < 100)) return n;
+  if (gapMs > BLUR_SLOW_MS) return Math.max(2, n >> 1);
+  return gapMs < BLUR_FAST_MS ? Math.min(BLUR_MAX_SAMPLES, n + 1) : n;
+}
 export const HIT_FLASH_SEC = 0.14; // how long a hit pad stays lit after a note hit
 export const BAR_FLASH_SEC = 0.24; // ... after a pedal or open hit (it lights every pad)
 

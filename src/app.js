@@ -4,7 +4,7 @@ import { DIFFICULTIES, EXTENDED_DRUM_LANES, instrumentOptions, availableDifficul
 import { MultiTrackPlayer } from './player.js';
 import { Metronome } from './metronome.js';
 import { Highway } from './highway.js';
-import { rebuildYNote, noteCutFraction } from './gfx.js';
+import { rebuildYNote, noteCutFraction, adaptBlurSamples, BLUR_MAX_SAMPLES } from './gfx.js';
 import { countdownColors, vocalColors } from './uicolors.js';
 import { createErrorGate } from './errorgate.js';
 import { PerfMeter } from './perf.js';
@@ -3163,6 +3163,15 @@ document.addEventListener('keydown', (e) => {
 let vis = { shown: null, last: null, anim: null, chart: null, step: 0 };
 const MOTION_BLUR_MIN_STEP = 0.06; // seconds of song per frame from which the jump is blurred
 const SEEK_JUMP_SEC = 0.75; // a bigger step between two frames than playback or a drag can make
+// Motion blur draws the whole chart once per sample. On a dense chart 8 samples took ~80 ms a frame, so a 0.7 s seek animation showed ~13 frames
+// and looked stuck. The count adapts to the gap between blurred frames (halved when slow, +1 when fast) and is kept for the next jump.
+let blurSamples = BLUR_MAX_SAMPLES;
+let lastBlurAt = -Infinity;
+function blurSampleCount(now) {
+  blurSamples = adaptBlurSamples(blurSamples, now - lastBlurAt);
+  lastBlurAt = now;
+  return blurSamples;
+}
 const seekAnimMs = (dist) => Math.min(700, 280 + dist * 25); // longer for longer jumps, 0.7 s at most
 function visualChartTime(ct) {
   const now = performance.now();
@@ -3295,7 +3304,8 @@ function frame(frameTs) {
       highway.litLag = shownTime - chartTime; // (a backward seek animation lights none of the notes it sweeps over)
       if (vis.anim && Math.abs(vis.step) > MOTION_BLUR_MIN_STEP && motionPref('highway.motionBlur')) { // a fast jump: blur the motion
         const span = Math.max(-0.6, Math.min(0.6, vis.step * 0.85)); // the exposure: most of the frame, within limits
-        draw(() => highway.renderBlur(Array.from({ length: 8 }, (_, k) => shownTime - span * (1 - k / 7))));
+        const n = blurSampleCount(frameTs || frameStart);
+        draw(() => highway.renderBlur(Array.from({ length: n }, (_, k) => shownTime - span * (1 - k / (n - 1)))));
       } else if (canSkipDraw(frameStart, shownTime)) { // idle: the panes are unchanged; a visualizer behind them (own canvas) keeps moving
         if (highway.visualizer) draw(() => highway.drawBackground(shownTime));
       } else {

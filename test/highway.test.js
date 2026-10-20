@@ -192,3 +192,14 @@ test('lane scroll speed is fixed in pixels: a taller window shows more lookahead
   // the visible time grows with the height
   assert.ok(BASE_LOOKAHEAD_SEC * laneLookFactor(1000) > BASE_LOOKAHEAD_SEC * laneLookFactor(700));
 });
+
+test('motion blur sample count adapts to the frame time (adaptBlurSamples)', async () => {
+  const { adaptBlurSamples, BLUR_MAX_SAMPLES } = await import('../src/gfx.js');
+  assert.equal(adaptBlurSamples(8, 80), 4); // 8 samples on a dense chart took ~80 ms: the seek animation showed ~13 frames
+  assert.equal(adaptBlurSamples(4, 40), 2);
+  assert.equal(adaptBlurSamples(2, 60), 2); // never below 2
+  assert.equal(adaptBlurSamples(4, 10), 5); // fast again: one more
+  assert.equal(adaptBlurSamples(BLUR_MAX_SAMPLES, 5), BLUR_MAX_SAMPLES);
+  assert.equal(adaptBlurSamples(3, 20), 3);
+  assert.equal(adaptBlurSamples(3, 500), 3); // not consecutive blurred frames: kept for the next jump
+});
