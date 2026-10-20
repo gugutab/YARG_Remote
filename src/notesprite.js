@@ -58,7 +58,7 @@ const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 100" width
 </svg>
 `;
 
-const LEVELS = [440, 1100]; // raster widths: a small sprite for small notes, a large one for the big notes near the hit line (drawn a note at a time, not blurred or blocky)
+const LEVELS = [120, 240, 480, 1000]; // raster widths (like a mip chain, each rendered straight from the SVG): a note is drawn from the smallest one that is not smaller than it is on screen, so it is never scaled by much
 const sprites = new Map(); // key|level -> canvas, or 'loading'
 const listeners = new Set(); // called when a sprite finishes loading (the highway redraws)
 export const onNoteSpriteReady = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
@@ -93,11 +93,11 @@ export function noteSpriteSvg(variant, color, sp) {
 
 export const noteVariant = (n) => (n.tap || n.ghost ? 'dark' : n.hopo || n.accent ? 'white' : 'plain');
 
-function getSprite(n, color, level) {
+function getSprite(n, color, level, peek = false) {
   const key = `${noteVariant(n)}|${color}|${n.sp ? 1 : 0}|${level}`;
   const hit = sprites.get(key);
   if (hit && hit !== 'loading' && hit !== 'failed') return hit;
-  if (!hit && typeof Image !== 'undefined' && typeof document !== 'undefined') {
+  if (!hit && !peek && typeof Image !== 'undefined' && typeof document !== 'undefined') {
     sprites.set(key, 'loading');
     const w = LEVELS[level];
     const img = new Image();
@@ -119,7 +119,7 @@ function getSprite(n, color, level) {
 
 // The perspective of a note: how much of the top face and how much of the side (the base) shows, from the angle at which the fretboard is seen. `elevation` is that angle in
 // degrees (90 = straight down); the design is drawn for 30 degrees, so the face is scaled by sin(angle) / sin(30) and the base by cos(angle) / cos(30). `dist` (px, 0 = none) is the
-// distance from the note to the vanishing point of the 3D view: the rows of the note are drawn narrower towards the top, as the outline of the canvas notes is.
+// distance from the note to the vanishing point of the 3D view (kept for callers; the note itself is not tapered any more).
 export function noteView(elevation, dist = 0) {
   const r = (elevation * Math.PI) / 180;
   return { fh: Math.sin(r) / Math.sin(Math.PI / 6), fb: Math.cos(r) / Math.cos(Math.PI / 6), dist };
@@ -127,16 +127,16 @@ export function noteView(elevation, dist = 0) {
 const FACE_TOP = 12; // sprite rows (in design units) of the face part and of the base part
 const FACE_BOTTOM = 84;
 const BASE_BOTTOM = 98;
-const SLICES = 5;
-const TAPER = 3; // the same exaggeration as the canvas notes (gfx.js TAPER_GAIN)
 
 // Draws the note at (cx, cy) (the middle of its face), `hw` the half width of the note's old outline; `white` (0..1) lightens it (held / leaving notes); `view` from noteView.
 // Returns false while the sprite is not ready (the caller draws the canvas version).
 export function drawNoteSprite(g, n, color, cx, cy, hw, white = 0, view = DEFAULT_VIEW) {
   const W = hw * 2 * (220 / 198); // the visible width of the design is 198 of the 220 units
   const px = W * (g.getTransform().a || 1); // the width on the screen in device pixels
-  const want = px > LEVELS[0] * 0.85 ? 1 : 0;
-  const sprite = getSprite(n, color, want) || (want ? getSprite(n, color, 0) : null); // (the small one while the large one loads)
+  let want = LEVELS.findIndex((w) => w >= px * 0.9);
+  if (want < 0) want = LEVELS.length - 1;
+  let sprite = getSprite(n, color, want);
+  for (let d = 1; !sprite && d < LEVELS.length; d++) sprite = (want + d < LEVELS.length ? getSprite(n, color, want + d, true) : null) || (want - d >= 0 ? getSprite(n, color, want - d, true) : null); // (a neighbour size while this one loads)
   if (!sprite) return false;
   const U = sprite.width / 220; // sprite pixels per design unit
   g.imageSmoothingEnabled = true;
@@ -147,13 +147,8 @@ export function drawNoteSprite(g, n, color, cx, cy, hw, white = 0, view = DEFAUL
   const baseH = (BASE_BOTTOM - FACE_BOTTOM) * s * view.fb;
   const paint = () => {
     g.drawImage(sprite, 0, FACE_BOTTOM * U, sprite.width, (BASE_BOTTOM - FACE_BOTTOM) * U, cx - W / 2, faceY + faceH - 0.5, W, baseH + 0.5); // the base first, the face over it
-    const n2 = view.dist > 0 && g.globalAlpha > 0.995 ? SLICES : 1; // rows of the face, each with its own width when there is a vanishing point (one piece while it is translucent: the rows would overlap and show as bands)
-    const srcH = ((FACE_BOTTOM - FACE_TOP) * U) / n2;
-    for (let i = 0; i < n2; i++) {
-      const py = faceY + (faceH / n2) * (i + 0.5);
-      const f = n2 === 1 ? 1 : Math.min(1.6, Math.max(0.5, 1 + (TAPER * (py - cy)) / view.dist));
-      g.drawImage(sprite, 0, FACE_TOP * U + i * srcH, sprite.width, srcH + 0.5 * (U / 2), cx - (W * f) / 2, faceY + (faceH / n2) * i, W * f, faceH / n2 + 0.6);
-    }
+    // One piece: drawing the face in rows with a different width each (to taper it towards the vanishing point) left stair-stepped, striped edges.
+    g.drawImage(sprite, 0, FACE_TOP * U, sprite.width, (FACE_BOTTOM - FACE_TOP) * U, cx - W / 2, faceY, W, faceH);
   };
   paint();
   if (white > 0.02) {
