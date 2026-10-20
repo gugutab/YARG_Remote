@@ -930,7 +930,7 @@ function renderList({ keepScroll = false } = {}) {
   els.sortDir.title = sortDesc ? 'Descending (click to reverse)' : 'Ascending (click to reverse)';
   list.setActive(infoOpen ? current?.song ?? null : null); // marked while its details are open
   list.setItems(heads ? buildItems(shown, els.sortBy.value) : shown.map((song) => ({ type: 'song', song })), { keepScroll, evenGroups: heads && els.sortBy.value === 'pack' }); // pack sort: every pack gets a label on the rail
-  els.count.textContent = songs.length ? `${shown.length} of ${songs.length} songs${ranked ? ' · best match first' : ''}` : '';
+  els.count.textContent = songs.length ? `${shown.length} of ${songs.length} songs${ranked ? ' · best matches first in each group' : ''}` : '';
   els.empty.hidden = songs.length > 0;
 }
 
