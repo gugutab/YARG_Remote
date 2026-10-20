@@ -53,7 +53,8 @@ import {
 } from './gfx.js';
 export { firstVisibleIndex } from './gfx.js';
 import { renderLanes3D } from './highway3d.js';
-import { drawNoteSprite, onNoteSpriteReady } from './notesprite.js';
+import { drawNoteSprite, onNoteSpriteReady, noteView } from './notesprite.js';
+const NOTE_VIEW_2D = noteView(50); // the flat view looks at the board from above: more of the face, less of the side
 import { buildKaraokeLines, karaokeAt, syllableProgress } from './karaoke.js';
 import { countdownColors, vocalColors, mixHex } from './uicolors.js';
 import { waitCountdowns, countdownAt, countdownAlpha, measureStarts, measuresLeft, COUNTDOWN_HIDE_SEC } from './countdown.js';
@@ -1407,7 +1408,7 @@ export class Highway {
         g.restore();
         g.globalCompositeOperation = 'source-over';
       }
-      const sprited = !n.cymbal && this.noteStyle === 'rect' && drawNoteSprite(g, n, colors[n.lane], cx, cy, r * wide * NOTE_RECT_W, white); // the SVG note design (notesprite.js), once its sprite is ready
+      const sprited = !n.cymbal && this.noteStyle === 'rect' && drawNoteSprite(g, n, colors[n.lane], cx, cy, r * wide * NOTE_RECT_W, white, NOTE_VIEW_2D); // the SVG note design (notesprite.js), once its sprite is ready
       if (!sprited) {
       g.beginPath();
       const disc = n.cymbal && this.noteStyle === 'rect'; // the rectangular style draws a cymbal as YARG's chrome disc (the circle style keeps the triangle)

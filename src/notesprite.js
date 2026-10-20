@@ -38,7 +38,7 @@ const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 100" width
   <use href="#body" fill="url(#g-body)"/>
   <use href="#body" fill="url(#g-ends)"/>
   {{extra}}
-  <g id="capL">
+  <g id="capL" transform="translate(11 0) scale(1.5 1) translate(-11 0)">
     <g clip-path="url(#clip-cap)">
       <use href="#cap" fill="{{capFill}}"/>
       <g filter="url(#soft)" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -76,8 +76,8 @@ const mix = (a, b, t) => {
 
 const EXTRA = {
   plain: '',
-  white: '<g clip-path="url(#clip-body)"><rect x="24" y="14" width="34" height="78" fill="#fff" opacity="0.96"/><rect x="162" y="14" width="34" height="78" fill="#fff" opacity="0.96"/></g>',
-  dark: '<g clip-path="url(#clip-body)"><rect x="56" y="14" width="108" height="78" fill="#1b1c1f"/><rect x="56" y="14" width="108" height="30" fill="#fff" opacity="0.07"/></g>',
+  white: '<g clip-path="url(#clip-body)"><rect x="24" y="14" width="48" height="78" fill="#fff" opacity="0.96"/><rect x="148" y="14" width="48" height="78" fill="#fff" opacity="0.96"/></g>',
+  dark: '<g clip-path="url(#clip-body)"><rect x="70" y="14" width="80" height="78" fill="#1b1c1f"/><rect x="70" y="14" width="80" height="30" fill="#fff" opacity="0.07"/></g>',
 };
 
 export function noteSpriteSvg(variant, color, sp) {
@@ -115,24 +115,49 @@ function getSprite(n, color) {
   return null;
 }
 
-// Draws the note at (cx, cy) (the middle of its face), `hw` the half width of the note's old outline; `white` (0..1) lightens it (held / leaving notes).
+// The perspective of a note: how much of the top face and how much of the side (the base) shows, from the angle at which the fretboard is seen. `elevation` is that angle in
+// degrees (90 = straight down); the design is drawn for 30 degrees, so the face is scaled by sin(angle) / sin(30) and the base by cos(angle) / cos(30). `dist` (px, 0 = none) is the
+// distance from the note to the vanishing point of the 3D view: the rows of the note are drawn narrower towards the top, as the outline of the canvas notes is.
+export function noteView(elevation, dist = 0) {
+  const r = (elevation * Math.PI) / 180;
+  return { fh: Math.sin(r) / Math.sin(Math.PI / 6), fb: Math.cos(r) / Math.cos(Math.PI / 6), dist };
+}
+const FACE_TOP = 12; // sprite rows (in design units) of the face part and of the base part
+const FACE_BOTTOM = 84;
+const BASE_BOTTOM = 98;
+const SLICES = 5;
+const TAPER = 3; // the same exaggeration as the canvas notes (gfx.js TAPER_GAIN)
+
+// Draws the note at (cx, cy) (the middle of its face), `hw` the half width of the note's old outline; `white` (0..1) lightens it (held / leaving notes); `view` from noteView.
 // Returns false while the sprite is not ready (the caller draws the canvas version).
-export function drawNoteSprite(g, n, color, cx, cy, hw, white = 0) {
+export function drawNoteSprite(g, n, color, cx, cy, hw, white = 0, view = DEFAULT_VIEW) {
   const sprite = getSprite(n, color);
   if (!sprite) return false;
   const W = hw * 2 * (220 / 198); // the visible width of the design is 198 of the 220 units
   const s = W / 220;
-  const x = cx - 110 * s;
-  const y = cy - 52.5 * s; // the face's middle is at 52.5 of 100
-  g.drawImage(sprite, x, y, W, 100 * s);
+  const faceH = (FACE_BOTTOM - FACE_TOP) * s * view.fh;
+  const faceY = cy - (52.5 - FACE_TOP) * s * view.fh; // the face's middle is at 52.5 of 100
+  const baseH = (BASE_BOTTOM - FACE_BOTTOM) * s * view.fb;
+  const paint = () => {
+    g.drawImage(sprite, 0, FACE_BOTTOM * 2, 440, (BASE_BOTTOM - FACE_BOTTOM) * 2, cx - W / 2, faceY + faceH - 0.5, W, baseH + 0.5); // the base first, the face over it
+    const n2 = view.dist > 0 && g.globalAlpha > 0.995 ? SLICES : 1; // rows of the face, each with its own width when there is a vanishing point (one piece while it is translucent: the rows would overlap and show as bands)
+    const srcH = ((FACE_BOTTOM - FACE_TOP) * 2) / n2;
+    for (let i = 0; i < n2; i++) {
+      const py = faceY + (faceH / n2) * (i + 0.5);
+      const f = n2 === 1 ? 1 : Math.min(1.6, Math.max(0.5, 1 + (TAPER * (py - cy)) / view.dist));
+      g.drawImage(sprite, 0, FACE_TOP * 2 + i * srcH, 440, srcH + 0.5, cx - (W * f) / 2, faceY + (faceH / n2) * i, W * f, faceH / n2 + 0.6);
+    }
+  };
+  paint();
   if (white > 0.02) {
     const alpha = g.globalAlpha;
     const filter = g.filter;
     g.globalAlpha = alpha * Math.min(1, white);
     g.filter = 'brightness(3) saturate(0.25)';
-    g.drawImage(sprite, x, y, W, 100 * s);
+    paint();
     g.filter = filter;
     g.globalAlpha = alpha;
   }
   return true;
 }
+const DEFAULT_VIEW = noteView(30);
