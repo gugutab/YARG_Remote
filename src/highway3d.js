@@ -355,8 +355,8 @@ export function renderLanes3D(hw, t, w, h) {
     g.fillStyle = body;
     g.fill();
     if (faced) drawGuitarNoteFace(g, x, y, rx * NOTE_RECT_W, ry * NOTE_RECT_H, n, colors[n.lane]);
-    g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH * p : Math.max(1, (n.sp ? 4.5 : 1.5) * p);
-    g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : n.sp ? STAR_POWER_GOLD : 'rgba(0,0,0,0.5)';
+    g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH * p : Math.max(1, 1.5 * p);
+    g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : 'rgba(0,0,0,0.5)';
     g.stroke();
     if (n.hopo && !faced) {
       g.beginPath();

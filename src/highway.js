@@ -1411,8 +1411,8 @@ export class Highway {
       g.fill();
       if (faced) drawGuitarNoteFace(g, cx, cy, r * wide * NOTE_RECT_W, r * NOTE_RECT_H, n, colors[n.lane]);
       // accent: same size, with a thicker outline in a darker shade of the note's colour
-      g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH : n.sp ? 4 : 2;
-      g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : n.sp ? STAR_POWER_GOLD : 'rgba(0,0,0,0.5)'; // star power: the white body with a gold outline, as YARG's white notes with gold metal
+      g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH : 2;
+      g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : 'rgba(0,0,0,0.5)'; // (star power notes have no coloured outline: the white body and, in the rectangular style, the gold caps mark them)
       g.stroke();
       if (n.hopo && !faced) { // guitar HOPO: a white dot in the head (the rectangular style has white strips instead)
         g.beginPath();

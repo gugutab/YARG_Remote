@@ -412,7 +412,7 @@ export function drawGuitarNoteFace(g, x, y, hw, hh, n, laneColor) {
   g.save();
   g.clip();
   const cap = hw * 0.26;
-  const strip = hw * 0.17;
+  const strip = hw * (n.tap ? 0.17 : 0.3); // the white HOPO strips are wider than the tap's coloured ones
   const top = y - hh - 1;
   const full = 2 * hh + 2;
   if (n.tap) { // dark centre, the colour on the strips beside the caps
