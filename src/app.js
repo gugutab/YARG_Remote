@@ -53,6 +53,8 @@ const els = Object.fromEntries([
 for (const img of [els.cover, els.infoCover, els.infoPopCover, els.endCover]) img.addEventListener('error', () => { img.hidden = true; });
 const player = new MultiTrackPlayer();
 const highway = new Highway(els.highway);
+let frameSleep = 0; // the timer while the frame loop ticks slowly (paused and idle, see `idleDeep`); 0 while it runs on requestAnimationFrame
+{ const invalidate = highway.invalidate; highway.invalidate = function () { invalidate.call(this); wakeLoop(); }; } // (any change to the picture wakes a sleeping loop)
 highway.setBackgroundCanvas(document.getElementById('bgCanvas'));
 const perf = new PerfMeter();
 let perfMode = 'off'; // the perf.overlay setting, kept here so the frame loop does not read the prefs every frame
@@ -1912,7 +1914,8 @@ function setSetting(name, value) {
 // The mouse wheel over any slider moves it (up = more, 5 notches... one step per notch; a slider with many steps moves 2% of its range per
 // notch); touchpads give fractions, which add up. The seek bar keeps its own wheel (5 s per notch). Listeners elsewhere hear a normal `input`.
 let wheelAcc = new WeakMap();
-// The (non-passive) listener sits on each range input, not on the document, so scrolling lists never waits for the main thread.
+// The (non-passive) listener sits on each range input, not on the document, so scrolling lists never waits for the main thread. It is bound lazily, the first
+// time the pointer goes over the slider or it takes the focus (one passive delegated listener each; no MutationObserver over the document).
 function onRangeWheel(e) {
   const el = e.currentTarget;
   if (el.disabled) return;
@@ -1933,7 +1936,8 @@ function onRangeWheel(e) {
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }
 // The other sliders (settings, the pause panel, the visualizer menu, the Listen card) get the same custom look: they are painted here, whatever sets their value
-// (an input event, a script assigning .value, a new min / max).
+// (an input event, a script assigning .value, .min or .max; the static ones once at start, and again when the pointer or the focus reaches them).
+// Every such slider is given its value through `.value` after it is built (settings refreshers, syncMetPop, the visualizer menu, the Listen card).
 const GENERIC_RANGE = '.sp-range input[type=range], .pp-row input[type=range], .viz-level input[type=range], .listen input[type=range], .now-playing input[type=range]';
 function paintGenericRange(el) {
   if (!el.matches?.(GENERIC_RANGE)) return;
@@ -1941,34 +1945,23 @@ function paintGenericRange(el) {
   const span = Number(el.max || 100) - min || 1;
   el.style.setProperty('--p', String(Math.min(1, Math.max(0, (Number(el.value) - min) / span))));
 }
-const rangeValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
-Object.defineProperty(HTMLInputElement.prototype, 'value', { ...rangeValue, set(v) { rangeValue.set.call(this, v); if (this.type === 'range') paintGenericRange(this); } });
+for (const prop of ['value', 'min', 'max']) {
+  const own = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, prop);
+  Object.defineProperty(HTMLInputElement.prototype, prop, { ...own, set(v) { own.set.call(this, v); if (this.type === 'range') paintGenericRange(this); } });
+}
 document.addEventListener('input', (e) => { if (e.target.type === 'range') paintGenericRange(e.target); }, true);
-function paintGenericIn(root) {
-  if (root.matches?.('input[type=range]')) paintGenericRange(root);
-  root.querySelectorAll?.('input[type=range]').forEach(paintGenericRange);
-}
-paintGenericIn(document.body);
-new MutationObserver((records) => {
-  for (const r of records) {
-    if (r.type === 'attributes') paintGenericRange(r.target);
-    else for (const n of r.addedNodes) if (n.nodeType === 1) paintGenericIn(n);
-  }
-}).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['min', 'max'] });
+document.querySelectorAll('input[type=range]').forEach(paintGenericRange);
 const wheelBound = new WeakSet();
-function bindRangeWheel(root) {
-  const list = root.matches?.('input[type=range]') ? [root] : [];
-  if (root.querySelectorAll) list.push(...root.querySelectorAll('input[type=range]'));
-  for (const el of list) {
-    if (wheelBound.has(el) || el.closest('#seekbox')) continue;
-    wheelBound.add(el);
-    el.addEventListener('wheel', onRangeWheel, { passive: false });
-  }
+function reachRange(e) {
+  const el = e.target;
+  if (el?.type !== 'range' || el.tagName !== 'INPUT') return;
+  paintGenericRange(el);
+  if (wheelBound.has(el) || el.closest('#seekbox')) return;
+  wheelBound.add(el);
+  el.addEventListener('wheel', onRangeWheel, { passive: false });
 }
-bindRangeWheel(document.body);
-new MutationObserver((records) => {
-  for (const r of records) for (const n of r.addedNodes) if (n.nodeType === 1) bindRangeWheel(n);
-}).observe(document.body, { childList: true, subtree: true });
+document.addEventListener('pointerover', reachRange, { capture: true, passive: true });
+document.addEventListener('focusin', reachRange, true);
 // ...and over the volume button of the bar it moves the master volume (5% per notch; it also un-mutes)
 let masterWheelAcc = 0;
 els.mixerBtn.addEventListener('wheel', (e) => {
@@ -2120,9 +2113,26 @@ document.addEventListener('click', (e) => {
 
 // ---------- Transport ----------
 els.play.addEventListener('click', () => (liveStage ? toggleBackground() : togglePlay())); // (the bar belongs to the song on the stage)
+// The bar is written every frame, so it is written only when the picture can change: while playing the fill and the thumb move in whole device
+// pixels of the bar (a write per pixel of travel, not per frame); paused, the exact position (so a paused bar looks as it always did).
+let seekBarPx = 0; // the bar's width in device pixels
+new ResizeObserver(([e]) => { seekBarPx = e.devicePixelContentBoxSize?.[0]?.inlineSize || e.contentRect.width * window.devicePixelRatio; }).observe(els.seek);
+let seekPct = '';
 function paintSeek(at = Number(els.seek.value)) { // the fill: the playing position (the thumb alone follows the pointer while it is dragged)
   const max = Number(els.seek.max) || 1;
-  els.seek.style.setProperty('--pct', `${Math.min(100, (at / max) * 100)}%`);
+  let pct = Math.min(100, (at / max) * 100);
+  if (player.playing && seekBarPx > 0) { const q = 100 / seekBarPx; pct = Math.floor(pct / q) * q; }
+  const s = `${pct}%`;
+  if (s !== seekPct) { seekPct = s; els.seek.style.setProperty('--pct', s); }
+}
+let seekValueAt = NaN;
+let seekValueStr = '';
+function setSeekValue(t) { // the thumb (same rule as the fill; written again if anything else moved it)
+  if (player.playing && seekBarPx > 0) { const q = (Number(els.seek.max) || 1) / seekBarPx; t = Math.floor(t / q) * q; }
+  if (t === seekValueAt && els.seek.value === seekValueStr) return;
+  seekValueAt = t;
+  els.seek.value = t;
+  seekValueStr = els.seek.value;
 }
 els.seek.addEventListener('input', () => {
   seeking = true;
@@ -2643,6 +2653,7 @@ document.addEventListener('visibilitychange', () => (document.hidden ? onFocusLo
 
 const PLAY_TITLES = { play: els.play.title, npPlay: els.npPlay.title };
 function syncPlayButton() {
+  wakeLoop(); // (playback can start without input: media keys, autoplay, a wait ending)
   const playing = player.playing || !!startDone || !!loopWait; // (the start delay shows the playing state)
   const restart = ended && !playing; // at the end of the song the play button restarts it
   const icon = playing ? '#i-pause' : restart ? '#i-replay' : '#i-play';
@@ -3648,7 +3659,7 @@ function visualChartTime(ct) {
 const IDLE_AFTER_MS = 3000;
 const IDLE_REFRESH_MS = 250;
 let lastInputAt = performance.now();
-const wakeUp = () => { lastInputAt = performance.now(); };
+const wakeUp = () => { lastInputAt = performance.now(); wakeLoop(); };
 for (const type of ['pointermove', 'pointerdown', 'pointerup', 'wheel', 'keydown', 'keyup', 'input', 'change', 'click', 'touchstart', 'dragover', 'drop']) document.addEventListener(type, wakeUp, { capture: true, passive: true });
 for (const type of ['resize', 'hashchange', 'popstate', 'focus', 'visibilitychange']) window.addEventListener(type, wakeUp);
 const lastDraw = { at: -Infinity, t: NaN, w: 0, h: 0, dpr: 0, panes: null, chart: null };
@@ -3657,6 +3668,19 @@ function canSkipDraw(now, t) {
   if (now - Math.max(lastInputAt, highway.dirtyAt) < IDLE_AFTER_MS || now - lastDraw.at >= IDLE_REFRESH_MS) return false;
   const c = els.highway;
   return lastDraw.t === t && lastDraw.w === c.clientWidth && lastDraw.h === c.clientHeight && lastDraw.dpr === window.devicePixelRatio && lastDraw.panes === highway.panes && lastDraw.chart === chart;
+}
+// Deep idle: on top of the idle conditions above, nothing that animates by itself (no visualizer, no loading backdrop, no start/resume/loop wait).
+// The loop then ticks at IDLE_REFRESH_MS on a timer instead of every display frame (the refresh it would draw anyway), and any input,
+// `highway.invalidate()` or play-button change wakes it at once (`wakeLoop`).
+function idleDeep(now) {
+  return !player.playing && !vis.anim && !seeking && perfMode === 'off' && !highway.visualizer && !holdStage && !loadingBackdrop
+    && !startDone && !resumeTimer && !loopWait && now - Math.max(lastInputAt, highway.dirtyAt) >= IDLE_AFTER_MS;
+}
+function wakeLoop() {
+  if (!frameSleep) return;
+  clearTimeout(frameSleep);
+  frameSleep = 0;
+  requestAnimationFrame(frame);
 }
 function noteDraw(now, t) {
   const c = els.highway;
@@ -3692,7 +3716,9 @@ function guarded(part, fn) {
 }
 
 function frame(frameTs) {
-  requestAnimationFrame(frame); // first, so nothing below can end the loop
+  // first, so nothing below can end the loop
+  if (guarded('idle check', () => idleDeep(performance.now()))) frameSleep = setTimeout(() => { frameSleep = 0; requestAnimationFrame(frame); }, IDLE_REFRESH_MS);
+  else requestAnimationFrame(frame);
   guarded('pause panel', syncPausePanel);
   guarded('pause info', syncPauseInfo);
   const frameStart = performance.now();
@@ -3748,8 +3774,8 @@ function frame(frameTs) {
         if (seeking) paintSeek(t); // dragging: the thumb is in the user's hand, the fill goes on with the music
         else {
           const barT = t; // the bar is always at the real position: the thumb is already where the song went and only the fretboards travel there
-          els.seek.value = barT;
-          els.seekbox.classList.toggle('animating', !!vis.anim);
+          setSeekValue(barT);
+          if (els.seekbox.classList.contains('animating') !== !!vis.anim) els.seekbox.classList.toggle('animating', !!vis.anim);
           paintSeek(vis.anim ? Math.max(0, Math.min(player.duration, shownTime + settings.chartDelay)) : barT); // the fill travels with the fretboards (the thumb is already at the target)
           setText(els.timeNow, fmt(barT));
         }
@@ -3766,7 +3792,7 @@ function frame(frameTs) {
     draw(() => highway.render(chartTime));
     guarded('seek bar', () => {
       if (seeking) { paintSeek(t); return; }
-      els.seek.value = t;
+      setSeekValue(t);
       paintSeek(t);
       setText(els.timeNow, fmt(t));
     });
@@ -3931,7 +3957,7 @@ function syncPausePanel() {
   if (els.ppMetronome.getAttribute('aria-pressed') !== String(met)) { els.ppMetronome.setAttribute('aria-pressed', String(met)); els.ppMetronome.textContent = met ? 'On' : 'Off'; }
   const vol = masterState.muted ? 0 : masterState.value;
   if (Number(els.ppVolume.value) !== vol && document.activeElement !== els.ppVolume) els.ppVolume.value = vol;
-  els.ppVolVal.textContent = masterState.muted ? 'Muted' : `${Math.round(masterState.value * 100)}%`;
+  setText(els.ppVolVal, masterState.muted ? 'Muted' : `${Math.round(masterState.value * 100)}%`); // (runs every frame: an unconditional write dirtied layout)
 }
 els.ppSlower.addEventListener('click', () => stepSpeed(-1));
 els.ppFaster.addEventListener('click', () => stepSpeed(1));

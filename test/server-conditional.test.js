@@ -11,7 +11,8 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { createServer, parseRange, isNotModified, validatorsOf } from '../server.mjs';
+import zlib from 'node:zlib';
+import { createServer, parseRange, isNotModified, validatorsOf, pickEncoding, encodedTag } from '../server.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -279,4 +280,85 @@ test('a file that vanishes between stat and open is a 404, not a crash', async (
     assert.equal(r.status, 404);
     assert.equal((await raw(port, '/api/library')).status, 200);
   });
+});
+
+test('pickEncoding: brotli first, then gzip; q=0 refuses; * accepts', () => {
+  assert.equal(pickEncoding('gzip, deflate, br, zstd'), 'br');
+  assert.equal(pickEncoding('gzip'), 'gzip');
+  assert.equal(pickEncoding('br;q=0, gzip;q=0.5'), 'gzip');
+  assert.equal(pickEncoding('br;q=0, gzip;q=0'), null);
+  assert.equal(pickEncoding('identity'), null);
+  assert.equal(pickEncoding(''), null);
+  assert.equal(pickEncoding(undefined), null);
+  assert.equal(pickEncoding('*'), 'br');
+  assert.equal(pickEncoding('*;q=0, gzip'), 'gzip');
+  assert.equal(pickEncoding('BR'), 'br');
+  assert.equal(encodedTag('W/"a-b"', 'br'), 'W/"a-b-br"');
+  assert.equal(encodedTag('W/"a-b"', null), 'W/"a-b"');
+});
+
+test('compression: /api/library and app files in br/gzip with Vary and their own ETag; ranges and /songs stay identity', async () => {
+  await withSpawned(async (port) => {
+    const smallLib = await raw(port, '/api/library', { 'Accept-Encoding': 'br' }); // (one song: under the 1 KB floor, sent as is)
+    assert.equal(smallLib.status, 200);
+    assert.equal(smallLib.headers['content-encoding'], undefined);
+    assert.equal(smallLib.headers.vary, 'Accept-Encoding');
+    for (const target of ['/src/app.js', '/styles.css', '/']) {
+      const plain = await raw(port, target);
+      for (const [enc, unzip] of [['br', zlib.brotliDecompressSync], ['gzip', zlib.gunzipSync]]) {
+        const r = await raw(port, target, { 'Accept-Encoding': enc === 'br' ? 'gzip, deflate, br' : 'gzip' });
+        assert.equal(r.status, 200, `${target} ${enc}`);
+        assert.equal(r.headers['content-encoding'], enc, `${target} ${enc}`);
+        assert.equal(r.headers.vary, 'Accept-Encoding');
+        assert.equal(Number(r.headers['content-length']), r.body.length);
+        assert.ok(unzip(r.body).equals(plain.body), `${target} ${enc} decodes to the identity body`);
+        assert.ok(r.headers.etag.endsWith(`-${enc}"`), r.headers.etag);
+        const again = await raw(port, target, { 'Accept-Encoding': enc, 'If-None-Match': r.headers.etag });
+        assert.equal(again.status, 304, `${target} ${enc} 304`);
+        assert.equal(again.headers.vary, 'Accept-Encoding');
+        const head = await raw(port, target, { 'Accept-Encoding': enc }, 'HEAD');
+        assert.equal(head.status, 200);
+        assert.equal(head.body.length, 0);
+        assert.equal(head.headers['content-length'], r.headers['content-length']);
+      }
+    }
+    const ranged = await raw(port, '/src/app.js', { 'Accept-Encoding': 'br', Range: 'bytes=0-9' });
+    assert.equal(ranged.status, 206);
+    assert.equal(ranged.headers['content-encoding'], undefined);
+    assert.equal(ranged.body.length, 10);
+    const song = await raw(port, OGG, { 'Accept-Encoding': 'br, gzip' });
+    assert.equal(song.status, 200);
+    assert.equal(song.headers['content-encoding'], undefined);
+    assert.ok(song.body.equals(BYTES));
+  });
+});
+
+test('compression: a big /api/library is sent in br/gzip, built once, with a 304 on its tag', async () => {
+  const songsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yarg-lib-songs-'));
+  const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yarg-lib-cache-'));
+  const songs = Array.from({ length: 300 }, (_, i) => ({ id: `Pack/Song ${i}`, folder: `Pack/Song ${i}`, title: `Song ${i}`, artist: 'Band', album: 'Album', ini: { name: `Song ${i}` }, parts: ['guitar'], files: [{ name: 'song.ogg', path: `Pack/Song ${i}/song.ogg` }] }));
+  const server = createServer({ songsDir, cacheDir, scan: async () => songs });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const { port } = server.address();
+  try {
+    const plain = await raw(port, '/api/library');
+    assert.equal(plain.headers['content-encoding'], undefined);
+    assert.ok(plain.body.length > 20000);
+    assert.equal(JSON.parse(plain.body).songs.length, 300);
+    assert.equal((await raw(port, '/api/library', { 'If-None-Match': plain.headers.etag })).status, 304);
+    for (const [enc, unzip] of [['br', zlib.brotliDecompressSync], ['gzip', zlib.gunzipSync]]) {
+      const r = await raw(port, '/api/library', { 'Accept-Encoding': enc });
+      assert.equal(r.headers['content-encoding'], enc);
+      assert.equal(r.headers.vary, 'Accept-Encoding');
+      assert.ok(r.body.length < plain.body.length / 4, `${enc}: ${r.body.length}`);
+      assert.ok(unzip(r.body).equals(plain.body));
+      assert.equal(r.headers.etag, encodedTag(plain.headers.etag, enc));
+      assert.equal((await raw(port, '/api/library', { 'Accept-Encoding': enc, 'If-None-Match': r.headers.etag })).status, 304);
+      assert.equal((await raw(port, '/api/library', { 'Accept-Encoding': enc, 'If-None-Match': plain.headers.etag })).status, 200, 'the identity tag is another representation');
+    }
+  } finally {
+    await new Promise((r) => server.close(r));
+    fs.rmSync(songsDir, { recursive: true, force: true });
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+  }
 });

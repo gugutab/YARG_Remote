@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { songDelaySeconds, parseSongIni } from '../src/ini.js';
-import { alignChannel, alignedLength } from '../src/player.js';
+import { alignChannel, alignedLength, alignOrKeep, sameChannels } from '../src/player.js';
 
 test('song.ini delay (ms) is converted to seconds with the sign kept', () => {
   assert.equal(songDelaySeconds({ delay: 250 }), 0.25);
@@ -32,4 +32,27 @@ test('no delay leaves the stem unchanged', () => {
 
 test('a delay longer than the file leaves a stem that is only silence', () => {
   assert.deepEqual([...alignChannel(Float32Array.from([1, 2, 3]), 1, 5)], [0]);
+});
+
+test('alignOrKeep: no shift keeps the decoded array itself, any shift copies like alignChannel', () => {
+  const src = Float32Array.from([1, 2, 3, 4]);
+  assert.equal(alignOrKeep(src, 1000, 0), src);
+  assert.equal(alignOrKeep(src, 1000, 0.0004), src); // (rounds to 0 samples)
+  assert.equal(alignOrKeep(src, 1000, -0.0004), src);
+  const later = alignOrKeep(src, 1000, 0.001);
+  assert.notEqual(later, src);
+  assert.deepEqual([...later], [2, 3, 4]);
+  assert.deepEqual([...alignOrKeep(src, 1000, -0.002)], [0, 0, 1, 2, 3, 4]);
+  const view = new Float32Array(src.buffer, 4, 2); // (a view on a bigger buffer could not be transferred alone: copied)
+  const kept = alignOrKeep(view, 1000, 0);
+  assert.notEqual(kept, view);
+  assert.deepEqual([...kept], [2, 3]);
+  assert.deepEqual([...alignOrKeep(new Float32Array(0), 1000, 0)], [0]); // (same as alignChannel: at least one sample)
+});
+
+test('sameChannels: identical channels only', () => {
+  assert.equal(sameChannels(Float32Array.from([0, 0.5, -1]), Float32Array.from([0, 0.5, -1])), true);
+  assert.equal(sameChannels(Float32Array.from([0, 0.5, -1]), Float32Array.from([0, 0.5, -0.99])), false);
+  assert.equal(sameChannels(Float32Array.from([0, 0.5]), Float32Array.from([0, 0.5, 0])), false);
+  assert.equal(sameChannels(Float32Array.from([NaN]), Float32Array.from([NaN])), false); // (never merged on doubt)
 });
