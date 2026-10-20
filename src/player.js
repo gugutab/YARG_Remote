@@ -8,7 +8,7 @@
 // load() shifts each stem by the delay once, so chart time 0 is sample 0 of the aligned stem.
 import { PitchShifter } from '../vendor/soundtouch.js';
 import { positionAt, trimHistory, suspendDue, settlesWithin, SUSPEND_AFTER_MS, RESUME_TIMEOUT_MS } from './clock.js';
-import { decodeAll } from './stemdecode.js';
+import { decodeAll, createBudget, withBudget, estimateDecodedBytes, DECODE_BUDGET_BYTES } from './stemdecode.js';
 
 export const WORKLET_START_MS = 6000; // how long the audio worklet may take to start before the legacy engine is used
 const SHIFTER_BUFFER = 2048; // legacy path: samples per ScriptProcessor block (bigger = fewer dropouts)
@@ -30,6 +30,24 @@ export function alignChannel(src, sampleRate, delay) {
   out.set(src.subarray(skip, skip + count), pad);
   return out;
 }
+
+// alignChannel without the copy when there is nothing to shift (the delay rounds to 0 samples, the usual case): the decoded array itself (it owns its
+// whole buffer, so it can be transferred to the worklet). Halves the peak memory of a decode.
+export function alignOrKeep(src, sampleRate, delay) {
+  const shift = Math.round(Math.abs(delay) * sampleRate);
+  if (!shift && src.length > 0 && src.byteOffset === 0 && src.byteLength === src.buffer.byteLength) return src;
+  return alignChannel(src, sampleRate, delay);
+}
+
+// True when the two channels hold the same samples (a stereo file with a mono signal): such a stem keeps one channel, which the mixer plays on
+// both sides (mixstretch.js `right: ch[1] || ch[0]`), so the output is bit-identical with half the memory.
+export function sameChannels(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+const decodeBudget = createBudget(DECODE_BUDGET_BYTES); // (shared by every load: see stemdecode.js)
 
 
 // Suspends the AudioContext after the player has been paused for SUSPEND_AFTER_MS (it releases the device and stops the worklet
@@ -99,7 +117,7 @@ export class LegacyPlayer {
     const result = await decodeAll(stems, async (s) => {
       const file = await s.getFile();
       const data = await file.arrayBuffer();
-      return this.alignBuffer(await this.ctx.decodeAudioData(data), delay);
+      return withBudget(decodeBudget, estimateDecodedBytes(data), async () => this.alignBuffer(await this.ctx.decodeAudioData(data), delay));
     }, onProgress, () => generation !== this.loadGeneration); // (a newer load() took over: stop)
     if (!result) return false;
     this.failedStems = result.failed;
@@ -117,6 +135,7 @@ export class LegacyPlayer {
 
   alignBuffer(decoded, delay) {
     const sr = decoded.sampleRate;
+    if (!Math.round(Math.abs(delay) * sr)) return decoded; // (nothing to shift: no copy)
     const out = this.ctx.createBuffer(decoded.numberOfChannels, alignedLength(decoded.length, sr, delay), sr);
     for (let ch = 0; ch < decoded.numberOfChannels; ch++) {
       out.copyToChannel(alignChannel(decoded.getChannelData(ch), sr, delay), ch);
@@ -274,13 +293,15 @@ class WorkletPlayer {
     const decodeOne = async (s) => {
       const file = await s.getFile();
       const data = await file.arrayBuffer();
-      const decoded = await this.ctx.decodeAudioData(data);
-      const channels = [];
-      for (let ch = 0; ch < Math.min(2, decoded.numberOfChannels); ch++) {
-        channels.push(alignChannel(decoded.getChannelData(ch), decoded.sampleRate, delay));
-      }
-      if (!channels.length) throw new Error('No audio channels');
-      return channels;
+      return withBudget(decodeBudget, estimateDecodedBytes(data), async () => {
+        const decoded = await this.ctx.decodeAudioData(data);
+        if (!decoded.numberOfChannels) throw new Error('No audio channels');
+        const left = decoded.getChannelData(0);
+        const right = decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : null;
+        const channels = [alignOrKeep(left, decoded.sampleRate, delay)];
+        if (right && !sameChannels(left, right)) channels.push(alignOrKeep(right, decoded.sampleRate, delay)); // (a mono signal in stereo keeps one channel)
+        return channels;
+      });
     };
     const head = first.length ? stems.filter((s) => first.includes(s.id)) : stems;
     const tail = head.length && head.length < stems.length ? stems.filter((s) => !head.includes(s)) : [];

@@ -39,3 +39,36 @@ export async function decodeAll(stems, decode, onProgress = () => {}, shouldStop
   }
   return { ok, failed };
 }
+
+// Decoding memory. A decoded stem is float32 at the context's rate (a 6 min stereo stem is ~130 MB), and with every stem decoding at once a long song
+// peaked well over a gigabyte. Each decode first takes its estimated size from a shared budget and gives it back when done: short songs still decode
+// all at once, long ones a few at a time. One decode always runs, however big.
+export const DECODE_BUDGET_BYTES = 640 * 1024 * 1024;
+// The decoded size of an audio file, roughly: a WAV (RIFF) is 16-bit PCM, about 2x as float32; compressed audio (Ogg Vorbis/Opus, MP3) about 24x.
+export function estimateDecodedBytes(data) {
+  const b = new Uint8Array(data, 0, Math.min(4, data.byteLength));
+  const wav = b.length === 4 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46;
+  return data.byteLength * (wav ? 2 : 24);
+}
+// A byte budget shared by async jobs: acquire(n) resolves once `n` more fits (or nothing else holds any), in the order asked; release(n) gives it back.
+export function createBudget(limit) {
+  let used = 0;
+  const waiting = [];
+  const pump = () => {
+    while (waiting.length && (used === 0 || used + waiting[0].n <= limit)) {
+      const w = waiting.shift();
+      used += w.n;
+      w.resolve();
+    }
+  };
+  return {
+    acquire(n) { return new Promise((resolve) => { waiting.push({ n, resolve }); pump(); }); },
+    release(n) { used -= n; pump(); },
+    get used() { return used; },
+  };
+}
+// Runs `job` holding `bytes` of the budget.
+export async function withBudget(budget, bytes, job) {
+  await budget.acquire(bytes);
+  try { return await job(); } finally { budget.release(bytes); }
+}
