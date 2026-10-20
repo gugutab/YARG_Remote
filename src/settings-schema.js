@@ -15,7 +15,7 @@
 
 import { PRESETS, THEME_KEYS, isHex } from './themes.js';
 import { ACTIONS } from './shortcuts.js';
-import { VISUALIZERS } from './visualizers.js';
+import { VISUALIZERS, showsStage } from './visualizers.js';
 import { DETAIL_CHIPS } from './songinfo.js';
 import { PALETTES, DEFAULT_LANE_COLORS, cleanLaneColors } from './palette.js';
 import { cleanPerInstrument } from './perinstrument.js';
@@ -119,8 +119,6 @@ export const SECTIONS = [
       { id: 'highway.palette', group: 'Colours', type: 'choice', label: 'Note colours', help: 'The colours of the five lanes (and of kicks, open and tap notes). Colour-blind safe keeps the lanes apart with red-green and blue-yellow colour blindness.', options: PALETTES.map(({ id, label }) => ({ value: id, label })), default: 'yarg', keywords: 'colour color palette lanes frets colour-blind colorblind deuteranopia protanopia tritanopia accessibility high contrast custom' },
       { id: 'highway.laneColors', group: 'Colours', type: 'custom', ids: ['highway.laneColors'], label: 'Custom lane colours', help: 'Green, red, yellow, blue and orange lanes, left to right (drums use the same colours for their pads).', keywords: 'colour color custom lanes frets picker', when: (get) => get('highway.palette') === 'custom' },
       { id: 'highway.trackOpacity', group: 'Track and bands', type: 'range', label: 'Track opacity', help: 'How solid the track behind the notes is: higher hides more of the background and visualizer.', min: 0, max: 100, step: 5, unit: '%', default: 75, keywords: 'transparent fretboard' },
-      { id: 'highway.stageColorOn', group: 'Track and bands', type: 'toggle', label: 'Custom stage colour', help: 'Use your own colour behind the tracks instead of the chart background of the theme (also in the visualizer menu).', default: false },
-      { id: 'highway.stageColor', group: 'Track and bands', type: 'color', label: 'Stage colour', default: '#0d1117', when: (get) => get('highway.stageColorOn') },
       { id: 'highway.starPowerBand', group: 'Track and bands', type: 'toggle', label: 'Star power highlight', help: 'Tints the track under a star power phrase (gold). Off by default: the notes of the phrase already stand out.', default: false, keywords: 'star power overlay background band gold overdrive' },
       { id: 'highway.fillBand', group: 'Track and bands', type: 'toggle', label: 'Drum fill track colour', help: 'Tints the track (green) during a drum fill. Off by default. The big rock ending band is not affected.', default: false, keywords: 'drum fill overlay background band green activation' },
       { id: 'highway.soloBand', group: 'Track and bands', type: 'toggle', label: 'Solo highlight', help: 'Tints the track (blue) during a guitar or drum solo.', default: true, keywords: 'solo overlay background band blue' },
@@ -145,6 +143,8 @@ export const SECTIONS = [
       { id: 'highway.visualizerFps', group: 'Visualizer', type: 'choice', label: 'Visualizer frame rate', help: 'How often the background is redrawn. Lower is lighter on the graphics card (the tracks are not affected). Unlimited redraws it on every frame of your screen, even above 60.', options: [{ value: '20', label: '20 frames per second' }, { value: '30', label: '30 frames per second' }, { value: '60', label: '60 frames per second' }, { value: 'unlimited', label: 'Unlimited (every screen frame)' }], default: '60', when: (get) => get('highway.visualizer') !== 'none' },
       { id: 'highway.visualizerOpacity', group: 'Visualizer', type: 'range', label: 'Visualizer opacity', help: 'How strongly the visualizer shows over the stage colour (the notes are not affected). 100 is full.', min: 0, max: 100, step: 1, unit: '%', default: 100, when: (get) => get('highway.visualizer') !== 'none' },
       { id: 'highway.visualizerBlur', group: 'Visualizer', type: 'range', label: 'Visualizer blur', help: 'Blurs the visualizer (not the notes). 0 is sharp.', min: 0, max: 40, step: 1, unit: 'px', default: 0, when: (get) => get('highway.visualizer') !== 'none' },
+      { id: 'highway.stageColorOn', group: 'Visualizer', type: 'toggle', label: 'Custom stage colour', help: 'Use your own colour behind the tracks instead of the chart background of the theme (also in the visualizer menu). Hidden while the selected visualizer covers the stage colour (Album art).', default: false, when: (get) => showsStage(get('highway.visualizer')) },
+      { id: 'highway.stageColor', group: 'Visualizer', type: 'color', label: 'Stage colour', default: '#0d1117', when: (get) => get('highway.stageColorOn') && showsStage(get('highway.visualizer')) },
     ],
   },
   {

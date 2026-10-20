@@ -225,3 +225,30 @@ test('melodyAt follows the pitch of the recent notes smoothly and rests in the m
   assert.ok(Math.abs(a - b) < 0.02); // continuous at the onset (the note fades in)
   assert.ok(melodyAt(ev, 1.5, 1.7, {}).energy > at(1.5).energy); // the gain exaggerates the energy
 });
+
+test('beat rings are born exactly on the beats of the chart beat map, with the highway time (chart delay already taken off)', async () => {
+  const { ringsAt, beatInfo } = await import('../src/visualizers.js');
+  const beats = [0.5, 1.1, 1.6, 2.2, 2.7].map((time, i) => ({ time, measure: i % 4 === 0 })); // uneven, like a tempo change
+  assert.equal(ringsAt(beats, 0.4, 0.5, 4).length, 0); // before the first beat: nothing
+  let r = ringsAt(beats, 1.1, 0.5, 4); // exactly on beat 1: it is there, age 0
+  assert.deepEqual([r[0].index, r[0].age], [1, 0]);
+  assert.equal(r[1].index, 0);
+  assert.ok(r[1].measure && !r[0].measure);
+  r = ringsAt(beats, 1.1 - 1e-6, 0.5, 4); // a hair before: not yet
+  assert.equal(r[0].index, 0);
+  const delay = 0.25; // the highway time is the playback time minus the chart delay: the ring is born when the notes of that beat reach the line
+  r = ringsAt(beats, 1.35 - delay, 0.5, 4); // playback 1.35 s
+  assert.deepEqual([r[0].index, r[0].age], [1, 1.1 - 1.1]);
+  r = ringsAt(beats, 2.0, 0.5, 0.5); // life: only the rings younger than `life`
+  assert.deepEqual(r.map((x) => x.index), [2]);
+  const grid = ringsAt([], 2.1, 0.5, 4); // no beat map: an even grid
+  assert.deepEqual([grid[0].index, +grid[0].age.toFixed(6)], [4, 0.1]);
+  const b = beatInfo(beats, 1.1, {}); // the orbit markers start their turn on the same beat
+  assert.equal(b.phase, 0);
+});
+
+test('showsStage: the opaque album art covers the stage colour, everything else lets it through', async () => {
+  const { showsStage } = await import('../src/visualizers.js');
+  assert.equal(showsStage('cover'), false);
+  for (const id of ['none', 'aurora', 'synthwave', 'warp', 'rings', 'tunnel', 'spotlights']) assert.equal(showsStage(id), true, id);
+});

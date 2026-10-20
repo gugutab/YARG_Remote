@@ -42,7 +42,7 @@ import { HISTORY_KEY, loadHistory, saveHistory, recordPlay, sortByHistory, playe
 import { createThumbs, renderCoverThumb } from './thumbs.js';
 import { snapPoints, snapTime, clampLoop, currentSectionRange, sectionRange, loopForSection, shouldWrap, MIN_LOOP } from './looprange.js';
 import { trainerConfig, startTrainer, nextTrainerState, trainerStatus, stepNote } from './trainer.js';
-import { VISUALIZERS, createDriver as createVisualizerDriver } from './visualizers.js';
+import { VISUALIZERS, showsStage, createDriver as createVisualizerDriver } from './visualizers.js';
 import { paintRange, installRangeUi } from './range-ui.js';
 
 const $ = (id) => document.getElementById(id);
@@ -3056,6 +3056,7 @@ function syncVizPop() {
   const custom = prefs.get('highway.stageColorOn');
   vizColorInput.value = custom ? prefs.get('highway.stageColor') : themeStage;
   vizColor.querySelector('button').hidden = !custom;
+  vizColor.hidden = !showsStage(id); // the album art covers the stage colour: no point offering it
 }
 // The opacity of the visualizer over the stage colour: the background canvas is made translucent (the stage colour is the CSS background behind it).
 function applyVizOpacity() {

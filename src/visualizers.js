@@ -536,7 +536,7 @@ const coverViz = (ctx) => {
 // note to note, resting in the middle when it is silent), and how much it plays makes it wider, brighter and more wavy. The waves travel along it on the SONG
 // time (never the beat count or a single hit, which made the first version jump), so the motion is steady and only happens when the music does. Instruments
 // that are not on screen are faint. Star power warms the colours.
-const AURORA_POINTS = 40;
+const AURORA_POINTS = 28;
 const auroraViz = (ctx) => {
   const mel = Array.from({ length: 8 }, () => ({ pitch: 0.5, energy: 0 }));
   const sky = memo();
@@ -581,12 +581,16 @@ const auroraViz = (ctx) => {
           const off = (strand - 1) * thick * 2.6;
           const sph = ph + strand * 1.3;
           g.beginPath();
+          let px = 0;
+          let py = 0;
           for (let k = 0; k <= AURORA_POINTS; k++) {
             const x = k * step;
             const y = y0 + off + Math.sin(x * f1 - s.bt * v1 + sph) * amp + Math.sin(x * f2 + s.bt * v2 + sph * 1.7) * amp * 0.5 + Math.sin(x * f3 + s.bt * v3 + sph * 0.6) * amp * 0.22;
-            if (k === 0) g.moveTo(x, y); else g.lineTo(x, y);
+            if (k === 0) g.moveTo(x, y); else g.quadraticCurveTo(px, py, (px + x) / 2, (py + y) / 2); // (smoothed through the midpoints: fewer points than straight segments need)
+            px = x; py = y;
           }
-          [[2.6, 0.028], [1.6, 0.05], [0.95, 0.085], [0.4, 0.15]].forEach(([wide, alpha]) => { // soft glow: the same line stroked wide and faint, then narrow and bright
+          g.lineTo(px, py);
+          [[2.6, 0.03], [1.2, 0.075], [0.4, 0.15]].forEach(([wide, alpha]) => { // soft glow: the same line stroked wide and faint, then narrow and bright (three passes: the stroke is the cost)
             g.lineWidth = thick * wide;
             g.strokeStyle = rgba(col, alpha * k0 * (0.55 + 0.6 * e));
             g.stroke();
@@ -642,7 +646,9 @@ const synthViz = (ctx) => {
         const u = (k + crawl) / 8;
         const y = side * (0.5 + 0.5 * u);
         if (y < side * 0.5) continue;
-        o.fillRect(0, y, side, Math.max(1, side * 0.045 + side * 0.07 * u));
+        const born = clamp01(u / 0.2); // a stripe is born thin at the middle of the sun and grows to its width on the way down (it used to appear at full width)
+        const grow = born * born * (3 - 2 * born);
+        if (grow > 0.02) o.fillRect(0, y, side, (side * 0.045 + side * 0.07 * u) * grow);
       }
       g.drawImage(sun, cx - R, sy - R, R * 2, R * 2);
       g.save();
@@ -686,6 +692,8 @@ const synthViz = (ctx) => {
 const STARS = 220;
 const warpViz = (ctx) => {
   const mel = Array.from({ length: 8 }, () => ({ pitch: 0.5, energy: 0 }));
+  const glowNow = [0, 0, 0]; // the glow colour eases towards its target over about a second (a change of who plays most must not jump)
+  let glowAt = -1;
   return {
     // The stars belong to the instruments of the song (star i takes layer i % layers): an instrument's stars are in its colour and stretch into longer, brighter
     // streaks as it plays (a slow swell of its energy, instruments exaggerated, the voice not), so the field breathes with who is playing; the vanishing
@@ -706,7 +714,7 @@ const warpViz = (ctx) => {
       const R = Math.hypot(w, h) * 0.53;
       const busy = L ? Math.min(1, total / 2) : s.density; // how much the instruments on screen play together
       const streak = (0.015 + 0.06 * Math.max(s.density, busy) + 0.04 * s.sp) * (0.75 + 0.35 * s.tempo);
-      const hot = s.sp > 0 ? [170, 225, 255] : null;
+      const hot = [170, 225, 255]; // star power turns the stars icy, blended in by how far into the phrase we are (s.sp eases 0..1), never switched
       g.save();
       g.lineCap = 'round';
       const travel = s.travel * 0.1 + s.bt * 0.04; // the density's travel plus the tempo's own: a fast part rushes, a slow one drifts
@@ -715,7 +723,7 @@ const warpViz = (ctx) => {
         const layer = L ? layers[gi] : null;
         const e = layer ? mel[gi].energy : 0.5;
         const on = layer ? layer.shown !== false : true;
-        const col = hot ?? (layer ? tint(layerColor(layer.kind, gi, pal), 0.5) : gi === 0 ? [235, 240, 255] : pal.v[1]);
+        const col = mixRgb(layer ? tint(layerColor(layer.kind, gi, pal), 0.5) : gi === 0 ? [235, 240, 255] : pal.v[1], hot, s.sp);
         const stretch = layer ? 0.55 + 1.5 * e : 1; // this instrument's streaks
         const alpha = layer ? (on ? 0.5 + 0.5 * e : 0.2) : 1;
         for (let band = 0; band < 3; band++) { // by brightness band, so a whole band is one path
@@ -736,7 +744,21 @@ const warpViz = (ctx) => {
         }
       }
       g.restore();
-      const glowCol = hot ?? (L && total > 0 ? tint(layerColor(layers[mel.slice(0, L).reduce((best, m, k) => (m.energy > mel[best].energy ? k : best), 0)].kind, 0, pal), 0.2) : pal.v[0]);
+      let tr = pal.v[0][0]; let tg = pal.v[0][1]; let tb = pal.v[0][2];
+      if (L && total > 0) { // the instruments' colours weighted by how much each plays (continuous: no switch between "the most active" ones)
+        let sum = 0; tr = 0; tg = 0; tb = 0;
+        for (let li = 0; li < L; li++) {
+          const c = tint(layerColor(layers[li].kind, li, pal), 0.2);
+          const wgt = mel[li].energy ** 2;
+          tr += c[0] * wgt; tg += c[1] * wgt; tb += c[2] * wgt; sum += wgt;
+        }
+        if (sum > 0) { tr /= sum; tg /= sum; tb /= sum; }
+      }
+      const dt = glowAt < 0 ? 9 : clampRange(s.clock - glowAt, 0, 0.25);
+      glowAt = s.clock;
+      const ease = 1 - Math.exp(-dt / 0.9);
+      glowNow[0] += (tr - glowNow[0]) * ease; glowNow[1] += (tg - glowNow[1]) * ease; glowNow[2] += (tb - glowNow[2]) * ease;
+      const glowCol = mixRgb(glowNow, hot, s.sp);
       const glow = g.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * (0.5 + 0.1 * busy));
       glow.addColorStop(0, rgba(glowCol, 0.16 + 0.3 * s.sp + 0.2 * busy));
       glow.addColorStop(1, rgba(glowCol, 0));
@@ -750,50 +772,103 @@ const warpViz = (ctx) => {
   };
 };
 
-const ringsViz = (ctx) => ({
-  draw(g, s) {
-    const { w, h } = s;
-    const pal = ctx.song.palette;
-    const beats = ctx.song.beats;
-    const cx = w / 2;
-    const cy = h / 2;
-    const maxR = Math.hypot(w, h) * 0.55;
-    const life = Math.min(4, 14 * s.beat.interval); // seconds a ring lives
-    const speed = maxR / life;
-    // the rings still alive: the beats before t; with no beat grid, an even 120 BPM one
-    const first = beats.length ? beatIndexAt(beats, s.t) : Math.floor(s.beat.pos);
-    g.save();
-    g.globalCompositeOperation = 'lighter';
-    for (let i = first, drawn = 0; i >= (beats.length ? 0 : -1e9) && drawn < 40; i--, drawn++) {
-      const when = beats.length ? beats[i].time : i * s.beat.interval;
-      const age = s.t - when;
-      if (age > life) break;
-      if (age < 0) continue;
-      const measure = beats.length ? beats[i].measure === true : ((i % 4) + 4) % 4 === 0;
-      const k = 1 - age / life;
-      g.strokeStyle = rgba(measure ? pal.va : pal.v[((i % 3) + 3) % 3], Math.min(1, k ** 1.2 * (measure ? 1.1 : 0.9)));
-      g.lineWidth = (measure ? 8 : 3) * (0.5 + k);
-      g.beginPath();
-      g.arc(cx, cy, 12 + age * speed, 0, TAU);
-      g.stroke();
-    }
-    for (const at of [s.perc]) { // percussion hits: a quick bright ring
-      if (at > 0.02) {
-        g.strokeStyle = rgba([255, 255, 255], at * 0.5);
-        g.lineWidth = 3;
+// The beat rings alive at t, newest first: a ring is born at exactly the time of its beat in the chart's beat map (age 0, the moment the note of that
+// beat reaches the hit line: `t` is the highway's time, chart delay already taken off) and lives `life` seconds. With no beat map it uses an even grid of
+// `interval` seconds. Fills and returns `out` (entries are reused): { index, age, measure }.
+export function ringsAt(beats, t, interval, life, out = []) {
+  const grid = beats.length > 0;
+  let n = 0;
+  for (let i = grid ? beatIndexAt(beats, t) : Math.floor(t / interval); (grid ? i >= 0 : true) && n < 40; i--) {
+    const age = t - (grid ? beats[i].time : i * interval);
+    if (age > life) break;
+    if (age < 0) continue;
+    const e = (out[n] ??= { index: 0, age: 0, measure: false });
+    e.index = i; e.age = age; e.measure = grid ? beats[i].measure === true : ((i % 4) + 4) % 4 === 0;
+    n++;
+  }
+  out.length = n;
+  return out;
+}
+
+// Beat rings: a ring leaves the centre on every beat (bigger and brighter on the first beat of a bar, with a wide faint halo behind it as a trail), a soft swell
+// of the core at the start of every bar, and three orbits whose marker turns once per beat, per two beats and per bar, so each is at the top exactly on
+// the beat it counts and lights up there.
+const ringsViz = (ctx) => {
+  const alive = [];
+  return {
+    draw(g, s) {
+      const { w, h } = s;
+      const pal = ctx.song.palette;
+      const beats = ctx.song.beats;
+      const cx = w / 2;
+      const cy = h / 2;
+      const maxR = Math.hypot(w, h) * 0.55;
+      const life = Math.min(4, 14 * s.beat.interval); // seconds a ring lives
+      const speed = maxR / life;
+      const unit = Math.min(w, h) / 760;
+      const bar = (1 - s.beat.measurePhase) ** 5; // a swell at the downbeat that fades over the bar (the driver's measurePulse is switched off)
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      g.lineCap = 'round';
+      const rings = ringsAt(beats, s.t, s.beat.interval, life, alive);
+      for (let r = 0; r < rings.length; r++) {
+        const { index: i, age, measure } = rings[r];
+        const k = 1 - age / life;
+        const col = measure ? pal.va : pal.v[((i % 3) + 3) % 3];
+        const rad = (12 + age * speed) * (measure ? 1 + 0.05 * bar : 1);
+        const a = Math.min(1, k ** 1.2 * (measure ? 1.1 : 0.9));
         g.beginPath();
-        g.arc(cx, cy, 30 + (1 - at) * maxR * 0.35, 0, TAU);
+        g.arc(cx, cy, rad, 0, TAU);
+        g.strokeStyle = rgba(col, a * 0.16); // the trail: a wide faint stroke under the line
+        g.lineWidth = (measure ? 30 : 14) * (0.4 + k) * unit;
+        g.stroke();
+        g.strokeStyle = rgba(col, a);
+        g.lineWidth = (measure ? 7 : 2.6) * (0.5 + k) * unit;
         g.stroke();
       }
-    }
-    const core = g.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * 0.22);
-    core.addColorStop(0, rgba(pal.va, 0.25 + 0.45 * s.beat.pulse + 0.2 * s.hit));
-    core.addColorStop(1, rgba(pal.va, 0));
-    g.fillStyle = core;
-    g.fillRect(0, 0, w, h);
-    g.restore();
-  },
-});
+      const orbits = [[0.17, s.beat.phase, pal.v[0]], [0.27, ((((s.beat.index % 2) + 2) % 2) + s.beat.phase) / 2, pal.v[1]], [0.38, s.beat.measurePhase, pal.va]]; // [size, turn 0..1, colour]
+      for (let o = 0; o < orbits.length; o++) {
+        const [size, frac, col] = orbits[o];
+        const rad = Math.min(w, h) * size;
+        const ang = -Math.PI / 2 + frac * TAU;
+        const flash = (1 - frac) ** 6; // brightest at the top, just after the beat it counts
+        g.strokeStyle = rgba(col, 0.1);
+        g.lineWidth = 1.5 * unit;
+        g.beginPath();
+        g.arc(cx, cy, rad, 0, TAU);
+        g.stroke();
+        g.strokeStyle = rgba(col, 0.38); // the marker's tail, fading behind it
+        g.lineWidth = 3.5 * unit;
+        g.beginPath();
+        g.arc(cx, cy, rad, ang - 0.9, ang);
+        g.stroke();
+        const px = cx + Math.cos(ang) * rad;
+        const py = cy + Math.sin(ang) * rad;
+        g.fillStyle = rgba(col, 0.25 + 0.3 * flash);
+        g.beginPath();
+        g.arc(px, py, (9 + 8 * flash) * unit, 0, TAU);
+        g.fill();
+        g.fillStyle = rgba(tint(col, 0.5), 0.9);
+        g.beginPath();
+        g.arc(px, py, 3.6 * unit, 0, TAU);
+        g.fill();
+      }
+      if (s.perc > 0.02) { // percussion hits: a quick bright ring
+        g.strokeStyle = rgba([255, 255, 255], s.perc * 0.5);
+        g.lineWidth = 3 * unit;
+        g.beginPath();
+        g.arc(cx, cy, 30 + (1 - s.perc) * maxR * 0.35, 0, TAU);
+        g.stroke();
+      }
+      const core = g.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * (0.2 + 0.03 * bar));
+      core.addColorStop(0, rgba(pal.va, 0.22 + 0.3 * bar + 0.2 * s.hit));
+      core.addColorStop(1, rgba(pal.va, 0));
+      g.fillStyle = core;
+      g.fillRect(0, 0, w, h);
+      g.restore();
+    },
+  };
+};
 
 // The MIDI equalizer: one equalizer per instrument of the song (all of them, whether or not its fretboard is on screen), each in its own colour. They all
 // hang from the same top edge, but each is taller than the one before (the first instrument has the shortest bars, the last the tallest). Each layer is
@@ -1072,6 +1147,50 @@ const radialViz = (ctx) => {
   };
 };
 
+// Sprites per beam colour (cone, floor pool, lamp), built once and drawn scaled: a beam used to need nine gradients and three big triangle fills a frame.
+function colourSprites(col) {
+  const key = col.join(',');
+  let sp = colourSprites.cache.get(key);
+  if (sp) return sp;
+  if (colourSprites.cache.size >= 48) colourSprites.cache.clear();
+  const cone = makeCanvas(96, 160);
+  const o = cone.getContext('2d');
+  o.globalCompositeOperation = 'lighter';
+  const gr = o.createLinearGradient(0, 0, 0, 160);
+  gr.addColorStop(0, rgba(col, 0.75));
+  gr.addColorStop(0.55, rgba(col, 0.22));
+  gr.addColorStop(1, rgba(col, 0));
+  o.fillStyle = gr;
+  [[0.25, 0.5], [0.5, 0.35], [1, 0.16]].forEach(([rel, a]) => { // soft edges: nested cones (half-widths 1/4, 1/2 and all of the sprite)
+    o.globalAlpha = a;
+    o.beginPath();
+    o.moveTo(48, 0);
+    o.lineTo(48 - 48 * rel, 160);
+    o.lineTo(48 + 48 * rel, 160);
+    o.closePath();
+    o.fill();
+  });
+  const pool = makeCanvas(64, 64);
+  const po = pool.getContext('2d');
+  const pg = po.createRadialGradient(32, 32, 0, 32, 32, 32);
+  pg.addColorStop(0, rgba(col, 1));
+  pg.addColorStop(1, rgba(col, 0));
+  po.fillStyle = pg;
+  po.fillRect(0, 0, 64, 64);
+  const lamp = makeCanvas(52, 52);
+  const lo = lamp.getContext('2d');
+  const lg = lo.createRadialGradient(26, 26, 0, 26, 26, 26);
+  lg.addColorStop(0, 'rgba(255,255,255,0.8)');
+  lg.addColorStop(0.3, rgba(col, 0.5));
+  lg.addColorStop(1, rgba(col, 0));
+  lo.fillStyle = lg;
+  lo.fillRect(0, 0, 52, 52);
+  sp = { cone, pool, lamp };
+  colourSprites.cache.set(key, sp);
+  return sp;
+}
+colourSprites.cache = new Map();
+
 // Stage lights hanging from the top edge, each sweeping on its own period of beats (beamAngle), in the cover colours and added
 // together. Busy music and singing make them brighter and wider; star power turns them warm and widens the sweep.
 const spotViz = (ctx) => {
@@ -1087,6 +1206,7 @@ const spotViz = (ctx) => {
       const n = Math.max(w > 1100 ? 8 : 6, layers.length); // more beams than instruments: an instrument lights every few beams across the stage
       const len = Math.hypot(w * 0.35, h) * 1.2; // long enough to cross the whole stage when tilted
       const drive = clamp01(0.8 + 0.3 * s.density + 0.25 * s.vocal + 0.15 * s.sp);
+      const warmK = Math.round(s.sp * 8) / 8 * 0.65; // (in steps: the beam sprites are cached per colour)
       g.save();
       g.fillStyle = haze(`${h}${pal.v[2]}${pal.va}`, () => {
         const gr = g.createLinearGradient(0, 0, 0, h);
@@ -1103,46 +1223,24 @@ const spotViz = (ctx) => {
         const x = (w * (i + 0.5)) / n;
         const ang = beamAngle(i, n, s.beat.pos) * (1.35 + 0.35 * s.sp); // wider sweeps
         const base = layer ? layerColor(layer.kind, i, pal) : pal.v[i % 4];
-        const col = mixRgb(layer ? tint(base, 0.3) : base, warm, 0.65 * s.sp).map(Math.round); // (a beam is light: a lighter version of the instrument's colour)
+        const col = mixRgb(layer ? tint(base, 0.3) : base, warm, warmK).map((v) => Math.round(v / 4) * 4); // (a beam is light: a lighter version of the instrument's colour)
         const power = layer ? (layer.shown !== false ? 0.55 + 0.45 * melodyAt(layer.events, s.t, layerGain(layer.kind), melTmp).energy : 0.2) : 1; // a slow swell (the energy glides over about a second), never a flash on every note
         const half = (0.17 + 0.03 * s.vocal + 0.03 * s.density) * (0.8 + 0.4 * power); // wide cones: they overlap and fill the stage // half-opening of the cone, radians
+        const sp = colourSprites(col);
         g.save();
         g.translate(x, -4);
         g.rotate(-ang);
-        const gr = g.createLinearGradient(0, 0, 0, len);
-        gr.addColorStop(0, rgba(col, 0.75));
-        gr.addColorStop(0.55, rgba(col, 0.22));
-        gr.addColorStop(1, rgba(col, 0));
-        g.fillStyle = gr;
-        [[0.5, 0.5], [1, 0.35], [2, 0.16]].forEach(([wide, a]) => { // soft edges: nested cones
-          const hw = Math.tan(half * wide) * len;
-          g.globalAlpha = Math.min(1, a * drive * 1.7 * power);
-          g.beginPath();
-          g.moveTo(0, 0);
-          g.lineTo(-hw, len);
-          g.lineTo(hw, len);
-          g.closePath();
-          g.fill();
-        });
+        const hw = Math.tan(half * 2) * len;
+        g.globalAlpha = Math.min(1, drive * 1.7 * power);
+        g.drawImage(sp.cone, -hw, 0, hw * 2, len);
         g.restore();
-        g.globalAlpha = 1;
         const hitX = x + Math.tan(ang) * h * 0.97; // the pool of light on the floor
-        g.save();
-        g.translate(hitX, h * 0.97);
-        g.scale(1, 0.16);
         const pr = h * (0.34 + 0.06 * s.vocal);
-        const pool = g.createRadialGradient(0, 0, 0, 0, 0, pr);
-        pool.addColorStop(0, rgba(col, 0.5 * drive * power));
-        pool.addColorStop(1, rgba(col, 0));
-        g.fillStyle = pool;
-        g.fillRect(-pr, -pr, pr * 2, pr * 2);
-        g.restore();
-        const lamp = g.createRadialGradient(x, 0, 0, x, 0, 26); // the fixture
-        lamp.addColorStop(0, `rgba(255,255,255,${0.35 + 0.45 * power})`);
-        lamp.addColorStop(0.3, rgba(col, 0.5 * power));
-        lamp.addColorStop(1, rgba(col, 0));
-        g.fillStyle = lamp;
-        g.fillRect(x - 26, 0, 52, 26);
+        g.globalAlpha = 0.5 * drive * power;
+        g.drawImage(sp.pool, hitX - pr, h * 0.97 - pr * 0.16, pr * 2, pr * 0.32);
+        g.globalAlpha = power; // the fixture
+        g.drawImage(sp.lamp, x - 26, -26);
+        g.globalAlpha = 1;
       }
       g.restore();
     },
@@ -1171,37 +1269,46 @@ const tunnelViz = (ctx) => ({
     const { w, h } = s;
     const song = ctx.song;
     const pal = song.palette;
-    const cx = w / 2 + Math.sin(s.beat.pos * 0.07) * w * 0.03;
-    const cy = h / 2 + Math.cos(s.beat.pos * 0.05) * h * 0.03;
+    const cx = w / 2 + Math.sin(s.beat.pos * 0.03) * w * 0.025;
+    const cy = h / 2 + Math.cos(s.beat.pos * 0.022) * h * 0.025;
     const R = Math.hypot(w, h) * 0.62;
-    const twist = sectionValue(song.sections, s.t, s.section, (k) => 0.5 + ((k * 7) % 5) * 0.22, 2.5);
-    const run = s.beat.pos * 0.05 + s.travel * 0.12;
+    // Calm on purpose: slow travel and turning, soft colours, low contrast (the rings were bright and fast and tired the eyes). Variety comes from the sections and
+    // slowly over time, never from a switch: every ring keeps its own shape and colour for its whole life (they are chosen from its number), the twist and the
+    // spacing ease between sections, and the colour wheel drifts with the song time.
+    const twist = sectionValue(song.sections, s.t, s.section, (k) => 0.3 + ((k * 7) % 5) * 0.12, 3);
+    const spread = sectionValue(song.sections, s.t, s.section, (k) => 1.7 + ((k * 3) % 4) * 0.2, 3); // how the rings crowd towards the distance (radius ~ depth^spread)
+    const run = s.beat.pos * 0.035 + s.travel * 0.08;
     const unit = Math.min(w, h) / 900;
     const warm = [255, 190, 90];
+    const drift = s.t / 45; // one slow turn of the colour wheel in about three minutes
     g.save();
     g.globalCompositeOperation = 'lighter';
     g.lineJoin = 'round';
     for (let i = 0; i < TUNNEL_RINGS; i++) {
       const q = run + i / TUNNEL_RINGS;
       const z = fract(q);
-      const id = Math.floor(q);
-      const fade = Math.sin(Math.PI * Math.min(1, z * 1.1)) ** 0.7; // fades in at the far end, out close up
+      const id = Math.floor(q) * TUNNEL_RINGS + i; // this ring's number: its own shape and colour for good
+      const fade = Math.sin(Math.PI * Math.min(1, z * 1.1)) ** 0.9; // fades in at the far end, out close up
       if (fade < 0.01) continue;
-      const r = R * z * z * 0.8 + 3;
-      const rot = s.beat.pos * 0.02 + z * twist * 2.2 + (i % 2) * 0.2;
-      const k = ((id % 4) + 4) % 4;
-      const col = mixRgb(mixRgb(pal.v[k], pal.v[(k + 1) % 4], z), warm, 0.6 * s.sp).map(Math.round);
+      const r = R * z ** spread * 0.8 + 3;
+      const rot = s.beat.pos * 0.006 + z * twist + hash01(id, 5) * TAU;
+      const wheel = (((id * 0.37 + drift) % 4) + 4) % 4;
+      const c0 = pal.v[Math.floor(wheel) % 4];
+      const c1 = pal.v[(Math.floor(wheel) + 1) % 4];
+      const col = mixRgb(mixRgb(mixRgb(c0, c1, wheel % 1), [150, 150, 170], 0.3), warm, 0.5 * s.sp).map(Math.round); // (softened towards grey)
+      const sides = 4 + Math.floor(hash01(id, 7) * 5); // squares to octagons
+      const round = 0.12 + 0.2 * hash01(id, 9);
       g.beginPath();
-      roundedPolygon(g, cx, cy, r, i % 2 ? 6 : 8, rot, 0.16);
-      g.strokeStyle = rgba(col, 0.5 * fade);
-      g.lineWidth = (5 + 24 * z ** 1.5) * unit;
+      roundedPolygon(g, cx, cy, r, sides, rot, round);
+      g.strokeStyle = rgba(col, 0.2 * fade);
+      g.lineWidth = (4 + 16 * z ** 1.5) * unit;
       g.stroke();
-      g.strokeStyle = rgba(col, fade);
-      g.lineWidth = (1.5 + 7 * z ** 1.5) * unit;
+      g.strokeStyle = rgba(col, 0.6 * fade);
+      g.lineWidth = (1.2 + 4.5 * z ** 1.5) * unit;
       g.stroke();
     }
     const core = g.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * 0.3);
-    core.addColorStop(0, rgba(mixRgb(pal.va, warm, 0.5 * s.sp), 0.2 + 0.2 * s.density));
+    core.addColorStop(0, rgba(mixRgb(pal.va, warm, 0.5 * s.sp), 0.12 + 0.12 * s.density));
     core.addColorStop(1, rgba(pal.va, 0));
     g.fillStyle = core;
     g.fillRect(0, 0, w, h);
@@ -1213,19 +1320,23 @@ const tunnelViz = (ctx) => ({
 
 export const VISUALIZERS = [
   { id: 'none', label: 'None', hint: 'Plain background', swatch: 'transparent', create: null },
-  { id: 'cover', label: 'Album art', hint: 'The cover, waving softly like cloth', swatch: 'linear-gradient(135deg,#6b5b95,#d9822b)', create: coverViz },
-  { id: 'aurora', label: 'Aurora', hint: 'Flowing ribbons in the cover colours', swatch: 'linear-gradient(135deg,#0f9b8e,#6a4fc2)', create: auroraViz },
+  { id: 'cover', label: 'Album art', hint: 'The cover, waving softly like cloth', swatch: 'linear-gradient(135deg,#6b5b95,#d9822b)', create: coverViz, opaque: true },
+  { id: 'aurora', label: 'Aurora', hint: 'Flowing ribbons in the cover colours', swatch: 'linear-gradient(135deg,#0f9b8e,#6a4fc2)', create: auroraViz, maxScale: 0.5 },
   { id: 'synthwave', label: 'Synthwave', hint: 'Grid and sun, rolling with the beats', swatch: 'linear-gradient(180deg,#ff5fa2,#ffb347 55%,#3a1c71)', create: synthViz },
   { id: 'warp', label: 'Warp', hint: 'Stars that rush faster in busy parts', swatch: 'radial-gradient(circle,#fff 0 6%,#4a6fd8 40%,#0a1030)', create: warpViz },
-  { id: 'rings', label: 'Beat rings', hint: 'A ring for every beat, thicker on bars', swatch: 'repeating-radial-gradient(circle,#7fd1ff 0 3px,#10203a 3px 9px)', create: ringsViz },
+  { id: 'rings', label: 'Beat rings', hint: 'A ring on every beat, a swell on every bar', swatch: 'repeating-radial-gradient(circle,#7fd1ff 0 3px,#10203a 3px 9px)', create: ringsViz },
   { id: 'equalizer', label: 'MIDI equalizer', hint: 'Bars driven by the notes being played', swatch: 'linear-gradient(90deg,#3ddc97 0 20%,#ffd23f 20% 40%,#ff7043 40% 60%,#ffd23f 60% 80%,#3ddc97 80%)', create: eqViz },
   { id: 'embers', label: 'Embers', hint: 'Sparks rising with the energy', swatch: 'radial-gradient(circle at 50% 80%,#ffb347,#8b1e1e 55%,#1a0a0a)', create: embersViz },
   { id: 'radial', label: 'Radial spectrum', hint: 'A ring of bars around a spinning record', swatch: 'radial-gradient(circle,#222 0 22%,#f6c344 24% 30%,#222 32% 40%,#ff6b9d 42% 62%,#14142a 64%)', create: radialViz },
-  { id: 'spotlights', label: 'Spotlights', hint: 'Stage lights sweeping with the tempo', swatch: 'conic-gradient(from 160deg at 50% 0,#0a0a1a 0 4%,#ffd36b 10%,#0a0a1a 18% 30%,#7fd1ff 36%,#0a0a1a 44% 56%,#ff7aa8 62%,#0a0a1a 70%)', create: spotViz },
+  { id: 'spotlights', label: 'Spotlights', hint: 'Stage lights sweeping with the tempo', swatch: 'conic-gradient(from 160deg at 50% 0,#0a0a1a 0 4%,#ffd36b 10%,#0a0a1a 18% 30%,#7fd1ff 36%,#0a0a1a 44% 56%,#ff7aa8 62%,#0a0a1a 70%)', create: spotViz, maxScale: 0.5 },
   { id: 'tunnel', label: 'Tunnel', hint: 'Rounded rings rushing towards you', swatch: 'repeating-radial-gradient(circle,#0b0b1e 0 3px,#6be0d0 3px 5px,#0b0b1e 5px 9px,#c06bff 9px 11px)', create: tunnelViz },
 ];
 
 export const VISUALIZER_IDS = VISUALIZERS.map((v) => v.id);
+
+// Whether the stage colour ("Background") can be seen with this visualizer: None shows it plainly and the translucent effects let it through; the album art
+// is opaque and covers it, so its "Background" control would change nothing.
+export const showsStage = (id) => VISUALIZERS.find((v) => v.id === id)?.opaque !== true;
 
 // Milliseconds spent drawing each visualizer (running average), for checking the cost: import('./visualizers.js').stats
 export const stats = {};
@@ -1266,7 +1377,7 @@ export function createDriver({ getSource }) {
   let coverToken = 0;
   const driver = {
     quality: 0.6, // resolution of the background canvas (fraction of full); the album art always keeps the full resolution
-    get scale() { return id === 'cover' || id === 'none' ? 1 : driver.quality; },
+    get scale() { return id === 'cover' || id === 'none' ? 1 : Math.min(driver.quality, VISUALIZERS.find((v) => v.id === id)?.maxScale ?? 1); }, // (soft effects cap their own resolution)
     get id() { return id; },
     select(next) {
       id = VISUALIZER_IDS.includes(next) ? next : 'none';
