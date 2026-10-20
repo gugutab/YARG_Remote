@@ -55,6 +55,13 @@ test('validator: multi is an array of allowed values, without duplicates', () =>
   assert.equal(validate('details.chips', { 0: 'pack' }).ok, false);
 });
 
+test('validator: details.sections keeps at least one section (an empty list falls back to the default)', () => {
+  assert.deepEqual(validate('details.sections', ['volume']), { ok: true, value: ['volume'] });
+  assert.equal(validate('details.sections', []).ok, false);
+  assert.equal(validate('details.sections', ['bogus']).ok, false, 'nothing valid left');
+  assert.deepEqual(load({ 'details.sections': [] }).get('details.sections'), defaults['details.sections']);
+});
+
 test('validator: colour fields need #rrggbb (and are normalised to lower case)', () => {
   assert.deepEqual(validate('highway.stageColor', '#AABBCC'), { ok: true, value: '#aabbcc' });
   for (const bad of ['red', '#abc', '#12345g', 'url(javascript:alert(1))', 'expression(1)', '#aabbcc;x', 12, null]) assert.equal(validate('highway.stageColor', bad).ok, false, String(bad));
