@@ -434,47 +434,263 @@ export function breAlpha(t, lane, lanes) {
   return BRE_ALPHA_MIN + (BRE_ALPHA_MAX - BRE_ALPHA_MIN) * mix;
 }
 
-// The face of a guitar-like note in the rectangular style, after YARG's note model: chrome end caps and a coloured centre band. A strum is the plain band; a HOPO has
-// white strips beside the caps; a tap has a dark centre between coloured strips; star power makes the caps gold (the band is the white-tinted colour already filled).
-// Call it with the note's outline as the current path (it clips to it); `hw` / `hh` are the half width / height of that outline, `laneColor` the plain lane colour.
-const CHROME = ['#2b2f35', '#e3e9f0', '#8f98a3', '#3b4048'];
-const CHROME_GOLD = ['#4d3b00', '#fff0a0', '#c99400', '#5c4500'];
-export function drawGuitarNoteFace(g, x, y, hw, hh, n, laneColor) {
+// The rectangular note ('ynote'), drawn as vectors after the note design SVG (220 x 100 viewBox): a lane-coloured body with a gloss and darker ends, two mirrored
+// chrome caps whose inner edge curves inwards (shaded bands that follow the cap: dark outer edge, grey ridge, bright highlight, dark inner line, vertical shade,
+// specular blob) and a base in perspective (dark top face narrower at the back, dark front face over the caps' lower ends, soft floor shadow).
+// Every part is a polygon sampled once from the design's path data, in design units centred on (110, 54); a note is drawn by scaling that space to its half
+// width / height (the design's visible half width 99.2 and the cap's half height 38) and re-tracing the polygons, so the edges stay crisp at any size and DPR.
+// The 3D taper is applied to the points while tracing (each point's x is scaled by 1 + k * its row), which an affine transform cannot do.
+// Speed: a screen holds 100+ notes, and in a GPU canvas every fill, clip and stroke is a draw of its own. So there are no clips, no blur and no strokes but the
+// floor shadow: the design's blurred cap strokes become one precomputed colour profile across the cap (a linear gradient, see capProfile), laid along the cap's
+// slanted ridge by a shear in three horizontal slabs; the body gloss is a gradient per colour (cached). A full-size note is one stroke (floor shadow) and
+// 12-13 fills; under 24 px of half width the caps are one piece each and the specular blobs go (8 draws); under 9 px the shade of the caps goes too.
+const YN_CX = 110;
+const YN_CY = 54;
+const YN_HW = 99.2;
+const YN_HH = 38;
+const YN_BASE_V = 35; // design row 89 (the body's bottom): the base below it is stretched or squashed by `side`
+// How tall the base under the note is drawn, relative to the design: the 2D view looks from above (less of the front face), the 3D one from a lower angle.
+export const YNOTE_SIDE_2D = 0.6;
+export const YNOTE_SIDE_3D = 1.6;
+function sampleDesign(start, segs, steps = 8) {
+  const out = [start[0] - YN_CX, start[1] - YN_CY];
+  let px = start[0];
+  let py = start[1];
+  for (const s of segs) {
+    if (s.length === 2) { out.push(s[0] - YN_CX, s[1] - YN_CY); px = s[0]; py = s[1]; continue; }
+    const q = s.length === 4; // quadratic (x1 y1 x y) or cubic (x1 y1 x2 y2 x y)
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const m = 1 - t;
+      if (q) out.push(m * m * px + 2 * m * t * s[0] + t * t * s[2] - YN_CX, m * m * py + 2 * m * t * s[1] + t * t * s[3] - YN_CY);
+      else out.push(m * m * m * px + 3 * m * m * t * s[0] + 3 * m * t * t * s[2] + t * t * t * s[4] - YN_CX, m * m * m * py + 3 * m * m * t * s[1] + 3 * m * t * t * s[3] + t * t * t * s[5] - YN_CY);
+    }
+    px = s[s.length - 2];
+    py = s[s.length - 1];
+  }
+  return Float32Array.from(out);
+}
+// The part of closed polygon P (u, v pairs) between rows v0 and v1 (Sutherland-Hodgman against the two lines).
+function clipRows(P, v0, v1) {
+  const half = (pts, keep, vc) => {
+    const out = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[(i + pts.length - 1) % pts.length];
+      const b = pts[i];
+      const ia = keep(a[1]);
+      const ib = keep(b[1]);
+      if (ia !== ib) out.push([a[0] + ((b[0] - a[0]) * (vc - a[1])) / (b[1] - a[1]), vc]);
+      if (ib) out.push(b);
+    }
+    return out;
+  };
+  let pts = [];
+  for (let i = 0; i < P.length; i += 2) pts.push([P[i], P[i + 1]]);
+  pts = half(pts, (v) => v >= v0, v0);
+  pts = half(pts, (v) => v <= v1, v1);
+  return Float32Array.from(pts.flat());
+}
+const YN_CAP = sampleDesign([39, 16], [[26, 16], [21.5, 16, 19.6, 18, 18.6, 21.5], [11.8, 43], [10.2, 48.5, 10.1, 54, 10.8, 59.5], [14.9, 92], [35.4, 92], [35, 89], [31.2, 60], [30.6, 55, 30.8, 50, 31.6, 46], [39, 16]]); // the left cap; the right one is mirrored
+const YN_BODY = sampleDesign([36, 16], [[184, 16], [191.4, 46], [192.2, 50, 192.4, 55, 191.8, 60], [188, 89], [32, 89], [28.2, 60], [27.6, 55, 27.8, 50, 28.6, 46]]);
+const YN_BASE_TOP = sampleDesign([19, 84], [[201, 84], [203.8, 84, 204.7, 86.5], [205.5, 90.5], [14.5, 90.5], [15.3, 86.5], [16.2, 84, 19, 84]], 4);
+const YN_BASE_FRONT = sampleDesign([14.5, 90.5], [[205.5, 90.5], [205.5, 92], [205.5, 96, 201.5, 96], [18.5, 96], [14.5, 96, 14.5, 92]], 4);
+// The band beside a cap (HOPO / accent white strip): from under the cap to the cap's inner edge moved `s` units in; both sides go in one path.
+const strip = (s) => sampleDesign([30, 16], [[39 + s, 16], [31.6 + s, 46], [30.8 + s, 50, 30.6 + s, 55, 31.2 + s, 60], [35 + s, 89], [30, 89]]);
+// The tap / ghost dark centre: between two coloured strips of width `s`.
+const centre = (s) => sampleDesign([39 + s, 16], [[31.6 + s, 46], [30.8 + s, 50, 30.6 + s, 55, 31.2 + s, 60], [35 + s, 89], [185 - s, 89], [188.8 - s, 60], [189.4 - s, 55, 189.2 - s, 50, 188.4 - s, 46], [181 - s, 16]]);
+const YN_HOPO_STRIP = strip(30); // design units (0.3 of the half width, as before)
+const YN_TAP_CENTRE = centre(17);
+// The cap's shading follows its ridge, which is (nearly) a straight slanted line in three stretches: [top row, bottom row, ridge x at the top, at the bottom]
+// (design units). Each slab of the cap is filled with the cap profile sheared along its stretch; a slab reaches 0.6 units into the next one, which is drawn
+// over it, so their shared edge has no anti-aliasing seam.
+const CAP_SLABS = [[10, 45, 33.6, 26.6], [45, 60, 26.6, 26.2], [60, 100, 26.2, 30]].map(([y0, y1, x0, x1], i, all) => {
+  const m = (x1 - x0) / (y1 - y0); // ridge x per row
+  return { poly: clipRows(YN_CAP, y0 - YN_CY, (i < all.length - 1 ? y1 + 0.6 : y1) - YN_CY), u0: x0 - YN_CX, v0: y0 - YN_CY, m, uc: (x0 + x1) / 2 - YN_CX };
+});
+
+// Adds polygon P to the current path, mirrored when m = -1, with the base rows (below the body) scaled by `side` and the taper k applied.
+function traceYN(g, P, m, k, side) {
+  for (let i = 0; i < P.length; i += 2) {
+    let v = P[i + 1];
+    if (v > YN_BASE_V) v = YN_BASE_V + (v - YN_BASE_V) * side;
+    const u = m * P[i] * (1 + k * v);
+    if (i === 0) g.moveTo(u, v); else g.lineTo(u, v);
+  }
+  g.closePath();
+}
+const baseRow = (py, side) => YN_BASE_V + (py - YN_CY - YN_BASE_V) * side;
+
+// The colour across a cap, from 18 units outside its ridge to 7 inside (design units), as the design paints it: fill, then each stroke blurred by its
+// stdDeviation 1.3 (a band of width w blurs to the difference of two error functions), composited in order. The outer edge is ~15.5 units out, the inner
+// edge ~4.9 units in, all along the cap.
+const CAP_FROM = -18;
+const CAP_TO = 7;
+function capProfile(pal) {
+  const erf = (x) => { // Abramowitz-Stegun 7.1.26
+    const s = Math.sign(x);
+    const a = Math.abs(x);
+    const t = 1 / (1 + 0.3275911 * a);
+    return s * (1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-a * a));
+  };
+  const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const layers = [[-15.5, 7, pal.outer], [0, 13, pal.ridge], [0, 7, pal.light], [0, 2.5, pal.white], [4.9, 1.6, pal.inner]];
+  const stops = [];
+  for (let d = CAP_FROM; d <= CAP_TO; d += 0.5) {
+    let c = rgb(pal.fill);
+    for (const [at, w, col] of layers) {
+      const s = 1.3 * Math.SQRT2;
+      const a = 0.5 * (erf((d - at + w / 2) / s) - erf((d - at - w / 2) / s));
+      const lc = rgb(col);
+      c = c.map((v, i) => v * (1 - a) + lc[i] * a);
+    }
+    stops.push([(d - CAP_FROM) / (CAP_TO - CAP_FROM), `rgb(${c.map(Math.round).join(',')})`]);
+  }
+  return stops;
+}
+const CAP_CHROME = { fill: '#2a2a2a', outer: '#0e0e0e', ridge: '#7a7a7a', light: '#bdbdbd', white: '#f4f4f4', inner: '#1a1a1a' };
+const CAP_GOLD = { fill: '#3a2c00', outer: '#140e00', ridge: '#a77d00', light: '#e8b923', white: '#fff3b8', inner: '#241a00' };
+const CAP_STOPS = [capProfile(CAP_CHROME), capProfile(CAP_GOLD)];
+
+// Gradients in design units (they scale with the transform): built once; the base ones per `side`, the body ones per colour.
+let ynShared = null;
+const ynBase = new Map(); // side -> [chrome, gold]
+const linGrad = (g, x0, y0, x1, y1, stops) => {
+  const gr = g.createLinearGradient(x0, y0, x1, y1);
+  for (const [o, c] of stops) gr.addColorStop(o, c);
+  return gr;
+};
+function ynGradients(g, side, gold) {
+  if (!ynShared) {
+    const spec = g.createRadialGradient(0, 0, 0, 0, 0, 1);
+    spec.addColorStop(0, '#fff');
+    spec.addColorStop(0.45, 'rgba(255,255,255,0.75)');
+    spec.addColorStop(1, 'rgba(255,255,255,0)');
+    ynShared = {
+      ends: linGrad(g, -82, 0, 82, 0, [[0, 'rgba(0,0,0,0.4)'], [0.1, 'rgba(0,0,0,0)'], [0.9, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.4)']]),
+      capV: linGrad(g, 0, -38, 0, 35, [[0, 'rgba(0,0,0,0.6)'], [0.38, 'rgba(0,0,0,0)'], [0.7, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.35)']]),
+      cap: CAP_STOPS.map((stops) => linGrad(g, CAP_FROM, 0, CAP_TO, 0, stops)),
+      spec,
+    };
+  }
+  let pair = ynBase.get(side);
+  if (!pair) {
+    const top0 = baseRow(84, side);
+    const top1 = baseRow(90.5, side);
+    const front1 = baseRow(96, side);
+    const fy = baseRow(96.5, side);
+    const fr = 3.4 * Math.max(0.5, side); // half height of the floor shadow
+    const shadow = linGrad(g, 0, fy - fr, 0, fy + fr, [[0, 'rgba(0,0,0,0)'], [0.5, 'rgba(0,0,0,0.55)'], [1, 'rgba(0,0,0,0)']]);
+    // the top face's dark line at row 88 is the design's contact shadow under the body
+    pair = [['#141414', '#0c0c0c', '#4a4a4a', '#3a3a3a', '#1e1e1e', '#0a0a0a'], ['#1c1600', '#120e00', '#5a4a14', '#4a3c10', '#261e00', '#0c0900']].map((c) => ({
+      top: linGrad(g, 0, Math.min(top0, top1 - 0.01), 0, top1, [[0, c[0]], [0.7, c[1]], [1, c[2]]]),
+      front: linGrad(g, 0, top1, 0, Math.max(front1, top1 + 0.01), [[0, c[3]], [0.5, c[4]], [1, c[5]]]),
+      shadow, fy, fr,
+    }));
+    if (ynBase.size >= 8) ynBase.clear();
+    ynBase.set(side, pair);
+  }
+  return pair[gold ? 1 : 0];
+}
+// The body's gloss for one flat colour, after the design's green (#79d304 -> #4f8f06 .. #6fb80e .. #9df22c .. #86dc1c .. #6cb80f .. #4c8a06): darker at the
+// top and bottom, a brighter band a little above the middle (added, so the hue stays saturated). `color` is #rrggbb or rgb(r,g,b).
+const bodyGradients = new Map();
+function bodyGradient(g, color) {
+  let gr = bodyGradients.get(color);
+  if (!gr) {
+    const c = color[0] === '#' ? [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16)) : color.slice(color.indexOf('(') + 1, -1).split(',').map(Number);
+    const mul = (f) => `rgb(${c.map((v) => Math.round(v * f)).join(',')})`;
+    const add = (n) => `rgb(${c.map((v) => Math.min(255, v + n)).join(',')})`;
+    gr = linGrad(g, 0, -38, 0, 35, [[0, mul(0.65)], [0.12, mul(0.88)], [0.45, add(36)], [0.6, add(14)], [0.92, mul(0.88)], [1, mul(0.63)]]);
+    if (bodyGradients.size >= 256) bodyGradients.clear(); // (held notes change their tint every frame)
+    bodyGradients.set(color, gr);
+  }
+  return gr;
+}
+
+// Draws a rectangular note centred at (x, y) with half width hw and half height hh (the box of the 'ynote' outline). `bodyColor` is the body's flat colour (lane
+// colour, star power tint, held / exit tint), `laneColor` the plain lane colour (the strips of a star power tap). `taper` is the perspective taper per px of row
+// (TAPER_GAIN / dist in 3D, 0 in 2D) and `side` scales the height of the base under the note (how much of the front face the view shows). Uses the caller's
+// globalAlpha and filter.
+export function drawYNote(g, x, y, hw, hh, n, laneColor, bodyColor, taper = 0, side = 1) {
+  const k = taper * (hh / YN_HH); // taper per design unit of row
+  const detail = hw >= 24 ? 2 : hw >= 9 ? 1 : 0; // the small parts only where they have pixels to live in
+  const base = ynGradients(g, side, n.sp);
+  const S = ynShared;
   g.save();
-  g.clip();
-  const cap = hw * 0.26;
-  const strip = hw * (n.tap || n.ghost ? 0.17 : 0.3); // the white HOPO strips are wider than the tap's coloured ones
-  const top = y - hh - 1;
-  const full = 2 * hh + 2;
-  if (n.tap || n.ghost) { // dark centre, the colour on the strips beside the caps (YARG's tap and ghost notes)
-    g.fillStyle = '#1b1c1f';
-    g.fillRect(x - hw + cap, top, 2 * (hw - cap), full);
-    g.fillStyle = laneColor;
-    g.fillRect(x - hw + cap, top, strip, full);
-    g.fillRect(x + hw - cap - strip, top, strip, full);
-  } else if (n.hopo || n.accent) { // white strips (the accent's white tabs)
-    g.fillStyle = 'rgba(255,255,255,0.95)';
-    g.fillRect(x - hw + cap, top, strip, full);
-    g.fillRect(x + hw - cap - strip, top, strip, full);
+  g.translate(x, y);
+  g.scale(hw / YN_HW, hh / YN_HH);
+  if (hw >= 16) { // the soft floor shadow: a round-capped stroke with a vertical fade
+    const fu = 91.5 * (1 + k * base.fy);
+    g.beginPath();
+    g.moveTo(-fu, base.fy);
+    g.lineTo(fu, base.fy);
+    g.lineCap = 'round';
+    g.lineWidth = 2 * base.fr;
+    g.strokeStyle = base.shadow;
+    g.stroke();
   }
-  const gloss = g.createLinearGradient(0, y - hh, 0, y + hh); // a soft highlight on top, a little shade below
-  gloss.addColorStop(0, 'rgba(255,255,255,0.32)');
-  gloss.addColorStop(0.45, 'rgba(255,255,255,0.04)');
-  gloss.addColorStop(1, 'rgba(0,0,0,0.3)');
-  g.fillStyle = gloss;
-  g.fillRect(x - hw - 1, top, 2 * hw + 2, full);
-  const stops = n.sp ? CHROME_GOLD : CHROME;
-  for (const side of [-1, 1]) { // the chrome caps: bright in the middle of the cap, dark at both edges
-    const edge = x + side * hw;
-    const cg = g.createLinearGradient(edge, 0, edge - side * cap, 0);
-    for (let i = 0; i < 4; i++) cg.addColorStop(i / 3, stops[i]);
-    g.fillStyle = cg;
-    g.fillRect(Math.min(edge, edge - side * cap) - 1, top, cap + 2, full);
-    g.fillStyle = 'rgba(0,0,0,0.5)'; // the seam between the cap and the band
-    g.fillRect(side < 0 ? edge + cap - 1 : edge - cap, top, 1, full);
+  // the base's top face (narrower at the back)
+  g.beginPath();
+  traceYN(g, YN_BASE_TOP, 1, k, side);
+  g.fillStyle = base.top;
+  g.fill();
+  // the body (a tap or ghost: the colour stays on the strips, the centre is dark; a HOPO or accent: white strips), then its darker ends over all of it
+  g.beginPath();
+  traceYN(g, YN_BODY, 1, k, side);
+  const dark = n.tap || n.ghost;
+  g.fillStyle = bodyGradient(g, dark && n.sp ? laneColor : bodyColor);
+  g.fill();
+  if (dark || n.hopo || n.accent) {
+    g.beginPath();
+    if (dark) traceYN(g, YN_TAP_CENTRE, 1, k, side);
+    else { traceYN(g, YN_HOPO_STRIP, 1, k, side); traceYN(g, YN_HOPO_STRIP, -1, k, side); }
+    g.fillStyle = bodyGradient(g, dark ? '#1b1c1f' : '#f4f4f4');
+    g.fill();
+    g.beginPath();
+    traceYN(g, YN_BODY, 1, k, side);
   }
-  g.fillStyle = gloss; // the shade also over the caps, so they curve like the band
-  g.fillRect(x - hw - 1, top, 2 * hw + 2, full);
+  g.fillStyle = S.ends;
+  g.fill();
+  // the two chrome (gold for star power) caps: the profile across the cap, sheared along the ridge slab by slab (one piece, along the middle stretch, when small)
+  g.fillStyle = S.cap[n.sp ? 1 : 0];
+  const slabs = detail === 2;
+  for (let m = -1; m <= 1; m += 2) {
+    const sg = m; // m = 1 is the design's left cap, -1 the mirrored right one (the profile is mirrored with it)
+    for (let i = slabs ? 0 : 1; i < (slabs ? CAP_SLABS.length : 2); i++) {
+      const s = CAP_SLABS[i];
+      g.beginPath();
+      traceYN(g, slabs ? s.poly : YN_CAP, sg, k, side);
+      // the gradient's x is the distance from the ridge: screen u = sg * (x + u0 + slope * (v - v0)) (+ the taper at the slab's ridge)
+      const c = sg * (s.m + s.uc * k);
+      const e = sg * (s.u0 - s.m * s.v0);
+      g.transform(sg, 0, c, 1, e, 0);
+      g.fill();
+      g.transform(sg, 0, -c * sg, 1, -e * sg, 0); // (the inverse: the path is already in place, only the gradient moved)
+    }
+  }
+  if (detail) {
+    g.beginPath(); // the vertical shade over both caps
+    traceYN(g, YN_CAP, 1, k, side);
+    traceYN(g, YN_CAP, -1, k, side);
+    g.fillStyle = S.capV;
+    g.fill();
+  }
+  if (detail === 2) { // the specular blobs on the ridges
+    g.fillStyle = S.spec;
+    for (let m = -1; m <= 1; m += 2) {
+      const cu = m * 83.6 * (1 - k * 2.5);
+      g.transform(2.6, 0, 0, 4.4, cu, -2.5);
+      g.beginPath();
+      g.arc(0, 0, 1, 0, Math.PI * 2);
+      g.fill();
+      g.transform(1 / 2.6, 0, 0, 1 / 4.4, -cu / 2.6, 2.5 / 4.4);
+    }
+  }
+  // the base's front face, over the caps' lower ends
+  g.beginPath();
+  traceYN(g, YN_BASE_FRONT, 1, k, side);
+  g.fillStyle = base.front;
+  g.fill();
   g.restore();
 }
 

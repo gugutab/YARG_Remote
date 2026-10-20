@@ -2,7 +2,7 @@
 // so it stays light enough for phones. Only the lane instruments (guitar, bass, keys, drums) have a highway;
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
-  GUITAR_LANE_COLORS, breAlpha, drawGuitarNoteFace, drawCymbalFace, NOTE_RECT_W, NOTE_RECT_H, KICK_COLOR, KICK_COLOR_5, STAR_POWER_GOLD, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
+  GUITAR_LANE_COLORS, breAlpha, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, NOTE_RECT_W, NOTE_RECT_H, KICK_COLOR, KICK_COLOR_5, STAR_POWER_GOLD, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
   ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
@@ -344,12 +344,23 @@ export function renderLanes3D(hw, t, w, h) {
     const disc = n.cymbal && hw.noteStyle === 'rect'; // ...and a cymbal is a chrome disc with a coloured cone
     const body = tintWhite(n.sp ? noteColor(n, colors) : n.tap && !faced ? TAP_COLOR : colors[n.lane], Math.min(1, kx + amt * (0.32 + 0.12 * shimmer))); // an active long note's head is lighter, like its tail
     g.globalAlpha = (1 - kx) * hw.noteAlpha(n) * Math.min(1, (1 - d) / FADE_IN);
+    if (faced) { // the rectangular style: the vector note after the design, with its base in perspective (no separate thickness edge)
+      drawYNote(g, x, y, rx * NOTE_RECT_W, ry * NOTE_RECT_H, n, colors[n.lane], body, TAPER_GAIN / (y - vy), YNOTE_SIDE_3D);
+      if (n.accent) {
+        g.beginPath();
+        noteShape(g, x, y, rx, ry, 'ynote', y - vy);
+        g.lineWidth = ACCENT_OUTLINE_WIDTH * p;
+        g.strokeStyle = darken(colors[n.lane], ACCENT_OUTLINE_DARKEN);
+        g.stroke();
+      }
+      continue;
+    }
     // thickness: a thin darker edge underneath the top face (no cast shadow; all of it moves, grows and fades with the note)
-    const th = Math.max(0.5, rx * (faced || disc ? 0.27 : 0.21)); // (a little thicker in the rectangular style)
-    const headStyle = disc ? 'round' : n.cymbal ? 'tri' : hw.noteStyle === 'rect' ? 'ynote' : hw.noteStyle; // cymbals: a disc in the rectangular style, else a rounded triangle
+    const th = Math.max(0.5, rx * (disc ? 0.27 : 0.21)); // (a little thicker in the rectangular style)
+    const headStyle = disc ? 'round' : n.cymbal ? 'tri' : hw.noteStyle; // cymbals: a disc in the rectangular style, else a rounded triangle
     g.beginPath();
     noteShape(g, x, y + th, rx, ry, headStyle, y + th - vy);
-    if (faced || disc) { // the rectangular style: the edge under the face is metal like the caps (not a dark shade of the colour)
+    if (disc) { // the rectangular style: the edge under the disc is metal like the caps (not a dark shade of the colour)
       const edge = g.createLinearGradient(0, y + ry * 0.4, 0, y + th + ry);
       const m = n.sp ? ['#f0d060', '#a37c00', '#3d2e00'] : ['#d4dae1', '#7f8893', '#30353b'];
       edge.addColorStop(0, m[0]);
@@ -363,12 +374,11 @@ export function renderLanes3D(hw, t, w, h) {
     noteShape(g, x, y, rx, ry, headStyle, y - vy);
     g.fillStyle = body;
     g.fill();
-    if (faced) drawGuitarNoteFace(g, x, y, rx * NOTE_RECT_W, ry * NOTE_RECT_H, n, colors[n.lane]);
-    else if (disc) drawCymbalFace(g, x, y, rx, ry, n, colors[n.lane]);
+    if (disc) drawCymbalFace(g, x, y, rx, ry, n, colors[n.lane]);
     g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH * p : Math.max(1, 1.5 * p);
     g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : 'rgba(0,0,0,0.5)';
     g.stroke();
-    if (n.hopo && !faced) {
+    if (n.hopo) {
       g.beginPath();
       noteShape(g, x, y, rx * 0.35, ry * 0.35, hw.noteStyle, y - vy);
       g.fillStyle = kx === 0 ? HOPO_DOT : `rgba(255,255,255,${0.9 * (1 - kx)})`;
