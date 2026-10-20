@@ -71,6 +71,7 @@ export function mountSettings({ root, frame, settings, sections, renderers = {},
         box.append(el('button', { type: 'button', class: 'chip', 'data-value': o.value, text: o.label, onclick: () => {
           const now = new Set(settings.get(id));
           if (now.has(o.value)) now.delete(o.value); else now.add(o.value);
+          if (now.size < (item.minItems ?? 0)) return; // (the last one stays on)
           settings.set(id, item.options.map((x) => x.value).filter((v) => now.has(v))); // keeps the option order
         } }));
       }
@@ -96,7 +97,7 @@ export function mountSettings({ root, frame, settings, sections, renderers = {},
     return el('span');
   }
 
-  function buildRow(item) {
+  function buildRow(item, section) {
     const text = el('span', { class: 'sp-text' }, el('b', { text: item.label }), item.help ? el('small', { text: item.help }) : null);
     let row;
     if (item.type === 'custom') {
@@ -109,9 +110,21 @@ export function mountSettings({ root, frame, settings, sections, renderers = {},
         ? el('div', { class: 'sp-row sp-row-custom' }, el('div', { class: 'sp-row-head' }, text, resetButton(item)), control(item))
         : el('div', { class: 'sp-row' }, text, el('span', { class: 'sp-ctl' }, control(item), resetButton(item)));
     }
-    row.dataset.search = `${item.label} ${item.help ?? ''} ${item.keywords ?? ''}`.toLowerCase();
+    row.dataset.search = `${item.label} ${item.help ?? ''} ${item.keywords ?? ''} ${item.group ?? ''} ${section.title}`.toLowerCase(); // (the group and section titles match too)
     if (item.when) visibility.push({ row, item });
     return row;
+  }
+
+  // "Reset this section": every setting of the section back to its default, after a confirmation. The saved themes are kept (they
+  // are the user's work, not a setting; Reset all and the theme's own reset button still clear them).
+  function sectionResetButton(section) {
+    const ids = section.items.flatMap(idsOf).filter((id) => id !== 'theme.saved');
+    if (!ids.length) return null;
+    const b = el('button', { class: 'chip-btn sp-sec-reset', type: 'button', text: 'Reset this section', title: `Restore the defaults of every ${section.title} setting`, onclick: () => {
+      if (window.confirm(`Reset every ${section.title} setting to its default?`)) settings.resetMany(ids);
+    } });
+    refreshers.push(() => { b.disabled = ids.every((id) => settings.isDefault(id)); });
+    return b;
   }
 
   const sectionEls = [];
@@ -121,10 +134,10 @@ export function mountSettings({ root, frame, settings, sections, renderers = {},
     for (const item of section.items) {
       if (item.group && item.group !== lastGroup) rowsAndGroups.push(el('h4', { class: 'sp-group', text: item.group }));
       lastGroup = item.group ?? null;
-      rowsAndGroups.push(buildRow(item));
+      rowsAndGroups.push(buildRow(item, section));
     }
     const body = el('div', { class: 'sp-section-body' }, rowsAndGroups);
-    const sec = el('section', { class: 'sp-section', id: `sp-sec-${section.id}` }, el('h3', {}, icon(section.icon), section.title), section.description ? el('p', { class: 'sp-desc', text: section.description }) : null, body);
+    const sec = el('section', { class: 'sp-section', id: `sp-sec-${section.id}` }, el('h3', {}, icon(section.icon), section.title, sectionResetButton(section)), section.description ? el('p', { class: 'sp-desc', text: section.description }) : null, body);
     content.append(sec);
     const link = el('button', { type: 'button', class: 'sp-nav-btn', onclick: () => { search.value = ''; applyQuery(''); pinned = sec; markCurrent(sec); sec.scrollIntoView({ block: 'start', behavior: 'smooth' }); } }, icon(section.icon), el('span', { text: section.title }));
     nav.append(link);
@@ -137,7 +150,7 @@ export function mountSettings({ root, frame, settings, sections, renderers = {},
     for (const { section, sec } of sectionEls) {
       let shown = 0;
       for (const row of sec.querySelectorAll('.sp-row')) {
-        const match = !query || row.dataset.search.includes(query) || section.title.toLowerCase().includes(query);
+        const match = !query || row.dataset.search.includes(query);
         row.hidden = !match;
         if (match) shown++;
       }

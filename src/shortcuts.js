@@ -19,7 +19,7 @@ export const ACTIONS = [
   { id: 'focusPrev', group: 'Windows', label: 'Previous fretboard window', key: 'BracketLeft' },
   { id: 'focusNext', group: 'Windows', label: 'Next fretboard window', key: 'BracketRight' },
   { id: 'view3d', group: 'Windows', label: 'Switch 2D / 3D', key: 'KeyV' },
-  { id: 'noteStyle', group: 'Windows', label: 'Switch rounded / rectangular notes', key: 'KeyN' },
+  { id: 'noteStyle', group: 'Windows', label: 'Switch note shape (circles / rectangles)', key: 'KeyN' },
   { id: 'vocalView', group: 'Windows', label: 'Vocals: switch notes / karaoke', key: 'KeyK' },
   { id: 'visualizerNext', group: 'Windows', label: 'Next visualizer', key: 'KeyG' },
   { id: 'visualizerPrev', group: 'Windows', label: 'Previous visualizer', key: 'Shift+KeyG' },

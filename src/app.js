@@ -21,7 +21,7 @@ import { isFreshStart, overlayLines, startPlan, INFO_FIRST_PLAY_MS } from './sta
 import { metaRows, extraRows, chartStats, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel, relabelStems } from './songinfo.js';
 import { parseRoute, formatRoute } from './route.js';
 import { createSettings } from './settings.js';
-import { SECTIONS, buildDefaults, buildValidator, FONT_OPTIONS } from './settings-schema.js';
+import { SECTIONS, buildDefaults, buildValidator, FONT_OPTIONS, RENAMES, SETTINGS_VERSION, itemById } from './settings-schema.js';
 import { resolveTheme, applyTheme } from './themes.js';
 import { mountSettings } from './settings-ui.js';
 import { renderThemeStudio, renderDataTools, renderShortcuts } from './settings-custom.js';
@@ -137,25 +137,38 @@ function takeStage() {
 
 let infoOpen = false;
 let loadInfo = { state: 'idle', text: '', fraction: 0 };
-const settings = { speed: 1, neck: 1.2, chartDelay: 0 };
+const PREF_DEFAULTS = buildDefaults();
+const settings = { speed: 1, neck: PREF_DEFAULTS['highway.neck'], chartDelay: 0 }; // (neck: the user's starting value is applied by the highway.neck EFFECT)
 let remote = false; // library comes from server.mjs (/api/library); no folder permission needed
 let detached = false; // list restored from storage without file access (browsers without showDirectoryPicker)
 let pendingSongId = null; // song clicked while detached; opened once the folder is picked again
 
 // ---------- Settings and theme (applied first, so the first frame already has the right colours) ----------
-const prefs = createSettings({ defaults: buildDefaults(), validate: buildValidator(SECTIONS), storage: (() => { try { return localStorage; } catch { return null; } })() });
+const prefs = createSettings({ defaults: PREF_DEFAULTS, validate: buildValidator(SECTIONS), renames: RENAMES, version: SETTINGS_VERSION, storage: (() => { try { return localStorage; } catch { return null; } })() });
 const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
-// Reduced motion: the OS preference sets the default of the motion settings, never an explicit choice. The settings store drops a
-// value equal to its default, so "the user switched it back on" is remembered separately (MOTION_KEY).
+// Reduced motion: the setting ui.reduceMotion (auto = the OS preference, on, off) turns the three motion settings off while it
+// applies; otherwise each switch decides on its own.
 const reduceQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
 let osReduceMotion = reduceQuery.matches; // cached: reading .matches every frame makes Chrome skip the 'change' event
 const MOTION_IDS = ['ui.animations', 'highway.seekAnimation', 'highway.motionBlur'];
-const MOTION_KEY = 'yargremote.motionTouched';
-const motionTouched = (() => { try { return new Set(JSON.parse(localStorage.getItem(MOTION_KEY)) || []); } catch { return new Set(); } })();
+const motionReduced = () => { const m = prefs.get('ui.reduceMotion'); return m === 'on' || (m === 'auto' && osReduceMotion); };
 function motionPref(id) {
-  const v = prefs.get(id);
-  return v && osReduceMotion && prefs.isDefault(id) && !motionTouched.has(id) ? false : v;
+  return prefs.get(id) && !motionReduced();
 }
+// Migration of the old hidden key (before ui.reduceMotion): it listed the motion switches the user had set by hand, which the OS
+// preference then no longer overrode. Those values now rule (Reduce motion: Off), and the switches the OS was turning off stay off.
+try {
+  const OLD_MOTION_KEY = 'yargremote.motionTouched';
+  const raw = localStorage.getItem(OLD_MOTION_KEY);
+  if (raw !== null) {
+    const touched = new Set([(() => { try { return JSON.parse(raw); } catch { return []; } })()].flat().filter((x) => typeof x === 'string'));
+    if (touched.size && prefs.isDefault('ui.reduceMotion')) {
+      if (osReduceMotion) for (const id of MOTION_IDS) if (!touched.has(id) && prefs.isDefault(id)) prefs.set(id, false);
+      prefs.set('ui.reduceMotion', 'off');
+    }
+    localStorage.removeItem(OLD_MOTION_KEY);
+  }
+} catch { /* no storage: nothing to migrate */ }
 let themeStage = '#0d1117';
 let themeUi = { accent: '#2f80ed', text: '#e6edf3', muted: '#8b949e', panel: '#161b22' }; // the active theme's colours the vocal view and the countdowns derive from
 // The colours of the wait countdowns and the vocal view: the theme's (default), the classic fixed ones, or from a colour the user picked.
@@ -1883,8 +1896,9 @@ function applyStem(st) {
   }
 }
 
-// Settings: one value each, shown by every [data-setting] slider (menu popover and info screen).
-const SETTING_DEFAULTS = { speed: 1, neck: 1.2, chartDelay: 0 };
+// Settings: one value each, shown by every [data-setting] slider (menu popover and info screen). The neck's "default" (what a reset
+// restores) is the user's starting value, the highway.neck setting.
+const SETTING_DEFAULTS = { speed: 1, get neck() { return prefs.get('highway.neck'); }, chartDelay: 0 };
 const SETTING_FORMAT = {
   speed: (v) => `${Number(v.toFixed(2))}×`, // (also the bar's readout, the quick settings and the speed note)
   neck: (v) => `${v.toFixed(1)}×`,
@@ -3386,7 +3400,6 @@ function setBarHidden(hidden, persist = true) {
   alignStageButtons();
 }
 setBarHidden(prefs.get('highway.barHidden') === 'hidden' || (prefs.get('highway.barHidden') === 'last' && store.get('barHidden') === '1'));
-if (prefs.get('highway.neck') !== SETTING_DEFAULTS.neck) setSetting('neck', prefs.get('highway.neck')); // the starting neck speed
 els.barHide.addEventListener('click', () => setBarHidden(!els.app.classList.contains('bar-hidden'))); // compact <-> full
 
 // ---------- Background visualizer ----------
@@ -3849,7 +3862,7 @@ const metPop = document.getElementById('metronomePop');
   volume.className = 'pp-row met-volume';
   volume.innerHTML = '<span>Volume</span><input type="range" min="0" max="100" step="5" aria-label="Metronome volume"><output></output>';
   volume.querySelector('input').addEventListener('input', (e) => prefs.set('audio.metronomeVolume', Number(e.target.value)));
-  metPop.replaceChildren(title, seg('Status', [[true, 'On'], [false, 'Off']], 'audio.metronome'), volume, seg('Sound', [['click', 'Click'], ['woodblock', 'Woodblock'], ['beep', 'Beep']], 'audio.metronomeSound'));
+  metPop.replaceChildren(title, seg('Status', [[true, 'On'], [false, 'Off']], 'audio.metronome'), volume, seg('Sound', itemById('audio.metronomeSound').options.map((o) => [o.value, o.label]), 'audio.metronomeSound'));
 }
 function syncMetPop() {
   const state = { 'audio.metronome': prefs.get('audio.metronome'), 'audio.metronomeSound': prefs.get('audio.metronomeSound') };
@@ -4001,15 +4014,11 @@ const EFFECTS = {
   'playback.songInfoOverlay': (v) => { if (!v) hideSongInfo(); },
   'playback.keepSongInfo': (v) => { if (!v && els.songInfo.classList.contains('show') && !startDone) scheduleInfoHide(INFO_FIRST_PLAY_MS); },
   'ui.animations': () => { document.documentElement.dataset.motion = motionPref('ui.animations') ? 'on' : 'off'; },
+  'ui.reduceMotion': () => EFFECTS['ui.animations'](),
+  'highway.neck': (v) => setSetting('neck', v), // the starting neck speed; also what the tracks' own neck speed resets to
 };
 for (const [id, fn] of Object.entries(EFFECTS)) fn(prefs.get(id));
-prefs.subscribe((id, value) => {
-  if (MOTION_IDS.includes(id) && !motionTouched.has(id)) { // the user chose: from now on the OS preference no longer decides
-    motionTouched.add(id);
-    try { localStorage.setItem(MOTION_KEY, JSON.stringify([...motionTouched])); } catch { /* session only */ }
-  }
-  wakeUp(); EFFECTS[id]?.(value);
-});
+prefs.subscribe((id, value) => { wakeUp(); EFFECTS[id]?.(value); });
 reduceQuery.addEventListener?.('change', (e) => { osReduceMotion = e.matches; EFFECTS['ui.animations'](); });
 
 // The settings window is the second window of the shared frame: the same controller as the library's (same width, edges, motion, drawer).
