@@ -1813,6 +1813,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .songs-wrap { border-top: 0; margin-left: 0; margin-right: 0; padding-left: 8px; }
 #songs { padding: 0; }
 :is(#songs, #endNext) li.row { border: 0 !important; background: none !important; isolation: isolate; padding-left: 12px; padding-right: 10px; }
+#endNext li.row { position: relative; } /* (the card drawn by ::after is positioned inside its row: in the library the virtual list makes rows absolute, here they must be positioned too) */
 :is(#songs, #endNext) li.row::after { content: ""; position: absolute; z-index: -1; transition: background .12s, border-color .12s; pointer-events: none; border-color: color-mix(in srgb, var(--line) 80%, transparent); border-radius: 10px; border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); box-shadow: none; inset: 4px; }
 :is(#songs, #endNext) li.row .thumb { border-radius: 8px; }
 #songs li.divider { background: none; border-bottom: 0; padding: 0 14px; gap: 10px; font-size: 11px; color: var(--accent); }
