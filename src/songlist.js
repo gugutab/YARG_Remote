@@ -209,9 +209,10 @@ export function filterSongs(songs, { query = '', instruments = [], instrument = 
 }
 
 // Short rail code of a pack: the initials of its words, roman numerals as digits, "+" for DLC.
-// "Rock Band 2 DLC" -> RB2+, "Guitar Hero III" -> GH3, "The Beatles Rock Band" -> BRB.
+// "Rock Band 2 DLC" -> RB2+, "Guitar Hero III" -> GH3, "The Beatles Rock Band" -> BRB; a name of one word of up to 4 characters is its own code.
 export function packCode(label) {
   if (label === 'No pack') return '?';
+  if (/^\S{1,4}$/.test(label)) return label; // already a code ("CDLC" stays "CDLC", not "C")
   const ROMAN = { i: '1', ii: '2', iii: '3', iv: '4', v: '5' };
   const words = norm(label).split(/[^a-z0-9]+/).filter((w) => w && w !== 'the' && w !== 'of');
   const dlc = words.includes('dlc');

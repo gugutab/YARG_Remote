@@ -13,6 +13,13 @@ const el = (tag, props = {}, ...kids) => {
   for (const kid of kids.flat()) if (kid != null) e.append(kid);
   return e;
 };
+// Which ends of a horizontally scrolling strip have more content past them (the tab strip of a narrow settings window fades there).
+// Nothing when the strip does not overflow; 1 px of slack for fractional widths.
+export function edgeFade(scrollLeft, clientWidth, scrollWidth) {
+  const over = scrollWidth - clientWidth > 1;
+  return { start: over && scrollLeft > 1, end: over && scrollLeft + clientWidth < scrollWidth - 1 };
+}
+
 const icon = (name) => {
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   s.innerHTML = `<use href="#i-${name}"/>`;
@@ -40,7 +47,8 @@ export function mountSettings({ root, frame, settings, sections, renderers = {},
   function resetButton(item) {
     const ids = idsOf(item);
     if (!ids.length) return null;
-    const b = el('button', { class: 'icon small-icon sp-reset', type: 'button', title: 'Restore the default', 'aria-label': `Restore the default of ${item.label}`, onclick: () => settings.resetMany(ids) }, icon('reset'));
+    // (out of the Tab order: about a hundred of them would sit between the controls; the keyboard resets with the section's "Reset this section")
+    const b = el('button', { class: 'icon small-icon sp-reset', type: 'button', tabindex: '-1', title: 'Restore the default', 'aria-label': `Restore the default of ${item.label}`, onclick: () => settings.resetMany(ids) }, icon('reset'));
     refreshers.push(() => { b.disabled = ids.every((id) => settings.isDefault(id)); });
     return b;
   }
@@ -143,6 +151,15 @@ export function mountSettings({ root, frame, settings, sections, renderers = {},
     nav.append(link);
     sectionEls.push({ section, sec, link });
   }
+
+  // The tab strip (narrow window) fades at an end with more tabs past it.
+  const syncNavFade = () => {
+    const f = edgeFade(nav.scrollLeft, nav.clientWidth, nav.scrollWidth);
+    nav.classList.toggle('fade-start', f.start);
+    nav.classList.toggle('fade-end', f.end);
+  };
+  nav.addEventListener('scroll', syncNavFade, { passive: true });
+  if (typeof ResizeObserver === 'function') new ResizeObserver(syncNavFade).observe(nav);
 
   function applyQuery(q) {
     query = q.trim().toLowerCase();

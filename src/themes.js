@@ -47,6 +47,9 @@ export function contrast(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 export const readableOn = (bg) => (luminance(bg) > 0.4 ? '#101418' : '#ffffff'); // text colour for text on a given background
+// The unfilled track of a progress fill in the accent colour (the start screen's Play button while it loads): the accent pulled far toward the pole away
+// from its text colour (black under white text, white under dark text), so the same text reads on the track and on the fill.
+export const accentTrack = (accent) => mix(accent, readableOn(accent) === '#ffffff' ? '#000000' : '#ffffff', 0.72);
 
 function hslToHex(h, s, l) {
   const k = (n) => (n + h / 30) % 12;
@@ -103,6 +106,7 @@ export function applyTheme(theme, root = document.documentElement) {
   root.style.setProperty('--muted', v.muted);
   root.style.setProperty('--accent', v.accent);
   root.style.setProperty('--accent-text', readableOn(v.accent)); // text on accent-coloured buttons
+  root.style.setProperty('--accent-track', accentTrack(v.accent)); // the unfilled part of an accent progress fill
   root.style.setProperty('--stage', v.stage);
   root.style.setProperty('color-scheme', theme.scheme); // native inputs, scrollbars and select lists follow
   root.dataset.theme = theme.scheme;
