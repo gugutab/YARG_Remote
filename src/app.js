@@ -19,8 +19,8 @@ import { previewWindow } from './preview.js';
 import { setLoopPoint, restartNote, pausePanelWanted } from './practice.js';
 import { isFreshStart, overlayLines, startPlan, INFO_FIRST_PLAY_MS } from './startinfo.js';
 import { metaRows, extraRows, bpmLabel, bpmRange, instrumentLevel, relabelStems } from './songinfo.js';
-import { parseRoute } from './route.js';
-import { initDeepLinks, applyInstruments, syncUrl, openFromHash } from './deeplink.js';
+import { parseRoute, formatRoute } from './route.js';
+import { initDeepLinks, applyInstruments, syncUrl, openFromHash, instrumentsOnScreen } from './deeplink.js';
 import { initEndUi, syncEndScreen, buildEndScreen, isEndShown } from './end-ui.js';
 import { initTilesUi, buildInstrumentCard, buildInstrumentCards, vocalViewSeg, setDiffLabel, diffSegObserver, buildTileTools, dropMenuMixViews } from './tiles-ui.js';
 import { initMixer, masterState, stemStates, groupList, buildMixer, applyStem, mixerRow, groupBlock, renderGroup } from './mixer-ui.js';
@@ -572,6 +572,12 @@ function syncInfoHistory() {
   infoPlayed.textContent = line;
   infoPlayed.hidden = !line;
 }
+// Share: a link that opens this song's details (with the instruments on screen, when it is the open song). It works for whoever opens the same server.
+$('infoShare').addEventListener('click', async () => {
+  if (!infoSong) return;
+  const link = location.origin + location.pathname + location.search + formatRoute({ view: 'song', id: infoSong.id, instruments: current?.song === infoSong ? instrumentsOnScreen() : undefined });
+  try { await navigator.clipboard.writeText(link); flashNote('Link copied'); } catch { window.prompt('Copy this link', link); }
+});
 infoFav.addEventListener('click', () => { if (infoSong) setFavourite(infoSong, !favourites.has(infoSong.id)); });
 // A play is recorded once the chart has played 10 s in one go (not the Listen card, not a preview); a song's end starts a new session.
 const playTracker = createPlayTracker();

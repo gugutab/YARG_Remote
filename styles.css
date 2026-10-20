@@ -2784,3 +2784,6 @@ button.icon.small-icon.sp-reset, #ppSlower, #ppFaster { min-width: 32px; min-hei
 .onb-slider { display: flex; align-items: center; gap: 8px; }
 .onb-slider input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
 .onb-ms { min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+
+.info-share svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.info-top .info-share { width: 32px; height: 32px; color: var(--muted); } .info-top .info-share svg { width: 18px; height: 18px; }
