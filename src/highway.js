@@ -2,17 +2,14 @@
 // so seek/pause just means re-rendering at a different `t`.
 
 import { sanitizeSizes, fitWidths } from './panesizes.js';
+import { PER_INSTRUMENT_BASES, instrumentDefaults } from './perinstrument.js';
 import {
-  GUITAR_LANE_COLORS, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, LYRIC_RAMP_STOPS,
-  KICK_COLOR,
-  KICK_COLOR_5,
+  NOTE_PALETTE, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, LYRIC_RAMP_STOPS,
   STAR_POWER_GOLD,
   STAR_POWER_BAND,
   SOLO_BAND,
-  OPEN_COLOR,
   KICK_BAR_HALF_H,
   DOUBLE_KICK_GAP,
-  TAP_COLOR,
   ACCENT_OUTLINE_WIDTH,
   ACCENT_OUTLINE_DARKEN,
   GHOST_ALPHA,
@@ -124,6 +121,7 @@ export class Highway {
     this.vizFps = () => Infinity; // how many times per second the background may be redrawn (set by the app from the setting)
     this.bgNext = 0; // the time (ms) from which the background may be redrawn
     this.paneOpts = {}; // per window overrides, see setPaneOpt
+    this.instrumentOpts = {}; // per instrument starting options (setting highway.perInstrument), see the perInstrument setter
     this.neck = 1.2; // neck speed (the app default): scales distance between notes only; timing is unchanged
     this.bg = '#0d1117'; // chart background and the colour its fades dissolve into (the theme's "stage" colour)
     this.bgRgb = '13, 17, 23';
@@ -273,7 +271,21 @@ export class Highway {
   paneOpt(key, name) {
     const v = this.paneOpts[key]?.[name];
     if (v !== undefined) return v;
-    return name === 'delay' ? 0 : name === 'view' ? this.view : name === 'noteStyle' ? this.noteStyle : this.neck;
+    return this.paneDefault(key, name);
+  }
+
+  // What a window's option is without its own override: the instrument's starting option (highway.perInstrument; a pane key is the
+  // instrument group of app.js, which is the instrument's base: guitar, bass, rhythm, keys, drums, vocals), else the global value.
+  paneDefault(key, name) {
+    if (name === 'delay') return 0;
+    const v = this.instrumentOpts[key]?.[name];
+    if (v !== undefined) return v;
+    return name === 'view' ? this.view : name === 'noteStyle' ? this.noteStyle : this.neck;
+  }
+
+  set perInstrument(value) { // (precomputed: paneOpt runs for every pane on every frame)
+    this.instrumentOpts = Object.fromEntries(PER_INSTRUMENT_BASES.map((b) => [b, instrumentDefaults(value, b)]));
+    this.invalidate();
   }
 
   setChart(chart) {
@@ -1323,7 +1335,7 @@ export class Highway {
       if (FILL_KINDS[i] === 'bre' && this.breBand === 'off') continue;
       const spans = spansOfKind(chart, chart.fills, 'kind', FILL_KINDS[i]);
       if (FILL_KINDS[i] === 'bre') { // the big rock ending: every lane in its own colour, pulsing (see breAlpha)
-        const cols = chart.laneColors || GUITAR_LANE_COLORS;
+        const cols = chart.laneColors || NOTE_PALETTE.lanes;
         const pulseBre = this.breBand === 'pulse';
         for (let l = 0; l < chart.lanes; l++) this.fillSpans(spans, t, ahead, x0 + l * laneW, laneW, h, withAlpha(cols[l] || cols[0], breAlpha(t, l, chart.lanes, pulseBre)));
       } else this.fillSpans(spans, t, ahead, x0, laneW * chart.lanes, h, FILL_COLORS[FILL_KINDS[i]]);
@@ -1359,7 +1371,7 @@ export class Highway {
     let end = from; // the notes that can be seen are notes[from .. end)
     while (end < notes.length && notes[end].time <= t + ahead) end++;
     const radius = Math.min(laneW * 0.36, 26) * this.noteSize; // (setting highway.noteScale: heads and pads)
-    const colors = chart.laneColors || GUITAR_LANE_COLORS;
+    const colors = chart.laneColors || NOTE_PALETTE.lanes;
     const tailW = this.sustainWidth;
     const held = this.heldMotion; // (setting highway.heldPulse: off keeps the held head, tail and pad still)
     const wide = this.noteStyle === 'rect' ? RECT_WIDEN_2D : 1; // 2D rounded rectangles are a bit wider than the shared shape
@@ -1408,7 +1420,7 @@ export class Highway {
       const full = laneW * chart.lanes;
       const height = KICK_BAR_HALF_H * this.kickBar * 2 * (1 + 0.4 * k); // (setting highway.kickBarHeight)
       g.globalAlpha = 1 - k;
-      g.fillStyle = tintWhite(n.open ? OPEN_COLOR : chart.drumKind === 'five' ? KICK_COLOR_5 : KICK_COLOR, k);
+      g.fillStyle = tintWhite(n.open ? NOTE_PALETTE.open : chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick, k);
       // double kick: a second bar stacked above the first
       g.fillRect(x0, cy + 0 - height / 2, full, height);
       if (n.doubleKick) g.fillRect(x0, cy + -(height + DOUBLE_KICK_GAP) - height / 2, full, height);
@@ -1422,7 +1434,7 @@ export class Highway {
       const yTop = laneY(n.time + n.length);
       const yBot = laneY(Math.max(n.time, t));
       if (n.open) {
-        g.fillStyle = withAlpha(OPEN_COLOR, 0.35);
+        g.fillStyle = withAlpha(NOTE_PALETTE.open, 0.35);
         g.fillRect(x0, yTop, laneW * chart.lanes, Math.max(0, yBot - yTop));
         continue;
       }
@@ -1482,7 +1494,7 @@ export class Highway {
       const disc = n.cymbal && this.noteStyle === 'rect'; // the rectangular style draws a cymbal as YARG's chrome disc (the circle style keeps the triangle)
       if (disc) noteShape(g, cx, cy, r * 0.95, r * 0.95, 'round');
       else noteShape(g, cx, cy, n.cymbal ? r : r * wide, r, n.cymbal ? 'tri' : this.noteStyle); // cymbals: rounded triangle
-      g.fillStyle = tintWhite(n.sp ? noteColor(n, colors) : n.tap ? TAP_COLOR : colors[n.lane], white);
+      g.fillStyle = tintWhite(n.sp ? noteColor(n, colors) : n.tap ? NOTE_PALETTE.tap : colors[n.lane], white);
       g.fill();
       if (disc) drawCymbalFace(g, cx, cy, r * 0.95, r * 0.95, n, colors[n.lane]);
       // accent: same size, with a thicker outline in a darker shade of the note's colour

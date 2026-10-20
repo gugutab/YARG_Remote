@@ -7,6 +7,7 @@
 // last argument and behaves as before when a key is absent.
 import { iniBool } from './ini.js';
 import { buildVocals, displayLyric } from './vocals.js';
+import { NOTE_PALETTE } from './palette.js';
 
 export const INSTRUMENTS = [
   { id: 'guitar', label: 'Guitar', tracks: ['PART GUITAR'], mode: 'lanes' },
@@ -36,12 +37,13 @@ const SOLO_NOTE = 103;
 const FIVE_LANE_GREEN_NOTE = 101;
 const CYMBAL_FLAG_FOR_OFFSET = { 2: 110, 3: 111, 4: 112 };
 const DRUM_CYMBAL_FLAGS = [110, 111, 112];
-const DRUM_LANE_COLORS_4 = ['#ff1d23', '#ffe900', '#00bfff', '#79d304']; // red, yellow, blue, green (YARG.Core ColorProfile.Defaults.cs)
-const DRUM_LANE_COLORS_5 = ['#ff1d23', '#ffe900', '#00bfff', '#ff8400', '#79d304']; // + orange
+// Lane colours come from the note palette (src/palette.js, setting highway.palette): YARG's by default, red, yellow, blue, green
+// (+ orange on 5 lanes) for drums (YARG.Core ColorProfile.Defaults.cs). The chart keeps the palette's array, which a palette change refills.
 // Extended Pro drums: every pad has its own lane, cymbals and toms no longer share one. Left to right.
 // YARG builds this per player: "Split" turns each combined pad (yellow, blue, green) into a drum item and a cymbal
 // item, inserted next to each other (Assets/Script/Menu/HighwayConfiguration, DrumsHighwaySpecs.cs); which side the
 // cymbal goes on was not confirmed, so the cymbal follows its tom here. Colours: YARG.Core ColorProfile.Defaults.cs.
+// (These are YARG's; what is drawn is NOTE_PALETTE.extended of src/palette.js, the same colours with the default palette.)
 // `pad` is the pad's offset in Pro drums (1 red, 2 yellow, 3 blue, 4 green).
 export const EXTENDED_DRUM_LANES = [
   { pad: 1, cymbal: false, color: '#ff1d23' }, // red (snare)
@@ -52,7 +54,6 @@ export const EXTENDED_DRUM_LANES = [
   { pad: 4, cymbal: false, color: '#79d304' }, // green tom
   { pad: 4, cymbal: true, color: '#a0d010' }, // green cymbal (crash)
 ];
-const GUITAR_LANE_COLORS = ['#79d304', '#ff1d23', '#ffe900', '#00bfff', '#ff8400']; // YARG.Core ColorProfile.Defaults.cs
 const STAR_POWER_NOTE = 116;
 const MEASURE_NOTE = 12;
 const BEAT_NOTE = 13;
@@ -267,7 +268,7 @@ export function buildChart(midi, instrument, difficulty, ini = {}) {
       : inWindows(hopoWindows, n.tick) ? true : natural.get(n) !== Boolean(n.forced));
     notes.push({ ...timed(n), lane, cymbal: false, tap, hopo: Boolean(hopo), open });
   }
-  return { mode: 'lanes', lanes: LANES, laneColors: GUITAR_LANE_COLORS, notes, ...commonParts(midi, track, toSec, settings) };
+  return { mode: 'lanes', lanes: LANES, laneColors: NOTE_PALETTE.lanes, notes, ...commonParts(midi, track, toSec, settings) };
 }
 
 // Tick of the first [ENHANCED_OPENS] / ENHANCED_OPENS text event in the track, or Infinity. YARG switches its process
@@ -326,7 +327,7 @@ function rollSpans(track, toSec) {
 function buildDrumChart(midi, track, kind, difficulty, timed, toSec, settings) {
   const extended = kind === 'extended';
   const lanes = extended ? EXTENDED_DRUM_LANES.length : kind === 'five' ? 5 : 4;
-  const laneColors = extended ? EXTENDED_DRUM_LANES.map((l) => l.color) : kind === 'five' ? DRUM_LANE_COLORS_5 : DRUM_LANE_COLORS_4;
+  const laneColors = extended ? NOTE_PALETTE.extended : kind === 'five' ? NOTE_PALETTE.drums5 : NOTE_PALETTE.drums4;
   const padCount = extended ? 4 : lanes; // pads in the MIDI (offsets 1..padCount)
   // Cymbal flags apply to Pro and 5-lane modes; 4-lane mode plays the same notes with no cymbals.
   const cymbalSpans = kind === 'four' ? null : cymbalFlagSpans(track);

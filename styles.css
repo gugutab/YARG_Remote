@@ -897,6 +897,20 @@ body.settings-open { overflow: hidden; }
 .ts-editor { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 8px 18px; }
 .ts-color { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .ts-color span { flex: 0 0 128px; } /* the swatch and the hex sit right after the name, not at the far end of a wide column */
+/* the note colours (highway.laneColors): a strip of the palette's lanes, then the kick and open colours */
+.lc-strip { display: flex; gap: 4px; margin: 0 0 10px; }
+.lc-strip i, .lc-strip b { width: 40px; height: 14px; border-radius: 4px; }
+.lc-strip b { width: 22px; margin-left: 4px; }
+/* the starting view of each instrument (highway.perInstrument) */
+.pi-table { display: grid; gap: 4px; max-width: 680px; }
+.pi-row { display: grid; grid-template-columns: 90px 120px 140px minmax(0, 1fr); align-items: center; gap: 10px; font-size: 13px; }
+.pi-head { color: var(--muted); font-size: 12px; }
+.pi-na { color: var(--muted); padding-left: 8px; }
+.pi-neck { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pi-neck input { flex: 1; min-width: 60px; accent-color: var(--accent); }
+.pi-neck .pi-unset { opacity: 0.5; }
+.pi-neck output { min-width: 52px; }
+@media (max-width: 640px) { .pi-row { grid-template-columns: 70px 1fr 1fr; } .pi-head span:last-child { display: none; } .pi-neck { grid-column: 1 / -1; } }
 .ts-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
 .ts-name { flex: 1; min-width: 140px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--text); }
 .ts-actions select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--text); }

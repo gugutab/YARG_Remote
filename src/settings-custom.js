@@ -1,6 +1,9 @@
-// Purpose-built controls of the settings page: the theme studio and the data/backup tools.
+// Purpose-built controls of the settings page: the theme studio, the note colours, the per-instrument starting views, the shortcuts and the
+// data/backup tools.
 import { ACTIONS, SHORTCUT_GROUPS, comboOf, effectiveBindings, assign, formatCombo } from './shortcuts.js';
 import { PRESETS, THEME_KEYS, THEME_LABELS, resolveTheme, deriveTheme, contrast, isHex } from './themes.js';
+import { resolvePalette, cleanLaneColors, DEFAULT_LANE_COLORS } from './palette.js';
+import { PER_INSTRUMENT_BASES, NECK_MIN, NECK_MAX, instrumentDefaults } from './perinstrument.js';
 
 const el = (tag, props = {}, ...kids) => {
   const e = document.createElement(tag);
@@ -220,4 +223,77 @@ export function renderShortcuts(host, { settings, notify = () => {} }) {
   render();
   host.append(list, el('div', { class: 'ts-actions' }, el('button', { type: 'button', class: 'chip-btn', text: 'Restore all default keys', onclick: () => { settings.reset('shortcuts.bindings'); say('Every shortcut is back to its default key.'); } })), status);
   return render; // called when the setting changes (also from imports and the reset buttons)
+}
+
+// The five custom lane colours (highway.laneColors): a picker and a hex box per lane, and a strip with the lanes as the chosen
+// palette draws them (any preset, so the strip also previews the presets).
+const LANE_NAMES = ['Green', 'Red', 'Yellow', 'Blue', 'Orange'];
+export function renderLaneColors(host, { settings }) {
+  const lanes = () => cleanLaneColors(settings.get('highway.laneColors')) ?? [...DEFAULT_LANE_COLORS];
+  const strip = el('div', { class: 'lc-strip', 'aria-hidden': 'true' });
+  const editor = el('div', { class: 'ts-editor lc-editor' });
+  const inputs = LANE_NAMES.map((name, i) => {
+    const picker = el('input', { type: 'color', 'aria-label': `${name} lane colour` });
+    const hex = el('input', { type: 'text', class: 'sp-hex', maxlength: '7', spellcheck: 'false', 'aria-label': `${name} lane colour (hex)` });
+    const setColor = (v) => { const next = lanes(); next[i] = v; settings.set('highway.laneColors', next); };
+    picker.addEventListener('input', () => setColor(picker.value));
+    hex.addEventListener('change', () => { if (isHex(hex.value.trim())) setColor(hex.value.trim().toLowerCase()); else hex.value = lanes()[i]; });
+    editor.append(el('label', { class: 'ts-color' }, el('span', { text: `${name} lane` }), picker, hex));
+    return { picker, hex };
+  });
+  host.append(strip, editor);
+  return function refresh() {
+    const own = lanes();
+    own.forEach((c, i) => { inputs[i].picker.value = c; inputs[i].hex.value = c; });
+    const p = resolvePalette(settings.get('highway.palette'), own);
+    strip.replaceChildren(...p.lanes.map((c) => el('i', { style: `background:${c}` })), el('b', { style: `background:${p.kick}`, title: 'Kick' }), el('b', { style: `background:${p.open}`, title: 'Open' }));
+  };
+}
+
+// The starting view of each instrument's window (highway.perInstrument): one row per instrument with the view, the note shape
+// and the neck speed, each "Default" (the global setting) unless picked. Vocals only have a neck speed (their view is the vocal view).
+const INSTRUMENT_NAMES = { guitar: 'Guitar', bass: 'Bass', rhythm: 'Rhythm', keys: 'Keys', drums: 'Drums', vocals: 'Vocals' };
+export function renderPerInstrument(host, { settings }) {
+  const all = () => settings.get('highway.perInstrument') || {};
+  const update = (base, name, value) => {
+    const entry = { ...instrumentDefaults(all(), base) };
+    if (value === undefined) delete entry[name]; else entry[name] = value;
+    const next = { ...all() };
+    if (Object.keys(entry).length) next[base] = entry; else delete next[base];
+    settings.set('highway.perInstrument', next);
+  };
+  const table = el('div', { class: 'pi-table', role: 'table', 'aria-label': 'Starting view of each instrument' },
+    el('div', { class: 'pi-row pi-head', role: 'row' }, ...['Instrument', 'View', 'Note shape', 'Neck speed'].map((t) => el('span', { role: 'columnheader', text: t }))));
+  const refreshers = [];
+  for (const base of PER_INSTRUMENT_BASES) {
+    const label = INSTRUMENT_NAMES[base];
+    const select = (name, options) => {
+      if (base === 'vocals') return el('span', { class: 'pi-na', role: 'cell', text: '-', title: 'Vocals use the vocal view' });
+      const sel = el('select', { class: 'sp-select', 'aria-label': `${label} ${name === 'view' ? 'view' : 'note shape'}` },
+        el('option', { value: '', text: 'Default' }), options.map(([v, t]) => el('option', { value: v, text: t })));
+      sel.addEventListener('change', () => update(base, name, sel.value || undefined));
+      refreshers.push(() => { sel.value = instrumentDefaults(all(), base)[name] ?? ''; });
+      return el('span', { role: 'cell' }, sel);
+    };
+    const range = el('input', { type: 'range', min: NECK_MIN, max: NECK_MAX, step: 0.1, 'aria-label': `${label} neck speed` });
+    const out = el('output', { class: 'sp-out' });
+    const def = el('button', { type: 'button', class: 'chip-btn pi-def', text: 'Default', title: `${label}: use the global neck speed`, onclick: () => update(base, 'neck', undefined) });
+    range.addEventListener('input', () => update(base, 'neck', Number(range.value)));
+    refreshers.push(() => {
+      const v = instrumentDefaults(all(), base).neck;
+      const shown = v ?? settings.get('highway.neck'); // (unset: the global neck speed, dimmed)
+      range.value = shown;
+      out.textContent = `${shown.toFixed(1)}×`;
+      range.classList.toggle('pi-unset', v === undefined);
+      out.classList.toggle('pi-unset', v === undefined);
+      def.disabled = v === undefined;
+    });
+    table.append(el('div', { class: 'pi-row', role: 'row' },
+      el('b', { role: 'rowheader', text: label }),
+      select('view', [['2d', '2D'], ['3d', '3D']]),
+      select('noteStyle', [['round', 'Circles'], ['rect', 'Rectangles']]),
+      el('span', { class: 'pi-neck', role: 'cell' }, range, out, def)));
+  }
+  host.append(table);
+  return () => { for (const fn of refreshers) fn(); };
 }

@@ -17,6 +17,8 @@ import { PRESETS, THEME_KEYS, isHex } from './themes.js';
 import { ACTIONS } from './shortcuts.js';
 import { VISUALIZERS } from './visualizers.js';
 import { DETAIL_CHIPS } from './songinfo.js';
+import { PALETTES, DEFAULT_LANE_COLORS, cleanLaneColors } from './palette.js';
+import { cleanPerInstrument } from './perinstrument.js';
 
 export const FONT_OPTIONS = [
   { value: 'system', label: 'System', css: "system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" },
@@ -24,6 +26,12 @@ export const FONT_OPTIONS = [
   { value: 'serif', label: 'Serif', css: "Georgia, 'Times New Roman', serif" },
   { value: 'mono', label: 'Monospace', css: "ui-monospace, 'Cascadia Code', Consolas, 'SF Mono', monospace" },
 ];
+
+// The system's reduced-motion preference, for the `when` of the motion switches (Reduce motion: Auto follows it). app.js sets the
+// probe (it caches the media query); without one (the unit tests) there is no system preference.
+let osReducedMotion = () => false;
+export function setMotionProbe(fn) { osReducedMotion = fn; }
+const motionOff = (get) => { const m = get('ui.reduceMotion'); return m === 'on' || (m === 'auto' && !!osReducedMotion()); };
 
 export const SECTIONS = [
   {
@@ -36,7 +44,7 @@ export const SECTIONS = [
       { id: 'ui.barPosition', type: 'choice', label: 'Player bar position', help: 'Where the bar with the title, the controls and the seek bar sits: under the tracks (the seek bar is on its top edge) or above them.', options: [{ value: 'bottom', label: 'Bottom' }, { value: 'top', label: 'Top' }], default: 'bottom', keywords: 'menu top bar controls seek layout' },
       { id: 'highway.barHidden', type: 'choice', label: 'Player bar at startup', help: 'Full or compact (key B), or as it was when you left.', options: [{ value: 'shown', label: 'Shown' }, { value: 'hidden', label: 'Hidden' }, { value: 'last', label: 'As I left it' }], default: 'last', keywords: 'compact bar hide' },
       { id: 'ui.reduceMotion', type: 'choice', label: 'Reduce motion', help: 'Auto follows your system\'s reduced-motion setting. On turns off the animations here and the animated jumps and motion blur of the Highway, whatever their switches say; Off lets each switch decide.', options: [{ value: 'auto', label: 'Auto' }, { value: 'on', label: 'On' }, { value: 'off', label: 'Off' }], default: 'auto', keywords: 'motion animation accessibility reduced' },
-      { id: 'ui.animations', type: 'toggle', label: 'Animations', help: 'Fades and slides in the interface.', default: true, keywords: 'motion transition reduce', when: (get) => get('ui.reduceMotion') !== 'on' },
+      { id: 'ui.animations', type: 'toggle', label: 'Animations', help: 'Fades and slides in the interface.', default: true, keywords: 'motion transition reduce', when: (get) => !motionOff(get) },
     ],
   },
   {
@@ -98,6 +106,7 @@ export const SECTIONS = [
       { id: 'highway.noteStyle', group: 'View', type: 'choice', label: 'Note shape', help: 'Circles are the classic round heads; Rectangles are the chrome-capped note. Also the N key and the chart menu.', options: [{ value: 'round', label: 'Circles' }, { value: 'rect', label: 'Rectangles' }], default: 'rect', keywords: 'circle rectangle round shape note head' },
       { id: 'highway.vocalView', group: 'View', type: 'choice', label: 'Vocal view', help: 'Notes shows the pitch bars with the lyrics; Karaoke shows only the lyrics. Key: K.', options: [{ value: 'track', label: 'Notes' }, { value: 'karaoke', label: 'Karaoke' }], default: 'track', keywords: 'karaoke lyrics' },
       { id: 'highway.paneMin', group: 'View', type: 'range', label: 'Narrowest track', help: 'With several tracks on screen, each one gets at least this width; the others wait outside (swipe, or [ and ]).', min: 200, max: 600, step: 20, unit: 'px', default: 280, keywords: 'window width split fretboard' },
+      { id: 'highway.perInstrument', group: 'Per instrument', type: 'custom', ids: ['highway.perInstrument'], label: 'Starting view of each instrument', help: 'The view, note shape and neck speed a window of that instrument starts with; Default uses the settings above. The chart menu of a window still changes it until the next song.', keywords: 'instrument guitar bass drums keys vocals view 2d 3d note shape neck speed default per' },
       { id: 'highway.noteScale', group: 'Notes', type: 'range', label: 'Note size', help: 'The size of the note heads and of the hit pads, in 2D and 3D.', min: 70, max: 130, step: 5, unit: '%', default: 100, keywords: 'note head gem size bigger smaller pads' },
       { id: 'highway.noteBase', group: 'Notes', type: 'range', label: 'Note base height', help: 'How tall the dark base under a rectangular note is drawn (0 hides it). Rectangles only.', min: 0, max: 200, step: 10, unit: '%', default: 100, keywords: 'rectangle note base side depth thickness' },
       { id: 'highway.noteCut', group: 'Notes', type: 'range', label: 'Rectangle note height cut', help: 'How much of the top of a rectangular note is cut off: 0 is the full design, higher is flatter. Rectangles only.', min: 0, max: 40, step: 1, unit: '%', default: 33, keywords: 'rectangle note height flat cut top' },
@@ -105,6 +114,8 @@ export const SECTIONS = [
       { id: 'highway.kickBarHeight', group: 'Notes', type: 'range', label: 'Kick and open bar thickness', help: 'How thick the bar across the track of a kick drum or an open note is.', min: 50, max: 200, step: 10, unit: '%', default: 100, keywords: 'kick pedal bass drum open bar thickness height' },
       { id: 'highway.padLook', group: 'Notes', type: 'range', label: 'Hit pad strength', help: 'How solid the hit pads at the bottom of the track are while nothing is hit.', min: 50, max: 150, step: 5, unit: '%', default: 100, keywords: 'pads strikeline hit line opacity' },
       { id: 'highway.heldPulse', group: 'Notes', type: 'toggle', label: 'Held note pulse', help: 'While a long note is held, its head swells slightly, its tail shimmers and its pad flickers. Off keeps them still.', default: true, keywords: 'sustain held wobble shimmer pulse flicker motion' },
+      { id: 'highway.palette', group: 'Colours', type: 'choice', label: 'Note colours', help: 'The colours of the five lanes (and of kicks, open and tap notes). Colour-blind safe keeps the lanes apart with red-green and blue-yellow colour blindness.', options: PALETTES.map(({ id, label }) => ({ value: id, label })), default: 'yarg', keywords: 'colour color palette lanes frets colour-blind colorblind deuteranopia protanopia tritanopia accessibility high contrast custom' },
+      { id: 'highway.laneColors', group: 'Colours', type: 'custom', ids: ['highway.laneColors'], label: 'Custom lane colours', help: 'Green, red, yellow, blue and orange lanes, left to right (drums use the same colours for their pads).', keywords: 'colour color custom lanes frets picker', when: (get) => get('highway.palette') === 'custom' },
       { id: 'highway.trackOpacity', group: 'Track and bands', type: 'range', label: 'Track opacity', help: 'How solid the track behind the notes is: higher hides more of the background and visualizer.', min: 0, max: 100, step: 5, unit: '%', default: 75, keywords: 'transparent fretboard' },
       { id: 'highway.stageColorOn', group: 'Track and bands', type: 'toggle', label: 'Custom stage colour', help: 'Use your own colour behind the tracks instead of the chart background of the theme (also in the visualizer menu).', default: false },
       { id: 'highway.stageColor', group: 'Track and bands', type: 'color', label: 'Stage colour', default: '#0d1117', when: (get) => get('highway.stageColorOn') },
@@ -124,8 +135,8 @@ export const SECTIONS = [
       { id: 'highway.lyricsAbove', group: 'Vocals', type: 'range', label: 'Lyrics above the line being sung', help: 'How much of the lyric sheets (karaoke) shows the lines before the current one, as a share of their height.', min: 0, max: 40, step: 1, unit: '%', default: 12 },
       { id: 'highway.lyricSize', group: 'Vocals', type: 'range', label: 'Lyrics size', help: 'The size of the lyrics under the vocal notes and in the karaoke sheets.', min: 70, max: 160, step: 5, unit: '%', default: 100, keywords: 'lyrics text font size karaoke words' },
       { id: 'highway.lyricOutline', group: 'Vocals', type: 'toggle', label: 'Lyrics outline', help: 'A dark edge around the letters of the lyrics, so they read over any background.', default: true, keywords: 'lyrics outline stroke shadow contrast' },
-      { id: 'highway.seekAnimation', group: 'Motion', type: 'toggle', label: 'Animate jumps in the song', help: 'When you seek or jump to a section, the notes scroll to the new place instead of snapping.', default: true, when: (get) => get('ui.reduceMotion') !== 'on' },
-      { id: 'highway.motionBlur', group: 'Motion', type: 'toggle', label: 'Motion blur on jumps', help: 'While the notes rush to the new place after a seek, draw a trail behind them.', default: true, when: (get) => get('ui.reduceMotion') !== 'on' && get('highway.seekAnimation') },
+      { id: 'highway.seekAnimation', group: 'Motion', type: 'toggle', label: 'Animate jumps in the song', help: 'When you seek or jump to a section, the notes scroll to the new place instead of snapping.', default: true, when: (get) => !motionOff(get) },
+      { id: 'highway.motionBlur', group: 'Motion', type: 'toggle', label: 'Motion blur on jumps', help: 'While the notes rush to the new place after a seek, draw a trail behind them.', default: true, when: (get) => !motionOff(get) && get('highway.seekAnimation') },
       { id: 'highway.neck', group: 'Motion', type: 'range', label: 'Note spacing (neck speed)', help: 'Only the spacing of the notes, not the music speed. Each track\'s own neck speed control resets to this value.', min: 0.5, max: 3, step: 0.1, unit: '×', default: 1.2, keywords: 'scroll speed spacing approach' },
       { id: 'highway.visualizer', group: 'Visualizer', type: 'choice', label: 'Background visualizer', help: 'An animation behind all the tracks, driven by the album art, the beats and the notes. Key: G.', options: VISUALIZERS.map((v) => ({ value: v.id, label: v.label })), default: 'none', keywords: 'background animation aurora synthwave warp rings equalizer embers cover radial spotlights tunnel' },
       { id: 'highway.visualizerQuality', group: 'Visualizer', type: 'choice', label: 'Visualizer quality', help: 'The background is drawn at a lower resolution and stretched: lower is much lighter on the graphics card (the album art always stays sharp).', options: [{ value: 'high', label: 'High (full resolution)' }, { value: 'medium', label: 'Medium' }, { value: 'low', label: 'Low (lightest)' }], default: 'medium', when: (get) => get('highway.visualizer') !== 'none' },
@@ -190,6 +201,8 @@ const CUSTOM_DEFAULTS = {
   'theme.overrides': {},
   'theme.saved': [],
   'shortcuts.bindings': {},
+  'highway.laneColors': [...DEFAULT_LANE_COLORS],
+  'highway.perInstrument': {},
 };
 
 export function buildDefaults(sections = SECTIONS) {
@@ -262,6 +275,8 @@ const presetIds = new Set(['auto', ...PRESETS.map((p) => p.id)]);
 
 // The custom (purpose-built) settings. Their values end up in CSS (colours) and in key matching, so the shapes are strict.
 const CUSTOM_CHECKS = {
+  'highway.laneColors': (v) => { const c = cleanLaneColors(v); return c ? { ok: true, value: c } : { ok: false }; },
+  'highway.perInstrument': (v) => cleanPerInstrument(v),
   'theme.preset': (v) => (typeof v === 'string' && (presetIds.has(v) || (v.startsWith('saved:') && ID_RE.test(v.slice(6)))) ? { ok: true, value: v } : { ok: false }),
   // only the known colour keys, each a #rrggbb colour; anything else is dropped
   'theme.overrides': (v) => {

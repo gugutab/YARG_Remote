@@ -22,10 +22,11 @@ import { isFreshStart, overlayLines, startPlan, INFO_FIRST_PLAY_MS } from './sta
 import { metaRows, extraRows, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel, relabelStems } from './songinfo.js';
 import { parseRoute, formatRoute } from './route.js';
 import { createSettings } from './settings.js';
-import { SECTIONS, buildDefaults, buildValidator, FONT_OPTIONS, RENAMES, SETTINGS_VERSION, itemById } from './settings-schema.js';
+import { SECTIONS, buildDefaults, buildValidator, FONT_OPTIONS, RENAMES, SETTINGS_VERSION, itemById, setMotionProbe } from './settings-schema.js';
+import { resolvePalette, applyPalette } from './palette.js';
 import { resolveTheme, applyTheme } from './themes.js';
 import { mountSettings } from './settings-ui.js';
-import { renderThemeStudio, renderDataTools, renderShortcuts } from './settings-custom.js';
+import { renderThemeStudio, renderDataTools, renderShortcuts, renderLaneColors, renderPerInstrument } from './settings-custom.js';
 import { WIN_MARGIN, WIN_BORDER, SETTINGS_MIN_W, contentMaxFor } from './windowframe.js';
 import { isPhone, createWidthPref, createWindowFrame } from './windowframe-dom.js';
 import { saveLibrary, loadLibrary, loadThumb, saveThumb, clearThumbs } from './store.js';
@@ -153,6 +154,7 @@ const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 // applies; otherwise each switch decides on its own.
 const reduceQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
 let osReduceMotion = reduceQuery.matches; // cached: reading .matches every frame makes Chrome skip the 'change' event
+setMotionProbe(() => osReduceMotion); // (the settings page dims the motion switches by the effective state)
 const MOTION_IDS = ['ui.animations', 'highway.seekAnimation', 'highway.motionBlur'];
 const motionReduced = () => { const m = prefs.get('ui.reduceMotion'); return m === 'on' || (m === 'auto' && osReduceMotion); };
 function motionPref(id) {
@@ -3213,7 +3215,7 @@ function buildTileTools(group) {
     paint();
     return b;
   };
-  optTool('speed', 'Neck speed', 'neck', 0.5, 3, 0.1, () => highway.neck, NECK_FMT);
+  optTool('speed', 'Neck speed', 'neck', 0.5, 3, 0.1, () => highway.paneDefault(group.key, 'neck'), NECK_FMT); // (the reset goes back to the instrument's own starting speed, else the global one)
   optTool('clock', 'Chart delay', 'delay', -1, 1, 0.05, () => 0, DELAY_FMT);
   if (!vocal) { // the view (2D / 3D) and the note shape (circles / rectangles) share one window
     const view = tool('eye', 'Fretboard view', (b) => {
@@ -3984,6 +3986,11 @@ function stepSpeed(dir) {
   setSetting('speed', v);
   flashNote(`Speed ${SETTING_FORMAT.speed(v)}`);
 }
+// The note colours: the palette's arrays are refilled in place, so the charts on screen (they hold them) follow without a rebuild.
+function applyNotePalette() {
+  applyPalette(resolvePalette(prefs.get('highway.palette'), prefs.get('highway.laneColors')));
+  highway.invalidate();
+}
 const EFFECTS = {
   'audio.metronome': (v) => { metronome.setEnabled(v); paintMetronome(v); syncMetPop(); },
   'audio.metronomeVolume': (v) => { metronome.setVolume(v); syncMetPop(); },
@@ -4048,10 +4055,13 @@ const EFFECTS = {
   'ui.animations': () => { document.documentElement.dataset.motion = motionPref('ui.animations') ? 'on' : 'off'; },
   'ui.reduceMotion': () => { EFFECTS['ui.animations'](); EFFECTS['highway.breBand'](prefs.get('highway.breBand')); },
   'highway.neck': (v) => setSetting('neck', v), // the starting neck speed; also what the tracks' own neck speed resets to
+  'highway.palette': applyNotePalette,
+  'highway.laneColors': applyNotePalette,
+  'highway.perInstrument': (v) => { highway.perInstrument = v; if (!els.paneMenu.hidden) buildPaneMenu(); },
 };
 for (const [id, fn] of Object.entries(EFFECTS)) fn(prefs.get(id));
 prefs.subscribe((id, value) => { wakeUp(); EFFECTS[id]?.(value); });
-reduceQuery.addEventListener?.('change', (e) => { osReduceMotion = e.matches; EFFECTS['ui.reduceMotion'](); });
+reduceQuery.addEventListener?.('change', (e) => { osReduceMotion = e.matches; EFFECTS['ui.reduceMotion'](); settingsPage.refresh(); });
 
 // The settings window is the second window of the shared frame: the same controller as the library's (same width, edges, motion, drawer).
 const settingsFrame = createWindowFrame({
@@ -4064,6 +4074,8 @@ const settingsPage = mountSettings({
   onOpen: () => { settingsFlag = true; syncWindowInsets(); if (libraryOpen()) setLibraryOpen(false, false); if (infoOpen) setInfoOpen(false); syncPanelUi(); }, // (the list first, so it does not grow into the details' room; not remembered: the library comes back as it was at the next start)
   renderers: {
     'shortcuts.bindings': (host, ctx) => renderShortcuts(host, { ...ctx, notify: setStatus }),
+    'highway.laneColors': (host, ctx) => renderLaneColors(host, ctx),
+    'highway.perInstrument': (host, ctx) => renderPerInstrument(host, ctx),
     theme: (host, ctx) => renderThemeStudio(host, { ...ctx, prefersDark: () => darkQuery.matches, notify: setStatus }),
     'data.tools': (host, ctx) => renderDataTools(host, {
       ...ctx, notify: setStatus,
