@@ -130,3 +130,13 @@ test('evenPerRow spreads items evenly over the rows that would be needed', async
   assert.equal(evenPerRow(8, 3), 3); // 3 rows of 3,3,2
   assert.equal(evenPerRow(10, 4), 4); // 3 rows: 4,4,2 -> the widest row is the cap
 });
+
+test('the charted-difficulty filter uses the server index and keeps songs without it', () => {
+  const mk2 = (title, diffs) => ({ id: title, title, artist: 'A', album: '', ini: {}, diffs });
+  const songs = [mk2('Full', { guitar: 'EMHX', drums: 'HX' }), mk2('Expert only', { guitar: 'X' }), mk2('Easy drums', { drums: 'EM' }), mk2('Unknown', undefined)];
+  const names = (f) => filterSongs(songs, f).map((s) => s.title);
+  assert.deepEqual(names({ diffs: ['E'] }), ['Full', 'Easy drums', 'Unknown']);
+  assert.deepEqual(names({ diffs: ['E'], instruments: ['guitar'] }), ['Full', 'Unknown']);
+  assert.deepEqual(names({ diffs: ['E', 'X'], instruments: ['drums'] }), ['Full', 'Easy drums', 'Unknown']);
+  assert.deepEqual(names({ diffs: ['H'], instruments: ['guitar', 'drums'] }), ['Full', 'Unknown']);
+});

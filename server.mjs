@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { parseSongIni } from './src/ini.js';
 import { parseMidi, MAX_MIDI_BYTES } from './src/midi.js';
 import { parseChart, MAX_CHART_BYTES } from './src/chartfile.js';
-import { instrumentOptions } from './src/chart.js';
+import { instrumentOptions, availableDifficulties, DIFFICULTIES } from './src/chart.js';
 import { parseSng, readSngBytes, findSngFile, isSngName } from './src/sng.js';
 
 const APP_ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -33,7 +33,7 @@ const SONG_EXTS = new Set([
   '.mid', '.chart', '.ini', '.sng', '.txt', '.json', // charts and metadata
 ]);
 // Bump when the index gets new fields: older cache files are then rebuilt.
-const INDEX_VERSION = 4; // 4: .sng songs
+const INDEX_VERSION = 5; // 5: charted difficulties (`diffs`); 4: .sng songs
 const SONG_MARKERS = ['song.ini', 'notes.mid', 'notes.chart'];
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
@@ -131,11 +131,25 @@ async function readCapped(file, max) {
 // The instruments a notes.mid (or notes.chart) really has (tracks with notes), like the picker of the app: guitar, bass, rhythm, keys, drums,
 // vocals (harmony counts as vocals). song.ini often has no difficulty levels, or -1 for everything, while the chart is fine.
 export function partsOf(midiBytes, isChart = false) {
+  return chartInfoOf(midiBytes, isChart).parts;
+}
+
+// { parts, diffs }: `diffs` maps each instrument to the letters (E M H X, in that order) of the difficulties that have notes in any of its modes
+// ({ guitar: 'EMHX', drums: 'HX' }), for the library's charted-difficulty filter.
+export function chartInfoOf(midiBytes, isChart = false) {
   try {
-    const bases = instrumentOptions(isChart ? parseChart(midiBytes) : parseMidi(midiBytes)).map((o) => (o.base === 'harmony' ? 'vocals' : o.base));
-    return [...new Set(bases)];
+    const midi = isChart ? parseChart(midiBytes) : parseMidi(midiBytes);
+    const found = {};
+    for (const o of instrumentOptions(midi)) {
+      const base = o.base === 'harmony' ? 'vocals' : o.base;
+      const set = (found[base] ??= new Set());
+      for (const d of availableDifficulties(midi, o)) set.add(d.id);
+    }
+    const diffs = {};
+    for (const [base, set] of Object.entries(found)) diffs[base] = DIFFICULTIES.filter((d) => set.has(d.id)).map((d) => d.short).join('');
+    return { parts: Object.keys(found), diffs };
   } catch {
-    return [];
+    return { parts: [], diffs: {} };
   }
 }
 
@@ -147,15 +161,16 @@ async function scanSng(file, rel) {
     const byName = new Map(sng.files.map((f) => [f.name.toLowerCase(), f]));
     const chartName = byName.has('notes.mid') ? 'notes.mid' : byName.has('notes.chart') ? 'notes.chart' : null;
     let parts = [];
+    let diffs = {};
     if (chartName && byName.get(chartName).size <= (chartName === 'notes.chart' ? MAX_CHART_BYTES : MAX_MIDI_BYTES)) { // a bigger one is not readable anyway
       try {
-        parts = partsOf(await readSngBytes(source, sng, byName.get(chartName)), chartName === 'notes.chart');
+        ({ parts, diffs } = chartInfoOf(await readSngBytes(source, sng, byName.get(chartName)), chartName === 'notes.chart'));
       } catch { /* unreadable chart: no parts */ }
     }
     return {
       id: rel, folder: rel,
       title: String(ini.name || path.basename(rel, path.extname(rel))), artist: String(ini.artist || ''), album: String(ini.album || ''),
-      ini, parts, files: sng.files.map((f) => ({ name: f.name, path: `${rel}/${f.name}` })),
+      ini, parts, diffs, files: sng.files.map((f) => ({ name: f.name, path: `${rel}/${f.name}` })),
     };
   });
 }
@@ -182,17 +197,18 @@ export async function scanLibrary(songsDir) {
       }
       const folderName = rel.split('/').pop() || path.basename(dir);
       let parts = [];
+      let diffs = {};
       const chartFile = lower.has('notes.mid') ? 'notes.mid' : lower.has('notes.chart') ? 'notes.chart' : null; // .mid wins, as in the app
       if (chartFile) {
         try {
           const bytes = await readCapped(path.join(dir, lower.get(chartFile)), chartFile === 'notes.chart' ? MAX_CHART_BYTES : MAX_MIDI_BYTES);
-          if (bytes) parts = partsOf(bytes, chartFile === 'notes.chart'); // over the cap: no parts, same as an unreadable chart
+          if (bytes) ({ parts, diffs } = chartInfoOf(bytes, chartFile === 'notes.chart')); // over the cap: no parts, same as an unreadable chart
         } catch { /* unreadable chart: no parts */ }
       }
       songs.push({
         id: rel, folder: rel,
         title: String(ini.name || folderName), artist: String(ini.artist || ''), album: String(ini.album || ''),
-        ini, parts, files: files.map((name) => ({ name, path: rel ? `${rel}/${name}` : name })),
+        ini, parts, diffs, files: files.map((name) => ({ name, path: rel ? `${rel}/${name}` : name })),
       });
     }
     for (const name of files) {
@@ -444,6 +460,7 @@ export function validIndex(songs) {
     && str(s.id) && str(s.folder) && str(s.title) && str(s.artist) && str(s.album)
     && s.ini && typeof s.ini === 'object' && !Array.isArray(s.ini)
     && Array.isArray(s.parts) && s.parts.every(str)
+    && (s.diffs === undefined || (s.diffs && typeof s.diffs === 'object' && !Array.isArray(s.diffs) && Object.values(s.diffs).every(str)))
     && Array.isArray(s.files) && s.files.every((f) => f && str(f.name) && str(f.path)));
 }
 

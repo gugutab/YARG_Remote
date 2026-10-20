@@ -48,7 +48,7 @@ import { paintRange, installRangeUi } from './range-ui.js';
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
   'app', 'library', 'closeLibrary', 'splitter', 'libTab', 'settingsTab', 'edgeDock', 'dockHandle', 'edgeL', 'edgeR', 'npPlay', 'npPreview', 'npPreviewBox', 'npSeek', 'npBand', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
-  'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'maxLevelSeg', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
+  'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'maxLevelSeg', 'diffChips', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
@@ -548,7 +548,7 @@ els.rescan.addEventListener('click', rescanFolder);
 els.folderInput.addEventListener('change', () => loadEntries(entriesFromFileList(els.folderInput.files)));
 // Filters: instrument chips (all selected must be present), minimum level, genre, decade; the search box adds
 // field syntax (artist:, year:, len:, inst:...). Everything here only changes what renderList() shows.
-const filters = { instruments: new Set(), minLevel: 0, maxLevel: 0, starred: false };
+const filters = { instruments: new Set(), minLevel: 0, maxLevel: 0, diffs: new Set(), starred: false };
 // Favourites (the star on the cards and in the details header) and the play history (favourites.js, history.js): local only.
 const localStore = (() => { try { return localStorage; } catch { return null; } })();
 let favourites = loadFavourites(localStore);
@@ -603,11 +603,13 @@ const selectSyncs = []; // refresh the custom dropdowns after the code changes a
 const FILTER_ICONS = { guitar: 'guitar', bass: 'bass', rhythm: 'rhythm', keys: 'keys', drums: 'drum', vocals: 'mic' };
 const INSTRUMENT_NAMES = { guitar: 'Guitar', bass: 'Bass', rhythm: 'Rhythm', keys: 'Keys', drums: 'Drums', vocals: 'Vocals' };
 // Genre, pack and decade take several values at once: the hidden <select multiple> holds the selection.
+const DIFF_NAMES = { E: 'Easy', M: 'Medium', H: 'Hard', X: 'Expert' };
 const picked = (select) => [...select.selectedOptions].map((o) => o.value);
 const clearPicked = (select) => { for (const o of select.options) o.selected = false; };
-const filterCount = () => filters.instruments.size + (filters.minLevel ? 1 : 0) + (filters.maxLevel ? 1 : 0) + (filters.starred ? 1 : 0) +picked(els.filterGenre).length + picked(els.filterDecade).length + picked(els.filterPack).length;
+const filterCount = () => filters.instruments.size + filters.diffs.size + (filters.minLevel ? 1 : 0) + (filters.maxLevel ? 1 : 0) + (filters.starred ? 1 : 0) +picked(els.filterGenre).length + picked(els.filterDecade).length + picked(els.filterPack).length;
 function syncFilterUi() {
   for (const b of els.instChips.querySelectorAll('[data-inst]')) b.setAttribute('aria-pressed', String(filters.instruments.has(b.dataset.inst)));
+  for (const b of els.diffChips.querySelectorAll('[data-diff]')) b.setAttribute('aria-pressed', String(filters.diffs.has(b.dataset.diff)));
   for (const b of els.levelSeg.querySelectorAll('[data-level]')) b.setAttribute('aria-pressed', String(Number(b.dataset.level) === filters.minLevel));
   for (const b of els.maxLevelSeg.querySelectorAll('[data-level]')) b.setAttribute('aria-pressed', String(Number(b.dataset.level) === filters.maxLevel));
   favChip.setAttribute('aria-pressed', String(filters.starred));
@@ -620,6 +622,7 @@ function syncFilterUi() {
   const add = (text, remove, icon) => chips.push({ text, remove, icon });
   if (filters.starred) add('Starred', () => { filters.starred = false; }, 'star');
   for (const i of filters.instruments) add(INSTRUMENT_NAMES[i], () => filters.instruments.delete(i), FILTER_ICONS[i]);
+  for (const d of filters.diffs) add(`${DIFF_NAMES[d]} charted`, () => filters.diffs.delete(d), 'sort');
   if (filters.minLevel) add(`Level ${filters.minLevel}+`, () => { filters.minLevel = 0; }, 'sort');
   if (filters.maxLevel) add(`Level up to ${filters.maxLevel}`, () => { filters.maxLevel = 0; }, 'sort');
   const addEach = (select, icon, textOf = (v) => v) => {
@@ -664,6 +667,13 @@ els.instChips.addEventListener('click', (e) => {
   syncFilterUi();
   renderList();
 });
+els.diffChips.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-diff]');
+  if (!b) return;
+  filters.diffs[filters.diffs.has(b.dataset.diff) ? 'delete' : 'add'](b.dataset.diff);
+  syncFilterUi();
+  renderList();
+});
 els.levelSeg.addEventListener('click', (e) => {
   const b = e.target.closest('[data-level]');
   if (!b) return;
@@ -685,6 +695,7 @@ favChip.addEventListener('click', () => {
 });
 els.filterClear.addEventListener('click', () => {
   filters.instruments.clear();
+  filters.diffs.clear();
   filters.minLevel = 0;
   filters.maxLevel = 0;
   filters.starred = false;
@@ -895,7 +906,7 @@ function renderList({ keepScroll = false } = {}) {
   const bySort = els.sortBy.value;
   const byHistory = HISTORY_SORTS.includes(bySort); // Recently played / Most played: never played songs last, no group headers
   let shown = filterSongs(filters.starred ? onlyFavourites(songs, favourites) : songs, {
-    query, instruments: [...filters.instruments], minLevel: filters.minLevel, maxLevel: filters.maxLevel, genre: picked(els.filterGenre), decade: picked(els.filterDecade), pack: picked(els.filterPack),
+    query, instruments: [...filters.instruments], minLevel: filters.minLevel, maxLevel: filters.maxLevel, diffs: [...filters.diffs], genre: picked(els.filterGenre), decade: picked(els.filterDecade), pack: picked(els.filterPack),
   });
   shown = byHistory ? sortByHistory(sortSongs(shown, 'title'), playHistory, bySort, sortDesc) : sortSongs(shown, bySort, sortDesc);
   if (ranked) shown = rankByRelevance(shown, query);

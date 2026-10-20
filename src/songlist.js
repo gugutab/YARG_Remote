@@ -176,7 +176,7 @@ export function highlightRanges(text, terms) {
 }
 
 // filters: { query, instruments: [], minLevel, maxLevel (0 = no limit; songs with an unknown level are kept out when a limit is set), genre, decade, instrument (old single value) }
-export function filterSongs(songs, { query = '', instruments = [], instrument = '', minLevel = 0, maxLevel = 0, genre = '', decade = 0, pack = '' } = {}) {
+export function filterSongs(songs, { query = '', instruments = [], instrument = '', minLevel = 0, maxLevel = 0, diffs = [], genre = '', decade = 0, pack = '' } = {}) {
   const { terms, fields } = parseQuery(query);
   const wanted = [...new Set([...instruments, ...(instrument ? [instrument] : [])])];
   const normTerms = terms.map(flat).filter(Boolean);
@@ -184,8 +184,13 @@ export function filterSongs(songs, { query = '', instruments = [], instrument = 
   const genres = list(genre);
   const packList = list(pack);
   const decades = list(decade).map(Number).filter(Boolean);
+  const letters = list(diffs);
   return songs.filter((s) => {
     for (const inst of wanted) if (!hasInstrument(s, inst)) return false;
+    if (letters.length && s.diffs) { // charted difficulties (server index): every selected instrument has one of them; with none selected, any instrument does
+      const has = (i) => letters.some((l) => (s.diffs[i] ?? '').includes(l));
+      if (!(wanted.length ? wanted.every(has) : INSTRUMENTS.some(has))) return false;
+    }
     if (minLevel > 0) { // every selected instrument reaches the level; with none selected, any instrument does
       const reaches = (i) => (levelOf(s, i) ?? -1) >= minLevel;
       if (!(wanted.length ? wanted.every(reaches) : INSTRUMENTS.some(reaches))) return false;
