@@ -481,3 +481,4 @@ Only checked by synthetic test, headless run or code reading:
 - The drum fill band (green) is off by default too (setting `highway.fillBand`); the BRE band is always drawn.
 - BRE band: every lane is tinted in its own note colour and pulses (`breAlpha` in gfx.js: a wave across the lanes plus a speed per lane, smooth sines in an alpha range of 0.07-0.30), in the 2D and 3D views.
 - While the bottom bar is held back (`stage-held`) and the pause dim shows, the bar's slot is painted with the same dim (the bar's children stay hidden).
+- Guitar-like notes in the rectangular style (`highway.noteStyle` = rect, not drums) are drawn after YARG's note model by `drawGuitarNoteFace` (gfx.js, 2D and 3D): chrome end caps with a coloured band; HOPO = white strips beside the caps (no dot), tap = dark centre between coloured strips (no purple), star power = gold caps. The circle style, drums, cymbals and open bars are unchanged. Drums and the circle style are the next candidates.

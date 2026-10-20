@@ -29,6 +29,9 @@ import {
   darken,
   withAlpha,
   breAlpha,
+  drawGuitarNoteFace,
+  NOTE_RECT_W,
+  NOTE_RECT_H,
   firstIndexAtOrAfter,
   exitTime,
   heldAmount,
@@ -1403,13 +1406,15 @@ export class Highway {
       }
       g.beginPath();
       noteShape(g, cx, cy, n.cymbal ? r : r * wide, r, n.cymbal ? 'tri' : this.noteStyle); // cymbals: rounded triangle
-      g.fillStyle = tintWhite(n.sp ? noteColor(n, colors) : n.tap ? TAP_COLOR : colors[n.lane], white);
+      const faced = !chart.drumKind && !n.cymbal && this.noteStyle === 'rect'; // guitar-like note in the rectangular style: YARG's chrome caps and coloured band
+      g.fillStyle = tintWhite(n.sp ? noteColor(n, colors) : n.tap && !faced ? TAP_COLOR : colors[n.lane], white);
       g.fill();
+      if (faced) drawGuitarNoteFace(g, cx, cy, r * wide * NOTE_RECT_W, r * NOTE_RECT_H, n, colors[n.lane]);
       // accent: same size, with a thicker outline in a darker shade of the note's colour
       g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH : n.sp ? 4 : 2;
       g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : n.sp ? STAR_POWER_GOLD : 'rgba(0,0,0,0.5)'; // star power: the white body with a gold outline, as YARG's white notes with gold metal
       g.stroke();
-      if (n.hopo) { // guitar HOPO: a white dot in the head
+      if (n.hopo && !faced) { // guitar HOPO: a white dot in the head (the rectangular style has white strips instead)
         g.beginPath();
         noteShape(g, cx, cy, r * 0.35, r * 0.35, this.noteStyle);
         g.fillStyle = k === 0 ? HOPO_DOT : `rgba(255,255,255,${0.9 * (1 - k)})`;

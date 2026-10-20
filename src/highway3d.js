@@ -2,7 +2,7 @@
 // so it stays light enough for phones. Only the lane instruments (guitar, bass, keys, drums) have a highway;
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
-  GUITAR_LANE_COLORS, breAlpha, KICK_COLOR, KICK_COLOR_5, STAR_POWER_GOLD, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
+  GUITAR_LANE_COLORS, breAlpha, drawGuitarNoteFace, NOTE_RECT_W, NOTE_RECT_H, KICK_COLOR, KICK_COLOR_5, STAR_POWER_GOLD, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
   ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
@@ -340,23 +340,25 @@ export function renderLanes3D(hw, t, w, h) {
       g.restore();
       g.globalCompositeOperation = 'source-over';
     }
-    const body = tintWhite(n.sp ? noteColor(n, colors) : n.tap ? TAP_COLOR : colors[n.lane], Math.min(1, kx + amt * (0.32 + 0.12 * shimmer))); // an active long note's head is lighter, like its tail
+    const faced = !chart.drumKind && !n.cymbal && hw.noteStyle === 'rect'; // guitar-like note in the rectangular style: YARG's chrome caps and coloured band
+    const body = tintWhite(n.sp ? noteColor(n, colors) : n.tap && !faced ? TAP_COLOR : colors[n.lane], Math.min(1, kx + amt * (0.32 + 0.12 * shimmer))); // an active long note's head is lighter, like its tail
     g.globalAlpha = (1 - kx) * hw.noteAlpha(n) * Math.min(1, (1 - d) / FADE_IN);
     // thickness: a thin darker edge underneath the top face (no cast shadow; all of it moves, grows and fades with the note)
     const th = Math.max(0.5, rx * 0.21);
     const headStyle = n.cymbal ? 'tri' : hw.noteStyle; // cymbals: rounded triangle (and no ring)
     g.beginPath();
     noteShape(g, x, y + th, rx, ry, headStyle, y + th - vy);
-    g.fillStyle = darken(n.tap && !n.sp ? TAP_COLOR : colors[n.lane], 0.45); // the edge keeps the plain lane colour (no star power overlay)
+    g.fillStyle = darken(n.tap && !n.sp && !faced ? TAP_COLOR : colors[n.lane], 0.45); // the edge keeps the plain lane colour (no star power overlay)
     g.fill();
     g.beginPath();
     noteShape(g, x, y, rx, ry, headStyle, y - vy);
     g.fillStyle = body;
     g.fill();
+    if (faced) drawGuitarNoteFace(g, x, y, rx * NOTE_RECT_W, ry * NOTE_RECT_H, n, colors[n.lane]);
     g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH * p : Math.max(1, (n.sp ? 4.5 : 1.5) * p);
     g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : n.sp ? STAR_POWER_GOLD : 'rgba(0,0,0,0.5)';
     g.stroke();
-    if (n.hopo) {
+    if (n.hopo && !faced) {
       g.beginPath();
       noteShape(g, x, y, rx * 0.35, ry * 0.35, hw.noteStyle, y - vy);
       g.fillStyle = kx === 0 ? HOPO_DOT : `rgba(255,255,255,${0.9 * (1 - kx)})`;

@@ -402,3 +402,47 @@ export function breAlpha(t, lane, lanes) {
   const mix = 0.5 * wave + 0.3 * fast + 0.2 * slow; // 0..1
   return BRE_ALPHA_MIN + (BRE_ALPHA_MAX - BRE_ALPHA_MIN) * mix;
 }
+
+// The face of a guitar-like note in the rectangular style, after YARG's note model: chrome end caps and a coloured centre band. A strum is the plain band; a HOPO has
+// white strips beside the caps; a tap has a dark centre between coloured strips; star power makes the caps gold (the band is the white-tinted colour already filled).
+// Call it with the note's outline as the current path (it clips to it); `hw` / `hh` are the half width / height of that outline, `laneColor` the plain lane colour.
+const CHROME = ['#2b2f35', '#e3e9f0', '#8f98a3', '#3b4048'];
+const CHROME_GOLD = ['#4d3b00', '#fff0a0', '#c99400', '#5c4500'];
+export function drawGuitarNoteFace(g, x, y, hw, hh, n, laneColor) {
+  g.save();
+  g.clip();
+  const cap = hw * 0.26;
+  const strip = hw * 0.17;
+  const top = y - hh - 1;
+  const full = 2 * hh + 2;
+  if (n.tap) { // dark centre, the colour on the strips beside the caps
+    g.fillStyle = '#1b1c1f';
+    g.fillRect(x - hw + cap, top, 2 * (hw - cap), full);
+    g.fillStyle = laneColor;
+    g.fillRect(x - hw + cap, top, strip, full);
+    g.fillRect(x + hw - cap - strip, top, strip, full);
+  } else if (n.hopo) { // white strips
+    g.fillStyle = 'rgba(255,255,255,0.95)';
+    g.fillRect(x - hw + cap, top, strip, full);
+    g.fillRect(x + hw - cap - strip, top, strip, full);
+  }
+  const gloss = g.createLinearGradient(0, y - hh, 0, y + hh); // a soft highlight on top, a little shade below
+  gloss.addColorStop(0, 'rgba(255,255,255,0.32)');
+  gloss.addColorStop(0.45, 'rgba(255,255,255,0.04)');
+  gloss.addColorStop(1, 'rgba(0,0,0,0.3)');
+  g.fillStyle = gloss;
+  g.fillRect(x - hw - 1, top, 2 * hw + 2, full);
+  const stops = n.sp ? CHROME_GOLD : CHROME;
+  for (const side of [-1, 1]) { // the chrome caps: bright in the middle of the cap, dark at both edges
+    const edge = x + side * hw;
+    const cg = g.createLinearGradient(edge, 0, edge - side * cap, 0);
+    for (let i = 0; i < 4; i++) cg.addColorStop(i / 3, stops[i]);
+    g.fillStyle = cg;
+    g.fillRect(Math.min(edge, edge - side * cap) - 1, top, cap + 2, full);
+    g.fillStyle = 'rgba(0,0,0,0.5)'; // the seam between the cap and the band
+    g.fillRect(side < 0 ? edge + cap - 1 : edge - cap, top, 1, full);
+  }
+  g.fillStyle = gloss; // the shade also over the caps, so they curve like the band
+  g.fillRect(x - hw - 1, top, 2 * hw + 2, full);
+  g.restore();
+}
