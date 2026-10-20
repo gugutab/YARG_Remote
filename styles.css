@@ -1459,8 +1459,8 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 
 /* Touch screens: every control gets a 44x44 px hit area. Where the layout has room the control itself grows; in the top bar,
    the pane tags, the edge tabs and the stage buttons (fixed metrics) an invisible ::before reaches out instead, so the look and
-   the bar heights do not change. Fine pointers (mouse) are untouched. */
-@media (pointer: coarse) {
+   the bar heights do not change. Fine pointers (mouse) are untouched, except in a phone-width window (700 px or less), which gets the same hit areas. */
+@media (pointer: coarse), (max-width: 700px) {
   :where(.topbar button, .pane-tag, button.stage-btn, .mix-row button:not(.stem-btn)) { position: relative; } /* zero specificity: absolute/fixed rules keep winning */
   .topbar button::before, .pane-tag::before, button.stage-btn::before, .mix-row button:not(.stem-btn)::before {
     content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%);
@@ -2667,6 +2667,12 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .icard-tools.units-cut .tile-tool { padding-left: 4px; }
 .icard-tools.units-cut .tile-tool:has(.tt-val:not(:empty)) { padding-left: 2px; }
 .tile-tool .tt-val { padding-right: 2px; margin-right: -2px; }
+/* UX review: small targets are at least 32 px. The chips are 32 px tall (still one line, fitTileTools unchanged); the reset icons grow to 32 x 32 with a -2 px
+   margin, so their margin box stays the 28 px grid track of the mixer, speed and pane rows (the extra 2 px per side sits in the grid gaps); the pause panel's
+   speed steps are 32 x 32. */
+.tile-tool { height: 32px; }
+button.icon.small-icon.reset { min-width: 32px; min-height: 32px; margin: -2px; }
+button.icon.small-icon.sp-reset, #ppSlower, #ppFaster { min-width: 32px; min-height: 32px; }
 /* The stage menu of an instrument is only the tile: no window behind it, and the tile is not clickable there */
 #paneMenu.pane-menu { background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 0; gap: 0; overflow: visible; }
 .pm-tile .icard, .pm-tile .icard:hover, .pm-tile .icard[data-active="true"], .pm-tile .icard[data-active="true"]:hover { cursor: default; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); box-shadow: 0 8px 24px rgba(0, 0, 0, .45); }
