@@ -2,7 +2,7 @@
 // so it stays light enough for phones. Only the lane instruments (guitar, bass, keys, drums) have a highway;
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
-  GUITAR_LANE_COLORS, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, NOTE_RECT_W, NOTE_RECT_H, KICK_COLOR, KICK_COLOR_5, STAR_POWER_GOLD, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
+  NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, NOTE_RECT_W, NOTE_RECT_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
   ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
@@ -160,7 +160,7 @@ export function renderLanes3D(hw, t, w, h) {
     if (FILL_KINDS[i] === 'bre' && hw.breBand === 'off') continue;
     const spans = spansOfKind(chart, chart.fills, 'kind', FILL_KINDS[i]);
     if (FILL_KINDS[i] === 'bre') { // the big rock ending: every lane in its own colour, pulsing (breAlpha)
-      const cols = chart.laneColors || GUITAR_LANE_COLORS;
+      const cols = chart.laneColors || NOTE_PALETTE.lanes;
       const pulseBre = hw.breBand === 'pulse';
       for (let l = 0; l < lanes; l++) span(g, spans, withAlpha(cols[l] || cols[0], breAlpha(t, l, lanes, pulseBre)), -half + l, -half + l + 1);
     } else span(g, spans, FILL_COLORS[FILL_KINDS[i]], -half, half);
@@ -206,7 +206,7 @@ export function renderLanes3D(hw, t, w, h) {
   const notes = chart.notes;
   let end = from; // the notes that can be seen are notes[from .. end)
   while (end < notes.length && notes[end].time <= t + windowSec) end++;
-  const colors = chart.laneColors || GUITAR_LANE_COLORS;
+  const colors = chart.laneColors || NOTE_PALETTE.lanes;
   const held = hw.heldMotion; // (setting highway.heldPulse: off keeps the held head, tail and pad still)
   const shimmer = held ? tailShimmer(t) : 0.5; // (the same for every note of the frame)
   const pulse = held ? heldPulse(t) : HELD_SCALE;
@@ -254,7 +254,7 @@ export function renderLanes3D(hw, t, w, h) {
     const kx = Math.max(0, past) / FADE_SEC;
     const e = easeOut(kx);
     const d = depth(n.time);
-    const base = n.open ? OPEN_COLOR : chart.drumKind === 'five' ? KICK_COLOR_5 : KICK_COLOR;
+    const base = n.open ? NOTE_PALETTE.open : chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick;
     const far = Math.min(1, (1 - d) / FADE_IN);
     const alpha = far * (1 - e * e); // stays solid for a moment, then drops
     const thick = barDepth * (1 - 0.55 * e); // the bar thins as it is "consumed"
@@ -305,7 +305,7 @@ export function renderLanes3D(hw, t, w, h) {
     const dBot = depth(Math.max(n.time, t));
     if (dTop <= dBot) continue;
     if (n.open) {
-      g.fillStyle = withAlpha(OPEN_COLOR, 0.3);
+      g.fillStyle = withAlpha(NOTE_PALETTE.open, 0.3);
       quad(g, dBot, dTop, -half, half);
       g.fill();
     } else {
@@ -377,7 +377,7 @@ export function renderLanes3D(hw, t, w, h) {
     }
     const faced = !n.cymbal && hw.noteStyle === 'rect'; // a note in the rectangular style: YARG's chrome caps and coloured band
     const disc = n.cymbal && hw.noteStyle === 'rect'; // ...and a cymbal is a chrome disc with a coloured cone
-    const body = tintWhite(n.sp ? noteColor(n, colors) : n.tap && !faced ? TAP_COLOR : colors[n.lane], Math.min(1, kx + amt * (0.32 + 0.12 * shimmer))); // an active long note's head is lighter, like its tail
+    const body = tintWhite(n.sp ? noteColor(n, colors) : n.tap && !faced ? NOTE_PALETTE.tap : colors[n.lane], Math.min(1, kx + amt * (0.32 + 0.12 * shimmer))); // an active long note's head is lighter, like its tail
     g.globalAlpha = (1 - kx) * hw.noteAlpha(n) * Math.min(1, (1 - d) / FADE_IN);
     if (faced) { // the rectangular style: the vector note after the design, with its base in perspective (no separate thickness edge)
       drawYNote(g, x, y, rx * NOTE_RECT_W, ry * NOTE_RECT_H, n, colors[n.lane], body, TAPER_GAIN / (y - vy), YNOTE_SIDE_3D * hw.noteBase);
@@ -409,7 +409,7 @@ export function renderLanes3D(hw, t, w, h) {
     } else {
       g.beginPath();
       noteShape(g, x, y + th, rx, ry, headStyle, y + th - vy);
-      g.fillStyle = darken(n.tap && !n.sp ? TAP_COLOR : colors[n.lane], 0.45); // the edge keeps the plain lane colour (no star power overlay)
+      g.fillStyle = darken(n.tap && !n.sp ? NOTE_PALETTE.tap : colors[n.lane], 0.45); // the edge keeps the plain lane colour (no star power overlay)
       g.fill();
     }
     g.beginPath();

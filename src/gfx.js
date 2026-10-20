@@ -1,4 +1,7 @@
 // Drawing constants and helpers shared by the 2D and 3D highway renderers.
+// The lane, kick, open and tap colours below are YARG's defaults; the renderers draw with NOTE_PALETTE (src/palette.js, setting
+// highway.palette), read at draw time, which holds these same colours unless another palette is chosen.
+export { NOTE_PALETTE } from './palette.js';
 export const GUITAR_LANE_COLORS = ['#79d304', '#ff1d23', '#ffe900', '#00bfff', '#ff8400']; // YARG.Core ColorProfile.Defaults.cs
 export const KICK_COLOR = '#ff8400'; // YARG's 4-lane kick (the 5-lane one is KICK_COLOR_5)
 export const KICK_COLOR_5 = '#e63fff'; // YARG's 5-lane kick (purple)
