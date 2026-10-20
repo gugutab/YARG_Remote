@@ -58,9 +58,8 @@ const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 100" width
 </svg>
 `;
 
-const SPRITE_W = 440;
-const SPRITE_H = 200;
-const sprites = new Map(); // key -> canvas, or 'loading'
+const LEVELS = [440, 1100]; // raster widths: a small sprite for small notes, a large one for the big notes near the hit line (drawn a note at a time, not blurred or blocky)
+const sprites = new Map(); // key|level -> canvas, or 'loading'
 const listeners = new Set(); // called when a sprite finishes loading (the highway redraws)
 export const onNoteSpriteReady = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
 
@@ -94,18 +93,21 @@ export function noteSpriteSvg(variant, color, sp) {
 
 export const noteVariant = (n) => (n.tap || n.ghost ? 'dark' : n.hopo || n.accent ? 'white' : 'plain');
 
-function getSprite(n, color) {
-  const key = `${noteVariant(n)}|${color}|${n.sp ? 1 : 0}`;
+function getSprite(n, color, level) {
+  const key = `${noteVariant(n)}|${color}|${n.sp ? 1 : 0}|${level}`;
   const hit = sprites.get(key);
-  if (hit && hit !== 'loading') return hit;
+  if (hit && hit !== 'loading' && hit !== 'failed') return hit;
   if (!hit && typeof Image !== 'undefined' && typeof document !== 'undefined') {
     sprites.set(key, 'loading');
+    const w = LEVELS[level];
     const img = new Image();
     img.onload = () => {
       const c = document.createElement('canvas');
-      c.width = SPRITE_W;
-      c.height = SPRITE_H;
-      c.getContext('2d').drawImage(img, 0, 0, SPRITE_W, SPRITE_H);
+      c.width = w;
+      c.height = Math.round((w * 100) / 220);
+      const cx = c.getContext('2d');
+      cx.imageSmoothingQuality = 'high';
+      cx.drawImage(img, 0, 0, c.width, c.height);
       sprites.set(key, c);
       for (const fn of listeners) fn();
     };
@@ -131,21 +133,26 @@ const TAPER = 3; // the same exaggeration as the canvas notes (gfx.js TAPER_GAIN
 // Draws the note at (cx, cy) (the middle of its face), `hw` the half width of the note's old outline; `white` (0..1) lightens it (held / leaving notes); `view` from noteView.
 // Returns false while the sprite is not ready (the caller draws the canvas version).
 export function drawNoteSprite(g, n, color, cx, cy, hw, white = 0, view = DEFAULT_VIEW) {
-  const sprite = getSprite(n, color);
-  if (!sprite) return false;
   const W = hw * 2 * (220 / 198); // the visible width of the design is 198 of the 220 units
+  const px = W * (g.getTransform().a || 1); // the width on the screen in device pixels
+  const want = px > LEVELS[0] * 0.85 ? 1 : 0;
+  const sprite = getSprite(n, color, want) || (want ? getSprite(n, color, 0) : null); // (the small one while the large one loads)
+  if (!sprite) return false;
+  const U = sprite.width / 220; // sprite pixels per design unit
+  g.imageSmoothingEnabled = true;
+  g.imageSmoothingQuality = 'high';
   const s = W / 220;
   const faceH = (FACE_BOTTOM - FACE_TOP) * s * view.fh;
   const faceY = cy - (52.5 - FACE_TOP) * s * view.fh; // the face's middle is at 52.5 of 100
   const baseH = (BASE_BOTTOM - FACE_BOTTOM) * s * view.fb;
   const paint = () => {
-    g.drawImage(sprite, 0, FACE_BOTTOM * 2, 440, (BASE_BOTTOM - FACE_BOTTOM) * 2, cx - W / 2, faceY + faceH - 0.5, W, baseH + 0.5); // the base first, the face over it
+    g.drawImage(sprite, 0, FACE_BOTTOM * U, sprite.width, (BASE_BOTTOM - FACE_BOTTOM) * U, cx - W / 2, faceY + faceH - 0.5, W, baseH + 0.5); // the base first, the face over it
     const n2 = view.dist > 0 && g.globalAlpha > 0.995 ? SLICES : 1; // rows of the face, each with its own width when there is a vanishing point (one piece while it is translucent: the rows would overlap and show as bands)
-    const srcH = ((FACE_BOTTOM - FACE_TOP) * 2) / n2;
+    const srcH = ((FACE_BOTTOM - FACE_TOP) * U) / n2;
     for (let i = 0; i < n2; i++) {
       const py = faceY + (faceH / n2) * (i + 0.5);
       const f = n2 === 1 ? 1 : Math.min(1.6, Math.max(0.5, 1 + (TAPER * (py - cy)) / view.dist));
-      g.drawImage(sprite, 0, FACE_TOP * 2 + i * srcH, 440, srcH + 0.5, cx - (W * f) / 2, faceY + (faceH / n2) * i, W * f, faceH / n2 + 0.6);
+      g.drawImage(sprite, 0, FACE_TOP * U + i * srcH, sprite.width, srcH + 0.5 * (U / 2), cx - (W * f) / 2, faceY + (faceH / n2) * i, W * f, faceH / n2 + 0.6);
     }
   };
   paint();
