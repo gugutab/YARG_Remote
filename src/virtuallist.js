@@ -148,7 +148,29 @@ export function railScroll(y, range, railH, thumbH) {
 const CHIP_W = 50;
 const CHIP_GAP = 10;
 
-export function createVirtualList({ scroller, label, rail, thumbs, onSelect, text, describe = () => ({ instruments: [] }), anchor = (l) => l[0], mode: initialMode = 'normal' }) {
+// The favourite star of a card: a real button (its own click never opens the card), aria-pressed while the song is a favourite.
+// `star` = { has(song), toggle(song) -> new state }. The visible box is small (CSS `.fav-btn`) so the card's layout and height
+// do not change; a pseudo-element gives it a 32 px hit area.
+export const FAV_LABELS = { off: 'Favourite', on: 'Remove from favourites' };
+export function syncStarButton(btn, on) {
+  btn.setAttribute('aria-pressed', String(on));
+  btn.setAttribute('aria-label', on ? FAV_LABELS.on : FAV_LABELS.off);
+  btn.title = on ? FAV_LABELS.on : FAV_LABELS.off;
+}
+function starButton(song, star) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'fav-btn';
+  btn.innerHTML = '<svg aria-hidden="true"><use href="#i-star"/></svg>';
+  syncStarButton(btn, star.has(song));
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation(); // (the card's click opens the details)
+    syncStarButton(btn, star.toggle(song));
+  });
+  return btn;
+}
+
+export function createVirtualList({ scroller, label, rail, thumbs, onSelect, text, describe = () => ({ instruments: [] }), anchor = (l) => l[0], mode: initialMode = 'normal', star = null }) {
   let mode = initialMode;
   let cards = DEFAULT_CARDS;
   let rowH = cardHeight(mode, cards);
@@ -265,6 +287,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
         line.append(pack);
       }
       el.append(line);
+      if (star) el.append(starButton(song, star));
       el.title = `${text(song.title)} — ${text(song.artist)}${d.pack ? ` · ${d.pack}` : ''}`;
       el.addEventListener('click', () => pick(song));
       return { el, timer: 0 };
@@ -307,6 +330,12 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
         const tag = Object.assign(mk('song-packtag', d.pack), { title: d.pack });
         tag.dataset.pack = d.pack;
         top.append(titleEl, tag);
+        if (star) top.append(starButton(song, star));
+        textBox.append(top);
+      } else if (star) { // (the star still sits at the right of the title)
+        const top = document.createElement('span');
+        top.className = 'song-top';
+        top.append(titleEl, starButton(song, star));
         textBox.append(top);
       } else textBox.append(titleEl);
       if (n.icons && d.instruments.length) { // the instruments the song has, as small icons to the right of the artist
@@ -322,6 +351,7 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       top.className = 'song-top';
       top.append(titleEl);
       if (l.length && d.length) top.append(mk('song-len', d.length));
+      if (star) top.append(starButton(song, star));
       textBox.append(top, artistEl);
       const facts = [l.album && d.album, l.year && d.year, l.genre && d.genre, l.charter && d.charter && `by ${d.charter}`].filter(Boolean);
       if (facts.length) textBox.append(mk('song-meta', facts.join(' · ')));
@@ -550,7 +580,8 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       const title = box.querySelector('.song-title');
       const gap = parseFloat(getComputedStyle(box).columnGap) || 0;
       const t = title ? widthOf(title.textContent, getComputedStyle(title).font) : 0;
-      return { e, short: packShort(box.clientWidth, t, gap, full) };
+      const starBtn = box.querySelector('.fav-btn'); // (the star takes its own room at the end of the row)
+      return { e, short: packShort(box.clientWidth, t + (starBtn ? starBtn.offsetWidth + gap : 0), gap, full) };
     });
     for (const { e, short } of room) {
       e.classList.toggle('short', short);

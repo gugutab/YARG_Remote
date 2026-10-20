@@ -2703,3 +2703,30 @@ button.icon.small-icon.sp-reset, #ppSlower, #ppFaster { min-width: 32px; min-hei
 .app.stage-held:has(.pause-dim.show) #topbar { visibility: visible; }
 .app.stage-held:has(.pause-dim.show) #topbar > * { visibility: hidden; }
 .app.stage-held:has(.pause-dim.show) #topbar::after { content: ""; position: absolute; inset: -4px 0 0 0; z-index: 20; background: rgba(0, 0, 0, .68); pointer-events: none; } /* the same dim as .pause-dim over the stage */
+
+/* ---------- Favourites and play history (favourites.js, history.js) ---------- */
+/* The star of a card: an 18 px box at the right of the title row (so the card's layout and height do not change); ::before widens the
+   hit area to 32 px. Outline and dim while off, filled in the accent colour while on. */
+.fav-btn { position: relative; flex: none; display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; margin: 0; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; opacity: .55; }
+.fav-btn::before { content: ""; position: absolute; inset: -7px; }
+.fav-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.fav-btn:hover, .fav-btn:focus-visible { opacity: 1; color: var(--accent); }
+.fav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.fav-btn[aria-pressed="true"] { opacity: 1; color: var(--accent); }
+.fav-btn[aria-pressed="true"] svg { fill: currentColor; }
+.song-top .fav-btn { align-self: flex-start; }
+:is(#songs, #endNext) li.row.compact .fav-btn { margin-left: -2px; }
+/* the details window header: a normal 32 px icon button before the close button */
+.info-top .info-fav { width: 32px; height: 32px; opacity: 1; color: var(--muted); }
+.info-top .info-fav::before { content: none; }
+.info-top .info-fav svg { width: 18px; height: 18px; }
+.info-top .info-fav[aria-pressed="true"] { color: var(--accent); }
+.fav-chip svg { stroke-width: 1.8; }
+.fav-chip[aria-pressed="true"] svg { fill: currentColor; }
+/* "Played 3 days ago · 12 plays" under the artist */
+.info-played { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+@container (max-width: 560px) { #infoPlayed { grid-column: 1 / -1; } }
+@media (max-width: 700px) { #infoPlayed { grid-column: 1 / -1; } }
+/* the card star keeps its small box on touch / phone widths too (the 44 px rule above would grow the title row): the hit area grows instead */
+.library .fav-btn:not(.info-fav), #endNext .fav-btn { min-height: 0; min-width: 0; }
+@media (pointer: coarse), (max-width: 700px) { .fav-btn:not(.info-fav)::before { inset: -13px -10px; } }

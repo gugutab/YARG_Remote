@@ -30,7 +30,9 @@ import { WIN_MARGIN, WIN_BORDER, SETTINGS_MIN_W, contentMaxFor } from './windowf
 import { isPhone, createWidthPref, createWindowFrame } from './windowframe-dom.js';
 import { saveLibrary, loadLibrary, loadThumb, saveThumb, clearThumbs } from './store.js';
 import { filterSongs, parseQuery, rankByRelevance, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, anchorLabel, INSTRUMENTS, hasInstrument } from './songlist.js';
-import { createVirtualList, DEFAULT_CARDS } from './virtuallist.js';
+import { createVirtualList, DEFAULT_CARDS, syncStarButton } from './virtuallist.js';
+import { loadFavourites, saveFavourites, toggleFavourite, onlyFavourites, mergeFavourites } from './favourites.js';
+import { loadHistory, saveHistory, recordPlay, sortByHistory, playedLine, createPlayTracker, HISTORY_SORTS } from './history.js';
 import { createThumbs, renderCoverThumb } from './thumbs.js';
 import { chartFacts, factRows } from './songstats.js';
 import { recommend } from './recommend.js';
@@ -468,17 +470,53 @@ els.rescan.addEventListener('click', rescanFolder);
 els.folderInput.addEventListener('change', () => loadEntries(entriesFromFileList(els.folderInput.files)));
 // Filters: instrument chips (all selected must be present), minimum level, genre, decade; the search box adds
 // field syntax (artist:, year:, len:, inst:...). Everything here only changes what renderList() shows.
-const filters = { instruments: new Set(), minLevel: 0 };
+const filters = { instruments: new Set(), minLevel: 0, starred: false };
+// Favourites (the star on the cards and in the details header) and the play history (favourites.js, history.js): local only.
+const localStore = (() => { try { return localStorage; } catch { return null; } })();
+let favourites = loadFavourites(localStore);
+let playHistory = loadHistory(localStore);
+const favChip = $('favChip');
+const infoFav = $('infoFav');
+const infoPlayed = $('infoPlayed');
+function setFavourite(song, on, fromCard = false) {
+  favourites = toggleFavourite(favourites, song.id, on);
+  saveFavourites(localStore, favourites);
+  const now = favourites.has(song.id);
+  if (infoSong === song) syncStarButton(infoFav, now);
+  if (filters.starred || !fromCard) renderList({ keepScroll: true }); // (an unstarred song leaves the Starred list; a star set in the details shows on its card)
+  return now;
+}
+const starApi = { has: (song) => favourites.has(song.id), toggle: (song) => setFavourite(song, !favourites.has(song.id), true) };
+let infoSong = null; // the song whose details are showing (for the header star and the played line)
+function syncInfoHistory() {
+  if (!infoSong) return;
+  syncStarButton(infoFav, favourites.has(infoSong.id));
+  const line = playedLine(playHistory, infoSong.id, Date.now());
+  infoPlayed.textContent = line;
+  infoPlayed.hidden = !line;
+}
+infoFav.addEventListener('click', () => { if (infoSong) setFavourite(infoSong, !favourites.has(infoSong.id)); });
+// A play is recorded once the chart has played 10 s in one go (not the Listen card, not a preview); a song's end starts a new session.
+const playTracker = createPlayTracker();
+function trackPlay(now) {
+  const id = playTracker.tick(current?.song?.id ?? null, player.playing && !listenMode && previewStop == null && !liveStage, now);
+  if (!id || !prefs.get('library.history')) return;
+  playHistory = recordPlay(playHistory, id, Date.now());
+  saveHistory(localStore, playHistory);
+  syncInfoHistory();
+  if (HISTORY_SORTS.includes(els.sortBy.value)) renderList({ keepScroll: true });
+}
 const selectSyncs = []; // refresh the custom dropdowns after the code changes a <select> (see customSelect)
 const FILTER_ICONS = { guitar: 'guitar', bass: 'bass', rhythm: 'rhythm', keys: 'keys', drums: 'drum', vocals: 'mic' };
 const INSTRUMENT_NAMES = { guitar: 'Guitar', bass: 'Bass', rhythm: 'Rhythm', keys: 'Keys', drums: 'Drums', vocals: 'Vocals' };
 // Genre, pack and decade take several values at once: the hidden <select multiple> holds the selection.
 const picked = (select) => [...select.selectedOptions].map((o) => o.value);
 const clearPicked = (select) => { for (const o of select.options) o.selected = false; };
-const filterCount = () => filters.instruments.size + (filters.minLevel ? 1 : 0) + picked(els.filterGenre).length + picked(els.filterDecade).length + picked(els.filterPack).length;
+const filterCount = () => filters.instruments.size + (filters.minLevel ? 1 : 0) + (filters.starred ? 1 : 0) +picked(els.filterGenre).length + picked(els.filterDecade).length + picked(els.filterPack).length;
 function syncFilterUi() {
   for (const b of els.instChips.querySelectorAll('[data-inst]')) b.setAttribute('aria-pressed', String(filters.instruments.has(b.dataset.inst)));
   for (const b of els.levelSeg.querySelectorAll('[data-level]')) b.setAttribute('aria-pressed', String(Number(b.dataset.level) === filters.minLevel));
+  favChip.setAttribute('aria-pressed', String(filters.starred));
   for (const sync of selectSyncs) sync();
   const n = filterCount();
   els.filterBadge.textContent = String(n);
@@ -486,6 +524,7 @@ function syncFilterUi() {
   els.filterClear.disabled = n === 0;
   const chips = [];
   const add = (text, remove, icon) => chips.push({ text, remove, icon });
+  if (filters.starred) add('Starred', () => { filters.starred = false; }, 'star');
   for (const i of filters.instruments) add(INSTRUMENT_NAMES[i], () => filters.instruments.delete(i), FILTER_ICONS[i]);
   if (filters.minLevel) add(`Level ${filters.minLevel}+`, () => { filters.minLevel = 0; }, 'sort');
   const addEach = (select, icon, textOf = (v) => v) => {
@@ -537,9 +576,15 @@ els.levelSeg.addEventListener('click', (e) => {
   syncFilterUi();
   renderList();
 });
+favChip.addEventListener('click', () => {
+  filters.starred = !filters.starred;
+  syncFilterUi();
+  renderList();
+});
 els.filterClear.addEventListener('click', () => {
   filters.instruments.clear();
   filters.minLevel = 0;
+  filters.starred = false;
   for (const s of [els.filterGenre, els.filterDecade, els.filterPack]) clearPicked(s);
   syncFilterUi();
   renderList();
@@ -722,7 +767,7 @@ const savedMode = prefs.get('library.cardStyle');
 const list = createVirtualList({
   mode: CARD_MODES.includes(savedMode) ? savedMode : 'normal', describe: describeSong,
   scroller: els.songs, label: els.groupLabel, rail: els.rail, thumbs, text: plainText, onSelect: (song) => selectSong(song),
-  anchor: (label) => anchorLabel(label, els.sortBy.value),
+  anchor: (label) => anchorLabel(label, els.sortBy.value), star: starApi,
 });
 
 function syncViewSeg() {
@@ -744,16 +789,19 @@ function renderList({ keepScroll = false } = {}) {
   const query = els.search.value;
   const terms = parseQuery(query).terms;
   const ranked = terms.length > 0 && prefs.get('library.searchRelevance'); // free text in the search: best match first
-  let shown = sortSongs(filterSongs(songs, {
+  const bySort = els.sortBy.value;
+  const byHistory = HISTORY_SORTS.includes(bySort); // Recently played / Most played: never played songs last, no group headers
+  let shown = filterSongs(filters.starred ? onlyFavourites(songs, favourites) : songs, {
     query, instruments: [...filters.instruments], minLevel: filters.minLevel, genre: picked(els.filterGenre), decade: picked(els.filterDecade), pack: picked(els.filterPack),
-  }), els.sortBy.value, sortDesc);
+  });
+  shown = byHistory ? sortByHistory(sortSongs(shown, 'title'), playHistory, bySort, sortDesc) : sortSongs(shown, bySort, sortDesc);
   if (ranked) shown = rankByRelevance(shown, query);
   shownSongs = shown;
   list.setHighlight(terms);
   els.sortDir.classList.toggle('desc', sortDesc); // the arrow points up when descending
   els.sortDir.title = sortDesc ? 'Descending (click to reverse)' : 'Ascending (click to reverse)';
   list.setActive(infoOpen ? current?.song ?? null : null); // marked while its details are open
-  const heads = prefs.get('library.dividers') && !ranked; // (a relevance order has no letter groups)
+  const heads = prefs.get('library.dividers') && !ranked && !byHistory; // (a relevance or history order has no letter groups)
   list.setItems(heads ? buildItems(shown, els.sortBy.value) : shown.map((song) => ({ type: 'song', song })), { keepScroll, evenGroups: heads && els.sortBy.value === 'pack' }); // pack sort: every pack gets a label on the rail
   els.count.textContent = songs.length ? `${shown.length} of ${songs.length} songs${ranked ? ' · best match first' : ''}` : '';
   els.empty.hidden = songs.length > 0;
@@ -1221,6 +1269,8 @@ function renderSongInfo(song) {
   const quote = plainText(song.ini?.loading_phrase);
   els.infoQuote.textContent = quote ? `“${quote}”` : '';
   els.infoQuote.hidden = !quote;
+  infoSong = song;
+  syncInfoHistory(); // the header star and "Played 3 days ago · 12 plays"
   renderMeta(song, null);
   els.instrumentCards.replaceChildren();
   const extras = extraRows(song);
@@ -2698,6 +2748,7 @@ player.onSeek = () => { cancelLoopWait(); loopHeld = false; metronome.reset(); s
 function setEnded(on) {
   if (ended === on) return;
   ended = on;
+  if (on) playTracker.reset(); // (a restart after the end is a new play)
   endDismissed = false;
   syncEndScreen();
   syncPlayButton();
@@ -3771,6 +3822,7 @@ function frame(frameTs) {
       }
       if (perfMode !== 'off' && player.playing && lastClock && Math.abs(t - lastClock.t) < SEEK_JUMP_SEC) perf.clock(((t - lastClock.t) - (((frameTs || frameStart) - lastClock.at) / 1000) * player.rate) * 1000); // steadiness of the music clock
       lastClock = { t, at: frameTs || frameStart };
+      guarded('play history', () => trackPlay(frameStart)); // (counts 10 s of playback once)
       return t;
     });
     if (t === undefined) lastClock = null; // no reliable time this frame: skip the drawing, keep the loop (and the jitter meter) clean
@@ -4086,7 +4138,28 @@ const settingsPage = mountSettings({
     theme: (host, ctx) => renderThemeStudio(host, { ...ctx, prefersDark: () => darkQuery.matches, notify: setStatus }),
     'data.tools': (host, ctx) => renderDataTools(host, {
       ...ctx, notify: setStatus,
-      extra: [{ label: 'Clear thumbnail cache', help: 'Album thumbnails are rebuilt as you scroll.', run: async () => { await clearThumbs(); return 'Thumbnail cache cleared; thumbnails are rebuilt as you scroll.'; } }],
+      extra: [
+        { label: 'Clear thumbnail cache', help: 'Album thumbnails are rebuilt as you scroll.', run: async () => { await clearThumbs(); return 'Thumbnail cache cleared; thumbnails are rebuilt as you scroll.'; } },
+        { label: 'Clear play history', help: 'Forgets when you last played each song and how many times. Your favourites stay.', confirm: 'Forget when you played each song and how many times?', run: async () => {
+          playHistory = new Map();
+          saveHistory(localStore, playHistory);
+          syncInfoHistory();
+          renderList({ keepScroll: true });
+          return 'Play history cleared.';
+        } },
+      ],
+      addons: [{ // the starred songs travel in the settings backup file (key "favourites": a list of song ids), merged on import
+        key: 'favourites',
+        export: () => [...favourites],
+        import: (value) => {
+          const { set, added, skipped } = mergeFavourites(favourites, value);
+          favourites = set;
+          saveFavourites(localStore, favourites);
+          syncInfoHistory();
+          renderList({ keepScroll: true });
+          return `Added ${added} favourite${added === 1 ? '' : 's'}${skipped ? ` (${skipped} skipped)` : ''}.`;
+        },
+      }],
     }),
   },
 });
