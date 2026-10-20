@@ -2,7 +2,7 @@
 // so it stays light enough for phones. Only the lane instruments (guitar, bass, keys, drums) have a highway;
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
-  GUITAR_LANE_COLORS, breAlpha, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, NOTE_RECT_W, NOTE_RECT_H, KICK_COLOR, KICK_COLOR_5, STAR_POWER_GOLD, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
+  GUITAR_LANE_COLORS, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, NOTE_RECT_W, NOTE_RECT_H, KICK_COLOR, KICK_COLOR_5, STAR_POWER_GOLD, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
   ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
@@ -21,6 +21,7 @@ const BAR_DEPTH = 0.0087; // one third of the earlier 0.026 // pedal/open bar th
 const GLOW_DEPTH = 0.009; // half-height of the hit glow (it was 0.026 and looked too tall)
 const easeOut = (x) => 1 - (1 - x) ** 3;
 const TAIL_RIGHT = new Float64Array(2 * 21); // scratch for taperedStrip
+const NO_BEATS = [];
 const FLASH = new Float64Array(16); // scratch of renderLanes3D: the light of each pad
 const FILL_KINDS = Object.keys(FILL_COLORS);
 const STAR_POWER_BAND_3D = 'rgba(255,176,0,0.17)'; // (the 3D bands are a little denser than the 2D ones)
@@ -98,7 +99,8 @@ export function renderLanes3D(hw, t, w, h) {
   // the window passes from taller than wide to wider than tall, and past the cap only the side gaps grow.
   const roadW = portrait ? w * 0.94 : Math.min(h * 1.05, h * 0.94 + (w - h) * 0.16);
   const laneW = roadW / lanes;
-  const padRy = laneW * HEAD_R * 1.05 * HEAD_TILT; // vertical radius of the hit pads
+  const headR = HEAD_R * hw.noteSize; // (setting highway.noteScale: heads and pads)
+  const padRy = laneW * headR * 1.05 * HEAD_TILT; // vertical radius of the hit pads
   const hitY = h - (padRy + 26); // hit line (the pads): the 26 px below them hold the bottom fade
   const cx = w / 2;
   const windowSec = (DEPTH_SEC / hw.neck) * laneLookFactor(h); // neck speed shortens or stretches the visible time; a taller window shows more of it (fixed pixel speed)
@@ -121,18 +123,20 @@ export function renderLanes3D(hw, t, w, h) {
   quad(g, ROAD_NEAR, ROAD_END, -half, half);
   g.fill();
   g.fillStyle = 'rgba(255,255,255,0.045)';
-  for (let i = 0; i < lanes; i += 2) {
+  for (let i = 0; i < lanes && hw.laneStripes; i += 2) { // (setting highway.laneStripes)
     quad(g, ROAD_NEAR, ROAD_END, i - half, i + 1 - half);
     g.fill();
   }
   if (hw.starPowerBand) span(g, chart.starPower, STAR_POWER_BAND_3D, -half, half);
-  span(g, chart.solos, SOLO_BAND_3D, -half, half);
+  if (hw.soloBand) span(g, chart.solos, SOLO_BAND_3D, -half, half);
   for (let i = 0; i < FILL_KINDS.length; i++) {
     if (FILL_KINDS[i] === 'fill' && !hw.fillBand) continue;
+    if (FILL_KINDS[i] === 'bre' && hw.breBand === 'off') continue;
     const spans = spansOfKind(chart, chart.fills, 'kind', FILL_KINDS[i]);
     if (FILL_KINDS[i] === 'bre') { // the big rock ending: every lane in its own colour, pulsing (breAlpha)
       const cols = chart.laneColors || GUITAR_LANE_COLORS;
-      for (let l = 0; l < lanes; l++) span(g, spans, withAlpha(cols[l] || cols[0], breAlpha(t, l, lanes)), -half + l, -half + l + 1);
+      const pulseBre = hw.breBand === 'pulse';
+      for (let l = 0; l < lanes; l++) span(g, spans, withAlpha(cols[l] || cols[0], breAlpha(t, l, lanes, pulseBre)), -half + l, -half + l + 1);
     } else span(g, spans, FILL_COLORS[FILL_KINDS[i]], -half, half);
   }
   for (let i = 0; i < ROLL_TYPES.length; i++) span(g, spansOfKind(chart, chart.rolls, 'type', ROLL_TYPES[i]), ROLL_COLORS[ROLL_TYPES[i]], -half, half);
@@ -157,13 +161,14 @@ export function renderLanes3D(hw, t, w, h) {
   g.stroke();
 
   // beat and measure lines
-  const beats = chart.beats;
+  const beatStyle = hw.beatStyles['3d']; // (setting highway.beatLines: null = off)
+  const beats = beatStyle ? chart.beats : NO_BEATS;
   for (let i = 0; i < beats.length; i++) {
     const b = beats[i];
     if (b.time < t || b.time > t + windowSec) continue;
     const d = depth(b.time);
     const p = scaleAt(d);
-    g.fillStyle = b.measure ? 'rgba(255,255,255,0.4)' : b.strong ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.14)';
+    g.fillStyle = b.measure ? beatStyle[0] : b.strong ? beatStyle[1] : beatStyle[2];
     const bh = b.measure ? 3 : b.strong ? 2 : 1;
     g.fillRect(PCX + -half * PLANE * p, PVY + (PHIT - PVY) * p - (bh / 2) * p, roadW * p, bh * p);
   }
@@ -176,8 +181,12 @@ export function renderLanes3D(hw, t, w, h) {
   let end = from; // the notes that can be seen are notes[from .. end)
   while (end < notes.length && notes[end].time <= t + windowSec) end++;
   const colors = chart.laneColors || GUITAR_LANE_COLORS;
-  const shimmer = tailShimmer(t); // (the same for every note of the frame)
-  const pulse = heldPulse(t);
+  const held = hw.heldMotion; // (setting highway.heldPulse: off keeps the held head, tail and pad still)
+  const shimmer = held ? tailShimmer(t) : 0.5; // (the same for every note of the frame)
+  const pulse = held ? heldPulse(t) : HELD_SCALE;
+  const flicker = held ? 0.15 * Math.sin(t * 22) : 0;
+  const tailW = hw.sustainWidth; // (setting highway.sustainWidth)
+  const barDepth = BAR_DEPTH * hw.kickBar; // (setting highway.kickBarHeight)
 
   // hit zone: a bar across the road and one pad per lane, lit while a note is being hit
   const flash = FLASH;
@@ -187,7 +196,7 @@ export function renderLanes3D(hw, t, w, h) {
     const n = notes[vi];
     const past = t - n.time;
     if (past < 0) continue;
-    if (n.lane >= 0 && !n.open) flash[n.lane] = Math.max(flash[n.lane], heldAmount(n, t) * (0.75 + 0.15 * Math.sin(t * 22)));
+    if (n.lane >= 0 && !n.open) flash[n.lane] = Math.max(flash[n.lane], heldAmount(n, t) * (0.75 + flicker));
     if (n.lane >= 0 && !n.open) {
       if (past < HIT_FLASH_SEC) flash[n.lane] = Math.max(flash[n.lane], 1 - past / HIT_FLASH_SEC);
     } else if (past < BAR_FLASH_SEC && 1 - past / BAR_FLASH_SEC > barFlash) {
@@ -195,15 +204,15 @@ export function renderLanes3D(hw, t, w, h) {
     }
   }
   // (there is no hit line: the pads mark the spot; a pedal hit lights every pad)
-  const padRx = laneW * HEAD_R;
+  const padRx = laneW * headR;
   for (let i = 0; i < lanes; i++) {
     const x = cx + (i + 0.5 - half) * laneW;
     g.beginPath();
     noteShape(g, x, hitY, padRx * 1.05, padRx * 1.05 * HEAD_TILT, chart.laneKinds?.[i] === 'cymbal' ? 'tri' : hw.noteStyle, hitY - vy);
-    g.fillStyle = withAlpha(colors[i], Math.min(0.9, PAD_FILL_ALPHA + 0.5 * flash[i] + 0.35 * barFlash));
+    g.fillStyle = withAlpha(colors[i], Math.min(0.9, hw.padFill + 0.5 * flash[i] + 0.35 * barFlash));
     g.fill();
     g.lineWidth = 2;
-    g.strokeStyle = withAlpha(colors[i], Math.min(1, PAD_RING_ALPHA + (1 - PAD_RING_ALPHA) * Math.max(flash[i], barFlash)));
+    g.strokeStyle = withAlpha(colors[i], Math.min(1, hw.padRing + (1 - hw.padRing) * Math.max(flash[i], barFlash)));
     g.stroke();
   }
 
@@ -222,7 +231,7 @@ export function renderLanes3D(hw, t, w, h) {
     const base = n.open ? OPEN_COLOR : chart.drumKind === 'five' ? KICK_COLOR_5 : KICK_COLOR;
     const far = Math.min(1, (1 - d) / FADE_IN);
     const alpha = far * (1 - e * e); // stays solid for a moment, then drops
-    const thick = BAR_DEPTH * (1 - 0.55 * e); // the bar thins as it is "consumed"
+    const thick = barDepth * (1 - 0.55 * e); // the bar thins as it is "consumed"
     const white = past > 0 ? 0.85 * (1 - Math.min(1, kx * 3)) : 0; // quick white flash at the moment of the hit, not before
     const barCount = n.doubleKick ? 2 : 1; // a double kick stacks a second bar
     if (kx > 0) { // glow: a wider, taller, translucent copy that spreads past the rails
@@ -234,7 +243,7 @@ export function renderLanes3D(hw, t, w, h) {
       g.globalCompositeOperation = 'source-over';
     }
     for (let bi = 0; bi < barCount; bi++) {
-      const off = bi === 0 ? 0 : BAR_DEPTH * 1.3;
+      const off = bi === 0 ? 0 : barDepth * 1.3;
       const d0 = d + off - thick / 2;
       const d1 = d + off + thick / 2;
       g.globalAlpha = alpha;
@@ -278,12 +287,12 @@ export function renderLanes3D(hw, t, w, h) {
       const amt = heldAmount(n, t); // fades in after the hit
       g.fillStyle = withAlpha(noteColor(n, colors), 0.6 + 0.25 * amt);
       const mid = n.lane + 0.5 - half;
-      const hr = HEAD_R * noteScale(n); // HOPO notes are smaller
-      taperedStrip(g, dBot, dTop, mid, hr * 0.38, dBot);
+      const hr = headR * noteScale(n); // HOPO notes are smaller
+      taperedStrip(g, dBot, dTop, mid, hr * 0.38 * tailW, dBot);
       g.fill();
       if (amt > 0) {
         g.fillStyle = `rgba(255,255,255,${amt * (0.3 + 0.12 * shimmer)})`;
-        taperedStrip(g, dBot, dTop, mid, hr * 0.38, dBot);
+        taperedStrip(g, dBot, dTop, mid, hr * 0.38 * tailW, dBot);
         g.fill();
         // soft halo around the tail while it is played: many wider and wider faint strips, added together, each with a
         // rounded end (a half ellipse beyond the tail's end, only when the end is on screen)
@@ -296,7 +305,7 @@ export function renderLanes3D(hw, t, w, h) {
         for (let i = 1; i <= 12; i++) {
           // each strip adds what the smooth falloff loses between its inner and outer edge, so the sum follows it
           g.fillStyle = withAlpha(haloColor, 0.12 * amt * (haloProfile((i - 1) / 12) - haloProfile(i / 12)));
-          const wl = hr * (0.38 + 0.08 * i); // half width in lane units
+          const wl = hr * (0.38 * tailW + 0.08 * i); // half width in lane units
           taperedStrip(g, dBot, dTop, mid, wl, dBot);
           g.fill();
           if (endVisible) {
@@ -329,7 +338,7 @@ export function renderLanes3D(hw, t, w, h) {
     const x = PCX + (n.lane + 0.5 - half) * PLANE * p;
     const y = PVY + (PHIT - PVY) * p;
     const amt = heldAmount(n, t);
-    const rx = laneW * HEAD_R * noteScale(n) * p * (1 + 0.4 * kx) * (1 + (pulse - 1) * amt);
+    const rx = laneW * headR * noteScale(n) * p * (1 + 0.4 * kx) * (1 + (pulse - 1) * amt);
     const ry = rx * HEAD_TILT;
     if (amt > 0) { // a soft halo while the note is held
       g.globalCompositeOperation = 'lighter';
@@ -345,7 +354,7 @@ export function renderLanes3D(hw, t, w, h) {
     const body = tintWhite(n.sp ? noteColor(n, colors) : n.tap && !faced ? TAP_COLOR : colors[n.lane], Math.min(1, kx + amt * (0.32 + 0.12 * shimmer))); // an active long note's head is lighter, like its tail
     g.globalAlpha = (1 - kx) * hw.noteAlpha(n) * Math.min(1, (1 - d) / FADE_IN);
     if (faced) { // the rectangular style: the vector note after the design, with its base in perspective (no separate thickness edge)
-      drawYNote(g, x, y, rx * NOTE_RECT_W, ry * NOTE_RECT_H, n, colors[n.lane], body, TAPER_GAIN / (y - vy), YNOTE_SIDE_3D);
+      drawYNote(g, x, y, rx * NOTE_RECT_W, ry * NOTE_RECT_H, n, colors[n.lane], body, TAPER_GAIN / (y - vy), YNOTE_SIDE_3D * hw.noteBase);
       if (n.accent) {
         g.beginPath();
         noteShape(g, x, y, rx, ry, 'ynote', y - vy);
