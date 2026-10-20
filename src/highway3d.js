@@ -380,7 +380,7 @@ export function renderLanes3D(hw, t, w, h) {
     const body = tintWhite(n.sp ? noteColor(n, colors) : n.tap && !faced ? NOTE_PALETTE.tap : colors[n.lane], Math.min(1, kx + amt * (0.32 + 0.12 * shimmer))); // an active long note's head is lighter, like its tail
     g.globalAlpha = (1 - kx) * hw.noteAlpha(n) * Math.min(1, (1 - d) / FADE_IN);
     if (faced) { // the rectangular style: the vector note after the design, with its base in perspective (no separate thickness edge)
-      drawYNote(g, x, y, rx * NOTE_RECT_W, ry * NOTE_RECT_H, n, colors[n.lane], body, TAPER_GAIN / (y - vy), YNOTE_SIDE_3D * hw.noteBase);
+      drawYNote(g, x, y, rx * NOTE_RECT_W, ry * NOTE_RECT_H, n, colors[n.lane], body, TAPER_GAIN / (y - vy), YNOTE_SIDE_3D * hw.noteBase, kx === 0 && amt === 0); // (a held or exiting note changes tint and size every frame: drawn directly)
       if (n.accent) {
         g.beginPath();
         noteShape(g, x, y, rx, ry, 'ynote', y - vy);
