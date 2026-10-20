@@ -22,6 +22,7 @@ import { isFreshStart, overlayLines, startPlan, INFO_FIRST_PLAY_MS } from './sta
 import { metaRows, extraRows, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel, relabelStems } from './songinfo.js';
 import { parseRoute } from './route.js';
 import { initDeepLinks, applyInstruments, syncUrl, openFromHash } from './deeplink.js';
+import { initEndUi, syncEndScreen, buildEndScreen, isEndShown } from './end-ui.js';
 import { createSettings } from './settings.js';
 import { SECTIONS, buildDefaults, buildValidator, FONT_OPTIONS, RENAMES, SETTINGS_VERSION, itemById, setMotionProbe } from './settings-schema.js';
 import { resolvePalette, applyPalette } from './palette.js';
@@ -36,8 +37,6 @@ import { createVirtualList, DEFAULT_CARDS, syncStarButton } from './virtuallist.
 import { loadFavourites, saveFavourites, toggleFavourite, onlyFavourites, mergeFavourites } from './favourites.js';
 import { loadHistory, saveHistory, recordPlay, sortByHistory, playedLine, createPlayTracker, HISTORY_SORTS } from './history.js';
 import { createThumbs, renderCoverThumb } from './thumbs.js';
-import { chartFacts, factRows } from './songstats.js';
-import { recommend } from './recommend.js';
 import { snapPoints, snapTime, clampLoop, currentSectionRange, sectionRange, loopForSection, shouldWrap, MIN_LOOP } from './looprange.js';
 import { trainerConfig, startTrainer, nextTrainerState, trainerStatus, stepNote } from './trainer.js';
 import { VISUALIZERS, createDriver as createVisualizerDriver } from './visualizers.js';
@@ -200,7 +199,6 @@ let flashEl = null;
 // end of song
 let ended = false;
 let endDismissed = false;
-let endShown = false;
 
 // ---------- Settings and theme (applied first, so the first frame already has the right colours) ----------
 const prefs = createSettings({ defaults: PREF_DEFAULTS, validate: buildValidator(SECTIONS), renames: RENAMES, version: SETTINGS_VERSION, storage: (() => { try { return localStorage; } catch { return null; } })() });
@@ -946,7 +944,7 @@ function stageLoading() {
 // A song that was picked but never played has no player bar yet: while its chart is on screen (details closed, nothing loading) a Play
 // button on the stage is the way to start it (on a phone it was a dead end).
 function syncStagePlay() {
-  const show = !!(current && chart) && (holdStage || els.app.classList.contains('stage-unborn')) && !infoOpen && !audioLoad && !endShown; // (held: the details were closed without playing the song: the stage still shows what it showed before)
+  const show = !!(current && chart) && (holdStage || els.app.classList.contains('stage-unborn')) && !infoOpen && !audioLoad && !isEndShown(); // (held: the details were closed without playing the song: the stage still shows what it showed before)
   els.stagePlay.hidden = !show;
 }
 els.stagePlay.addEventListener('click', () => togglePlay());
@@ -1662,7 +1660,7 @@ function updateChart() {
     return;
   }
   highway.setCharts(items);
-  if (endShown) buildEndScreen();
+  if (isEndShown()) buildEndScreen();
   fillSectionOptions();
   const hasLanes = items.some((x) => x.chooser || x.chart.mode !== 'vocals');
   const hasVocals = items.some((x) => !x.chooser && x.chart.mode === 'vocals');
@@ -2759,7 +2757,7 @@ function syncPlayButton() {
 // general.endScreen, a glass window (#endScreen) replaces the fretboards: facts about each instrument on screen (songstats.js) and a few
 // songs to play next (recommend.js). Any seek (the player's onSeek hook), a restart, Play or a song change clears the state; Esc only
 // hides the window (the buttons stay Restart). The canvas is hidden by CSS (.song-ended), so the background visualizer keeps running.
-const NEXT_COUNT = 20;
+// (The window itself is src/end-ui.js.)
 player.onSeek = () => { cancelLoopWait(); loopHeld = false; metronome.reset(); setEnded(false); cancelStartWait(); if (!internalSeek) clearRewind(); }; // (a seek of the user ends a rewind; the rewind's own seek does not)
 
 function setEnded(on) {
@@ -2789,61 +2787,10 @@ async function restartSong() {
   syncPlayButton();
 }
 
-function syncEndScreen() {
-  const show = ended && !endDismissed && !!chart && !!current && !infoOpen && prefs.get('general.endScreen');
-  if (show === endShown) return;
-  endShown = show;
-  els.endScreen.hidden = !show;
-  els.app.classList.toggle('song-ended', show);
-  highway.invalidate();
-  wakeUp();
-  if (!show) return;
-  closePopovers();
-  els.paneMenu.hidden = true;
-  buildEndScreen();
-  els.endScreen.querySelector('.end-scroll').scrollTop = 0;
-  if (!/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName || '')) els.endAgain.focus({ preventScroll: true });
-}
-
-function endCard(it) {
-  const card = document.createElement('div');
-  card.className = 'end-inst';
-  const head = document.createElement('div');
-  head.className = 'end-inst-head';
-  head.innerHTML = `<svg><use href="#i-${it.icon}"/></svg><strong></strong><span class="end-diff"></span>`;
-  head.querySelector('strong').textContent = it.name;
-  const diff = head.querySelector('.end-diff');
-  diff.textContent = it.diffLabel;
-  diff.hidden = !it.diffLabel;
-  const dl = document.createElement('dl');
-  dl.className = 'end-facts';
-  dl.append(...kv(factRows(chartFacts(it.chart), { base: it.base })));
-  card.append(head, dl);
-  return card;
-}
-
-list.bindTip(els.endNext); // the instrument icons of the suggestions show the same hover tip (name and difficulty) as in the library
-function endRow(song, reason) {
-  const li = list.cardFor(song, (picked) => playNext(picked)); // the library's own song card (its style and what it shows)
-  li.title = `${plainText(song.title)} - ${plainText(song.artist)}${reason ? ` (${reason})` : ''}`;
-  return li;
-}
-
-function buildEndScreen() {
-  const song = current.song;
-  els.endTitle.textContent = plainText(song.title);
-  els.endArtist.textContent = [plainText(song.artist), plainText(song.album)].filter(Boolean).join(' · ');
-  els.endCover.src = current.coverUrl || '';
-  els.endCover.hidden = !current.coverUrl;
-  const screen = [...(current.screen || [])].sort((a, b) => Number(!!b.active) - Number(!!a.active));
-  els.endCards.replaceChildren(...screen.map(endCard));
-  els.endCards.hidden = screen.length === 0;
-  const parts = [...new Set(screen.map((it) => (it.base === 'harmony' ? 'vocals' : it.base)))];
-  const picks = recommend(song, songs, { count: NEXT_COUNT, instruments: parts });
-  els.endNext.replaceChildren(...picks.map((r) => endRow(r.song, r.reason)));
-  els.endNextBox.hidden = picks.length === 0;
-}
-
+initEndUi({ // the end-of-song window (src/end-ui.js); its init binds the suggestions' hover tip here, as before
+  els, list, prefs, highway, ended: () => ended, endDismissed: () => endDismissed, chart: () => chart, current: () => current, infoOpen: () => infoOpen, songs: () => songs,
+  wakeUp: () => wakeUp(), closePopovers: () => closePopovers(), playNext: (song) => playNext(song), kv: (rows) => kv(rows),
+});
 // A recommended song: opened with the same instruments and difficulties where it has them, and played.
 let playingNext = false; // a second click while the first is opening its song is ignored
 async function playNext(song) {
@@ -3692,7 +3639,7 @@ document.addEventListener('keydown', (e) => {
   if (e.code === 'Escape') {
     if (pauseInfoShown && !pausePanelShown && popovers.every(([, pop]) => pop.hidden)) { piDismissed = true; syncPauseInfo(); return; } // the paused song window closes (the song stays paused)
     if (pausePanelShown && popovers.every(([, pop]) => pop.hidden)) { ppDismissed = true; syncPausePanel(); return; } // the quick settings close (the song stays paused); an open popover/menu goes first
-    if (endShown && popovers.every(([, pop]) => pop.hidden)) { endDismissed = true; syncEndScreen(); els.play.focus({ preventScroll: true }); return; } // the end window goes, the fretboards come back
+    if (isEndShown() && popovers.every(([, pop]) => pop.hidden)) { endDismissed = true; syncEndScreen(); els.play.focus({ preventScroll: true }); return; } // the end window goes, the fretboards come back
     if (popovers.every(([, pop]) => pop.hidden) && infoOpen) setInfoOpen(false); // details -> chart
     const open = popovers.find(([, pop]) => !pop.hidden);
     const owner = open && (open[1] === els.paneMenu ? document.querySelector('.pane-tag[aria-expanded="true"]') : open[0]);
