@@ -11,6 +11,9 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { pipeline } from 'node:stream';
+import zlib from 'node:zlib';
+import crypto from 'node:crypto';
+import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { parseSongIni } from './src/ini.js';
 import { parseMidi, MAX_MIDI_BYTES } from './src/midi.js';
@@ -38,7 +41,58 @@ const TYPES = {
   '.ogg': 'audio/ogg', '.opus': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.flac': 'audio/flac',
   '.m4a': 'audio/mp4', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.mid': 'audio/midi',
   '.webp': 'image/webp', '.gif': 'image/gif', '.bmp': 'image/bmp', '.chart': 'text/plain; charset=utf-8', '.ini': 'text/plain; charset=utf-8',
+  '.svg': 'image/svg+xml', '.woff2': 'font/woff2',
 };
+
+// Compression of text responses (the app's scripts/styles/markup and /api/library): brotli or gzip when the client accepts it, computed once
+// per (file, mtime, size) and kept in memory up to COMPRESS_CACHE_BYTES (least recently used out). /songs is never compressed (audio is
+// already, and ranges must stay byte-exact); a Range request gets the identity body.
+const COMPRESSIBLE = new Set(['.html', '.js', '.mjs', '.css', '.json', '.svg']);
+const COMPRESS_MIN_BYTES = 1024; // (smaller bodies are not worth the header)
+const COMPRESS_CACHE_BYTES = 32 * 1024 * 1024;
+const brotli = promisify(zlib.brotliCompress);
+const gzip = promisify(zlib.gzip);
+// 'br', 'gzip' or null from an Accept-Encoding header (q=0 refuses a coding; brotli preferred when both are accepted; `*` counts for both).
+export function pickEncoding(header) {
+  const q = new Map();
+  for (const part of String(header || '').split(',')) {
+    const [name, ...params] = part.trim().toLowerCase().split(';');
+    if (!name) continue;
+    const qp = params.map((p) => p.trim()).find((p) => p.startsWith('q='));
+    const v = qp ? Number(qp.slice(2)) : 1;
+    q.set(name, Number.isFinite(v) ? v : 0);
+  }
+  const ok = (name) => (q.has(name) ? q.get(name) > 0 : (q.get('*') ?? 0) > 0);
+  return ok('br') ? 'br' : ok('gzip') ? 'gzip' : null;
+}
+const encode = (enc, buf) => (enc === 'br'
+  ? brotli(buf, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 9, [zlib.constants.BROTLI_PARAM_SIZE_HINT]: buf.length } })
+  : gzip(buf, { level: 9 }));
+// The ETag of an encoded representation: the identity tag with the coding inside the quotes (a weak tag, compared weakly).
+export const encodedTag = (etag, enc) => (enc ? etag.replace(/"$/, `-${enc}"`) : etag);
+const compressCache = new Map(); // `${enc}:${key}` -> { bytes, promise of Buffer }, least recently used first
+let compressCacheBytes = 0;
+function compressedBody(key, enc, read) {
+  const k = `${enc}:${key}`;
+  let hit = compressCache.get(k);
+  if (hit) { compressCache.delete(k); compressCache.set(k, hit); return hit.promise; }
+  hit = { bytes: 0, promise: null };
+  const entry = hit;
+  entry.promise = Promise.resolve(read()).then((buf) => encode(enc, buf)).then((out) => {
+    if (compressCache.get(k) !== entry) return out; // (evicted or replaced meanwhile: not counted)
+    entry.bytes = out.length;
+    compressCacheBytes += out.length;
+    for (const [oldKey, old] of compressCache) {
+      if (compressCacheBytes <= COMPRESS_CACHE_BYTES) break;
+      if (old === entry) continue;
+      compressCache.delete(oldKey);
+      compressCacheBytes -= old.bytes;
+    }
+    return out;
+  }, (err) => { if (compressCache.get(k) === entry) compressCache.delete(k); throw err; });
+  compressCache.set(k, entry);
+  return entry.promise;
+}
 
 // A source for sng.js over a file on disk (reads only the requested ranges).
 async function withSngSource(file, fn) {
@@ -279,14 +333,40 @@ function answer(req, res, type, size, v) {
   return { head: [200, { ...base, 'Content-Length': size }], start: 0, end: size - 1 };
 }
 
-function sendFile(req, res, file) {
-  fs.stat(file, (err, stat) => {
+// A compressed app file (see pickEncoding): 304 on its own tag, else the whole encoded body. Returns false when it does not apply (the caller
+// sends the identity body).
+async function sendCompressed(req, res, file, stat, type) {
+  if (req.headers.range || stat.size < COMPRESS_MIN_BYTES) return false;
+  const enc = pickEncoding(req.headers['accept-encoding']);
+  if (!enc) return false;
+  const v = validatorsOf(stat);
+  const etag = encodedTag(v.etag, enc);
+  const head = { 'Cache-Control': 'no-cache', ETag: etag, 'Last-Modified': v.lastModified, Vary: 'Accept-Encoding' };
+  if (isNotModified(req.headers, { ...v, etag })) {
+    res.writeHead(304, head).end();
+    return true;
+  }
+  const body = await compressedBody(`${file}|${stat.mtimeMs}|${stat.size}`, enc, () => fs.promises.readFile(file));
+  if (res.destroyed) return true;
+  res.writeHead(200, { ...head, 'Content-Type': type, 'Content-Encoding': enc, 'Content-Length': body.length });
+  res.end(req.method === 'HEAD' ? undefined : body);
+  return true;
+}
+
+function sendFile(req, res, file, { compress = false } = {}) {
+  fs.stat(file, async (err, stat) => {
     try {
       if (err || !stat.isFile()) {
         if (!res.headersSent) res.writeHead(404).end('Not found');
         return;
       }
-      const a = answer(req, res, TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream', stat.size, validatorsOf(stat));
+      const ext = path.extname(file).toLowerCase();
+      const type = TYPES[ext] || 'application/octet-stream';
+      if (compress && COMPRESSIBLE.has(ext)) {
+        res.setHeader('Vary', 'Accept-Encoding'); // (the identity answer too: a cache must not hand it to a client that asked for br, or the reverse)
+        if (await sendCompressed(req, res, file, stat, type)) return;
+      }
+      const a = answer(req, res, type, stat.size, validatorsOf(stat));
       if (!a) return;
       if (req.method === 'HEAD' || stat.size === 0) { // an empty file has no byte to read (createReadStream rejects end < start)
         res.writeHead(...a.head).end();
@@ -374,6 +454,7 @@ export function createServer({ songsDir, appRoot = APP_ROOT, host = '127.0.0.1',
   const cacheFile = path.join(cacheDir, 'library.json');
   let library = null; // song index in memory
   let scanning = null;
+  let libraryBody = null; // { songs, json (Buffer), etag } for the current `library` (the JSON is built once, not per request)
 
   async function getLibrary(refresh) {
     if (!refresh && library) return library;
@@ -423,8 +504,21 @@ export function createServer({ songsDir, appRoot = APP_ROOT, host = '127.0.0.1',
       }
       if (pathname === '/api/library') {
         const songs = await getLibrary(query.has('refresh'));
-        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
-        res.end(JSON.stringify({ rootName: path.basename(songsDir), songs }));
+        if (libraryBody?.songs !== songs) {
+          const json = Buffer.from(JSON.stringify({ rootName: path.basename(songsDir), songs }));
+          libraryBody = { songs, json, etag: `W/"lib-${crypto.createHash('sha1').update(json).digest('hex').slice(0, 16)}"` };
+        }
+        const body = libraryBody;
+        const enc = body.json.length >= COMPRESS_MIN_BYTES ? pickEncoding(req.headers['accept-encoding']) : null;
+        const etag = encodedTag(body.etag, enc);
+        const head = { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', ETag: etag, Vary: 'Accept-Encoding' };
+        if (isNotModified({ 'if-none-match': req.headers['if-none-match'] }, { etag })) { // (If-None-Match only: the index has no Last-Modified)
+          res.writeHead(304, { 'Cache-Control': head['Cache-Control'], ETag: etag, Vary: head.Vary }).end();
+          return;
+        }
+        const out = enc ? await compressedBody(`library|${body.etag}`, enc, () => body.json) : body.json;
+        res.writeHead(200, { ...head, ...(enc ? { 'Content-Encoding': enc } : {}), 'Content-Length': out.length });
+        res.end(req.method === 'HEAD' ? undefined : out);
       } else if (pathname.startsWith('/songs/')) {
         res.setHeader('Content-Security-Policy', 'sandbox');
         const rel = pathname.slice('/songs/'.length);
@@ -440,7 +534,7 @@ export function createServer({ songsDir, appRoot = APP_ROOT, host = '127.0.0.1',
       } else {
         const file = resolveAppFile(appRoot, pathname === '/' ? 'index.html' : pathname.slice(1));
         const real = file ? await realCheck(appRoot, file) : 'missing';
-        if (real === 'ok') sendFile(req, res, file);
+        if (real === 'ok') sendFile(req, res, file, { compress: true });
         else res.writeHead(real === 'outside' ? 403 : 404).end(real === 'outside' ? 'Forbidden' : 'Not found');
       }
     } catch (err) {
