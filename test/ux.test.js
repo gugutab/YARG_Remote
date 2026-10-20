@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { edgeFade } from '../src/settings-ui.js';
 import { paneDotIndex, focusShowing, PANE_DOT_GAP } from '../src/highway.js';
+import { packShort, PACK_CODE_BELOW } from '../src/virtuallist.js';
+import { packCode } from '../src/songlist.js';
 import { PRESETS, accentTrack, readableOn, contrast, mix } from '../src/themes.js';
 
 test('edgeFade: no fade when the strip fits', () => {
@@ -44,4 +46,16 @@ test('focusShowing: the least move that brings a fretboard into view', () => {
   assert.equal(focusShowing(1, 0, 2, 3), 0); // already in view
   assert.equal(focusShowing(2, 0, 2, 3), 1);
   assert.equal(focusShowing(0, 1, 2, 3), 0);
+});
+
+test('packShort: a narrow card always shows the code; a wide one the name when it fits beside the title', () => {
+  assert.equal(PACK_CODE_BELOW, 300);
+  assert.equal(packShort(228, 40, 4, 60), true); // phone: short title, the name would fit, still the code
+  assert.equal(packShort(332, 120, 4, 100), false); // wide: fits
+  assert.equal(packShort(332, 250, 4, 100), true); // wide: long title
+});
+
+test('packCode: a one-word name of up to 4 characters is kept', () => {
+  assert.equal(packCode('CDLC'), 'CDLC');
+  assert.equal(packCode('Rock Band 3 DLC'), 'RB3+');
 });
