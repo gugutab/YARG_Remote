@@ -20,7 +20,8 @@ import { previewWindow } from './preview.js';
 import { setLoopPoint, restartNote, pausePanelWanted } from './practice.js';
 import { isFreshStart, overlayLines, startPlan, INFO_FIRST_PLAY_MS } from './startinfo.js';
 import { metaRows, extraRows, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel, relabelStems } from './songinfo.js';
-import { parseRoute, formatRoute } from './route.js';
+import { parseRoute } from './route.js';
+import { initDeepLinks, applyInstruments, syncUrl, openFromHash } from './deeplink.js';
 import { createSettings } from './settings.js';
 import { SECTIONS, buildDefaults, buildValidator, FONT_OPTIONS, RENAMES, SETTINGS_VERSION, itemById, setMotionProbe } from './settings-schema.js';
 import { resolvePalette, applyPalette } from './palette.js';
@@ -260,6 +261,12 @@ const store = {
   get(key) { try { return localStorage.getItem(`yargremote.${key}`); } catch { return null; } },
   set(key, value) { try { localStorage.setItem(`yargremote.${key}`, value); } catch { /* storage unavailable */ } },
 };
+initDeepLinks({
+  els, store, current: () => current, songs: () => songs, infoOpen: () => infoOpen,
+  instrumentGroups: () => instrumentGroups(), diffFor: (ins) => diffFor(ins), fillDifficultyOptions: () => fillDifficultyOptions(), updateChart: () => updateChart(),
+  selectSong: (song) => selectSong(song), markStageLive: () => markStageLive(), setInfoOpen: (open, opts) => setInfoOpen(open, opts),
+  setPendingOpen: (withAudio, instruments) => { loadAudioWithSong = withAudio; pendingInstruments = instruments; },
+});
 
 // ---------- Library window ----------
 // The library is a glass window floating over the stage (left). It never takes room from the chart: the stage always spans the whole
@@ -4179,65 +4186,5 @@ const settingsPage = mountSettings({
 });
 attachScrollThumb(document.querySelector('#settingsPage .sp-content')); // the same slim thumb as the details
 
-// ---------- Deep links: the URL hash names the open song ----------
-// The hash is only replaced (no history entries): a reload or a shared link opens the same song, and the two panels
-// stay in place. #/song/<id> opens the details, #/song/<id>/play the chart.
-// The instruments on screen for the link: the active one first, then the pinned ones, each with its difficulty.
-function instrumentsOnScreen() {
-  if (!current?.options?.length) return [];
-  const out = [];
-  for (const g of instrumentGroups()) {
-    if (!(g.active && !current.hiddenActive) && !g.pinned) continue;
-    const d = g.active ? els.difficulty.value : diffFor(g.chosen).chosen?.id;
-    out.push({ id: g.chosen.id, diff: d || undefined, active: g.active });
-  }
-  out.sort((x, y) => Number(!!y.active) - Number(!!x.active)); // the active one leads
-  return out.map(({ id, diff }) => ({ id, diff }));
-}
-// Puts the instruments of a link on screen: the first is the active one, the others are pinned. Unknown ones are ignored.
-function applyInstruments(list) {
-  // (a link names ids; the pick of another song may only share the kind of instrument: drums in another mode, vocals for harmony)
-  const seen = new Set();
-  const known = (list || []).map((x) => {
-    const o = current.options.find((c) => c.id === x.id) ?? (x.base ? current.options.find((c) => c.base === x.base) ?? (x.base === 'harmony' ? current.options.find((c) => c.mode === 'vocals') : null) : null);
-    return o && !seen.has(o.id) && seen.add(o.id) ? { ...x, id: o.id } : null;
-  }).filter(Boolean);
-  if (!known.length) return false;
-  const [first, ...rest] = known;
-  els.instrument.value = first.id;
-  fillDifficultyOptions();
-  if (first.diff && [...els.difficulty.options].some((o) => o.value === first.diff)) els.difficulty.value = first.diff;
-  current.pins.clear();
-  current.hiddenActive = false;
-  const groups = instrumentGroups();
-  for (const x of rest) {
-    const g = groups.find((gr) => gr.options.some((o) => o.id === x.id));
-    if (!g || g.active) continue;
-    current.modeChoice[g.key] = x.id;
-    if (x.diff) current.diffChoice[x.id] = x.diff;
-    current.pins.add(g.key);
-  }
-  return true;
-}
-function syncUrl() {
-  if (!current) return;
-  store.set('lastSong', current.song.id); // for "Reopen the last song"
-  const hash = formatRoute({ view: infoOpen ? 'song' : 'play', id: current.song.id, instruments: instrumentsOnScreen() });
-  if (location.hash !== hash) history.replaceState(null, '', hash);
-  document.title = `${plainText(current.song.title)} - ${plainText(current.song.artist)} · YARG Remote`;
-}
-function openFromHash() {
-  const route = parseRoute(location.hash);
-  if (route.view === 'library') return;
-  if (current?.song.id === route.id) { // the same song: a link with other instruments rearranges the screen
-    if (route.instruments && applyInstruments(route.instruments)) updateChart();
-    return;
-  }
-  const song = songs.find((s) => s.id === route.id);
-  if (!song) return;
-  loadAudioWithSong = route.view === 'play';
-  pendingInstruments = route.instruments || null;
-  selectSong(song);
-  if (route.view === 'play') { markStageLive(); setInfoOpen(false, { grow: false, release: false }); } // (the stage stays held until the audio of the link has loaded) // a /play link is the player: the bar shows, the library keeps its width
-}
+// ---------- Deep links (src/deeplink.js; initDeepLinks is called near the top) ----------
 window.addEventListener('hashchange', openFromHash);
