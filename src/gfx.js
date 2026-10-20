@@ -584,6 +584,8 @@ export function rebuildYNote(cut = YNOTE_CUT) {
   ynShared = null; // (capV starts at the top row)
   bodyGradients.clear(); // (so does every body gloss)
   ynSprites.clear(); // (and every cached note picture)
+  yn3Sprites.clear();
+  yn3Px = 0;
   return c;
 }
 
@@ -682,6 +684,8 @@ function bodyGradient(g, color) {
   return gr;
 }
 const ynSprites = new Map(); // cached flat notes (ynSprite)
+const yn3Sprites = new Map(); // cached 3D notes (ynSprite3D)
+let yn3Px = 0; // (their pixels)
 rebuildYNote(YNOTE_CUT); // (after the gradient caches it resets exist)
 
 // Draws a rectangular note centred at (x, y) with half width hw and half height hh (the box of the 'ynote' outline). `bodyColor` is the body's flat colour (lane
@@ -691,9 +695,55 @@ rebuildYNote(YNOTE_CUT); // (after the gradient caches it resets exist)
 // `cacheable`: the caller's colours are steady from frame to frame (not a held or exiting note's changing tint); a flat (2D) note is then drawn from a
 // cached picture of itself (ynSprite) when nothing in the canvas state would make that look different.
 export function drawYNote(g, x, y, hw, hh, n, laneColor, bodyColor, taper = 0, side = 1, cacheable = false) {
-  if (cacheable && taper === 0 && g.globalAlpha === 1 && g.filter === 'none' && g.globalCompositeOperation === 'source-over' && typeof g.getTransform === 'function'
-    && ynSprite(g, x, y, hw, hh, n, laneColor, bodyColor, side)) return;
+  if (cacheable && g.globalAlpha === 1 && g.filter === 'none' && g.globalCompositeOperation === 'source-over' && typeof g.getTransform === 'function'
+    && (taper === 0 ? ynSprite(g, x, y, hw, hh, n, laneColor, bodyColor, side) : ynSprite3D(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side))) return;
   drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side);
+}
+
+// Sprites of 3D notes. In the 3D view a steady note's taper per design unit (taper * hh / YN_HH) and its aspect (hh / hw) are the same at every depth (its
+// size and its distance to the vanishing point both grow with the road's scale), so it is one picture uniformly scaled: drawn once per size bucket
+// (half width in device px rounded to a power of YN3_STEP) at YN3_SS times that size, then drawn scaled to the exact size and sub-pixel place with
+// drawImage (bilinear). Unlike the flat sprites this resamples: edges differ from the direct path by up to ~1/4 of their contrast on a few pixels.
+// The detail level (parts dropped under 24 / 16 / 9 px) follows the note's real size, so it is part of the key. Same canvas-state conditions as ynSprite.
+// Cleared when it holds YN3_MAX sprites or YN3_MAX_PX pixels, or the note's cut changes.
+const YN3_STEP = 1.05;
+const YN3_SS = 2;
+const YN3_MAX = 1200;
+const YN3_MAX_PX = 8e6; // (~32 MB; Highway Star with 3 panes at 1300x760 holds ~570 sprites, 1.8 M px)
+const LOG_YN3_STEP = Math.log(YN3_STEP);
+function ynSprite3D(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side) {
+  const m = g.getTransform();
+  if (m.b !== 0 || m.c !== 0 || !(m.a > 0) || !(m.d > 0)) return false;
+  const hwd = hw * m.a; // half width in device px
+  const bi = Math.round(Math.log(hwd) / LOG_YN3_STEP);
+  const f = (Math.exp(bi * LOG_YN3_STEP) * YN3_SS) / hwd; // sprite px per device px
+  const kq = Math.round(taper * (hh / YN_HH) * 1e7); // the taper per design unit (equal up to rounding noise at every depth)
+  const asp = Math.round((hh * m.d * 1e4) / hwd);
+  const dark = n.tap || n.ghost;
+  const key = `${bodyColor}|${dark && n.sp ? laneColor : ''}|${n.sp ? 1 : 0}${n.tap ? 1 : 0}${n.ghost ? 1 : 0}${n.hopo || n.accent ? 1 : 0}|${bi}|${kq}|${asp}|${side}|${hw >= 24 ? 2 : hw >= 16 ? 1 : 0}${hw >= 9 ? 1 : 0}`;
+  let sp = yn3Sprites.get(key);
+  if (!sp) {
+    // the note's extent around (x, y) as in ynSprite, widened by the taper at the farthest row
+    const sy = hh / YN_HH;
+    const mid = (YT - YN_CY + YN_BASE_V) / 2;
+    const vLo = YT - YN_CY;
+    const vHi = Math.max(baseRow(96.5, side) + 3.4 * Math.max(0.5, side), baseRow(96, side));
+    const vMax = Math.max(Math.abs(vLo - mid), Math.abs(vHi - mid));
+    const X = Math.ceil(((100 * (1 + Math.abs(kq / 1e7) * Math.max(Math.abs(vLo), Math.abs(vHi))) * hw) / YN_HW) * m.a * f) + 3;
+    const Y = Math.ceil(vMax * sy * m.d * f) + 3;
+    const canvas = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(2 * X, 2 * Y) : Object.assign(document.createElement('canvas'), { width: 2 * X, height: 2 * Y });
+    const sg = canvas.getContext('2d');
+    sg.setTransform(m.a * f, 0, 0, m.d * f, X, Y);
+    drawYNoteDirect(sg, 0, 0, hw, hh, n, laneColor, bodyColor, taper, side);
+    if (yn3Sprites.size >= YN3_MAX || yn3Px >= YN3_MAX_PX) { yn3Sprites.clear(); yn3Px = 0; }
+    sp = { canvas, X, Y };
+    yn3Sprites.set(key, sp);
+    yn3Px += 4 * X * Y;
+  }
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.drawImage(sp.canvas, m.a * x + m.e - sp.X / f, m.d * y + m.f - sp.Y / f, (2 * sp.X) / f, (2 * sp.Y) / f);
+  g.setTransform(m);
+  return true;
 }
 
 // Sprites of flat notes. A note is ~13 gradient fills and ~10 polygons; in 2D every note of one kind in one lane has the same size, so it is drawn once into a
