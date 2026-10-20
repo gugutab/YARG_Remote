@@ -490,14 +490,36 @@ function clipRows(P, v0, v1) {
   pts = half(pts, (v) => v <= v1, v1);
   return Float32Array.from(pts.flat());
 }
-const YN_CAP = sampleDesign([39, 16], [[26, 16], [21.5, 16, 19.6, 18, 18.6, 21.5], [11.8, 43], [10.2, 48.5, 10.1, 54, 10.8, 59.5], [14.9, 92], [35.4, 92], [35, 89], [31.2, 60], [30.6, 55, 30.8, 50, 31.6, 46], [39, 16]]); // the left cap; the right one is mirrored
-const YN_BODY = sampleDesign([36, 16], [[184, 16], [191.4, 46], [192.2, 50, 192.4, 55, 191.8, 60], [188, 89], [32, 89], [28.2, 60], [27.6, 55, 27.8, 50, 28.6, 46]]);
+// The top of the note can be cut: YNOTE_CUT is the fraction of the face height (design rows 16 .. 89) taken off the top. The cut note keeps the design's "ceiling": the flat top
+// with its rounded corner (7.4 units in, 5.5 down) is laid again at the cut line, on the cap's outer edge as it is there; the cap's inner edge and the body just end at the cut.
+export const YNOTE_CUT = 1 / 3;
+const CUT_D = 73 * YNOTE_CUT;
+const YT = 16 + CUT_D; // the design row of the (new) top
+const OUTER = [[18.6, 21.5], [11.8, 43], [10.8, 59.5], [14.9, 92]]; // the cap's outer edge below the corner: line, cubic (via 10.2 48.5, 10.1 54), line
+const cubicPt = (t) => { // the outer cubic from (11.8, 43) to (10.8, 59.5)
+  const m = 1 - t;
+  return [m * m * m * 11.8 + 3 * m * m * t * 10.2 + 3 * m * t * t * 10.1 + t * t * t * 10.8, m * m * m * 43 + 3 * m * m * t * 48.5 + 3 * m * t * t * 54 + t * t * t * 59.5];
+};
+const outerAt = (y) => { // the outer edge at design row y (y between the corner's end and row 92): [x, rest], rest = the points that follow, down to row 92
+  if (y <= 43) return [18.6 + ((y - 21.5) * (11.8 - 18.6)) / (43 - 21.5), [[11.8, 43], ...Array.from({ length: 8 }, (_, i) => cubicPt((i + 1) / 8)), [14.9, 92]]];
+  if (y <= 59.5) {
+    let lo = 0;
+    let hi = 1;
+    for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; if (cubicPt(mid)[1] < y) lo = mid; else hi = mid; }
+    return [cubicPt(lo)[0], [...Array.from({ length: 8 }, (_, i) => cubicPt(lo + ((i + 1) / 8) * (1 - lo))), [14.9, 92]]];
+  }
+  return [10.8 + ((y - 59.5) * (14.9 - 10.8)) / (92 - 59.5), [[14.9, 92]]];
+};
+const [XE, OUTER_REST] = outerAt(YT + 5.5); // the outer edge where the corner ends
+const XI = 31.6 + ((46 - YT) * 7.4) / 30; // the cap's inner edge at the new top
+const YN_CAP = sampleDesign([XI, YT], [[XE + 7.4, YT], [XE + 2.9, YT, XE + 1, YT + 2, XE, YT + 5.5], ...OUTER_REST, [35.4, 92], [35, 89], [31.2, 60], [30.6, 55, 30.8, 50, 31.6, 46]]); // the left cap; the right one is mirrored
+const YN_BODY = sampleDesign([XI, YT], [[220 - XI, YT], [191.4, 46], [192.2, 50, 192.4, 55, 191.8, 60], [188, 89], [32, 89], [28.2, 60], [27.6, 55, 27.8, 50, 28.6, 46]]);
 const YN_BASE_TOP = sampleDesign([19, 84], [[201, 84], [203.8, 84, 204.7, 86.5], [205.5, 90.5], [14.5, 90.5], [15.3, 86.5], [16.2, 84, 19, 84]], 4);
 const YN_BASE_FRONT = sampleDesign([14.5, 90.5], [[205.5, 90.5], [205.5, 92], [205.5, 96, 201.5, 96], [18.5, 96], [14.5, 96, 14.5, 92]], 4);
 // The band beside a cap (HOPO / accent white strip): from under the cap to the cap's inner edge moved `s` units in; both sides go in one path.
-const strip = (s) => sampleDesign([30, 16], [[39 + s, 16], [31.6 + s, 46], [30.8 + s, 50, 30.6 + s, 55, 31.2 + s, 60], [35 + s, 89], [30, 89]]);
+const strip = (s) => sampleDesign([30, YT], [[XI + s, YT], [31.6 + s, 46], [30.8 + s, 50, 30.6 + s, 55, 31.2 + s, 60], [35 + s, 89], [30, 89]]);
 // The tap / ghost dark centre: between two coloured strips of width `s`.
-const centre = (s) => sampleDesign([39 + s, 16], [[31.6 + s, 46], [30.8 + s, 50, 30.6 + s, 55, 31.2 + s, 60], [35 + s, 89], [185 - s, 89], [188.8 - s, 60], [189.4 - s, 55, 189.2 - s, 50, 188.4 - s, 46], [181 - s, 16]]);
+const centre = (s) => sampleDesign([XI + s, YT], [[31.6 + s, 46], [30.8 + s, 50, 30.6 + s, 55, 31.2 + s, 60], [35 + s, 89], [185 - s, 89], [188.8 - s, 60], [189.4 - s, 55, 189.2 - s, 50, 188.4 - s, 46], [181 - s, 16]]);
 const YN_HOPO_STRIP = strip(30); // design units (0.3 of the half width, as before)
 const YN_TAP_CENTRE = centre(17);
 // The cap's shading follows its ridge, which is (nearly) a straight slanted line in three stretches: [top row, bottom row, ridge x at the top, at the bottom]
@@ -567,7 +589,7 @@ function ynGradients(g, side, gold) {
     spec.addColorStop(1, 'rgba(255,255,255,0)');
     ynShared = {
       ends: linGrad(g, -82, 0, 82, 0, [[0, 'rgba(0,0,0,0.4)'], [0.1, 'rgba(0,0,0,0)'], [0.9, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.4)']]),
-      capV: linGrad(g, 0, -38, 0, 35, [[0, 'rgba(0,0,0,0.6)'], [0.38, 'rgba(0,0,0,0)'], [0.7, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.35)']]),
+      capV: linGrad(g, 0, YT - YN_CY, 0, 35, [[0, 'rgba(0,0,0,0.6)'], [0.38, 'rgba(0,0,0,0)'], [0.7, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.35)']]),
       cap: CAP_STOPS.map((stops) => linGrad(g, CAP_FROM, 0, CAP_TO, 0, stops)),
       spec,
     };
@@ -600,7 +622,7 @@ function bodyGradient(g, color) {
     const c = color[0] === '#' ? [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16)) : color.slice(color.indexOf('(') + 1, -1).split(',').map(Number);
     const mul = (f) => `rgb(${c.map((v) => Math.round(v * f)).join(',')})`;
     const add = (n) => `rgb(${c.map((v) => Math.min(255, v + n)).join(',')})`;
-    gr = linGrad(g, 0, -38, 0, 35, [[0, mul(0.65)], [0.12, mul(0.88)], [0.45, add(36)], [0.6, add(14)], [0.92, mul(0.88)], [1, mul(0.63)]]);
+    gr = linGrad(g, 0, YT - YN_CY, 0, 35, [[0, mul(0.65)], [0.12, mul(0.88)], [0.45, add(36)], [0.6, add(14)], [0.92, mul(0.88)], [1, mul(0.63)]]);
     if (bodyGradients.size >= 256) bodyGradients.clear(); // (held notes change their tint every frame)
     bodyGradients.set(color, gr);
   }
@@ -617,7 +639,7 @@ export function drawYNote(g, x, y, hw, hh, n, laneColor, bodyColor, taper = 0, s
   const base = ynGradients(g, side, n.sp);
   const S = ynShared;
   g.save();
-  g.translate(x, y);
+  g.translate(x, y - ((YT - YN_CY + YN_BASE_V) / 2) * (hh / YN_HH)); // (the middle of the cut note's face on the note's position)
   g.scale(hw / YN_HW, hh / YN_HH);
   if (hw >= 16) { // the soft floor shadow: a round-capped stroke with a vertical fade
     const fu = 91.5 * (1 + k * base.fy);
