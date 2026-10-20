@@ -7,7 +7,7 @@
 // (YARG: SongRunner.AudioTime = AudioPlaybackTime + SongOffset, with SongOffset = -delay).
 // load() shifts each stem by the delay once, so chart time 0 is sample 0 of the aligned stem.
 import { PitchShifter } from '../vendor/soundtouch.js';
-import { positionAt, trimHistory, suspendDue, settlesWithin, SUSPEND_AFTER_MS, RESUME_TIMEOUT_MS } from './clock.js';
+import { positionAt, jumpHistory, trimHistory, suspendDue, settlesWithin, SUSPEND_AFTER_MS, RESUME_TIMEOUT_MS } from './clock.js';
 import { decodeAll, createBudget, withBudget, estimateDecodedBytes, DECODE_BUDGET_BYTES } from './stemdecode.js';
 
 export const WORKLET_START_MS = 6000; // how long the audio worklet may take to start before the legacy engine is used
@@ -419,20 +419,31 @@ class WorkletPlayer {
     this.startAt(this.offset);
   }
 
-  startAt(seconds) {
+  // heard: keep the clock on the old audio until the new start is heard (jumpHistory); else the clock jumps at once.
+  startAt(seconds, heard = false) {
     const frame = Math.round(seconds * this.ctx.sampleRate);
     this.epoch++;
-    this.smooth = null;
-    this.history = [{ time: this.ctx.currentTime, pos: seconds }]; // until the worklet reports for real
+    if (!heard) this.smooth = null; // (heard: the smoothing snaps by itself when the jump is reached)
+    const keep = heard && this.playing;
+    this.pendingJump = keep ? { at: this.ctx.currentTime, pos: seconds } : null;
+    this.history = keep ? jumpHistory(this.history, this.ctx.currentTime, this.rate, seconds)
+      : [{ time: this.ctx.currentTime, pos: seconds }]; // until the worklet reports for real
     this.node.port.postMessage({ type: 'seek', frame, epoch: this.epoch });
     this.node.port.postMessage({ type: 'play' });
     this.offset = seconds;
     this.playing = true;
   }
 
+  // A heard seek whose new start is not heard yet (the chart clock still runs on the old audio).
+  get jumpPending() {
+    const j = this.pendingJump;
+    return !!(j && this.playing && this.ctx.currentTime - this.outputLatency < j.at);
+  }
+
   pause() {
     if (!this.playing) return;
-    this.offset = this.currentTime();
+    this.offset = this.jumpPending ? this.pendingJump.pos : this.currentTime(); // (paused before a loop wrap is heard: resume from the new start)
+    this.pendingJump = null;
     this.scrub = null;
     this.node.port.postMessage({ type: 'pause' });
     this.playing = false;
@@ -448,17 +459,22 @@ class WorkletPlayer {
     this.epoch++;
     this.smooth = null;
     this.scrub = { to, end: this.ctx.currentTime + ms / 1000 };
+    this.pendingJump = null;
     this.history = [{ time: this.scrub.end, pos: to }]; // until the worklet reports for real after the scrub
     this.offset = to;
     this.node.port.postMessage({ type: 'scrub', from: Math.round(from * this.ctx.sampleRate), to: Math.round(to * this.ctx.sampleRate), dur, epoch: this.epoch });
   }
 
-  seek(seconds) {
+  // { heard: true }: the chart clock keeps following the audio already on its way to the speakers and jumps when the new
+  // start is heard (the loop wrap); otherwise it jumps at once.
+  seek(seconds, { heard = false } = {}) {
     const t = Math.max(0, Math.min(this.duration, seconds));
+    const wasScrub = this.scrub;
     this.scrub = null;
-    if (this.playing) this.startAt(t);
+    if (this.playing) this.startAt(t, heard && !wasScrub);
     else {
       this.offset = t;
+      this.pendingJump = null;
       this.epoch++;
       this.history = [];
       this.node?.port.postMessage({ type: 'seek', frame: Math.round(t * this.ctx.sampleRate), epoch: this.epoch });
@@ -522,6 +538,7 @@ export class MultiTrackPlayer {
   get failedStems() { return this.impl.failedStems || []; } // [{ id, label, error }] of the last load()
   get rate() { return this.speed; }
   get outputLatency() { return this.impl.outputLatency || 0; } // seconds until the sound is heard (worklet engine)
+  get jumpPending() { return !!this.impl.jumpPending; } // a seek(t, { heard: true }) not heard yet
   setMaster(value) { this.master.gain.value = value; }
   setVolume(id, value) { this.impl.setVolume(id, value); }
   setRate(rate) { this.speed = rate; this.impl.setRate(rate); }
@@ -529,7 +546,7 @@ export class MultiTrackPlayer {
   metronomeClock() { return this.impl.metronomeClock(); }
   play() { return this.impl.play(); }
   pause() { this.impl.pause(); }
-  seek(seconds) { this.onSeek?.(); this.impl.seek(seconds); } // onSeek: set by the app (any seek leaves the "ended" state)
+  seek(seconds, opts) { this.onSeek?.(); this.impl.seek(seconds, opts); } // onSeek: set by the app (any seek leaves the "ended" state)
   scrubTo(seconds, ms) { this.onSeek?.(); if (this.impl.scrubTo) this.impl.scrubTo(seconds, ms); else this.impl.seek(seconds); } // (the legacy engine just cuts)
   stop() { this.impl.stop(); }
   unload() { this.impl.unload(); } // frees the decoded audio (a song change, before its audio loads)

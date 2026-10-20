@@ -105,8 +105,13 @@ export const heldPulse = (t) => HELD_SCALE + 0.025 * Math.sin(t * 9);
 // How much of the "active long note" look to show, 0..1: it fades in over HELD_FADE_IN seconds after the hit and
 // fades out over the exit (FADE_SEC) after the tail ends, so nothing pops.
 export const HELD_FADE_IN = 0.2;
+// Notes the playing position has not reached are never lit: while a seek animation sweeps the drawn time BACK (the loop
+// wrap, a backward seek) the notes it passes over must not flash or glow as if hit. `litFrom` = drawn time - real time
+// when that is positive, else 0; a note is lit only once `t - n.time >= litFrom` (set per frame by Highway.draw).
+export let litFrom = 0;
+export function setLitLag(lag) { litFrom = lag > 0 ? lag : 0; }
 export function heldAmount(n, t) {
-  if (!(n.length > 0) || t < n.time) return 0;
+  if (!(n.length > 0) || t - n.time < litFrom) return 0;
   const end = n.time + n.length;
   const x = Math.min(1, (t - n.time) / HELD_FADE_IN);
   const rampIn = x * x * (3 - 2 * x); // smoothstep

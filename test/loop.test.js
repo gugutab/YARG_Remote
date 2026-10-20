@@ -66,3 +66,26 @@ test('shouldWrap only when leaving the end from inside', () => {
   assert.equal(shouldWrap(null, 1, 2), false);
   assert.equal(shouldWrap(r, null, 60), false);
 });
+
+test('loop wrap: the chart clock follows the old audio until the restart is heard (jumpHistory)', async () => {
+  const { jumpHistory, positionAt } = await import('../src/clock.js');
+  const hist = [{ time: 10, pos: 50 }, { time: 10.5, pos: 50.5 }];
+  const lat = 0.2; // output latency: at audio time 10.6 the speakers play what was rendered at 10.4
+  const h = jumpHistory(hist, 10.6, 1, 40); // B reached in rendered time at 10.6: restart at 40
+  assert.ok(Math.abs(positionAt(h, 10.6 - lat, 1) - 50.4) < 1e-9); // still hearing the old stretch (before B)
+  assert.ok(Math.abs(positionAt(h, 10.59, 1) - 50.59) < 1e-9); // up to B
+  assert.equal(positionAt(h, 10.6, 1), 40); // then the new start, when it is heard
+  assert.ok(Math.abs(positionAt(h, 10.7, 1) - 40.1) < 1e-9);
+  assert.deepEqual(jumpHistory([], 3, 1, 7), [{ time: 3, pos: 7 }]); // nothing to keep: a plain jump
+});
+
+test('a backward seek animation lights no note it sweeps over (setLitLag)', async () => {
+  const { heldAmount, setLitLag } = await import('../src/gfx.js');
+  const n = { time: 10, length: 2 };
+  assert.ok(heldAmount(n, 11) > 0);
+  setLitLag(1.5); // drawn at 11, real time 9.5: the note has not been reached
+  assert.equal(heldAmount(n, 11), 0);
+  setLitLag(-3); // a forward animation (drawn behind the real time) changes nothing
+  assert.ok(heldAmount(n, 11) > 0);
+  setLitLag(0);
+});
