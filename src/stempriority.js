@@ -28,7 +28,7 @@ export function dropStems(stems) {
 }
 
 // Is a note of this instrument played in [from, to] (seconds)?
-export function playsBetween(midi, kind, from, to) {
+function playsBetween(midi, kind, from, to) {
   const names = TRACKS[kind];
   if (!names || !midi?.tracks) return false;
   const [lo, hi] = NOTE_RANGE[kind] || DEFAULT_RANGE;

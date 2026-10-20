@@ -18,7 +18,7 @@ import { attachScrollThumb } from './scrollthumb.js';
 import { previewWindow } from './preview.js';
 import { setLoopPoint, restartNote, pausePanelWanted } from './practice.js';
 import { isFreshStart, overlayLines, startPlan, INFO_FIRST_PLAY_MS } from './startinfo.js';
-import { metaRows, extraRows, chartStats, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel, relabelStems } from './songinfo.js';
+import { metaRows, extraRows, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel, relabelStems } from './songinfo.js';
 import { parseRoute, formatRoute } from './route.js';
 import { createSettings } from './settings.js';
 import { SECTIONS, buildDefaults, buildValidator, FONT_OPTIONS, RENAMES, SETTINGS_VERSION, itemById } from './settings-schema.js';
@@ -958,7 +958,7 @@ async function selectSong(song) {
   let coverUrl = null;
   try {
     if (coverEntry) coverUrl = coverEntry.url || URL.createObjectURL(await coverEntry.getFile());
-  } catch { /* a missing cover must not block the song */ }
+  } catch (err) { console.debug(err); /* a missing cover must not block the song */ }
   if (token !== loadToken) {
     if (coverUrl) URL.revokeObjectURL(coverUrl);
     return;
@@ -970,7 +970,7 @@ async function selectSong(song) {
   }
 
   try {
-    current = { song, midi, coverUrl, options: instrumentOptions(midi, song.ini), diffChoice: {}, pins: new Set(), choosers: [], chooserSeq: 0, hiddenActive: false, statsCache: new Map(), expandedStats: new Set(), modeChoice: {} };
+    current = { song, midi, coverUrl, options: instrumentOptions(midi, song.ini), diffChoice: {}, pins: new Set(), choosers: [], chooserSeq: 0, hiddenActive: false, modeChoice: {} };
     syncPlayButton(); // (the Listen card's button now knows whose sound is playing)
     renderMeta(song, midi); // adds the BPM chip
     renderList({ keepScroll: true }); // highlight the loaded song
@@ -1238,15 +1238,6 @@ function selectInstrument(insId, diffId) {
   fillDifficultyOptions();
   if (diffId && [...els.difficulty.options].some((o) => o.value === diffId)) els.difficulty.value = diffId;
   updateChart();
-}
-
-function cardStats(ins, diff) {
-  const key = `${ins.id}:${diff.id}`;
-  if (!current.statsCache.has(key)) {
-    const built = ins.id === els.instrument.value && diff.id === els.difficulty.value && chart ? chart : buildChart(current.midi, ins, diff, current.song.ini);
-    current.statsCache.set(key, chartStats(built));
-  }
-  return current.statsCache.get(key);
 }
 
 const INSTRUMENT_ICON = { guitar: 'guitar', bass: 'bass', rhythm: 'rhythm', keys: 'keys', drums: 'drum', vocals: 'mic', harmony: 'harmony' };

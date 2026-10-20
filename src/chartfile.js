@@ -273,7 +273,7 @@ function buildEvents(lines, resolution) {
   return { events, vocals };
 }
 
-export function parseChartText(text, { maxBytes = MAX_CHART_BYTES, maxEvents = MAX_CHART_EVENTS } = {}) {
+function parseChartText(text, { maxBytes = MAX_CHART_BYTES, maxEvents = MAX_CHART_EVENTS } = {}) {
   if (text.length > maxBytes) throw new Error(`Invalid .chart: file too large (${text.length} characters)`);
   const sections = readSections(text, maxEvents);
   const song = sections.find((s) => s.name === 'Song');

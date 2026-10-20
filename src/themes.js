@@ -27,11 +27,11 @@ export const presetById = (id) => PRESETS.find((p) => p.id === id) ?? null;
 
 // --- colour helpers ------------------------------------------------------------------------------------------------
 export const isHex = (s) => /^#[0-9a-f]{6}$/i.test(String(s));
-export function hexToRgb(hex) {
+function hexToRgb(hex) {
   const n = parseInt(String(hex).slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
-export const rgbToHex = (r, g, b) => `#${[r, g, b].map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0')).join('')}`;
+const rgbToHex = (r, g, b) => `#${[r, g, b].map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0')).join('')}`;
 export function mix(hexA, hexB, t) { // t = 0 -> A, 1 -> B
   const a = hexToRgb(hexA);
   const b = hexToRgb(hexB);
