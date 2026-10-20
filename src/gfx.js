@@ -694,9 +694,12 @@ rebuildYNote(YNOTE_CUT); // (after the gradient caches it resets exist)
 // globalAlpha and filter.
 // `cacheable`: the caller's colours are steady from frame to frame (not a held or exiting note's changing tint); a flat (2D) note is then drawn from a
 // cached picture of itself (ynSprite) when nothing in the canvas state would make that look different.
+// Setting highway.fast3dNotes: 3D notes come from scaled cached pictures (about a third faster, slightly softer edges); off = every 3D note drawn directly.
+let fast3d = false;
+export function setFast3dNotes(on) { fast3d = !!on; }
 export function drawYNote(g, x, y, hw, hh, n, laneColor, bodyColor, taper = 0, side = 1, cacheable = false) {
   if (cacheable && g.globalAlpha === 1 && g.filter === 'none' && g.globalCompositeOperation === 'source-over' && typeof g.getTransform === 'function'
-    && (taper === 0 ? ynSprite(g, x, y, hw, hh, n, laneColor, bodyColor, side) : ynSprite3D(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side))) return;
+    && (taper === 0 ? ynSprite(g, x, y, hw, hh, n, laneColor, bodyColor, side) : fast3d && ynSprite3D(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side))) return;
   drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side);
 }
 
