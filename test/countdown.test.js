@@ -68,3 +68,11 @@ test('measuresLeft counts the whole measures until the measure the notes come ba
   assert.equal(measuresLeft(starts, 2.1, 21), 9); // the end snaps down to the start of its measure (21 s is inside measure 10)
   assert.equal(measuresLeft(starts, 19.9, 20), 1);
 });
+
+test('the shortest rest with a countdown can be changed (setting highway.countdownMin)', () => {
+  const c = chart([{ time: 0.5, end: 1 }, { time: 7, end: 8 }, { time: 20, end: 21 }]); // gaps: 6 s, 12 s
+  assert.deepEqual(waitCountdowns(c), [{ start: 8, end: 20 }]);
+  assert.deepEqual(waitCountdowns(c, { min: 5 }), [{ start: 1, end: 7 }, { start: 8, end: 20 }]);
+  assert.deepEqual(waitCountdowns(c, { min: 15 }), []);
+  assert.deepEqual(waitCountdowns(c, { min: MIN_COUNTDOWN_SEC }), waitCountdowns(c));
+});
