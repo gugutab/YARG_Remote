@@ -585,7 +585,7 @@ function ynGradients(g, side, gold) {
   if (!ynShared) {
     ynShared = {
       ends: linGrad(g, -82, 0, 82, 0, [[0, 'rgba(0,0,0,0.4)'], [0.1, 'rgba(0,0,0,0)'], [0.9, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.4)']]),
-      baseEnds: linGrad(g, -95.5, 0, 95.5, 0, [[0, 'rgba(0,0,0,0.5)'], [0.06, 'rgba(0,0,0,0.425)'], [0.2, 'rgba(0,0,0,0.175)'], [0.34, 'rgba(0,0,0,0)'], [0.66, 'rgba(0,0,0,0)'], [0.8, 'rgba(0,0,0,0.175)'], [0.94, 'rgba(0,0,0,0.425)'], [1, 'rgba(0,0,0,0.5)']]), // the base fades to black at both ends: it curves away
+      baseEnds: linGrad(g, -95.5, 0, 95.5, 0, [[0, 'rgba(0,0,0,0.75)'], [0.06, 'rgba(0,0,0,0.64)'], [0.2, 'rgba(0,0,0,0.26)'], [0.34, 'rgba(0,0,0,0)'], [0.66, 'rgba(0,0,0,0)'], [0.8, 'rgba(0,0,0,0.26)'], [0.94, 'rgba(0,0,0,0.64)'], [1, 'rgba(0,0,0,0.75)']]), // the base fades to black at both ends: it curves away
       capV: linGrad(g, 0, YT - YN_CY, 0, 35, [[0, 'rgba(0,0,0,0.6)'], [0.38, 'rgba(0,0,0,0)'], [0.7, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.35)']]),
       cap: CAP_STOPS.map((stops) => linGrad(g, CAP_FROM, 0, CAP_TO, 0, stops)),
     };
