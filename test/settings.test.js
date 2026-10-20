@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSettings } from '../src/settings.js';
+import { createSettings, migrate } from '../src/settings.js';
 import { PRESETS, presetById, resolveTheme, deriveTheme, isHex, mix, luminance, contrast, readableOn, hexToHue, THEME_KEYS } from '../src/themes.js';
 
 const memory = () => {
@@ -17,7 +17,7 @@ test('settings: defaults, set, reset, only changes are stored', () => {
   s.set('a', 5);
   assert.equal(s.get('a'), 5);
   assert.equal(s.isDefault('a'), false);
-  assert.deepEqual(JSON.parse(storage.getItem('yargremote.settings')), { a: 5 });
+  assert.deepEqual(JSON.parse(storage.getItem('yargremote.settings')), { $version: 1, a: 5 }); // (the version of the data goes with it)
   s.set('a', 1); // back to the default: not stored any more
   assert.equal(storage.getItem('yargremote.settings'), null);
   s.set('c', { k: [1, 3] });
@@ -55,6 +55,35 @@ test('settings: export / import keeps known settings only', () => {
   assert.equal(t.get('a'), 9);
   assert.throws(() => t.importJson('nope'), /valid JSON/);
   assert.throws(() => t.importJson('{"x":1}'), /not a YARG Remote/);
+});
+
+test('settings: renamed ids are migrated from storage, and the version is stored', () => {
+  const storage = memory();
+  storage.setItem('yargremote.settings', JSON.stringify({ old: 7, scaled: 3, gone: 1 }));
+  const renames = { old: 'a', scaled: { id: 'b', value: (v) => v * 10 } };
+  const s = createSettings({ defaults: { a: 1, b: 2 }, storage, renames, version: 4 });
+  assert.equal(s.get('a'), 7);
+  assert.equal(s.get('b'), 30);
+  s.set('a', 8);
+  assert.deepEqual(JSON.parse(storage.getItem('yargremote.settings')), { $version: 4, a: 8, b: 30 }); // the old ids are gone once saved
+  storage.setItem('yargremote.settings', JSON.stringify({ old: 7, a: 5 }));
+  assert.equal(createSettings({ defaults: { a: 1 }, storage, renames }).get('a'), 5, 'a value under the new id wins');
+});
+
+test('settings: an imported file of an older version migrates renamed ids; export writes the real version', () => {
+  const renames = { old: 'a', bad: { id: 'b', value: () => { throw new Error('x'); } } };
+  const s = createSettings({ defaults: { a: 1, b: 2 }, storage: memory(), renames, version: 3 });
+  assert.deepEqual(s.importJson(JSON.stringify({ app: 'yarg-remote', version: 1, settings: { old: 9, bad: 1 } })), { imported: 1, skipped: 0 });
+  assert.equal(s.get('a'), 9);
+  assert.equal(s.get('b'), 2, 'a failing transform drops the value');
+  assert.equal(JSON.parse(s.exportJson()).version, 3);
+  assert.deepEqual(JSON.parse(s.exportJson()).settings, { a: 9 });
+});
+
+test('migrate: keeps a __proto__ key as a plain entry and does not touch prototypes', () => {
+  const out = migrate(JSON.parse('{"__proto__":{"x":1},"old":2}'), { old: 'new' });
+  assert.deepEqual(Object.keys(out).sort(), ['__proto__', 'new']);
+  assert.equal({}.x, undefined);
 });
 
 test('themes: every preset has every colour, valid hex, and readable text', () => {

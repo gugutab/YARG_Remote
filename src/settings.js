@@ -3,15 +3,35 @@
 // defaults) is in settings-schema.js; the page that edits them is settings-ui.js.
 
 const KEY = 'yargremote.settings';
+const VERSION_KEY = '$version'; // stored next to the values (an id never starts with '$'); older builds ignore it as an unknown id
+
 
 const clone = (v) => (v && typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
+// Applies renamed ids ({ oldId: 'newId' } or { oldId: { id, value } }, see RENAMES in settings-schema.js) to a plain object of
+// outside values. A value already given under the new id wins over the old one. Returns a new object; never throws.
+export function migrate(values, renames = {}) {
+  const out = Object.create(null); // (a '__proto__' key stays a plain entry, refused later as an unknown id)
+  for (const [id, value] of Object.entries(values)) if (!Object.hasOwn(renames, id)) out[id] = value;
+  for (const [id, value] of Object.entries(values)) {
+    if (!Object.hasOwn(renames, id)) continue;
+    const r = renames[id];
+    const to = typeof r === 'string' ? r : r?.id;
+    if (typeof to !== 'string' || Object.hasOwn(out, to)) continue;
+    try {
+      out[to] = typeof r?.value === 'function' ? r.value(value) : value;
+    } catch { /* a transform that fails drops the value */ }
+  }
+  return out;
+}
+
 // `validate(id, value) -> { ok, value }` (optional, see buildValidator in settings-schema.js) checks what comes from outside:
 // the stored JSON and imported files. A stored value that fails falls back to the default, silently; an imported one is
 // skipped and counted. Without it values are trusted (the unit tests of the plain store). Only ids that have a default
-// are ever read, so `__proto__` and friends in a hand-edited file cannot reach the store.
-export function createSettings({ defaults = {}, storage = null, key = KEY, validate = null } = {}) {
+// are ever read, so `__proto__` and friends in a hand-edited file cannot reach the store. `renames` (RENAMES of the schema) are
+// applied to stored and imported values first; `version` is written with the stored values and in exports.
+export function createSettings({ defaults = {}, storage = null, key = KEY, validate = null, renames = {}, version = 1 } = {}) {
   let values = {}; // only what differs from the defaults
   const listeners = new Set();
 
@@ -32,7 +52,7 @@ export function createSettings({ defaults = {}, storage = null, key = KEY, valid
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        for (const [id, value] of Object.entries(parsed)) {
+        for (const [id, value] of Object.entries(migrate(parsed, renames))) {
           const r = accept(id, value);
           if (r.ok && !same(r.value, defaults[id])) values[id] = clone(r.value);
         }
@@ -42,7 +62,7 @@ export function createSettings({ defaults = {}, storage = null, key = KEY, valid
 
   const save = () => {
     try {
-      if (Object.keys(values).length) storage?.setItem(key, JSON.stringify(values));
+      if (Object.keys(values).length) storage?.setItem(key, JSON.stringify({ [VERSION_KEY]: version, ...values }));
       else storage?.removeItem(key);
     } catch { /* storage full or blocked: the settings just last for this visit */ }
   };
@@ -75,9 +95,9 @@ export function createSettings({ defaults = {}, storage = null, key = KEY, valid
     changed() { return clone(values); },
     all() { return { ...clone(defaults), ...clone(values) }; },
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
-    // JSON text of the changed settings, and the reverse: only known settings with a valid value are taken. Returns
-    // { imported, skipped }; skipped counts unknown ids and invalid values.
-    exportJson() { return JSON.stringify({ app: 'yarg-remote', version: 1, settings: values }, null, 2); },
+    // JSON text of the changed settings, and the reverse: only known settings with a valid value are taken (renamed ids of an
+    // older file are migrated first). Returns { imported, skipped }; skipped counts unknown ids and invalid values.
+    exportJson() { return JSON.stringify({ app: 'yarg-remote', version, settings: values }, null, 2); },
     importJson(text) {
       let data;
       try {
@@ -89,7 +109,7 @@ export function createSettings({ defaults = {}, storage = null, key = KEY, valid
       if (!incoming || data.app !== 'yarg-remote') throw new Error('This file is not a YARG Remote settings export.');
       let imported = 0;
       let skipped = 0;
-      for (const [id, value] of Object.entries(incoming)) {
+      for (const [id, value] of Object.entries(migrate(incoming, renames))) {
         const r = accept(id, value); // also refuses a setting this version does not know
         if (!r.ok) { skipped++; continue; }
         api.set(id, r.value);
