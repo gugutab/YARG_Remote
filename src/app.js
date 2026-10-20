@@ -14,16 +14,16 @@ import { songDelaySeconds, plainText, packOf } from './ini.js';
 import { actionFor, comboOf } from './shortcuts.js';
 import { dropStems, stemPriority } from './stempriority.js';
 import { rememberPick, serializePick, parsePick } from './lastpick.js';
-import { parseVolumes, serializeVolumes, remember as rememberLevel, recall as recallLevel } from './volmemory.js';
 import { attachScrollThumb } from './scrollthumb.js';
 import { previewWindow } from './preview.js';
 import { setLoopPoint, restartNote, pausePanelWanted } from './practice.js';
 import { isFreshStart, overlayLines, startPlan, INFO_FIRST_PLAY_MS } from './startinfo.js';
-import { metaRows, extraRows, bpmLabel, bpmRange, instrumentLevel, stemKind, stemBadge, stemGroup, stemGroupLabel, relabelStems } from './songinfo.js';
+import { metaRows, extraRows, bpmLabel, bpmRange, instrumentLevel, relabelStems } from './songinfo.js';
 import { parseRoute } from './route.js';
 import { initDeepLinks, applyInstruments, syncUrl, openFromHash } from './deeplink.js';
 import { initEndUi, syncEndScreen, buildEndScreen, isEndShown } from './end-ui.js';
-import { initTilesUi, buildInstrumentCard, buildInstrumentCards, vocalViewSeg, setDiffLabel, diffSegObserver, buildTileTools, dropMenuMixViews, refreshTileVolumes } from './tiles-ui.js';
+import { initTilesUi, buildInstrumentCard, buildInstrumentCards, vocalViewSeg, setDiffLabel, diffSegObserver, buildTileTools, dropMenuMixViews } from './tiles-ui.js';
+import { initMixer, masterState, stemStates, groupList, buildMixer, applyStem, mixerRow, groupBlock, renderGroup } from './mixer-ui.js';
 import { createSettings } from './settings.js';
 import { SECTIONS, buildDefaults, buildValidator, FONT_OPTIONS, RENAMES, SETTINGS_VERSION, itemById, setMotionProbe } from './settings-schema.js';
 import { resolvePalette, applyPalette } from './palette.js';
@@ -169,8 +169,6 @@ let loadingBackdrop = 0; // while the held song's audio loads: when it started (
 let audioLoad = null; // { song, promise } while a load runs
 // sections, mixer, visualizer, instrument menu
 let activeSection = -2; // index shown as current in the section chip and list
-let stemStates = []; // { stem, value, muted, group, views[] }: one state per stem, shown in the menu and on the info screen
-let groupList = []; // { key, label, members[], value, muted, expanded, views[] }: stems of one instrument, collapsed by default
 let vizAll = null; // the equalizer's source: every instrument of the song (the ones on screen are marked); null = rebuild
 let menuKey = null; // the instrument whose menu is open
 // A-B loop and speed trainer
@@ -1610,228 +1608,7 @@ function stepSection(dir) {
 }
 
 // ---------- Mixer and settings ----------
-const LONG_PRESS_MS = 500;
-// Master volume: one more mixer row (kept across songs) that scales every stem.
-const masterState = { stem: { id: 'master', label: 'Master' }, master: true, value: savedMaster(), muted: store.get('masterMuted') === '1', views: [] };
-els.mixerVal.textContent = masterState.muted ? 'Muted' : `${Math.round(masterState.value * 100)}%`;
-player.setMaster(masterState.muted ? 0 : masterState.value); // from the first sound on, not only after a mixer is built
-
-function savedMaster() {
-  const v = Number(store.get('master'));
-  return store.get('master') !== null && Number.isFinite(v) ? Math.min(1.5, Math.max(0, v)) : 1;
-}
-
-const silent = (st) => st.muted || Boolean(st.group?.muted); // not audible because of its own or its group's mute
-const groupSilent = (g) => g.muted || g.members.every((m) => m.muted);
-const effectiveVolume = (st) => (silent(st) ? 0 : st.value * (st.group?.value ?? 1));
-
-// The volume of every track is remembered (src/volmemory.js, store key `stemVolumes`, setting `audio.rememberVolumes`): a song opens with the levels you left.
-let volMem = parseVolumes(store.get('stemVolumes'));
-let volTimer = 0;
-function rememberVolume(kind, key, value) {
-  if (!prefs.get('audio.rememberVolumes')) return;
-  rememberLevel(volMem, kind, key, value);
-  clearTimeout(volTimer);
-  volTimer = setTimeout(() => store.set('stemVolumes', serializeVolumes(volMem)), 250); // (a slider drag sends many values)
-}
-function buildMixer(stems) {
-  const restore = prefs.get('audio.rememberVolumes');
-  const owner = current?.song ?? null; // (whose audio the track is: another song's sound is not touched by this mixer)
-  stemStates = stems.map((stem) => ({ stem, owner, value: restore ? recallLevel(volMem, 'stems', stem.label) : 1, muted: false, group: null, views: [] }));
-  const byKey = new Map();
-  for (const st of stemStates) {
-    const key = stemGroup(st.stem.label);
-    if (!byKey.has(key)) byKey.set(key, { key, label: stemGroupLabel(key), members: [], value: 1, muted: false, expanded: false, views: [] });
-    byKey.get(key).members.push(st);
-  }
-  groupList = [...byKey.values()];
-  if (restore) for (const g of groupList) g.value = recallLevel(volMem, 'groups', g.key);
-  for (const g of groupList) if (g.members.length > 1) for (const m of g.members) m.group = g;
-  groupList = groupList.filter((g) => g.members.length > 1); // a lone stem needs no group
-
-  masterState.views = liveStage ? masterState.views.filter((v) => v.container !== els.mixerInfo) : []; // (a live stage keeps its own bar mixer and the master row in it)
-  const grouped = new Set(groupList.flatMap((g) => g.members));
-  for (const container of liveStage ? [els.mixerInfo] : [els.mixer, els.mixerInfo]) {
-    const master = mixerRow(masterState);
-    masterState.views[masterState.views.length - 1].container = container;
-    master.classList.add('master');
-    const rows = [master];
-    const done = new Set();
-    for (const st of stemStates) {
-      if (!grouped.has(st)) { rows.push(mixerRow(st)); continue; }
-      if (done.has(st.group)) continue;
-      done.add(st.group);
-      rows.push(groupBlock(st.group));
-    }
-    container.replaceChildren(...rows);
-  }
-  applyStem(masterState);
-  groupList.forEach(renderGroup);
-  stemStates.forEach(applyStem);
-  queueMicrotask(() => refreshTileVolumes()); // (the tiles' volume buttons wait for the stems)
-}
-
-// A long press on a mute button solos what it stands for (mutes everything else); on the only audible one it restores all.
-function pressHandlers(btn, solo, toggle) {
-  let timer = 0;
-  let longPressed = false;
-  btn.addEventListener('pointerdown', () => {
-    longPressed = false;
-    clearTimeout(timer);
-    if (solo) timer = setTimeout(() => { longPressed = true; solo(); }, LONG_PRESS_MS);
-  });
-  for (const type of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(type, () => clearTimeout(timer));
-  btn.addEventListener('contextmenu', (e) => e.preventDefault());
-  btn.addEventListener('click', () => {
-    if (longPressed) { longPressed = false; return; } // the press already did its job
-    toggle();
-  });
-}
-
-const ROW_HTML = (kind) => `
-    <button class="stem-btn" type="button" aria-pressed="false"><svg><use href="#i-${kind}"/></svg><b class="badge"></b></button>
-    <span class="mix-name"></span>
-    <input type="range" min="0" max="1.5" step="0.01" value="1">
-    <span class="mix-val">100%</span>
-    <button class="icon small-icon reset" type="button" title="Reset volume" aria-label="Reset volume"><svg><use href="#i-reset"/></svg></button>`;
-
-function mixerRow(st) {
-  const row = document.createElement('div');
-  row.className = 'mix-row';
-  row.innerHTML = ROW_HTML(st.master ? 'volume' : stemKind(st.stem.label));
-  const mute = row.querySelector('.stem-btn');
-  mute.querySelector('.badge').textContent = st.master ? '' : stemBadge(st.stem.label);
-  const number = st.master ? '' : /^\d+$/.test(stemBadge(st.stem.label)) ? ` ${stemBadge(st.stem.label)}` : '';
-  row.querySelector('.mix-name').textContent = st.master ? 'Master' : `${stemGroupLabel(stemGroup(st.stem.label))}${number}`; // shown only in wide cards
-  const view = { row, range: row.querySelector('input'), val: row.querySelector('.mix-val'), mute, reset: row.querySelector('.reset') };
-  paintRange(view.range, st.master ? 1 : 1);
-  st.views.push(view);
-  view.range.addEventListener('input', () => { st.value = Number(view.range.value); st.muted = false; applyStem(st); if (!st.master) rememberVolume('stems', st.stem.label, st.value); }); // moving the slider re-enables the track
-  pressHandlers(mute, st.master ? null : () => soloStem(st), () => {
-    if (st.group?.muted) { st.group.muted = false; applyGroup(st.group); return; } // the group was muted: this click turns it back on
-    st.muted = !st.muted;
-    applyStem(st);
-  });
-  row.querySelector('.reset').addEventListener('click', () => { st.value = 1; st.muted = false; applyStem(st); if (!st.master) rememberVolume('stems', st.stem.label, 1); });
-  return row;
-}
-
-// One slider for a whole instrument (it scales every member), with a button that shows the individual sliders.
-function groupBlock(g, own = null) { // own: the instrument menu keeps its own open/closed state for the tracks ({ open, toggle })
-  const block = document.createElement('div');
-  block.className = 'mix-group';
-  const row = document.createElement('div');
-  row.className = 'mix-row';
-  row.classList.add('has-expand'); // one more (narrow) column, only on group rows
-  row.innerHTML = ROW_HTML(stemKind(g.members[0].stem.label));
-  const mute = row.querySelector('.stem-btn');
-  mute.insertAdjacentHTML('afterend', '<button class="icon small-icon expand-btn" type="button" aria-expanded="false"><svg><use href="#i-chevron"/></svg></button>');
-  mute.querySelector('.badge').textContent = String(g.members.length);
-  row.querySelector('.mix-name').textContent = g.label;
-  const kids = document.createElement('div');
-  kids.className = 'mix-kids';
-  kids.hidden = !g.expanded;
-  for (const m of g.members) kids.append(mixerRow(m));
-  const expand = row.querySelector('.expand-btn');
-  const view = { row, range: row.querySelector('input'), val: row.querySelector('.mix-val'), mute, reset: row.querySelector('.reset'), expand, kids };
-  paintRange(view.range, 1);
-  g.views.push(view);
-  view.range.addEventListener('input', () => { g.value = Number(view.range.value); unmuteGroup(g); applyGroup(g); rememberVolume('groups', g.key, g.value); });
-  pressHandlers(mute, () => soloGroup(g), () => {
-    if (groupSilent(g)) unmuteGroup(g);
-    else g.muted = true;
-    applyGroup(g);
-  });
-  row.querySelector('.reset').addEventListener('click', () => { g.value = 1; unmuteGroup(g); applyGroup(g); rememberVolume('groups', g.key, 1); });
-  if (own) view.own = own.open; // this view opens and closes on its own, not with the Stem volume card
-  expand.addEventListener('click', () => {
-    if (own) { view.own = !view.own; own.toggle(view.own); } else g.expanded = !g.expanded;
-    renderGroup(g);
-  });
-  block.append(row, kids);
-  return block;
-}
-
-function unmuteGroup(g) {
-  g.muted = false;
-  for (const m of g.members) m.muted = false;
-}
-
-function applyGroup(g) {
-  renderGroup(g);
-  g.members.forEach(applyStem);
-}
-
-function renderGroup(g) {
-  const muted = groupSilent(g);
-  for (const v of g.views) {
-    v.range.value = g.value;
-    paintRange(v.range);
-    v.val.textContent = `${Math.round(g.value * 100)}%`;
-    v.row.classList.toggle('muted', muted);
-    v.mute.setAttribute('aria-pressed', String(muted));
-    v.mute.title = `${g.label} (${g.members.length} tracks) — ${muted ? 'unmute' : 'mute'} (hold to solo)`;
-    v.mute.setAttribute('aria-label', `${muted ? 'Unmute' : 'Mute'} ${g.label}`);
-    v.range.setAttribute('aria-label', `${g.label} volume`);
-    v.reset.disabled = g.value === 1 && !muted;
-    const open = v.own ?? g.expanded;
-    v.kids.hidden = !open;
-    v.expand.setAttribute('aria-expanded', String(open));
-    v.expand.title = open ? 'Collapse tracks' : 'Show each track';
-    v.expand.setAttribute('aria-label', v.expand.title);
-  }
-}
-
-function soloStem(st) {
-  const others = stemStates.filter((o) => o !== st);
-  const alreadySolo = !silent(st) && others.every(silent);
-  groupList.forEach((g) => { g.muted = false; });
-  for (const o of others) o.muted = !alreadySolo;
-  st.muted = false;
-  applyEverything();
-}
-
-function soloGroup(g) {
-  const others = stemStates.filter((o) => o.group !== g);
-  const alreadySolo = g.members.every((m) => !silent(m)) && others.every(silent);
-  groupList.forEach((x) => { x.muted = false; });
-  for (const o of others) o.muted = !alreadySolo;
-  for (const m of g.members) m.muted = false;
-  applyEverything();
-}
-
-function applyEverything() {
-  groupList.forEach(renderGroup);
-  stemStates.forEach(applyStem);
-}
-
-// The slider keeps its value while a stem is muted; every view of the stem is updated together.
-function applyStem(st) {
-  if (st.master) {
-    els.mixerVal.textContent = st.muted ? 'Muted' : `${Math.round(st.value * 100)}%`; // (shown beside the volume icon on wide screens)
-    player.setMaster(st.muted ? 0 : st.value);
-    store.set('master', String(st.value)); // the master level and its mute are kept between visits
-    store.set('masterMuted', st.muted ? '1' : '0');
-  } else if (st.owner === audioSong || !audioSong) player.setVolume(st.stem.id, effectiveVolume(st)); // (the sound of another song is not touched by this song's mixer)
-  const off = st.master ? st.muted : silent(st);
-  for (const v of st.views) {
-    v.range.value = st.value;
-    paintRange(v.range);
-    v.val.textContent = `${Math.round(st.value * 100)}%`;
-    v.row.classList.toggle('muted', off);
-    v.mute.setAttribute('aria-pressed', String(off));
-    v.mute.title = `${st.stem.label} — ${off ? 'unmute' : 'mute'} (hold to solo)`;
-    v.reset.disabled = st.value === 1 && !off; // already at the default
-    v.mute.setAttribute('aria-label', `${off ? 'Unmute' : 'Mute'} ${st.stem.label}`);
-    v.range.setAttribute('aria-label', `${st.stem.label} volume`);
-    if (st.failed) { // never decoded: nothing to control
-      v.row.classList.add('muted');
-      v.row.title = 'Could not be decoded';
-      v.mute.title = `${st.stem.label} — could not be decoded`;
-      for (const el of [v.range, v.mute, v.reset]) el.disabled = true;
-    }
-  }
-}
+initMixer({ els, store, prefs, player, current: () => current, liveStage: () => liveStage, audioSong: () => audioSong }); // the stem volumes and the master row (src/mixer-ui.js), at the same point as before
 
 // Settings: one value each, shown by every [data-setting] slider (menu popover and info screen). The neck's "default" (what a reset
 // restores) is the user's starting value, the highway.neck setting.
