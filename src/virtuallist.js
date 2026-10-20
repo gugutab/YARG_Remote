@@ -1,5 +1,12 @@
 import { evenPerRow, highlightRanges, packCode } from './songlist.js';
 
+// The pack beside the title of a medium card: a card whose text block is narrower than PACK_CODE_BELOW px (a phone) always shows the short code, so the
+// rows of a narrow list agree; a wider one shows the full name when the title and the name both fit, the code when not. (The full name is always the tooltip.)
+export const PACK_CODE_BELOW = 300;
+export function packShort(boxWidth, titleWidth, gap, fullWidth) {
+  return boxWidth < PACK_CODE_BELOW || titleWidth + gap + fullWidth > boxWidth;
+}
+
 // A windowed list for the library: only the rows near the viewport exist in the DOM, so ~750 songs with album
 // thumbnails scroll smoothly and stay light on memory. Items are fixed-height song rows and group headers.
 
@@ -543,12 +550,12 @@ export function createVirtualList({ scroller, label, rail, thumbs, onSelect, tex
       const title = box.querySelector('.song-title');
       const gap = parseFloat(getComputedStyle(box).columnGap) || 0;
       const t = title ? widthOf(title.textContent, getComputedStyle(title).font) : 0;
-      return { e, short: t + gap + full > box.clientWidth };
+      return { e, short: packShort(box.clientWidth, t, gap, full) };
     });
     for (const { e, short } of room) {
       e.classList.toggle('short', short);
       e.textContent = short ? packCode(e.dataset.pack) : e.dataset.pack;
-      e.title = short ? e.dataset.pack : '';
+      e.title = e.dataset.pack;
     }
     fitMeta(rowEls);
   }
