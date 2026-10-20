@@ -585,6 +585,7 @@ function ynGradients(g, side, gold) {
   if (!ynShared) {
     ynShared = {
       ends: linGrad(g, -82, 0, 82, 0, [[0, 'rgba(0,0,0,0.4)'], [0.1, 'rgba(0,0,0,0)'], [0.9, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.4)']]),
+      baseEnds: linGrad(g, -95.5, 0, 95.5, 0, [[0, 'rgba(0,0,0,1)'], [0.06, 'rgba(0,0,0,0.85)'], [0.2, 'rgba(0,0,0,0.35)'], [0.34, 'rgba(0,0,0,0)'], [0.66, 'rgba(0,0,0,0)'], [0.8, 'rgba(0,0,0,0.35)'], [0.94, 'rgba(0,0,0,0.85)'], [1, 'rgba(0,0,0,1)']]), // the base fades to black at both ends: it curves away
       capV: linGrad(g, 0, YT - YN_CY, 0, 35, [[0, 'rgba(0,0,0,0.6)'], [0.38, 'rgba(0,0,0,0)'], [0.7, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.35)']]),
       cap: CAP_STOPS.map((stops) => linGrad(g, CAP_FROM, 0, CAP_TO, 0, stops)),
     };
@@ -651,6 +652,8 @@ export function drawYNote(g, x, y, hw, hh, n, laneColor, bodyColor, taper = 0, s
   traceYN(g, YN_BASE_TOP, 1, k, side);
   g.fillStyle = base.top;
   g.fill();
+  g.fillStyle = S.baseEnds;
+  g.fill();
   // the body (a tap or ghost: the colour stays on the strips, the centre is dark; a HOPO or accent: white strips), then its darker ends over all of it
   g.beginPath();
   traceYN(g, YN_BODY, 1, k, side);
@@ -696,6 +699,8 @@ export function drawYNote(g, x, y, hw, hh, n, laneColor, bodyColor, taper = 0, s
   g.beginPath();
   traceYN(g, YN_BASE_FRONT, 1, k, side);
   g.fillStyle = base.front;
+  g.fill();
+  g.fillStyle = S.baseEnds; // (the vertical fade above stays; this one only darkens the two ends)
   g.fill();
   g.restore();
 }
