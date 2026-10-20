@@ -1408,7 +1408,7 @@ export class Highway {
       g.beginPath();
       const disc = n.cymbal && this.noteStyle === 'rect'; // the rectangular style draws a cymbal as YARG's chrome disc (the circle style keeps the triangle)
       if (disc) noteShape(g, cx, cy, r * 0.95, r * 0.95, 'round');
-      else noteShape(g, cx, cy, n.cymbal ? r : r * wide, r, n.cymbal ? 'tri' : this.noteStyle); // cymbals: rounded triangle
+      else noteShape(g, cx, cy, n.cymbal ? r : r * wide, r, n.cymbal ? 'tri' : this.noteStyle === 'rect' ? 'ynote' : this.noteStyle); // cymbals: rounded triangle; the rectangular style: the note design's silhouette
       const faced = !n.cymbal && this.noteStyle === 'rect'; // a note in the rectangular style: YARG's chrome caps and coloured band
       g.fillStyle = tintWhite(n.sp ? noteColor(n, colors) : n.tap && !faced ? TAP_COLOR : colors[n.lane], white);
       g.fill();

@@ -273,8 +273,38 @@ function roundedTriangle(x0, y0, x1, y1, x2, y2, r) {
   return n / 2;
 }
 
+// The silhouette of the rectangular note after the note design (an SVG: narrower flat top with small rounded corners, sides that slant outwards to the widest point a little
+// below the middle, then in again to the bottom). The points are in units of the half width and half height of the shape (the cap path of the design, mirrored).
+const NOTE_SIL = (() => {
+  const U = (px) => (px - 110) / 99.2; // design x -> -1..1 (the widest point of the design is 10.8 .. 209.2)
+  const V = (py) => (py - 54) / 38; // design y -> -1..1 (16 .. 92)
+  const cubic = (p0, p1, p2, p3, steps) => Array.from({ length: steps }, (_, i) => {
+    const t = (i + 1) / steps;
+    const m = 1 - t;
+    return [m * m * m * p0[0] + 3 * m * m * t * p1[0] + 3 * m * t * t * p2[0] + t * t * t * p3[0], m * m * m * p0[1] + 3 * m * m * t * p1[1] + 3 * m * t * t * p2[1] + t * t * t * p3[1]];
+  });
+  const right = [[194, 16]]; // from the top middle clockwise (the left side of the design mirrored about x = 110)
+  right.push(...cubic([194, 16], [198.5, 16], [200.4, 18], [201.4, 21.5], 4));
+  right.push([208.2, 43]);
+  right.push(...cubic([208.2, 43], [209.8, 48.5], [209.9, 54], [209.2, 59.5], 4));
+  right.push([205.1, 92]);
+  const mirrored = right.slice(0, -1).reverse().map(([px, py]) => [220 - px, py]); // the left side, from the bottom up
+  const all = [[110, 16], ...right, [14.9, 92], ...mirrored];
+  return all.map(([px, py]) => [U(px), V(py)]);
+})();
+const NOTE_SIL_N = NOTE_SIL.length;
+
 // Fills PT with the outline of a note head and returns how many points it holds.
 function outline(x, y, rx, ry, style) {
+  if (style === 'ynote') { // the rectangular note after the design (same size as 'rect': the half width and height are the same)
+    const w = rx * NOTE_RECT_W;
+    const h = ry * NOTE_RECT_H;
+    for (let i = 0; i < NOTE_SIL_N; i++) {
+      PT[2 * i] = x + NOTE_SIL[i][0] * w;
+      PT[2 * i + 1] = y + NOTE_SIL[i][1] * h;
+    }
+    return NOTE_SIL_N;
+  }
   if (style === 'tri') { // a rounded triangle pointing up (cymbal notes)
     const w = rx * NOTE_TRI_W;
     const h = ry * NOTE_TRI_H;
@@ -307,7 +337,7 @@ function outline(x, y, rx, ry, style) {
 
 export function noteShape(g, x, y, rx, ry, style, dist = 0) {
   if (!dist) {
-    if (style !== 'rect' && style !== 'tri') {
+    if (style !== 'rect' && style !== 'tri' && style !== 'ynote') {
       g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
       return;
     }

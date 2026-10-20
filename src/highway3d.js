@@ -346,7 +346,7 @@ export function renderLanes3D(hw, t, w, h) {
     g.globalAlpha = (1 - kx) * hw.noteAlpha(n) * Math.min(1, (1 - d) / FADE_IN);
     // thickness: a thin darker edge underneath the top face (no cast shadow; all of it moves, grows and fades with the note)
     const th = Math.max(0.5, rx * (faced || disc ? 0.27 : 0.21)); // (a little thicker in the rectangular style)
-    const headStyle = disc ? 'round' : n.cymbal ? 'tri' : hw.noteStyle; // cymbals: a disc in the rectangular style, else a rounded triangle
+    const headStyle = disc ? 'round' : n.cymbal ? 'tri' : hw.noteStyle === 'rect' ? 'ynote' : hw.noteStyle; // cymbals: a disc in the rectangular style, else a rounded triangle
     g.beginPath();
     noteShape(g, x, y + th, rx, ry, headStyle, y + th - vy);
     if (faced || disc) { // the rectangular style: the edge under the face is metal like the caps (not a dark shade of the colour)
