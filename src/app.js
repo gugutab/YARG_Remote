@@ -36,8 +36,8 @@ import { isPhone, createWidthPref, createWindowFrame } from './windowframe-dom.j
 import { saveLibrary, loadLibrary, loadThumb, saveThumb, clearThumbs } from './store.js';
 import { filterSongs, parseQuery, rankByRelevance, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, anchorLabel, INSTRUMENTS, hasInstrument } from './songlist.js';
 import { createVirtualList, DEFAULT_CARDS, syncStarButton } from './virtuallist.js';
-import { loadFavourites, saveFavourites, toggleFavourite, onlyFavourites, mergeFavourites } from './favourites.js';
-import { loadHistory, saveHistory, recordPlay, sortByHistory, playedLine, createPlayTracker, HISTORY_SORTS } from './history.js';
+import { FAVOURITES_KEY, loadFavourites, saveFavourites, toggleFavourite, onlyFavourites, mergeFavourites } from './favourites.js';
+import { HISTORY_KEY, loadHistory, saveHistory, recordPlay, sortByHistory, playedLine, createPlayTracker, HISTORY_SORTS } from './history.js';
 import { createThumbs, renderCoverThumb } from './thumbs.js';
 import { snapPoints, snapTime, clampLoop, currentSectionRange, sectionRange, loopForSection, shouldWrap, MIN_LOOP } from './looprange.js';
 import { trainerConfig, startTrainer, nextTrainerState, trainerStatus, stepNote } from './trainer.js';
@@ -572,6 +572,15 @@ function syncInfoHistory() {
   infoPlayed.textContent = line;
   infoPlayed.hidden = !line;
 }
+// Another tab of the app changed the favourites or the play history: take them over (the `storage` event never fires in the tab that wrote).
+window.addEventListener('storage', (e) => {
+  if (e.storageArea !== localStore) return;
+  if (e.key === FAVOURITES_KEY || e.key === null) favourites = loadFavourites(localStore);
+  if (e.key === HISTORY_KEY || e.key === null) playHistory = loadHistory(localStore);
+  if (e.key !== FAVOURITES_KEY && e.key !== HISTORY_KEY && e.key !== null) return;
+  syncInfoHistory();
+  renderList({ keepScroll: true });
+});
 // Share: a link that opens this song's details (with the instruments on screen, when it is the open song). It works for whoever opens the same server.
 $('infoShare').addEventListener('click', async () => {
   if (!infoSong) return;
