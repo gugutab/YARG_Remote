@@ -30,6 +30,7 @@ import {
   withAlpha,
   breAlpha,
   drawGuitarNoteFace,
+  drawCymbalFace,
   NOTE_RECT_W,
   NOTE_RECT_H,
   firstIndexAtOrAfter,
@@ -1405,11 +1406,14 @@ export class Highway {
         g.globalCompositeOperation = 'source-over';
       }
       g.beginPath();
-      noteShape(g, cx, cy, n.cymbal ? r : r * wide, r, n.cymbal ? 'tri' : this.noteStyle); // cymbals: rounded triangle
-      const faced = !chart.drumKind && !n.cymbal && this.noteStyle === 'rect'; // guitar-like note in the rectangular style: YARG's chrome caps and coloured band
+      const disc = n.cymbal && this.noteStyle === 'rect'; // the rectangular style draws a cymbal as YARG's chrome disc (the circle style keeps the triangle)
+      if (disc) noteShape(g, cx, cy, r * 0.95, r * 0.95, 'round');
+      else noteShape(g, cx, cy, n.cymbal ? r : r * wide, r, n.cymbal ? 'tri' : this.noteStyle); // cymbals: rounded triangle
+      const faced = !n.cymbal && this.noteStyle === 'rect'; // a note in the rectangular style: YARG's chrome caps and coloured band
       g.fillStyle = tintWhite(n.sp ? noteColor(n, colors) : n.tap && !faced ? TAP_COLOR : colors[n.lane], white);
       g.fill();
       if (faced) drawGuitarNoteFace(g, cx, cy, r * wide * NOTE_RECT_W, r * NOTE_RECT_H, n, colors[n.lane]);
+      else if (disc) drawCymbalFace(g, cx, cy, r * 0.95, r * 0.95, n, colors[n.lane]);
       // accent: same size, with a thicker outline in a darker shade of the note's colour
       g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH : 2;
       g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : 'rgba(0,0,0,0.5)'; // (star power notes have no coloured outline: the white body and, in the rectangular style, the gold caps mark them)

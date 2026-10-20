@@ -13,7 +13,7 @@ export const DOUBLE_KICK_GAP = 4; // px between the two bars of a double kick
 export const TAP_COLOR = '#b25cff';
 export const ACCENT_OUTLINE_WIDTH = 4;
 export const ACCENT_OUTLINE_DARKEN = 0.55; // multiplier applied to the note colour for the accent outline
-export const GHOST_ALPHA = 0.45;
+export const GHOST_ALPHA = 0.65;
 export const DISABLED_FILTER = 'saturate(0.06)'; // canvas filter of the disabled notes (a replayed stretch, what follows a loop): almost no colour
 export const ROLL_COLORS = {
   kick: 'rgba(242,134,30,0.14)',
@@ -336,7 +336,8 @@ export const PAD_RING_ALPHA = 0.8; // originally 0.55
 
 // Hammer-on / pull-off notes (and their tails) are drawn 20% smaller than strummed ones.
 export const HOPO_SCALE = 0.8;
-export const noteScale = (n) => (n.hopo ? HOPO_SCALE : 1);
+export const GHOST_SCALE = 0.8; // YARG's ghost note model is about 80% as wide as a normal one
+export const noteScale = (n) => (n.hopo ? HOPO_SCALE : n.ghost ? GHOST_SCALE : 1);
 
 // Star power notes: a white overlay at 80% over the lane colour (the colour and the centre still show through).
 export const STAR_POWER_OVERLAY = 0.8;
@@ -412,16 +413,16 @@ export function drawGuitarNoteFace(g, x, y, hw, hh, n, laneColor) {
   g.save();
   g.clip();
   const cap = hw * 0.26;
-  const strip = hw * (n.tap ? 0.17 : 0.3); // the white HOPO strips are wider than the tap's coloured ones
+  const strip = hw * (n.tap || n.ghost ? 0.17 : 0.3); // the white HOPO strips are wider than the tap's coloured ones
   const top = y - hh - 1;
   const full = 2 * hh + 2;
-  if (n.tap) { // dark centre, the colour on the strips beside the caps
+  if (n.tap || n.ghost) { // dark centre, the colour on the strips beside the caps (YARG's tap and ghost notes)
     g.fillStyle = '#1b1c1f';
     g.fillRect(x - hw + cap, top, 2 * (hw - cap), full);
     g.fillStyle = laneColor;
     g.fillRect(x - hw + cap, top, strip, full);
     g.fillRect(x + hw - cap - strip, top, strip, full);
-  } else if (n.hopo) { // white strips
+  } else if (n.hopo || n.accent) { // white strips (the accent's white tabs)
     g.fillStyle = 'rgba(255,255,255,0.95)';
     g.fillRect(x - hw + cap, top, strip, full);
     g.fillRect(x + hw - cap - strip, top, strip, full);
@@ -444,5 +445,50 @@ export function drawGuitarNoteFace(g, x, y, hw, hh, n, laneColor) {
   }
   g.fillStyle = gloss; // the shade also over the caps, so they curve like the band
   g.fillRect(x - hw - 1, top, 2 * hw + 2, full);
+  g.restore();
+}
+
+// A cymbal in the rectangular style, after YARG's cymbal model: a chrome disc with a coloured cone in the middle (an accent has a white ring, a ghost a dark centre with
+// a coloured ring). Call it with the disc's outline (an ellipse of half sizes rx / ry at x, y) as the current path.
+export function drawCymbalFace(g, x, y, rx, ry, n, laneColor) {
+  g.save();
+  g.clip();
+  g.translate(x, y);
+  g.scale(1, ry / rx); // work in a circle of radius rx, the ellipse comes from this scale
+  const gold = n.sp;
+  const chrome = g.createRadialGradient(0, 0, 0, 0, 0, rx);
+  chrome.addColorStop(0, gold ? '#fff0a0' : '#eef2f6');
+  chrome.addColorStop(0.6, gold ? '#b88a00' : '#9aa3ad');
+  chrome.addColorStop(0.88, gold ? '#ffe27a' : '#e3e9f0');
+  chrome.addColorStop(1, gold ? '#3d2e00' : '#2e3237');
+  g.fillStyle = chrome;
+  g.beginPath();
+  g.arc(0, 0, rx + 1, 0, Math.PI * 2);
+  g.fill();
+  if (n.accent) { // the white ring
+    g.strokeStyle = '#ffffff';
+    g.lineWidth = rx * 0.14;
+    g.beginPath();
+    g.arc(0, 0, rx * 0.76, 0, Math.PI * 2);
+    g.stroke();
+  }
+  const inner = rx * 0.62;
+  g.beginPath();
+  g.arc(0, 0, inner, 0, Math.PI * 2);
+  if (n.ghost) { // dark centre inside a coloured ring
+    g.fillStyle = '#1b1c1f';
+    g.fill();
+    g.strokeStyle = laneColor;
+    g.lineWidth = rx * 0.11;
+    g.stroke();
+  } else { // the cone: the colour with a light top
+    g.fillStyle = laneColor;
+    g.fill();
+    const cone = g.createRadialGradient(-inner * 0.25, -inner * 0.3, 0, 0, 0, inner);
+    cone.addColorStop(0, 'rgba(255,255,255,0.6)');
+    cone.addColorStop(1, 'rgba(0,0,0,0.12)');
+    g.fillStyle = cone;
+    g.fill();
+  }
   g.restore();
 }
