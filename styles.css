@@ -153,6 +153,8 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 }
 .welcome svg { width: 48px; height: 48px; }
 .welcome button { background: var(--accent); border-color: var(--accent); color: var(--accent-text, #fff); }
+/* read by screen readers only (the stage's live status line, #stageStatus) */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* Fullscreen / idle: the bar hides while playing and returns on mouse move */
 .app.immersive .topbar { position: absolute; left: 0; right: 0; top: 0; opacity: .96; transition: transform .2s ease; }

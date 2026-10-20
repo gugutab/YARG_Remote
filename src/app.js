@@ -1630,6 +1630,7 @@ function setActiveSection(index) {
   if (index === activeSection) return;
   activeSection = index;
   els.sectionText.textContent = chart?.sections[index]?.name ?? 'No sections';
+  if (player.playing && chart?.sections[index]) announce(chart.sections[index].name); // (screen readers: the section reached while playing)
   for (const row of els.sectionPop.children) row.dataset.active = String(Number(row.dataset.index) === index);
   if (index >= 0) els.sectionSelect.value = String(index);
 }
@@ -2641,9 +2642,24 @@ window.addEventListener('blur', onFocusLoss);
 window.addEventListener('focus', onFocusBack);
 document.addEventListener('visibilitychange', () => (document.hidden ? onFocusLoss() : onFocusBack()));
 
+// Screen readers: the canvas has no text, so a visually hidden live line (#stageStatus) says the section reached while playing, play / pause and
+// the fretboards brought into view; it is written only when the text changes.
+const stageStatus = $('stageStatus');
+function announce(text) {
+  if (stageStatus && text && stageStatus.textContent !== text) stageStatus.textContent = text;
+}
+function announceView() {
+  const names = highway.panesInView().filter(Boolean).join(', ');
+  if (!names) return;
+  els.highway.setAttribute('aria-label', `Note highway: ${names}`);
+  announce(`Showing ${names}`);
+}
+let announcedPlaying = null; // (the first sync only records the state)
+
 const PLAY_TITLES = { play: els.play.title, npPlay: els.npPlay.title };
 function syncPlayButton() {
   const playing = player.playing || !!startDone || !!loopWait; // (the start delay shows the playing state)
+  if (playing !== announcedPlaying) { if (announcedPlaying !== null) announce(playing ? 'Playing' : 'Paused'); announcedPlaying = playing; }
   const restart = ended && !playing; // at the end of the song the play button restarts it
   const icon = playing ? '#i-pause' : restart ? '#i-replay' : '#i-play';
   const detailIcon = playing && !backgroundAudio() ? '#i-pause' : '#i-play'; // (the Listen card: the sound of another song is not its)
@@ -3313,8 +3329,9 @@ els.highway.addEventListener('pointermove', (e) => {
     highway.hover = d;
     const jump = highway.sheetPlayButtonAt(...canvasPoint(e)); // over the "jump to" button of a lyric row
     const toCurrent = highway.sheetButtonAt(...canvasPoint(e)); // over the button that goes back to the line being sung
-    els.highway.style.cursor = jump || toCurrent ? 'pointer' : d ? (d.type === 'row' ? 'row-resize' : 'col-resize') : '';
-    els.highway.title = jump ? `Jump to ${highway.fmtTime(jump.playBtn.time + settings.chartDelay)}` : toCurrent ? 'Jump to the line being sung' : '';
+    const dot = highway.paneDotAt(...canvasPoint(e)); // over a pane dot (tap: that fretboard comes into view)
+    els.highway.style.cursor = jump || toCurrent || dot ? 'pointer' : d ? (d.type === 'row' ? 'row-resize' : 'col-resize') : '';
+    els.highway.title = jump ? `Jump to ${highway.fmtTime(jump.playBtn.time + settings.chartDelay)}` : toCurrent ? 'Jump to the line being sung' : dot ? `Show ${dot.label || 'this track'}` : '';
     return;
   }
   if (!swipe.sheet) return;
@@ -3334,10 +3351,12 @@ els.highway.addEventListener('pointerup', (e) => {
   }
   const { x, y, sheet } = swipe;
   swipe = null;
+  const dot = Math.abs(e.clientX - x) < 10 && Math.abs(e.clientY - y) < 10 ? highway.paneDotAt(...canvasPoint(e)) : null; // a tap on a pane dot
+  if (dot) { if (highway.showPane(dot.index)) announceView(); return; }
   if (sheet) return; // (dragging the lyrics only scrolls them; playing from a line is the button that shows when the pointer rests on it)
   const dx = e.clientX - x;
   const dy = e.clientY - y;
-  if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) highway.shiftFocus(dx < 0 ? 1 : -1);
+  if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5 && highway.shiftFocus(dx < 0 ? 1 : -1)) announceView();
 });
 els.highway.addEventListener('pointercancel', () => { swipe = null; highway.hover = null; });
 els.highway.addEventListener('wheel', (e) => { // the mouse wheel scrolls the lyrics when the pointer is over them
@@ -3562,8 +3581,8 @@ const SHORTCUT_HANDLERS = {
   topBar: () => setBarHidden(!els.app.classList.contains('bar-hidden')),
   fullscreen: () => toggleFullscreen(),
   view3d: () => setView(highway.view === '3d' ? '2d' : '3d'),
-  focusNext: () => highway.shiftFocus(1),
-  focusPrev: () => highway.shiftFocus(-1),
+  focusNext: () => { if (highway.shiftFocus(1)) announceView(); },
+  focusPrev: () => { if (highway.shiftFocus(-1)) announceView(); },
   vocalView: () => { if (highway.panes.some((p) => p.chart.mode === 'vocals')) setVocalView(highway.vocalView === 'karaoke' ? 'track' : 'karaoke'); },
   perf: () => cyclePerfOverlay(),
   loop: () => { if (chart && !liveStage) toggleLoop(); },
