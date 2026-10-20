@@ -288,7 +288,7 @@ export class Highway {
     this.invalidate();
   }
 
-  // Options of one window (a fretboard or the vocal chart) that override the global ones: view, noteStyle, neck, delay (seconds the
+  // Options of one window (a fretboard or the vocal chart) that override the global ones: view, noteStyle, leftHanded, neck, delay (seconds the
   // notes arrive later). `paneOpt` answers with the override or the global value; clearPaneOpt(null, name) clears it for every window.
   setPaneOpt(key, name, value) {
     (this.paneOpts[key] ??= {})[name] = value;
@@ -312,7 +312,7 @@ export class Highway {
     if (name === 'delay') return 0;
     const v = this.instrumentOpts[key]?.[name];
     if (v !== undefined) return v;
-    return name === 'view' ? this.view : name === 'noteStyle' ? this.noteStyle : this.neck;
+    return name === 'view' ? this.view : name === 'noteStyle' ? this.noteStyle : name === 'leftHanded' ? this.leftHanded : this.neck;
   }
 
   set perInstrument(value) { // (precomputed: paneOpt runs for every pane on every frame)
@@ -727,7 +727,7 @@ export class Highway {
         lg.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.g = lg;
         this.layered = true;
-        const flip = this.leftHanded;
+        const flip = this.paneOpt(pane.key, 'leftHanded'); // (this window's lane order: the instrument's start, else the global highway.leftHanded)
         if (flip) mirrorText(lg, pw); // the layer is drawn flipped below: its text is pre-flipped so it still reads right
         try {
           if (this.view === '3d') renderLanes3D(this, t, pw, ph);

@@ -277,16 +277,19 @@ export function renderPerInstrument(host, { settings }) {
     settings.set('highway.perInstrument', next);
   };
   const table = el('div', { class: 'pi-table', role: 'table', 'aria-label': 'Starting view of each instrument' },
-    el('div', { class: 'pi-row pi-head', role: 'row' }, ...['Instrument', 'View', 'Note shape', 'Neck speed'].map((t) => el('span', { role: 'columnheader', text: t }))));
+    el('div', { class: 'pi-row pi-head', role: 'row' }, ...['Instrument', 'View', 'Note shape', 'Lane order', 'Neck speed'].map((t) => el('span', { role: 'columnheader', text: t }))));
   const refreshers = [];
   for (const base of PER_INSTRUMENT_BASES) {
     const label = INSTRUMENT_NAMES[base];
+    const NAMES = { view: 'view', noteStyle: 'note shape', leftHanded: 'lane order' };
     const select = (name, options) => {
       if (base === 'vocals') return el('span', { class: 'pi-na', role: 'cell', text: '-', title: 'Vocals use the vocal view' });
-      const sel = el('select', { class: 'sp-select', 'aria-label': `${label} ${name === 'view' ? 'view' : 'note shape'}` },
+      const sel = el('select', { class: 'sp-select', 'aria-label': `${label} ${NAMES[name]}` },
         el('option', { value: '', text: 'Default' }), options.map(([v, t]) => el('option', { value: v, text: t })));
-      sel.addEventListener('change', () => update(base, name, sel.value || undefined));
-      refreshers.push(() => { sel.value = instrumentDefaults(all(), base)[name] ?? ''; });
+      const toValue = (s) => (name === 'leftHanded' ? s === 'mirrored' : s); // (lane order is stored as a boolean)
+      const toOption = (v) => (name === 'leftHanded' ? (v ? 'mirrored' : 'normal') : v);
+      sel.addEventListener('change', () => update(base, name, sel.value ? toValue(sel.value) : undefined));
+      refreshers.push(() => { const v = instrumentDefaults(all(), base)[name]; sel.value = v === undefined ? '' : toOption(v); });
       return el('span', { role: 'cell' }, sel);
     };
     const range = el('input', { type: 'range', min: NECK_MIN, max: NECK_MAX, step: 0.1, 'aria-label': `${label} neck speed` });
@@ -306,6 +309,7 @@ export function renderPerInstrument(host, { settings }) {
       el('b', { role: 'rowheader', text: label }),
       select('view', [['2d', '2D'], ['3d', '3D']]),
       select('noteStyle', [['round', 'Circles'], ['rect', 'Rectangles']]),
+      select('leftHanded', [['normal', 'Normal'], ['mirrored', 'Mirrored']]),
       el('span', { class: 'pi-neck', role: 'cell' }, range, out, def)));
   }
   host.append(table);

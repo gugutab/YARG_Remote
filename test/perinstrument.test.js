@@ -73,3 +73,9 @@ test('reduce motion: the motion rows are dimmed by the effective state (Auto fol
     setMotionProbe(() => false);
   }
 });
+
+test('leftHanded is kept only as a boolean, per instrument', () => {
+  const r = cleanPerInstrument({ guitar: { leftHanded: true }, drums: { leftHanded: 'yes' }, bass: { leftHanded: false, view: '2d' } });
+  assert.deepEqual(r.value, { guitar: { leftHanded: true }, bass: { leftHanded: false, view: '2d' } });
+  assert.equal(instrumentDefaults(r.value, 'guitar').leftHanded, true);
+});

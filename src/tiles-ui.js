@@ -332,7 +332,7 @@ export function buildTileTools(group) {
         }
         return el;
       };
-      box.append(seg('view', [['2d', '2D', 'view-normal'], ['3d', '3D', 'cube']]), seg('noteStyle', [['round', 'Circles', 'circle'], ['rect', 'Rectangles', 'shapes']]));
+      box.append(seg('view', [['2d', '2D', 'view-normal'], ['3d', '3D', 'cube']]), seg('noteStyle', [['round', 'Circles', 'circle'], ['rect', 'Rectangles', 'shapes']]), seg('leftHanded', [[false, 'Normal lanes', 'arrow-right'], [true, 'Mirrored lanes', 'arrow-left']]));
       openTilePop(b, `${group.label} view`, box);
     });
     const paintView = () => {
