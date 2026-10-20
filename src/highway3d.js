@@ -348,7 +348,14 @@ export function renderLanes3D(hw, t, w, h) {
     const headStyle = n.cymbal ? 'tri' : hw.noteStyle; // cymbals: rounded triangle (and no ring)
     g.beginPath();
     noteShape(g, x, y + th, rx, ry, headStyle, y + th - vy);
-    g.fillStyle = darken(n.tap && !n.sp && !faced ? TAP_COLOR : colors[n.lane], 0.45); // the edge keeps the plain lane colour (no star power overlay)
+    if (faced) { // the rectangular style: the edge under the face is metal like the caps (not a dark shade of the colour)
+      const edge = g.createLinearGradient(0, y + ry * 0.4, 0, y + th + ry);
+      const m = n.sp ? ['#f0d060', '#a37c00', '#3d2e00'] : ['#d4dae1', '#7f8893', '#30353b'];
+      edge.addColorStop(0, m[0]);
+      edge.addColorStop(0.45, m[1]);
+      edge.addColorStop(1, m[2]);
+      g.fillStyle = edge;
+    } else g.fillStyle = darken(n.tap && !n.sp ? TAP_COLOR : colors[n.lane], 0.45); // the edge keeps the plain lane colour (no star power overlay)
     g.fill();
     g.beginPath();
     noteShape(g, x, y, rx, ry, headStyle, y - vy);
