@@ -40,7 +40,7 @@ Web visualizer (HTML + ES modules, **no build**) for songs in the Rock Band / YA
 ```bash
 npm start              # node server.mjs [songsDir]; env SONGS_DIR, PORT=8080, HOST=127.0.0.1, CACHE_DIR; open http://localhost:8080
 npm run start:static   # python -m http.server 8080 --bind 127.0.0.1 (folder picker only, no server features; use python3 where `python` does not exist)
-npm test               # node --test test/*.test.js, no browser: 457 tests at last run (the only place the count is written)
+npm test               # node --test test/*.test.js, no browser: 464 tests at last run (the only place the count is written)
 npm run smoke          # scripts/smoke.mjs: server on a free port + temp synthetic song; non-zero exit on any failure
 node scripts/find-special-notes.mjs <folder> [--only open,accent] [--max 5] [--json]
 ```
