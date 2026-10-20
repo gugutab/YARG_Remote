@@ -2116,9 +2116,26 @@ document.addEventListener('click', (e) => {
 
 // ---------- Transport ----------
 els.play.addEventListener('click', () => (liveStage ? toggleBackground() : togglePlay())); // (the bar belongs to the song on the stage)
+// The bar is written every frame, so it is written only when the picture can change: while playing the fill and the thumb move in whole device
+// pixels of the bar (a write per pixel of travel, not per frame); paused, the exact position (so a paused bar looks as it always did).
+let seekBarPx = 0; // the bar's width in device pixels
+new ResizeObserver(([e]) => { seekBarPx = e.devicePixelContentBoxSize?.[0]?.inlineSize || e.contentRect.width * window.devicePixelRatio; }).observe(els.seek);
+let seekPct = '';
 function paintSeek(at = Number(els.seek.value)) { // the fill: the playing position (the thumb alone follows the pointer while it is dragged)
   const max = Number(els.seek.max) || 1;
-  els.seek.style.setProperty('--pct', `${Math.min(100, (at / max) * 100)}%`);
+  let pct = Math.min(100, (at / max) * 100);
+  if (player.playing && seekBarPx > 0) { const q = 100 / seekBarPx; pct = Math.floor(pct / q) * q; }
+  const s = `${pct}%`;
+  if (s !== seekPct) { seekPct = s; els.seek.style.setProperty('--pct', s); }
+}
+let seekValueAt = NaN;
+let seekValueStr = '';
+function setSeekValue(t) { // the thumb (same rule as the fill; written again if anything else moved it)
+  if (player.playing && seekBarPx > 0) { const q = (Number(els.seek.max) || 1) / seekBarPx; t = Math.floor(t / q) * q; }
+  if (t === seekValueAt && els.seek.value === seekValueStr) return;
+  seekValueAt = t;
+  els.seek.value = t;
+  seekValueStr = els.seek.value;
 }
 els.seek.addEventListener('input', () => {
   seeking = true;
@@ -3761,8 +3778,8 @@ function frame(frameTs) {
         if (seeking) paintSeek(t); // dragging: the thumb is in the user's hand, the fill goes on with the music
         else {
           const barT = t; // the bar is always at the real position: the thumb is already where the song went and only the fretboards travel there
-          els.seek.value = barT;
-          els.seekbox.classList.toggle('animating', !!vis.anim);
+          setSeekValue(barT);
+          if (els.seekbox.classList.contains('animating') !== !!vis.anim) els.seekbox.classList.toggle('animating', !!vis.anim);
           paintSeek(vis.anim ? Math.max(0, Math.min(player.duration, shownTime + settings.chartDelay)) : barT); // the fill travels with the fretboards (the thumb is already at the target)
           setText(els.timeNow, fmt(barT));
         }
@@ -3779,7 +3796,7 @@ function frame(frameTs) {
     draw(() => highway.render(chartTime));
     guarded('seek bar', () => {
       if (seeking) { paintSeek(t); return; }
-      els.seek.value = t;
+      setSeekValue(t);
       paintSeek(t);
       setText(els.timeNow, fmt(t));
     });
