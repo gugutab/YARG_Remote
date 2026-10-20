@@ -15,7 +15,7 @@ const sub = (phrase, from, count, time, tick, timeEnd, tickEnd) => ({
 
 // SplitPhraseByTime: split where the next syllable starts >= 0.4 s after the previous one ends,
 // never after a syllable joined to the next one.
-export function splitByTime(phrase) {
+function splitByTime(phrase) {
   const L = phrase.lyrics;
   if (L.length === 0) return [phrase];
   const out = [];
@@ -40,7 +40,7 @@ export function splitByTime(phrase) {
 
 // SplitPhraseByCharacterCount: over 50 characters, cut into ceil(chars / 37.5) chunks and split at the first
 // word boundary (a syllable that is not joined to the next) once a chunk reaches the target size.
-export function splitByCharCount(phrase, maxChars = MAX_LINE_CHARS) {
+function splitByCharCount(phrase, maxChars = MAX_LINE_CHARS) {
   const L = phrase.lyrics;
   if (L.length === 0) return [phrase];
   const total = L.reduce((n, l) => n + (l.text?.length ?? 0), 0);

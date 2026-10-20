@@ -293,7 +293,7 @@ function inWindows(windows, tick) {
 // Natural HOPO per note, as YARG.Core MoonNote.IsNaturalHopo: not a chord, has a previous note
 // (a different fret, or any chord before it), and comes within hopoThreshold + 1 ticks of it (MidReader.cs adds 1 for
 // leniency). hopoThreshold defaults to resolution / 3; song.ini can change it (chartSettings). fretNotes must be sorted by tick.
-export function naturalHopo(fretNotes, division, hopoThreshold = Math.floor(division / 3)) {
+function naturalHopo(fretNotes, division, hopoThreshold = Math.floor(division / 3)) {
   const threshold = hopoThreshold + 1;
   const groups = [];
   for (const n of fretNotes) {
@@ -432,7 +432,7 @@ function commonParts(midi, track, toSec, settings = chartSettings({}, midi.divis
 
 // Coda ranges in ticks from the EVENTS texts, as YARG.Core MidReader.GetCodaRanges: [midcoda] ... [midcoda_end] pairs
 // and a final [coda] that runs to the end; unbalanced markers drop the ranges. `end` is Infinity while open.
-export function codaRanges(eventsTrack) {
+function codaRanges(eventsTrack) {
   const ranges = [];
   let midcodas = 0;
   for (const ev of eventsTrack ? eventsTrack.texts : []) {
@@ -562,7 +562,7 @@ export function displaySectionName(name) {
 // A song with no sections gets ten automatic ones, "0% - 10%" ... "90% - 100%" of the song, so the section chip, the list and the
 // jumps still work (YARG.Core Chart/SongChart.AutoGeneration.cs PostProcessSections). The song's last tick is the last note or
 // lyric of any instrument (SongChart.GetLastTick); the EVENTS, BEAT, VENUE and animation tracks are not counted.
-export function autoSections(midi, toSec) {
+function autoSections(midi, toSec) {
   let lastTick = 0;
   for (const track of midi.tracks) {
     const name = String(track.name || '').toUpperCase();

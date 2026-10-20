@@ -16,7 +16,7 @@ export const DEFAULT_CARDS = {
 };
 
 // Height of a card of a style with a configuration: it follows the lines the card shows and the thumbnail size.
-export function cardHeight(mode, cards = DEFAULT_CARDS) {
+function cardHeight(mode, cards = DEFAULT_CARDS) {
   const { thumbs, scale } = cards;
   if (mode === 'compact') return Math.max(22, Math.round(ROW_HEIGHTS.compact * scale));
   if (mode === 'normal') return Math.max(46, thumbs ? Math.round(50 * scale + 10) : 0); // the art (50 px) fills the card: + 4 px gap and 1 px border on each side

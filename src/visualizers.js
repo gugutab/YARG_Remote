@@ -20,13 +20,13 @@ export function hash01(n, salt = 0) {
   return ((x ^ (x >>> 15)) >>> 0) / 4294967296;
 }
 
-export function hashText(text) {
+function hashText(text) {
   let h = 2166136261;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
   return h >>> 0;
 }
 
-export function rgbToHsl([r, g, b]) {
+function rgbToHsl([r, g, b]) {
   r /= 255; g /= 255; b /= 255;
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
@@ -41,7 +41,7 @@ export function rgbToHsl([r, g, b]) {
   return [(h * 60 + 360) % 360, s, l];
 }
 
-export function hslToRgb([h, s, l]) {
+function hslToRgb([h, s, l]) {
   const c = (1 - Math.abs(2 * l - 1)) * s;
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
   const m = l - c / 2;
@@ -92,7 +92,7 @@ export function extractPalette(pixels, count = 4) {
 }
 
 // Brightens a colour so it reads on a dark stage: lightness 0.52-0.68, saturation at least 0.55.
-export function vivid(c) {
+function vivid(c) {
   const [h, s, l] = rgbToHsl(c);
   return hslToRgb([h, Math.max(s, 0.55), Math.min(0.68, Math.max(0.52, l))]);
 }
@@ -258,7 +258,7 @@ export const INSTRUMENT_NAMES = { guitar: 'Guitar', bass: 'Bass', drum: 'Drums',
 export const layerColor = (kind, index, palette) => INSTRUMENT_COLORS[kind] ?? palette?.v?.[index % (palette.v.length || 1)] ?? [200, 200, 200];
 
 // First index whose time is at least `t`.
-export function lowerBound(times, t) {
+function lowerBound(times, t) {
   let lo = 0;
   let hi = times.length;
   while (lo < hi) {
@@ -304,7 +304,7 @@ export function pulseAfter(times, t, tau = 0.25) {
   return found < 0 ? 0 : Math.exp(-(t - times[found]) / tau);
 }
 
-export function sectionAt(sections, t) {
+function sectionAt(sections, t) {
   let idx = 0;
   for (let i = 0; i < sections.length; i++) if (sections[i].time <= t) idx = i;
   return idx;
@@ -1233,7 +1233,7 @@ export const stats = {};
 // ---------- Browser side: cover and driver ----------
 
 // Loads the cover and returns { palette, canvas }: the palette from a 32x32 downscale, the canvas a 64x64 blurred square.
-export async function loadCover(url) {
+async function loadCover(url) {
   const img = new Image();
   img.decoding = 'async';
   img.src = url;
