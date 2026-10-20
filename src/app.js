@@ -28,6 +28,7 @@ import { createSettings } from './settings.js';
 import { SECTIONS, buildDefaults, buildValidator, FONT_OPTIONS, RENAMES, SETTINGS_VERSION, itemById, setMotionProbe } from './settings-schema.js';
 import { resolvePalette, applyPalette, PALETTES } from './palette.js';
 import { resolveTheme, applyTheme, PRESETS as THEME_PRESETS } from './themes.js';
+import { createWakeLock } from './wakelock.js';
 import { openOnboarding, shouldShowOnboarding, ONBOARDED_KEY } from './onboarding.js';
 import { mountSettings } from './settings-ui.js';
 import { renderThemeStudio, renderDataTools, renderShortcuts, renderLaneColors, renderPerInstrument } from './settings-custom.js';
@@ -2412,10 +2413,12 @@ function announceView() {
 let announcedPlaying = null; // (the first sync only records the state)
 
 const PLAY_TITLES = { play: els.play.title, npPlay: els.npPlay.title };
+const wakeLock = createWakeLock();
 function syncPlayButton() {
   wakeLoop(); // (playback can start without input: media keys, autoplay, a wait ending)
   const playing = player.playing || !!startDone || !!loopWait; // (the start delay shows the playing state)
   if (playing !== announcedPlaying) { if (announcedPlaying !== null) announce(playing ? 'Playing' : 'Paused'); announcedPlaying = playing; }
+  wakeLock.set(playing && prefs.get('playback.keepAwake'));
   const restart = ended && !playing; // at the end of the song the play button restarts it
   const icon = playing ? '#i-pause' : restart ? '#i-replay' : '#i-play';
   const detailIcon = playing && !backgroundAudio() ? '#i-pause' : '#i-play'; // (the Listen card: the sound of another song is not its)
@@ -3558,6 +3561,7 @@ const EFFECTS = {
   'highway.kickBarHeight': (v) => { highway.kickBar = v / 100; },
   'highway.padLook': (v) => { highway.padLook = v / 100; },
   'highway.heldPulse': (v) => { highway.heldMotion = !!v; },
+  'playback.keepAwake': () => syncPlayButton(),
   'highway.leftHanded': (v) => { highway.leftHanded = !!v; },
   'highway.lyricSize': (v) => { highway.lyricScale = v / 100; },
   'highway.lyricOutline': (v) => { highway.lyricOutline = !!v; },
@@ -3631,6 +3635,8 @@ attachScrollThumb(document.querySelector('#settingsPage .sp-content')); // the s
 
 // ---------- Deep links (src/deeplink.js; initDeepLinks is called near the top) ----------
 window.addEventListener('hashchange', openFromHash);
+
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {}); // (only makes the app installable; needs a secure origin)
 
 // ---------- Welcome (src/onboarding.js): first run, and "Run setup again" in Settings ----------
 function runWelcome() {

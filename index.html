@@ -8,7 +8,9 @@
     try { const c = JSON.parse(localStorage.getItem("yargremote.themeCache")); if (c) { const r = document.documentElement; for (const k in c.css) r.style.setProperty(k, c.css[k]); r.dataset.theme = c.scheme; } } catch (e) {}
   </script>
   <title>YARG Remote - Viewer</title>
-  <link rel="icon" href="data:,">
+  <link rel="icon" href="src/icons/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0d1117">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>

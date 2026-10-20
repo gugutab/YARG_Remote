@@ -22,7 +22,7 @@ import { instrumentOptions } from './src/chart.js';
 import { parseSng, readSngBytes, findSngFile, isSngName } from './src/sng.js';
 
 const APP_ROOT = path.dirname(fileURLToPath(import.meta.url));
-const APP_FILES = new Set(['index.html', 'styles.css']);
+const APP_FILES = new Set(['index.html', 'styles.css', 'manifest.webmanifest', 'sw.js']);
 const APP_DIRS = ['src', 'vendor'];
 // Inside APP_DIRS only what the page loads (scripts, styles, markup, images); never README/licence text or dotfiles.
 const APP_EXTS = new Set(['.js', '.mjs', '.css', '.html', '.json', '.png', '.jpg', '.jpeg', '.webp', '.svg', '.woff2']);
@@ -37,7 +37,7 @@ const INDEX_VERSION = 4; // 4: .sng songs
 const SONG_MARKERS = ['song.ini', 'notes.mid', 'notes.chart'];
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.txt': 'text/plain; charset=utf-8',
+  '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain; charset=utf-8',
   '.ogg': 'audio/ogg', '.opus': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.flac': 'audio/flac',
   '.m4a': 'audio/mp4', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.mid': 'audio/midi',
   '.webp': 'image/webp', '.gif': 'image/gif', '.bmp': 'image/bmp', '.chart': 'text/plain; charset=utf-8', '.ini': 'text/plain; charset=utf-8',
