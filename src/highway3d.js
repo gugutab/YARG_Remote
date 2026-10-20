@@ -349,7 +349,6 @@ export function renderLanes3D(hw, t, w, h) {
     const headStyle = disc ? 'round' : n.cymbal ? 'tri' : hw.noteStyle; // cymbals: a disc in the rectangular style, else a rounded triangle
     g.beginPath();
     noteShape(g, x, y + th, rx, ry, headStyle, y + th - vy);
-    let edgeFill = null;
     if (faced || disc) { // the rectangular style: the edge under the face is metal like the caps (not a dark shade of the colour)
       const edge = g.createLinearGradient(0, y + ry * 0.4, 0, y + th + ry);
       const m = n.sp ? ['#f0d060', '#a37c00', '#3d2e00'] : ['#d4dae1', '#7f8893', '#30353b'];
@@ -357,7 +356,7 @@ export function renderLanes3D(hw, t, w, h) {
       edge.addColorStop(0.45, m[1]);
       edge.addColorStop(0.75, m[2]);
       edge.addColorStop(1, n.sp ? 'rgba(61,46,0,0.35)' : 'rgba(48,53,59,0.35)'); // the metal fades into the road at the bottom: depth
-      g.fillStyle = edgeFill = edge;
+      g.fillStyle = edge;
     } else g.fillStyle = darken(n.tap && !n.sp ? TAP_COLOR : colors[n.lane], 0.45); // the edge keeps the plain lane colour (no star power overlay)
     g.fill();
     g.beginPath();
@@ -369,21 +368,6 @@ export function renderLanes3D(hw, t, w, h) {
     g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH * p : Math.max(1, 1.5 * p);
     g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : 'rgba(0,0,0,0.5)';
     g.stroke();
-    if (faced && edgeFill) { // the front of the metal edge goes over the chrome caps (not over the band): redrawn clipped to the lower part of the two caps
-      const hwF = rx * NOTE_RECT_W;
-      const cap = hwF * 0.26;
-      const from = y + ry - th * 0.9;
-      g.save();
-      g.beginPath();
-      g.rect(x - hwF - 2, from, cap + 2, ry + th * 2);
-      g.rect(x + hwF - cap, from, cap + 2, ry + th * 2);
-      g.clip();
-      g.beginPath();
-      noteShape(g, x, y + th, rx, ry, headStyle, y + th - vy);
-      g.fillStyle = edgeFill;
-      g.fill();
-      g.restore();
-    }
     if (n.hopo && !faced) {
       g.beginPath();
       noteShape(g, x, y, rx * 0.35, ry * 0.35, hw.noteStyle, y - vy);
