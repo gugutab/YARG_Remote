@@ -8,6 +8,8 @@ import { buildDefaults } from '../src/settings-schema.js';
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const css = read('styles.css');
 const app = read('src/app.js');
+// app.js and the UI modules split out of it (src/*.js): where the prefs.get ids are read
+const appSources = () => fs.readdirSync(new URL('../src/', import.meta.url)).filter((f) => f.endsWith('.js')).map((f) => read(`src/${f}`)).join('\n');
 const claudeMd = read('CLAUDE.md');
 const frame = read('src/windowframe.js');
 const constant = (name) => {
@@ -57,9 +59,9 @@ test('every key of EFFECTS is a settings id', () => {
   assert.ok(Object.keys(defaults).some((k) => k.startsWith('cards.')), 'the cards.* settings that EFFECTS builds are gone');
 });
 
-test('every prefs.get / motionPref id read by app.js exists in the schema', () => {
+test('every prefs.get / motionPref id read by app.js (and the modules split out of it) exists in the schema', () => {
   const defaults = buildDefaults();
-  const ids = [...app.matchAll(/(?:prefs\.get|motionPref)\('([\w.]+)'\)/g)].map((m) => m[1]);
+  const ids = [...appSources().matchAll(/(?:prefs\.get|motionPref)\('([\w.]+)'\)/g)].map((m) => m[1]);
   assert.ok(ids.length > 30, 'prefs.get ids not parsed');
   for (const id of new Set(ids)) assert.ok(Object.hasOwn(defaults, id), `app.js reads '${id}' but settings-schema.js has no such setting`);
 });

@@ -40,6 +40,7 @@ import { recommend } from './recommend.js';
 import { snapPoints, snapTime, clampLoop, currentSectionRange, sectionRange, loopForSection, shouldWrap, MIN_LOOP } from './looprange.js';
 import { trainerConfig, startTrainer, nextTrainerState, trainerStatus, stepNote } from './trainer.js';
 import { VISUALIZERS, createDriver as createVisualizerDriver } from './visualizers.js';
+import { paintRange, installRangeUi } from './range-ui.js';
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
@@ -1828,14 +1829,6 @@ function pressHandlers(btn, solo, toggle) {
   });
 }
 
-// Sliders draw their fill and a marker at the default value from two CSS variables: --p (current) and --def.
-function paintRange(input, def) {
-  const min = Number(input.min);
-  const span = Number(input.max) - min || 1;
-  input.style.setProperty('--p', String((Number(input.value) - min) / span));
-  if (def !== undefined) input.style.setProperty('--def', String((def - min) / span));
-}
-
 const ROW_HTML = (kind) => `
     <button class="stem-btn" type="button" aria-pressed="false"><svg><use href="#i-${kind}"/></svg><b class="badge"></b></button>
     <span class="mix-name"></span>
@@ -2002,58 +1995,8 @@ function setSetting(name, value) {
   if (name === 'speed') { player.setRate(value); els.speedVal.textContent = SETTING_FORMAT.speed(value); }
   if (name === 'neck') highway.setNeckSpeed(value);
 }
-// The mouse wheel over any slider moves it (up = more, 5 notches... one step per notch; a slider with many steps moves 2% of its range per
-// notch); touchpads give fractions, which add up. The seek bar keeps its own wheel (5 s per notch). Listeners elsewhere hear a normal `input`.
-let wheelAcc = new WeakMap();
-// The (non-passive) listener sits on each range input, not on the document, so scrolling lists never waits for the main thread. It is bound lazily, the first
-// time the pointer goes over the slider or it takes the focus (one passive delegated listener each; no MutationObserver over the document).
-function onRangeWheel(e) {
-  const el = e.currentTarget;
-  if (el.disabled) return;
-  e.preventDefault();
-  const delta = e.deltaY || e.deltaX;
-  const acc = (wheelAcc.get(el) || 0) + -delta / (e.deltaMode === 1 ? 3 : 100);
-  const notches = Math.trunc(acc);
-  wheelAcc.set(el, acc - notches);
-  if (!notches) return;
-  const min = Number(el.min || 0);
-  const max = Number(el.max || 100);
-  const step = Number(el.step) > 0 ? Number(el.step) : 1;
-  const move = (max - min) / step > 100 ? (max - min) * 0.02 : step; // fine-grained sliders: 2% of the range
-  const next = Math.min(max, Math.max(min, Number(el.value) + notches * move));
-  const rounded = Math.round((next - min) / step) * step + min;
-  el.value = String(Math.min(max, Math.max(min, +rounded.toFixed(6))));
-  el.dispatchEvent(new Event('input', { bubbles: true }));
-  el.dispatchEvent(new Event('change', { bubbles: true }));
-}
-// The other sliders (settings, the pause panel, the visualizer menu, the Listen card) get the same custom look: they are painted here, whatever sets their value
-// (an input event, a script assigning .value, .min or .max; the static ones once at start, and again when the pointer or the focus reaches them).
-// Every such slider is given its value through `.value` after it is built (settings refreshers, syncMetPop, the visualizer menu, the Listen card).
-const GENERIC_RANGE = '.sp-range input[type=range], .pp-row input[type=range], .viz-level input[type=range], .listen input[type=range], .now-playing input[type=range]';
-function paintGenericRange(el) {
-  if (!el.matches?.(GENERIC_RANGE)) return;
-  const min = Number(el.min || 0);
-  const span = Number(el.max || 100) - min || 1;
-  el.style.setProperty('--p', String(Math.min(1, Math.max(0, (Number(el.value) - min) / span))));
-}
-for (const prop of ['value', 'min', 'max']) {
-  const own = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, prop);
-  Object.defineProperty(HTMLInputElement.prototype, prop, { ...own, set(v) { own.set.call(this, v); if (this.type === 'range') paintGenericRange(this); } });
-}
-document.addEventListener('input', (e) => { if (e.target.type === 'range') paintGenericRange(e.target); }, true);
-document.querySelectorAll('input[type=range]').forEach(paintGenericRange);
-const wheelBound = new WeakSet();
-function reachRange(e) {
-  const el = e.target;
-  if (el?.type !== 'range' || el.tagName !== 'INPUT') return;
-  paintGenericRange(el);
-  if (wheelBound.has(el) || el.closest('#seekbox')) return;
-  wheelBound.add(el);
-  el.addEventListener('wheel', onRangeWheel, { passive: false });
-}
-document.addEventListener('pointerover', reachRange, { capture: true, passive: true });
-document.addEventListener('focusin', reachRange, true);
-// ...and over the volume button of the bar it moves the master volume (5% per notch; it also un-mutes)
+installRangeUi(); // slider paint and wheel (src/range-ui.js), at the same point of the start-up as before
+// The mouse wheel over the volume button of the bar moves the master volume (5% per notch; it also un-mutes)
 let masterWheelAcc = 0;
 els.mixerBtn.addEventListener('wheel', (e) => {
   e.preventDefault();
