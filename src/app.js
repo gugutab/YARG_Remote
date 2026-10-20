@@ -4,6 +4,7 @@ import { DIFFICULTIES, EXTENDED_DRUM_LANES, instrumentOptions, availableDifficul
 import { MultiTrackPlayer } from './player.js';
 import { Metronome } from './metronome.js';
 import { Highway } from './highway.js';
+import { rebuildYNote, noteCutFraction } from './gfx.js';
 import { countdownColors, vocalColors } from './uicolors.js';
 import { createErrorGate } from './errorgate.js';
 import { PerfMeter } from './perf.js';
@@ -3998,6 +3999,20 @@ const EFFECTS = {
   'highway.trackOpacity': (v) => { highway.trackOpacity = v / 100; },
   'highway.starPowerBand': (v) => { highway.starPowerBand = !!v; },
   'highway.fillBand': (v) => { highway.fillBand = !!v; },
+  'highway.soloBand': (v) => { highway.soloBand = !!v; },
+  'highway.breBand': (v) => { highway.breBand = v === 'pulse' && motionReduced() ? 'steady' : v; }, // (the pulse is flashing: reduced motion draws it steady)
+  'highway.beatLines': (v) => { highway.beatLines = v; },
+  'highway.laneStripes': (v) => { highway.laneStripes = !!v; },
+  'highway.noteScale': (v) => { highway.noteSize = v / 100; },
+  'highway.noteBase': (v) => { highway.noteBase = v / 100; },
+  'highway.noteCut': (v) => { rebuildYNote(noteCutFraction(v)); highway.invalidate(); },
+  'highway.sustainWidth': (v) => { highway.sustainWidth = v / 100; },
+  'highway.kickBarHeight': (v) => { highway.kickBar = v / 100; },
+  'highway.padLook': (v) => { highway.padLook = v / 100; },
+  'highway.heldPulse': (v) => { highway.heldMotion = !!v; },
+  'highway.lyricSize': (v) => { highway.lyricScale = v / 100; },
+  'highway.lyricOutline': (v) => { highway.lyricOutline = !!v; },
+  'highway.countdownMin': (v) => { highway.countdownMin = Number(v) || 9; },
   'highway.stageColorOn': () => { applyStage(); syncVizPop(); },
   'highway.stageColor': () => { applyStage(); syncVizPop(); },
   'ui.barPosition': (v) => { els.app.classList.toggle('bar-bottom', v !== 'top'); closePopovers(); },
@@ -4005,12 +4020,12 @@ const EFFECTS = {
   'playback.songInfoOverlay': (v) => { if (!v) hideSongInfo(); },
   'playback.keepSongInfo': (v) => { if (!v && els.songInfo.classList.contains('show') && !startDone) scheduleInfoHide(INFO_FIRST_PLAY_MS); },
   'ui.animations': () => { document.documentElement.dataset.motion = motionPref('ui.animations') ? 'on' : 'off'; },
-  'ui.reduceMotion': () => EFFECTS['ui.animations'](),
+  'ui.reduceMotion': () => { EFFECTS['ui.animations'](); EFFECTS['highway.breBand'](prefs.get('highway.breBand')); },
   'highway.neck': (v) => setSetting('neck', v), // the starting neck speed; also what the tracks' own neck speed resets to
 };
 for (const [id, fn] of Object.entries(EFFECTS)) fn(prefs.get(id));
 prefs.subscribe((id, value) => { wakeUp(); EFFECTS[id]?.(value); });
-reduceQuery.addEventListener?.('change', (e) => { osReduceMotion = e.matches; EFFECTS['ui.animations'](); });
+reduceQuery.addEventListener?.('change', (e) => { osReduceMotion = e.matches; EFFECTS['ui.reduceMotion'](); });
 
 // The settings window is the second window of the shared frame: the same controller as the library's (same width, edges, motion, drawer).
 const settingsFrame = createWindowFrame({

@@ -13,16 +13,16 @@ function intervals(chart, percussion = true) {
   return list.sort((a, b) => a[0] - b[0]);
 }
 
-// -> [{ start, end }]: from the end of the last note (0 at the start of the song) to the next note, for gaps of 9 s or
-// more. A big rock ending (coda) cuts a countdown at its start and suppresses the ones after it, as in YARG.
+// -> [{ start, end }]: from the end of the last note (0 at the start of the song) to the next note, for gaps of `min` seconds
+// (YARG's 9 s by default; setting highway.countdownMin) or more. A big rock ending (coda) cuts a countdown at its start and suppresses the ones after it, as in YARG.
 // `percussion: false` leaves the percussion hits out: the lyric views (karaoke) count a percussion section as a rest.
-export function waitCountdowns(chart, { percussion = true } = {}) {
+export function waitCountdowns(chart, { percussion = true, min = MIN_COUNTDOWN_SEC } = {}) {
   if (!chart) return [];
   const coda = (chart.fills || []).find((f) => f.kind === 'bre')?.start ?? Infinity;
   const out = [];
   let latestEnd = 0;
   for (const [time, end] of intervals(chart, percussion)) {
-    if (time - latestEnd >= MIN_COUNTDOWN_SEC && latestEnd < coda) {
+    if (time - latestEnd >= min && latestEnd < coda) {
       out.push({ start: latestEnd, end: Math.min(time, coda) });
     }
     latestEnd = Math.max(latestEnd, end);

@@ -364,6 +364,19 @@ export function noteShape(g, x, y, rx, ry, style, dist = 0) {
 export const PAD_FILL_ALPHA = 0.26; // originally 0.14: the resting pads are more opaque now
 export const PAD_RING_ALPHA = 0.8; // originally 0.55
 
+// The resting pads scaled by the setting highway.padLook (1 = as above): [fill alpha, ring alpha], the ring at most 1.
+export const padAlphas = (look) => [PAD_FILL_ALPHA * look, Math.min(1, PAD_RING_ALPHA * look)];
+
+// The beat grid: [measure line, strong beat, weak beat] fill styles of a view at a level of the setting highway.beatLines (null = no lines).
+// 'normal' is the original look of each view (the 3D lines are a little stronger than the 2D ones).
+const BEAT_ALPHAS = { '2d': [0.35, 0.2, 0.12], '3d': [0.4, 0.22, 0.14] };
+export const BEAT_LEVELS = { off: 0, subtle: 0.5, normal: 1, strong: 1.8 };
+export function beatLineStyles(level, view) {
+  const f = BEAT_LEVELS[level] ?? 1;
+  if (!f) return null;
+  return (BEAT_ALPHAS[view] || BEAT_ALPHAS['2d']).map((a) => `rgba(255,255,255,${Math.min(1, +(a * f).toFixed(3))})`);
+}
+
 // Hammer-on / pull-off notes (and their tails) are drawn 20% smaller than strummed ones.
 export const HOPO_SCALE = 0.8;
 export const GHOST_SCALE = 0.8; // YARG's ghost note model is about 80% as wide as a normal one
@@ -426,7 +439,9 @@ export const boardBase = (a) => (a === baseAlpha ? baseStyle : (baseStyle = `rgb
 // (frantic, but made of smooth sines in a narrow alpha range, so it does not flash). `t` in seconds; the result is an alpha in [BRE_ALPHA_MIN, BRE_ALPHA_MAX].
 export const BRE_ALPHA_MIN = 0.07;
 export const BRE_ALPHA_MAX = 0.3;
-export function breAlpha(t, lane, lanes) {
+export const BRE_ALPHA_STEADY = (BRE_ALPHA_MIN + BRE_ALPHA_MAX) / 2; // the mean of the pulse (each sine averages 0.5): setting highway.breBand 'steady'
+export function breAlpha(t, lane, lanes, pulse = true) {
+  if (!pulse) return BRE_ALPHA_STEADY;
   const wave = 0.5 + 0.5 * Math.sin(2 * Math.PI * 1.8 * t - (lane / Math.max(1, lanes)) * 2 * Math.PI); // a chase across the lanes, 1.8 times a second
   const fast = 0.5 + 0.5 * Math.sin(2 * Math.PI * (2.4 + 0.3 * lane) * t + lane * 1.7); // each lane at its own speed
   const slow = 0.5 + 0.5 * Math.sin(2 * Math.PI * 0.7 * t + lane * 2.3);
@@ -490,11 +505,13 @@ function clipRows(P, v0, v1) {
   pts = half(pts, (v) => v <= v1, v1);
   return Float32Array.from(pts.flat());
 }
-// The top of the note can be cut: YNOTE_CUT is the fraction of the face height (design rows 16 .. 89) taken off the top. The cut note keeps the design's "ceiling": the flat top
-// with its rounded corner (7.4 units in, 5.5 down) is laid again at the cut line, on the cap's outer edge as it is there; the cap's inner edge and the body just end at the cut.
+// The top of the note can be cut: the cut is the fraction of the face height (design rows 16 .. 89) taken off the top (YNOTE_CUT by default, setting
+// highway.noteCut). The cut note keeps the design's "ceiling": the flat top with its rounded corner (7.4 units in, 5.5 down) is laid again at the cut line, on the
+// cap's outer edge as it is there; the cap's inner edge and the body just end at the cut. Everything below that depends on the cut is rebuilt by rebuildYNote.
 export const YNOTE_CUT = 1 / 3;
-const CUT_D = 73 * YNOTE_CUT;
-const YT = 16 + CUT_D; // the design row of the (new) top
+export const YNOTE_CUT_MAX = 0.4; // (past 0.4 the cut reaches the cap's inner curve at row 46 and the outline would fold)
+// The setting's percentage as a cut fraction: 33 is the design's one third exactly (so the default draws what it always drew).
+export const noteCutFraction = (pct) => (pct === 33 ? YNOTE_CUT : Math.min(YNOTE_CUT_MAX, Math.max(0, pct / 100)));
 const OUTER = [[18.6, 21.5], [11.8, 43], [10.8, 59.5], [14.9, 92]]; // the cap's outer edge below the corner: line, cubic (via 10.2 48.5, 10.1 54), line
 const cubicPt = (t) => { // the outer cubic from (11.8, 43) to (10.8, 59.5)
   const m = 1 - t;
@@ -510,25 +527,41 @@ const outerAt = (y) => { // the outer edge at design row y (y between the corner
   }
   return [10.8 + ((y - 59.5) * (14.9 - 10.8)) / (92 - 59.5), [[14.9, 92]]];
 };
-const [XE, OUTER_REST] = outerAt(YT + 5.5); // the outer edge where the corner ends
-const XI = 31.6 + ((46 - YT) * 7.4) / 30; // the cap's inner edge at the new top
-const YN_CAP = sampleDesign([XI, YT], [[XE + 7.4, YT], [XE + 2.9, YT, XE + 1, YT + 2, XE, YT + 5.5], ...OUTER_REST, [35.4, 92], [35, 89], [31.2, 60], [30.6, 55, 30.8, 50, 31.6, 46]]); // the left cap; the right one is mirrored
-const YN_BODY = sampleDesign([XI, YT], [[220 - XI, YT], [191.4, 46], [192.2, 50, 192.4, 55, 191.8, 60], [188, 89], [32, 89], [28.2, 60], [27.6, 55, 27.8, 50, 28.6, 46]]);
 const YN_BASE_TOP = sampleDesign([19, 84], [[201, 84], [203.8, 84, 204.7, 86.5], [205.5, 90.5], [14.5, 90.5], [15.3, 86.5], [16.2, 84, 19, 84]], 4);
 const YN_BASE_FRONT = sampleDesign([14.5, 90.5], [[205.5, 90.5], [205.5, 93.5, 203, 96, 200, 96], [20, 96], [17, 96, 14.5, 93.5, 14.5, 90.5]], 8); // the lower ends are quarter circles of the face's whole height
+let YT = 0; // the design row of the (new) top
+let XI = 0; // the cap's inner edge at the new top
+let YN_CAP = null; // the left cap; the right one is mirrored
+let YN_BODY = null;
+let YN_HOPO_STRIP = null; // the band beside a cap (HOPO / accent white strip)
+let YN_TAP_CENTRE = null; // the tap / ghost dark centre
+let CAP_SLABS = null;
 // The band beside a cap (HOPO / accent white strip): from under the cap to the cap's inner edge moved `s` units in; both sides go in one path.
 const strip = (s) => sampleDesign([30, YT], [[XI + s, YT], [31.6 + s, 46], [30.8 + s, 50, 30.6 + s, 55, 31.2 + s, 60], [35 + s, 89], [30, 89]]);
 // The tap / ghost dark centre: between two coloured strips of width `s`.
 const centre = (s) => sampleDesign([XI + s, YT], [[31.6 + s, 46], [30.8 + s, 50, 30.6 + s, 55, 31.2 + s, 60], [35 + s, 89], [185 - s, 89], [188.8 - s, 60], [189.4 - s, 55, 189.2 - s, 50, 188.4 - s, 46], [181 - s, 16]]);
-const YN_HOPO_STRIP = strip(30); // design units (0.3 of the half width, as before)
-const YN_TAP_CENTRE = centre(17);
-// The cap's shading follows its ridge, which is (nearly) a straight slanted line in three stretches: [top row, bottom row, ridge x at the top, at the bottom]
-// (design units). Each slab of the cap is filled with the cap profile sheared along its stretch; a slab reaches 0.6 units into the next one, which is drawn
-// over it, so their shared edge has no anti-aliasing seam.
-const CAP_SLABS = [[10, 45, 33.6, 26.6], [45, 60, 26.6, 26.2], [60, 100, 26.2, 30]].map(([y0, y1, x0, x1], i, all) => {
-  const m = (x1 - x0) / (y1 - y0); // ridge x per row
-  return { poly: clipRows(YN_CAP, y0 - YN_CY, (i < all.length - 1 ? y1 + 0.6 : y1) - YN_CY), u0: x0 - YN_CX, v0: y0 - YN_CY, m, uc: (x0 + x1) / 2 - YN_CX };
-});
+// Recomputes the cut-dependent polygons for a cut fraction (0 .. YNOTE_CUT_MAX) and drops the gradients that depend on the top row.
+export function rebuildYNote(cut = YNOTE_CUT) {
+  const c = Math.min(YNOTE_CUT_MAX, Math.max(0, Number(cut) || 0));
+  const CUT_D = 73 * c;
+  YT = 16 + CUT_D;
+  const [XE, OUTER_REST] = outerAt(YT + 5.5); // the outer edge where the corner ends
+  XI = 31.6 + ((46 - YT) * 7.4) / 30;
+  YN_CAP = sampleDesign([XI, YT], [[XE + 7.4, YT], [XE + 2.9, YT, XE + 1, YT + 2, XE, YT + 5.5], ...OUTER_REST, [35.4, 92], [35, 89], [31.2, 60], [30.6, 55, 30.8, 50, 31.6, 46]]);
+  YN_BODY = sampleDesign([XI, YT], [[220 - XI, YT], [191.4, 46], [192.2, 50, 192.4, 55, 191.8, 60], [188, 89], [32, 89], [28.2, 60], [27.6, 55, 27.8, 50, 28.6, 46]]);
+  YN_HOPO_STRIP = strip(30); // design units (0.3 of the half width, as before)
+  YN_TAP_CENTRE = centre(17);
+  // The cap's shading follows its ridge, which is (nearly) a straight slanted line in three stretches: [top row, bottom row, ridge x at the top, at the bottom]
+  // (design units). Each slab of the cap is filled with the cap profile sheared along its stretch; a slab reaches 0.6 units into the next one, which is drawn
+  // over it, so their shared edge has no anti-aliasing seam.
+  CAP_SLABS = [[10, 45, 33.6, 26.6], [45, 60, 26.6, 26.2], [60, 100, 26.2, 30]].map(([y0, y1, x0, x1], i, all) => {
+    const m = (x1 - x0) / (y1 - y0); // ridge x per row
+    return { poly: clipRows(YN_CAP, y0 - YN_CY, (i < all.length - 1 ? y1 + 0.6 : y1) - YN_CY), u0: x0 - YN_CX, v0: y0 - YN_CY, m, uc: (x0 + x1) / 2 - YN_CX };
+  });
+  ynShared = null; // (capV starts at the top row)
+  bodyGradients.clear(); // (so does every body gloss)
+  return c;
+}
 
 // Adds polygon P to the current path, mirrored when m = -1, with the base rows (below the body) scaled by `side` and the taper k applied.
 function traceYN(g, P, m, k, side) {
@@ -624,6 +657,7 @@ function bodyGradient(g, color) {
   }
   return gr;
 }
+rebuildYNote(YNOTE_CUT); // (after the gradient caches it resets exist)
 
 // Draws a rectangular note centred at (x, y) with half width hw and half height hh (the box of the 'ynote' outline). `bodyColor` is the body's flat colour (lane
 // colour, star power tint, held / exit tint), `laneColor` the plain lane colour (the strips of a star power tap). `taper` is the perspective taper per px of row

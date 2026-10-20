@@ -41,6 +41,9 @@ import {
   BAR_FLASH_SEC,
   PAD_FILL_ALPHA,
   PAD_RING_ALPHA,
+  padAlphas,
+  beatLineStyles,
+  HELD_SCALE,
   noteShape,
   fillHalo,
   spansOfKind,
@@ -56,7 +59,7 @@ export { firstVisibleIndex } from './gfx.js';
 import { renderLanes3D } from './highway3d.js';
 import { buildKaraokeLines, karaokeAt, syllableProgress } from './karaoke.js';
 import { countdownColors, vocalColors, mixHex } from './uicolors.js';
-import { waitCountdowns, countdownAt, countdownAlpha, measureStarts, measuresLeft, COUNTDOWN_HIDE_SEC } from './countdown.js';
+import { waitCountdowns, countdownAt, countdownAlpha, measureStarts, measuresLeft, COUNTDOWN_HIDE_SEC, MIN_COUNTDOWN_SEC } from './countdown.js';
 
 const RECT_WIDEN_2D = 1.18;
 // (a loop, not Math.max(...spread): a spread of >~120k notes throws a RangeError)
@@ -98,6 +101,7 @@ const lyricFont = (size) => {
 };
 const trackStyles = new Map(); // alpha -> [black, white] fill styles of trackBase
 const NO_SHIFTS = [];
+const NO_BEATS = [];
 const VOC_GLOW_HOLD = 0.22; // seconds the vocal hit glow stays after the voice stops (a shorter gap does not dim it at all)
 const VOC_GLOW_FADE = 0.35; // and then fades out over this long
 const REPLAY_ALPHA = 0.5; // (they are also drawn almost without colour: DISABLED_FILTER)
@@ -152,6 +156,23 @@ export class Highway {
     this._fillBand = false; // the green band during a drum fill (setting highway.fillBand, off by default; the big rock ending band always shows)
     this._starPowerBand = false; // the gold band under a star power phrase (setting highway.starPowerBand, off by default)
     this._trackOpacity = 0.75; // how opaque the board of a fretboard is (setting highway.trackOpacity)
+    // The look of the notes and the board (settings of the Highway "Notes" and "Track and bands" groups; 1 / true = the original look)
+    this._noteSize = 1; // note heads and pads (highway.noteScale)
+    this._noteBase = 1; // height of the rectangular note's base (highway.noteBase)
+    this._sustainWidth = 1; // tail width (highway.sustainWidth)
+    this._kickBar = 1; // pedal / open bar thickness (highway.kickBarHeight)
+    this._heldMotion = true; // the held note's swell, tail shimmer and pad flicker (highway.heldPulse)
+    this._padLook = 1; // opacity of the resting pads (highway.padLook)
+    this.padFill = PAD_FILL_ALPHA;
+    this.padRing = PAD_RING_ALPHA;
+    this._beatLines = 'normal'; // highway.beatLines
+    this.beatStyles = { '2d': beatLineStyles('normal', '2d'), '3d': beatLineStyles('normal', '3d') };
+    this._laneStripes = true; // the alternate lane tint (highway.laneStripes)
+    this._soloBand = true; // highway.soloBand
+    this._breBand = 'pulse'; // the big rock ending band: 'off', 'steady' or 'pulse' (highway.breBand, made steady by reduced motion in app.js)
+    this._lyricScale = 1; // vocal lyrics size (highway.lyricSize)
+    this._lyricOutline = true; // the dark outline under the lyrics (highway.lyricOutline)
+    this._countdownMin = MIN_COUNTDOWN_SEC; // shortest rest that gets a countdown (highway.countdownMin)
     this.visualizer = null; // (g, w, h, t, bgRgb) => draws the shared background behind every pane, or null (src/visualizers.js)
     this.dirtyAt = 0; // performance.now() of the last change to what is drawn (see invalidate); the page skips idle redraws until it is old
   }
@@ -169,6 +190,37 @@ export class Highway {
   set starPowerBand(v) { this._starPowerBand = v; this.invalidate(); }
   get trackOpacity() { return this._trackOpacity; }
   set trackOpacity(v) { this._trackOpacity = v; this.invalidate(); }
+  get noteSize() { return this._noteSize; }
+  set noteSize(v) { this._noteSize = v; this.invalidate(); }
+  get noteBase() { return this._noteBase; }
+  set noteBase(v) { this._noteBase = v; this.invalidate(); }
+  get sustainWidth() { return this._sustainWidth; }
+  set sustainWidth(v) { this._sustainWidth = v; this.invalidate(); }
+  get kickBar() { return this._kickBar; }
+  set kickBar(v) { this._kickBar = v; this.invalidate(); }
+  get heldMotion() { return this._heldMotion; }
+  set heldMotion(v) { this._heldMotion = v; this.invalidate(); }
+  get padLook() { return this._padLook; }
+  set padLook(v) { this._padLook = v; [this.padFill, this.padRing] = padAlphas(v); this.invalidate(); }
+  get beatLines() { return this._beatLines; }
+  set beatLines(v) { this._beatLines = v; this.beatStyles = { '2d': beatLineStyles(v, '2d'), '3d': beatLineStyles(v, '3d') }; this.invalidate(); }
+  get laneStripes() { return this._laneStripes; }
+  set laneStripes(v) { this._laneStripes = v; this.invalidate(); }
+  get soloBand() { return this._soloBand; }
+  set soloBand(v) { this._soloBand = v; this.invalidate(); }
+  get breBand() { return this._breBand; }
+  set breBand(v) { this._breBand = v; this.invalidate(); }
+  get lyricScale() { return this._lyricScale; }
+  set lyricScale(v) { this._lyricScale = v; this.invalidate(); }
+  get lyricOutline() { return this._lyricOutline; }
+  set lyricOutline(v) { this._lyricOutline = v; this.invalidate(); }
+  get countdownMin() { return this._countdownMin; }
+  set countdownMin(v) { // the countdown lists are cached per pane: rebuilt with the new minimum
+    if (v === this._countdownMin) return;
+    this._countdownMin = v;
+    for (const p of this.panes) { p.countdowns = undefined; p.countdownsLyrics = undefined; p.railCtx = undefined; }
+    this.invalidate();
+  }
 
   // Marks the picture as stale: the page keeps redrawing every frame for a while after this (it skips frames only when paused and idle).
   invalidate() {
@@ -630,11 +682,11 @@ export class Highway {
     }
   }
 
-  // The wait countdown: while the chart has nothing to play for 9 s or more, the seconds until its next note, in a ring that
+  // The wait countdown: while the chart has nothing to play for `countdownMin` (9 s) or more, the seconds until its next note, in a ring that
   // empties (YARG's WaitCountdown). Drawn over the pane's centre.
   // The rests of the lyric views (karaoke): percussion hits are no singing.
   lyricGaps(pane) {
-    pane.countdownsLyrics ??= waitCountdowns(pane.chart, { percussion: false });
+    pane.countdownsLyrics ??= waitCountdowns(pane.chart, { percussion: false, min: this.countdownMin });
     return this.countdowns ? pane.countdownsLyrics : [];
   }
 
@@ -652,7 +704,7 @@ export class Highway {
       }
       const lines = this.karaokeLines(pane, 'main');
       const duration = Math.max(pane.chart.duration || 0, lines.length ? lines[lines.length - 1].end : 0, hits.length ? hits[hits.length - 1] : 0, 1);
-      return { pauses: waitCountdowns(pane.chart, { percussion: false }), perc, duration };
+      return { pauses: waitCountdowns(pane.chart, { percussion: false, min: this.countdownMin }), perc, duration };
     })();
     return { gaps: this.lyricGaps(pane), ...pane.railCtx };
   }
@@ -686,8 +738,8 @@ export class Highway {
 
   countdownState(pane, t, lyrics = false) {
     if (!this.countdowns) return null;
-    if (lyrics) pane.countdownsLyrics ??= waitCountdowns(pane.chart, { percussion: false }); // karaoke: percussion hits are no singing
-    else pane.countdowns ??= waitCountdowns(pane.chart);
+    if (lyrics) pane.countdownsLyrics ??= waitCountdowns(pane.chart, { percussion: false, min: this.countdownMin }); // karaoke: percussion hits are no singing
+    else pane.countdowns ??= waitCountdowns(pane.chart, { min: this.countdownMin });
     const c = countdownAt(lyrics ? pane.countdownsLyrics : pane.countdowns, t);
     if (!c || c.remaining <= COUNTDOWN_HIDE_SEC) return null; // (YARG hides it 1.5 s before the notes: faded out by 1 s)
     let label;
@@ -742,8 +794,8 @@ export class Highway {
 
   vocalCenterY(chart, h, w = Infinity) {
     const second = (chart.lyrics2 || []).length > 0;
-    const secondSize = Math.max(15, Math.min(26, h * 0.08));
-    const fontSize = Math.max(24, Math.min(36, h * 0.095));
+    const secondSize = Math.max(15, Math.min(26, h * 0.08)) * this.lyricScale;
+    const fontSize = Math.max(24, Math.min(36, h * 0.095)) * this.lyricScale;
     const lyricY = h - fontSize * 0.75;
     const bottom = lyricY - fontSize * 0.5 - 16;
     const top = Math.max(second ? secondSize * 0.75 + secondSize * 0.75 : 8, bottom - this.vocalMaxArea(w));
@@ -799,9 +851,11 @@ export class Highway {
     g.lineJoin = 'round';
     line.syl.forEach((syl, i) => {
       const sw = g.measureText(syl.text).width;
-      g.lineWidth = Math.max(3, sz * 0.14);
-      g.strokeStyle = 'rgba(0,0,0,0.65)';
-      g.strokeText(syl.text, x, cy);
+      if (this.lyricOutline) {
+        g.lineWidth = Math.max(3, sz * 0.14);
+        g.strokeStyle = 'rgba(0,0,0,0.65)';
+        g.strokeText(syl.text, x, cy);
+      }
       g.fillStyle = `rgba(255,255,255,${alpha})`;
       g.fillText(syl.text, x, cy);
       const p = prog ? prog[i] : 0;
@@ -857,7 +911,7 @@ export class Highway {
 
   // A lyric sheet that scrolls, drawn at the current origin of the canvas (which sits at x0, y0 of the whole canvas): it
   // follows the line being sung (that line is filled as it goes, and bigger); wheel / drag moves it by hand and it glides
-  // back to the singer a few seconds after you stop. Clicking a line seeks to it. Rests of 9 s or more get a countdown row
+  // back to the singer a few seconds after you stop. Clicking a line seeks to it. Rests of `countdownMin` (9 s) or more get a countdown row
   // between the lines: ring and seconds counting down while it runs, the length of the rest before and after.
   renderLyricSheet(t, w, h, lines, state, x0 = 0, y0 = 0, ctx = { gaps: [], pauses: [], perc: [], duration: 1 }) {
     const gaps = ctx.gaps;
@@ -889,7 +943,7 @@ export class Highway {
     // Sizes: the font stays the same (it does not follow the height) while the previous, current and next lines fit; it only
     // shrinks when they cannot.
     const peekPx = h * this.sheetPeek; // how much of the lines before the focus shows at the top: a share of the sheet's height
-    let big = Math.max(18, Math.min(46, w * 0.06));
+    let big = Math.max(18, Math.min(46, w * 0.06)) * this.lyricScale; // (setting highway.lyricSize)
     let small = Math.max(14, big * 0.72);
     let step = Math.max(small * 1.55, big * 1.15);
     while (big > 16 && peekPx - small * 0.5 + step * 2 + small * 0.6 > h) {
@@ -1262,14 +1316,16 @@ export class Highway {
     g.globalAlpha = boardK;
     // star power / solo bands
     if (this.starPowerBand) this.fillSpans(chart.starPower, t, ahead, x0, laneW * chart.lanes, h, STAR_POWER_BAND);
-    this.fillSpans(chart.solos, t, ahead, x0, laneW * chart.lanes, h, SOLO_BAND);
+    if (this.soloBand) this.fillSpans(chart.solos, t, ahead, x0, laneW * chart.lanes, h, SOLO_BAND);
     // drum fills / big rock endings (YARG activation phrases and BRE), a faint band under the notes
     for (let i = 0; i < FILL_KINDS.length; i++) {
       if (FILL_KINDS[i] === 'fill' && !this.fillBand) continue;
+      if (FILL_KINDS[i] === 'bre' && this.breBand === 'off') continue;
       const spans = spansOfKind(chart, chart.fills, 'kind', FILL_KINDS[i]);
       if (FILL_KINDS[i] === 'bre') { // the big rock ending: every lane in its own colour, pulsing (see breAlpha)
         const cols = chart.laneColors || GUITAR_LANE_COLORS;
-        for (let l = 0; l < chart.lanes; l++) this.fillSpans(spans, t, ahead, x0 + l * laneW, laneW, h, withAlpha(cols[l] || cols[0], breAlpha(t, l, chart.lanes)));
+        const pulseBre = this.breBand === 'pulse';
+        for (let l = 0; l < chart.lanes; l++) this.fillSpans(spans, t, ahead, x0 + l * laneW, laneW, h, withAlpha(cols[l] || cols[0], breAlpha(t, l, chart.lanes, pulseBre)));
       } else this.fillSpans(spans, t, ahead, x0, laneW * chart.lanes, h, FILL_COLORS[FILL_KINDS[i]]);
     }
     // drum rolls: one band per roll type (kick roll, tremolo lane, trill lane)
@@ -1278,19 +1334,20 @@ export class Highway {
     }
 
     // beat lines
-    const beats = chart.beats;
+    const beatStyle = this.beatStyles['2d'];
+    const beats = beatStyle ? chart.beats : NO_BEATS; // (setting highway.beatLines: off draws none)
     for (let i = 0; i < beats.length; i++) {
       const b = beats[i];
       if (b.time > t + ahead) continue;
       const y = laneY(b.time);
       if (y > h) continue; // already below the screen; lines above the top are clipped by the canvas
-      g.fillStyle = b.measure ? 'rgba(255,255,255,0.35)' : b.strong ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.12)'; // measure, strong beat (the middle of an even measure), weak beat
+      g.fillStyle = b.measure ? beatStyle[0] : b.strong ? beatStyle[1] : beatStyle[2]; // measure, strong beat (the middle of an even measure), weak beat
       g.fillRect(x0, y, laneW * chart.lanes, b.measure ? 2 : b.strong ? 1.5 : 1);
     }
 
     // lane guides
     g.fillStyle = 'rgba(255,255,255,0.04)';
-    for (let i = 0; i < chart.lanes; i++) {
+    for (let i = 0; i < chart.lanes && this.laneStripes; i++) {
       if (i % 2 === 0) g.fillRect(x0 + i * laneW, 0, laneW, h); // down to the bottom edge, where it fades out
     }
     g.globalAlpha = 1;
@@ -1301,8 +1358,10 @@ export class Highway {
     const notes = chart.notes;
     let end = from; // the notes that can be seen are notes[from .. end)
     while (end < notes.length && notes[end].time <= t + ahead) end++;
-    const radius = Math.min(laneW * 0.36, 26);
+    const radius = Math.min(laneW * 0.36, 26) * this.noteSize; // (setting highway.noteScale: heads and pads)
     const colors = chart.laneColors || GUITAR_LANE_COLORS;
+    const tailW = this.sustainWidth;
+    const held = this.heldMotion; // (setting highway.heldPulse: off keeps the held head, tail and pad still)
     const wide = this.noteStyle === 'rect' ? RECT_WIDEN_2D : 1; // 2D rounded rectangles are a bit wider than the shared shape
 
     // hit pads, like the 3D view: a ring per lane at the hit line, lit when a note is hit, while a long note is held,
@@ -1311,15 +1370,16 @@ export class Highway {
     const flash = FLASH_2D;
     flash.fill(0, 0, chart.lanes);
     let barFlash = 0;
-    const shimmer = tailShimmer(t); // (the same for every note of the frame)
-    const pulse = heldPulse(t);
+    const shimmer = held ? tailShimmer(t) : 0.5; // (the same for every note of the frame)
+    const pulse = held ? heldPulse(t) : HELD_SCALE;
+    const flicker = held ? 0.15 * Math.sin(t * 22) : 0;
     for (let vi = from; vi < end; vi++) {
       const n = notes[vi];
       const past = t - n.time;
       if (past < 0) continue;
       if (n.lane >= 0 && !n.open) {
         if (past < HIT_FLASH_SEC) flash[n.lane] = Math.max(flash[n.lane], 1 - past / HIT_FLASH_SEC);
-        flash[n.lane] = Math.max(flash[n.lane], heldAmount(n, t) * (0.75 + 0.15 * Math.sin(t * 22)));
+        flash[n.lane] = Math.max(flash[n.lane], heldAmount(n, t) * (0.75 + flicker));
       } else if (past < BAR_FLASH_SEC) {
         barFlash = Math.max(barFlash, 1 - past / BAR_FLASH_SEC);
       }
@@ -1328,10 +1388,10 @@ export class Highway {
       g.beginPath();
       const cymbalLane = chart.laneKinds?.[i] === 'cymbal'; // extended drums: the cymbal lanes have triangle pads
       noteShape(g, x0 + (i + 0.5) * laneW, hitY, radius * 1.05 * (cymbalLane ? 1 : wide), radius * 1.05, cymbalLane ? 'tri' : this.noteStyle);
-      g.fillStyle = withAlpha(colors[i], Math.min(0.9, PAD_FILL_ALPHA + 0.5 * flash[i] + 0.35 * barFlash));
+      g.fillStyle = withAlpha(colors[i], Math.min(0.9, this.padFill + 0.5 * flash[i] + 0.35 * barFlash));
       g.fill();
       g.lineWidth = 2;
-      g.strokeStyle = withAlpha(colors[i], Math.min(1, PAD_RING_ALPHA + (1 - PAD_RING_ALPHA) * Math.max(flash[i], barFlash)));
+      g.strokeStyle = withAlpha(colors[i], Math.min(1, this.padRing + (1 - this.padRing) * Math.max(flash[i], barFlash)));
       g.stroke();
     }
 
@@ -1346,7 +1406,7 @@ export class Highway {
       const k = Math.max(0, past) / FADE_SEC; // same exit animation as the other heads
       const cy = laneY(Math.max(n.time, t));
       const full = laneW * chart.lanes;
-      const height = KICK_BAR_HALF_H * 2 * (1 + 0.4 * k);
+      const height = KICK_BAR_HALF_H * this.kickBar * 2 * (1 + 0.4 * k); // (setting highway.kickBarHeight)
       g.globalAlpha = 1 - k;
       g.fillStyle = tintWhite(n.open ? OPEN_COLOR : chart.drumKind === 'five' ? KICK_COLOR_5 : KICK_COLOR, k);
       // double kick: a second bar stacked above the first
@@ -1371,13 +1431,13 @@ export class Highway {
       // held (active): the whole tail is lighter, more opaque and slowly brightens and dims (no extra shapes)
       const amt = heldAmount(n, t); // fades in after the hit
       g.fillStyle = withAlpha(noteColor(n, colors), 0.55 + 0.25 * amt);
-      g.fillRect(cx - rad * 0.35, yTop, rad * 0.7, Math.max(0, yBot - yTop));
+      g.fillRect(cx - rad * 0.35 * tailW, yTop, rad * 0.7 * tailW, Math.max(0, yBot - yTop)); // (tailW: setting highway.sustainWidth)
       if (amt > 0) {
         g.fillStyle = `rgba(255,255,255,${amt * (0.3 + 0.12 * shimmer)})`;
-        g.fillRect(cx - rad * 0.35, yTop, rad * 0.7, Math.max(0, yBot - yTop));
+        g.fillRect(cx - rad * 0.35 * tailW, yTop, rad * 0.7 * tailW, Math.max(0, yBot - yTop));
         // soft halo around the tail while it is played, with a rounded end (the cap only if the end is on screen)
         g.globalCompositeOperation = 'lighter';
-        fillTailHalo(g, noteColor(n, colors), cx, rad * 0.35, rad * 1.1, yTop, yBot, 0.11 * amt, n.time + n.length <= t + ahead);
+        fillTailHalo(g, noteColor(n, colors), cx, rad * 0.35 * tailW, rad * 1.1, yTop, yBot, 0.11 * amt, n.time + n.length <= t + ahead);
         g.globalCompositeOperation = 'source-over';
       }
     }
@@ -1408,7 +1468,7 @@ export class Highway {
       }
       const faced = !n.cymbal && this.noteStyle === 'rect'; // a note in the rectangular style: the vector note after the design (chrome caps, coloured band, base)
       if (faced) {
-        drawYNote(g, cx, cy, r * wide * NOTE_RECT_W, r * NOTE_RECT_H, n, colors[n.lane], tintWhite(n.sp ? noteColor(n, colors) : colors[n.lane], white), 0, YNOTE_SIDE_2D);
+        drawYNote(g, cx, cy, r * wide * NOTE_RECT_W, r * NOTE_RECT_H, n, colors[n.lane], tintWhite(n.sp ? noteColor(n, colors) : colors[n.lane], white), 0, YNOTE_SIDE_2D * this.noteBase);
         if (n.accent) {
           g.beginPath();
           noteShape(g, cx, cy, r * wide, r, 'ynote');
@@ -1476,10 +1536,10 @@ export class Highway {
     const lo = range[0];
     const hi = range[1];
     const second = (chart.lyrics2 || []).length > 0; // harmony charts: the other voices' own words get a line above the chart
-    const secondSize = Math.max(15, Math.min(26, h * 0.08));
+    const secondSize = Math.max(15, Math.min(26, h * 0.08)) * this.lyricScale; // (setting highway.lyricSize)
     const secondY = secondSize * 0.75; // the harmony line (and its track) sits right at the top edge
     let top = second ? secondY + secondSize * 0.75 : 8; // pitch area: below the second lyric line, if any, down to the lyrics
-    const fontSize = Math.max(24, Math.min(36, h * 0.095)); // lyric size, grows with the band
+    const fontSize = Math.max(24, Math.min(36, h * 0.095)) * this.lyricScale; // lyric size, grows with the band
     const lyricY = h - fontSize * 0.75; // the lyrics and their track sit right at the bottom edge of the window
     const bottom = lyricY - fontSize * 0.5 - 16; // and 16 px of air between them and the notes
     top = Math.max(top, bottom - this.vocalMaxArea(w)); // wide and low, like YARG's track: the notes stay close to the lyrics
@@ -1614,10 +1674,12 @@ export class Highway {
       prevRight = x + l.vw;
       if (l.time < t - behind - 0.8) continue;
       const sungUntil = l.end > l.time ? l.end : list[i + 1]?.time ?? Infinity; // the paired note's end, else the next syllable
-      g.lineWidth = Math.max(3, size * 0.16); // a dark outline under the letters, so they read over any background
-      g.strokeStyle = 'rgba(0,0,0,0.85)';
-      g.lineJoin = 'round';
-      g.strokeText(l.text, x, y);
+      if (this.lyricOutline) { // a dark outline under the letters, so they read over any background (setting highway.lyricOutline)
+        g.lineWidth = Math.max(3, size * 0.16);
+        g.strokeStyle = 'rgba(0,0,0,0.85)';
+        g.lineJoin = 'round';
+        g.strokeText(l.text, x, y);
+      }
       g.fillStyle = l.time > t ? colors[0] : t < sungUntil ? colors[1] : colors[2];
       g.fillText(l.text, x, y);
     }
