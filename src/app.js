@@ -3558,6 +3558,7 @@ const EFFECTS = {
   'highway.kickBarHeight': (v) => { highway.kickBar = v / 100; },
   'highway.padLook': (v) => { highway.padLook = v / 100; },
   'highway.heldPulse': (v) => { highway.heldMotion = !!v; },
+  'highway.leftHanded': (v) => { highway.leftHanded = !!v; },
   'highway.lyricSize': (v) => { highway.lyricScale = v / 100; },
   'highway.lyricOutline': (v) => { highway.lyricOutline = !!v; },
   'highway.countdownMin': (v) => { highway.countdownMin = Number(v) || 9; },

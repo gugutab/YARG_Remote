@@ -125,6 +125,20 @@ export function focusShowing(i, focus, per, total) {
   return Math.max(0, Math.min(Math.max(0, total - per), f));
 }
 
+// Left-handed play flips each lane layer left to right when it is drawn; text drawn into the layer is mirrored in advance (around the pane width)
+// so the final flip makes it read normally and keep its place. Removed with `delete ctx.fillText` after the frame.
+function mirrorText(g, w) {
+  const wrap = (fn) => function (text, x, y, maxWidth) {
+    this.save();
+    this.translate(w - x, y);
+    this.scale(-1, 1);
+    if (maxWidth === undefined) fn.call(this, text, 0, 0); else fn.call(this, text, 0, 0, maxWidth);
+    this.restore();
+  };
+  g.fillText = wrap(CanvasRenderingContext2D.prototype.fillText);
+  g.strokeText = wrap(CanvasRenderingContext2D.prototype.strokeText);
+}
+
 export class Highway {
   constructor(canvas) {
     this.canvas = canvas;
@@ -176,6 +190,7 @@ export class Highway {
     this._noteBase = 1; // height of the rectangular note's base (highway.noteBase)
     this._sustainWidth = 1; // tail width (highway.sustainWidth)
     this._kickBar = 1; // pedal / open bar thickness (highway.kickBarHeight)
+    this.leftHanded = false; // the lanes of the guitar-like and drum windows run right to left (highway.leftHanded)
     this._heldMotion = true; // the held note's swell, tail shimmer and pad flicker (highway.heldPulse)
     this._padLook = 1; // opacity of the resting pads (highway.padLook)
     this.padFill = PAD_FILL_ALPHA;
@@ -712,14 +727,19 @@ export class Highway {
         lg.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.g = lg;
         this.layered = true;
+        const flip = this.leftHanded;
+        if (flip) mirrorText(lg, pw); // the layer is drawn flipped below: its text is pre-flipped so it still reads right
         try {
           if (this.view === '3d') renderLanes3D(this, t, pw, ph);
           else this.renderLanes(t, pw, ph);
         } finally {
           this.g = main;
           this.layered = false;
+          if (flip) delete lg.fillText, delete lg.strokeText;
         }
+        if (flip) { main.save(); main.translate(pw, 0); main.scale(-1, 1); }
         main.drawImage(layer, 0, 0, layer.width, layer.height, 0, 0, pw, ph);
+        if (flip) main.restore();
       }
       pane.vRange = this.vRange;
       if (!(pane.chart.mode === 'vocals' && this.vocalView === 'karaoke')) this.drawCountdown(pane, t, pw, ph);
