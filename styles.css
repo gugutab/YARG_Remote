@@ -2748,3 +2748,11 @@ button.icon.small-icon.sp-reset, #ppSlower, #ppFaster { min-width: 32px; min-hei
 /* the card star keeps its small box on touch / phone widths too (the 44 px rule above would grow the title row): the hit area grows instead */
 .library .fav-btn:not(.info-fav), #endNext .fav-btn { min-height: 0; min-width: 0; }
 @media (pointer: coarse), (max-width: 700px) { .fav-btn:not(.info-fav)::before { inset: -13px -10px; } }
+
+/* The Listen card folds to its title row */
+.listen-toggle { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; padding: 2px 4px 2px 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; min-height: 32px; width: auto; }
+.listen-toggle h3 { margin: 0; }
+.listen-toggle svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
+.card-listen.folded .listen-toggle svg { transform: rotate(-90deg); }
+.card-listen.folded .listen { display: none; }
+.card-listen.folded .card-head { margin-bottom: 0; }

@@ -381,6 +381,25 @@ els.libTab.addEventListener('click', () => {
 els.settingsTab.addEventListener('click', () => (settingsIsOpen() ? settingsPage.close() : settingsPage.open()));
 
 let listenQueued = false; // a press while the audio is still loading: it plays when ready (more presses meanwhile do nothing)
+// The Listen card can be folded to its title row: folded by default on a phone-width window (so the instrument tiles come up), open on wide ones; the user's choice is remembered.
+{
+  const toggle = $('listenToggle');
+  const card = toggle?.closest('.card-listen');
+  const phone = window.matchMedia('(max-width: 700px)');
+  const saved = () => { try { return localStorage.getItem('yargremote.listenFolded'); } catch { return null; } };
+  const apply = () => {
+    const folded = saved() === null ? phone.matches : saved() === '1';
+    card?.classList.toggle('folded', folded);
+    toggle?.setAttribute('aria-expanded', String(!folded));
+  };
+  toggle?.addEventListener('click', () => {
+    const folded = !card.classList.contains('folded');
+    try { localStorage.setItem('yargremote.listenFolded', folded ? '1' : '0'); } catch { /* optional */ }
+    apply();
+  });
+  phone.addEventListener?.('change', apply);
+  apply();
+}
 els.npPlay.addEventListener('click', async () => { // the Listen card: play here, without leaving the details
   clearPreview();
   if (listenQueued) return;

@@ -399,10 +399,10 @@
                   <ul id="infoMeta" class="chips-v"></ul>
                 </div>
                 <div class="card-listen">
-                  <div class="card-head"><h3>Listen</h3>
+                  <div class="card-head"><button id="listenToggle" class="listen-toggle" type="button" aria-expanded="true" aria-controls="listenBody" title="Show or hide the player"><h3>Listen</h3><svg aria-hidden="true"><use href="#i-chevron"/></svg></button>
                     <span id="npTime" class="listen-time">0:00 / 0:00</span>
                     <label id="npPreviewBox" class="listen-preview" title="Play only the preview section defined in song.ini" hidden><input id="npPreview" type="checkbox"> Preview</label></div>
-                  <div class="listen">
+                  <div class="listen" id="listenBody">
                     <button id="npPlay" class="icon primary" type="button" title="Listen here, without opening the chart" aria-label="Play or pause" disabled><svg><use href="#i-play"/></svg></button>
                     <div class="listen-seek">
                       <i class="listen-band" id="npBand" hidden></i>
