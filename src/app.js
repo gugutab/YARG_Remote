@@ -26,8 +26,9 @@ import { initTilesUi, buildInstrumentCard, buildInstrumentCards, vocalViewSeg, s
 import { initMixer, masterState, stemStates, groupList, buildMixer, applyStem, mixerRow, groupBlock, renderGroup } from './mixer-ui.js';
 import { createSettings } from './settings.js';
 import { SECTIONS, buildDefaults, buildValidator, FONT_OPTIONS, RENAMES, SETTINGS_VERSION, itemById, setMotionProbe } from './settings-schema.js';
-import { resolvePalette, applyPalette } from './palette.js';
-import { resolveTheme, applyTheme } from './themes.js';
+import { resolvePalette, applyPalette, PALETTES } from './palette.js';
+import { resolveTheme, applyTheme, PRESETS as THEME_PRESETS } from './themes.js';
+import { openOnboarding, shouldShowOnboarding, ONBOARDED_KEY } from './onboarding.js';
 import { mountSettings } from './settings-ui.js';
 import { renderThemeStudio, renderDataTools, renderShortcuts, renderLaneColors, renderPerInstrument } from './settings-custom.js';
 import { WIN_MARGIN, WIN_BORDER, SETTINGS_MIN_W, contentMaxFor } from './windowframe.js';
@@ -148,6 +149,7 @@ let infoOpen = false;
 let loadInfo = { state: 'idle', text: '', fraction: 0 };
 const PREF_DEFAULTS = buildDefaults();
 const settings = { speed: 1, neck: PREF_DEFAULTS['highway.neck'], chartDelay: 0 }; // (neck: the user's starting value is applied by the highway.neck EFFECT)
+let latencyBase = 0; // seconds: the audio.latency setting, the starting chart delay of every song
 let remote = false; // library comes from server.mjs (/api/library); no folder permission needed
 let detached = false; // list restored from storage without file access (browsers without showDirectoryPicker)
 let pendingSongId = null; // song clicked while detached; opened once the folder is picked again
@@ -1641,7 +1643,7 @@ initMixer({ els, store, prefs, player, current: () => current, liveStage: () => 
 
 // Settings: one value each, shown by every [data-setting] slider (menu popover and info screen). The neck's "default" (what a reset
 // restores) is the user's starting value, the highway.neck setting.
-const SETTING_DEFAULTS = { speed: 1, get neck() { return prefs.get('highway.neck'); }, chartDelay: 0 };
+const SETTING_DEFAULTS = { speed: 1, get neck() { return prefs.get('highway.neck'); }, get chartDelay() { return latencyBase; } };
 const SETTING_FORMAT = {
   speed: (v) => `${Number(v.toFixed(2))}×`, // (also the bar's readout, the quick settings and the speed note)
   neck: (v) => `${v.toFixed(1)}×`,
@@ -3552,6 +3554,12 @@ const EFFECTS = {
   'playback.keepSongInfo': (v) => { if (!v && els.songInfo.classList.contains('show') && !startDone) scheduleInfoHide(INFO_FIRST_PLAY_MS); },
   'ui.animations': () => { document.documentElement.dataset.motion = motionPref('ui.animations') ? 'on' : 'off'; },
   'ui.reduceMotion': () => { EFFECTS['ui.animations'](); EFFECTS['highway.breBand'](prefs.get('highway.breBand')); },
+  'audio.latency': (v) => { // the new starting chart delay; a delay the user has not moved off the old one follows it
+    const next = v / 1000;
+    const follows = Math.abs(settings.chartDelay - latencyBase) < 1e-9;
+    latencyBase = next;
+    setSetting('chartDelay', follows ? next : settings.chartDelay);
+  },
   'highway.neck': (v) => setSetting('neck', v), // the starting neck speed; also what the tracks' own neck speed resets to
   'highway.palette': applyNotePalette,
   'highway.laneColors': applyNotePalette,
@@ -3578,6 +3586,7 @@ const settingsPage = mountSettings({
     'data.tools': (host, ctx) => renderDataTools(host, {
       ...ctx, notify: setStatus,
       extra: [
+        { label: 'Run setup again', help: 'Opens the welcome steps: songs folder, look and sync check.', run: () => { runWelcome(); return 'Welcome steps opened.'; } },
         { label: 'Clear thumbnail cache', help: 'Album thumbnails are rebuilt as you scroll.', run: async () => { await clearThumbs(); return 'Thumbnail cache cleared; thumbnails are rebuilt as you scroll.'; } },
         { label: 'Clear play history', help: 'Forgets when you last played each song and how many times. Your favourites stay.', confirm: 'Forget when you played each song and how many times?', run: async () => {
           playHistory = new Map();
@@ -3606,3 +3615,21 @@ attachScrollThumb(document.querySelector('#settingsPage .sp-content')); // the s
 
 // ---------- Deep links (src/deeplink.js; initDeepLinks is called near the top) ----------
 window.addEventListener('hashchange', openFromHash);
+
+// ---------- Welcome (src/onboarding.js): first run, and "Run setup again" in Settings ----------
+function runWelcome() {
+  openOnboarding({
+    prefs,
+    themes: THEME_PRESETS.map((t) => ({ id: t.id, name: t.name, bg: t.vars.bg, accent: t.vars.accent })),
+    palettes: PALETTES.filter((p) => p.lanes),
+    pickFolder: () => pickFolder(),
+    songCount: () => songs.length,
+    done: (finished) => { if (finished) setLibraryOpen(true); },
+  });
+}
+{
+  let seen = false;
+  try { seen = localStorage.getItem(ONBOARDED_KEY) === '1'; } catch { /* optional */ }
+  if (shouldShowOnboarding({ onboarded: seen, changedCount: Object.keys(prefs.changed()).length, hash: location.hash })) runWelcome();
+  else if (!seen) { try { localStorage.setItem(ONBOARDED_KEY, '1'); } catch { /* optional */ } } // (a returning user, or a song link: never welcomed)
+}
