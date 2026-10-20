@@ -1,6 +1,7 @@
 // 3D view of the note highway: a perspective projection drawn on the same 2D canvas (no WebGL, no libraries),
 // so it stays light enough for phones. Only the lane instruments (guitar, bass, keys, drums) have a highway;
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
+import { drawNoteSprite } from './notesprite.js';
 import {
   GUITAR_LANE_COLORS, breAlpha, drawGuitarNoteFace, drawCymbalFace, NOTE_RECT_W, NOTE_RECT_H, KICK_COLOR, KICK_COLOR_5, STAR_POWER_GOLD, OPEN_COLOR, TAP_COLOR, ACCENT_OUTLINE_WIDTH,
   ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
@@ -344,6 +345,7 @@ export function renderLanes3D(hw, t, w, h) {
     const disc = n.cymbal && hw.noteStyle === 'rect'; // ...and a cymbal is a chrome disc with a coloured cone
     const body = tintWhite(n.sp ? noteColor(n, colors) : n.tap && !faced ? TAP_COLOR : colors[n.lane], Math.min(1, kx + amt * (0.32 + 0.12 * shimmer))); // an active long note's head is lighter, like its tail
     g.globalAlpha = (1 - kx) * hw.noteAlpha(n) * Math.min(1, (1 - d) / FADE_IN);
+    if (faced && drawNoteSprite(g, n, colors[n.lane], x, y, rx * NOTE_RECT_W, Math.min(1, kx + amt * (0.32 + 0.12 * shimmer)))) continue; // the SVG note design (notesprite.js), once its sprite is ready
     // thickness: a thin darker edge underneath the top face (no cast shadow; all of it moves, grows and fades with the note)
     const th = Math.max(0.5, rx * (faced || disc ? 0.27 : 0.21)); // (a little thicker in the rectangular style)
     const headStyle = disc ? 'round' : n.cymbal ? 'tri' : hw.noteStyle; // cymbals: a disc in the rectangular style, else a rounded triangle
