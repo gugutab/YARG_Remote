@@ -175,8 +175,8 @@ export function highlightRanges(text, terms) {
   return merged;
 }
 
-// filters: { query, instruments: [], minLevel, genre, decade, instrument (old single value) }
-export function filterSongs(songs, { query = '', instruments = [], instrument = '', minLevel = 0, genre = '', decade = 0, pack = '' } = {}) {
+// filters: { query, instruments: [], minLevel, maxLevel (0 = no limit; songs with an unknown level are kept out when a limit is set), genre, decade, instrument (old single value) }
+export function filterSongs(songs, { query = '', instruments = [], instrument = '', minLevel = 0, maxLevel = 0, genre = '', decade = 0, pack = '' } = {}) {
   const { terms, fields } = parseQuery(query);
   const wanted = [...new Set([...instruments, ...(instrument ? [instrument] : [])])];
   const normTerms = terms.map(flat).filter(Boolean);
@@ -189,6 +189,10 @@ export function filterSongs(songs, { query = '', instruments = [], instrument = 
     if (minLevel > 0) { // every selected instrument reaches the level; with none selected, any instrument does
       const reaches = (i) => (levelOf(s, i) ?? -1) >= minLevel;
       if (!(wanted.length ? wanted.every(reaches) : INSTRUMENTS.some(reaches))) return false;
+    }
+    if (maxLevel > 0) { // every selected instrument stays at or under the level; with none selected, any instrument with a known level does
+      const within = (i) => { const l = levelOf(s, i); return l !== null && l <= maxLevel; };
+      if (!(wanted.length ? wanted.every(within) : INSTRUMENTS.some(within))) return false;
     }
     if (genres.length && !genres.includes(s.ini?.genre)) return false; // within one filter any value matches; filters combine with AND
     if (packList.length && !packList.includes(packOf(s))) return false;

@@ -59,6 +59,9 @@ test('query fields, instruments, levels and decades filter the list', async () =
   assert.deepEqual(names({ query: 'inst:drums' }), ['Highway Star', 'Bohemian', 'Smells Like']); // lenient: a song without a drums key is kept
   assert.deepEqual(names({ instruments: ['guitar', 'drums'], minLevel: 3 }), ['Highway Star']);
   assert.deepEqual(names({ minLevel: 5 }), ['Highway Star']);
+  assert.deepEqual(names({ maxLevel: 3 }), ['Bohemian', 'Smells Like']); // any instrument with a known level at or under 3
+  assert.deepEqual(names({ instruments: ['guitar', 'drums'], maxLevel: 3 }), ['Smells Like']); // every selected instrument stays under
+  assert.deepEqual(names({ minLevel: 2, maxLevel: 3, instruments: ['guitar'] }), ['Bohemian', 'Smells Like']);
   assert.deepEqual(names({ decade: 1990 }), ['Smells Like']);
   assert.deepEqual(names({ query: 'year:' }), ['Highway Star', 'Bohemian', 'Smells Like']); // an unfinished token filters nothing
   assert.deepEqual(decadesOf(all), [1990, 1970]);
