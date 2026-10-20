@@ -1908,7 +1908,8 @@ function setSetting(name, value) {
 // The mouse wheel over any slider moves it (up = more, 5 notches... one step per notch; a slider with many steps moves 2% of its range per
 // notch); touchpads give fractions, which add up. The seek bar keeps its own wheel (5 s per notch). Listeners elsewhere hear a normal `input`.
 let wheelAcc = new WeakMap();
-// The (non-passive) listener sits on each range input, not on the document, so scrolling lists never waits for the main thread.
+// The (non-passive) listener sits on each range input, not on the document, so scrolling lists never waits for the main thread. It is bound lazily, the first
+// time the pointer goes over the slider or it takes the focus (one passive delegated listener each; no MutationObserver over the document).
 function onRangeWheel(e) {
   const el = e.currentTarget;
   if (el.disabled) return;
@@ -1929,7 +1930,8 @@ function onRangeWheel(e) {
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }
 // The other sliders (settings, the pause panel, the visualizer menu, the Listen card) get the same custom look: they are painted here, whatever sets their value
-// (an input event, a script assigning .value, a new min / max).
+// (an input event, a script assigning .value, .min or .max; the static ones once at start, and again when the pointer or the focus reaches them).
+// Every such slider is given its value through `.value` after it is built (settings refreshers, syncMetPop, the visualizer menu, the Listen card).
 const GENERIC_RANGE = '.sp-range input[type=range], .pp-row input[type=range], .viz-level input[type=range], .listen input[type=range], .now-playing input[type=range]';
 function paintGenericRange(el) {
   if (!el.matches?.(GENERIC_RANGE)) return;
@@ -1937,34 +1939,23 @@ function paintGenericRange(el) {
   const span = Number(el.max || 100) - min || 1;
   el.style.setProperty('--p', String(Math.min(1, Math.max(0, (Number(el.value) - min) / span))));
 }
-const rangeValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
-Object.defineProperty(HTMLInputElement.prototype, 'value', { ...rangeValue, set(v) { rangeValue.set.call(this, v); if (this.type === 'range') paintGenericRange(this); } });
+for (const prop of ['value', 'min', 'max']) {
+  const own = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, prop);
+  Object.defineProperty(HTMLInputElement.prototype, prop, { ...own, set(v) { own.set.call(this, v); if (this.type === 'range') paintGenericRange(this); } });
+}
 document.addEventListener('input', (e) => { if (e.target.type === 'range') paintGenericRange(e.target); }, true);
-function paintGenericIn(root) {
-  if (root.matches?.('input[type=range]')) paintGenericRange(root);
-  root.querySelectorAll?.('input[type=range]').forEach(paintGenericRange);
-}
-paintGenericIn(document.body);
-new MutationObserver((records) => {
-  for (const r of records) {
-    if (r.type === 'attributes') paintGenericRange(r.target);
-    else for (const n of r.addedNodes) if (n.nodeType === 1) paintGenericIn(n);
-  }
-}).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['min', 'max'] });
+document.querySelectorAll('input[type=range]').forEach(paintGenericRange);
 const wheelBound = new WeakSet();
-function bindRangeWheel(root) {
-  const list = root.matches?.('input[type=range]') ? [root] : [];
-  if (root.querySelectorAll) list.push(...root.querySelectorAll('input[type=range]'));
-  for (const el of list) {
-    if (wheelBound.has(el) || el.closest('#seekbox')) continue;
-    wheelBound.add(el);
-    el.addEventListener('wheel', onRangeWheel, { passive: false });
-  }
+function reachRange(e) {
+  const el = e.target;
+  if (el?.type !== 'range' || el.tagName !== 'INPUT') return;
+  paintGenericRange(el);
+  if (wheelBound.has(el) || el.closest('#seekbox')) return;
+  wheelBound.add(el);
+  el.addEventListener('wheel', onRangeWheel, { passive: false });
 }
-bindRangeWheel(document.body);
-new MutationObserver((records) => {
-  for (const r of records) for (const n of r.addedNodes) if (n.nodeType === 1) bindRangeWheel(n);
-}).observe(document.body, { childList: true, subtree: true });
+document.addEventListener('pointerover', reachRange, { capture: true, passive: true });
+document.addEventListener('focusin', reachRange, true);
 // ...and over the volume button of the bar it moves the master volume (5% per notch; it also un-mutes)
 let masterWheelAcc = 0;
 els.mixerBtn.addEventListener('wheel', (e) => {
