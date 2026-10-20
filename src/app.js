@@ -4,7 +4,7 @@ import { DIFFICULTIES, EXTENDED_DRUM_LANES, instrumentOptions, availableDifficul
 import { MultiTrackPlayer } from './player.js';
 import { Metronome } from './metronome.js';
 import { Highway } from './highway.js';
-import { rebuildYNote, noteCutFraction } from './gfx.js';
+import { rebuildYNote, noteCutFraction, adaptBlurSamples, BLUR_MAX_SAMPLES } from './gfx.js';
 import { countdownColors, vocalColors } from './uicolors.js';
 import { createErrorGate } from './errorgate.js';
 import { PerfMeter } from './perf.js';
@@ -1981,7 +1981,7 @@ function wrapLoop() {
   trainerPass(); // (before the seek: a speed step starts with the new pass)
   const back = prefs.get('playback.resumeRewind') ? Math.max(0, loop.start - PAUSE_REWIND_SEC) : loop.start;
   internalSeek = true;
-  player.seek(back); // the audio restarts at once (no scrub)...
+  player.seek(back, { heard: true }); // the audio restarts at once (no scrub), the chart clock follows what is heard: it reaches B, then jumps...
   internalSeek = false;
   pendingSeekDur = 450; // ...and the fretboards rewind with the usual seek animation, a little quicker
   if (back < loop.start) { replay = { from: back, to: loop.start }; highway.replayWindow = replay; } else clearRewind();
@@ -3177,6 +3177,15 @@ document.addEventListener('keydown', (e) => {
 let vis = { shown: null, last: null, anim: null, chart: null, step: 0 };
 const MOTION_BLUR_MIN_STEP = 0.06; // seconds of song per frame from which the jump is blurred
 const SEEK_JUMP_SEC = 0.75; // a bigger step between two frames than playback or a drag can make
+// Motion blur draws the whole chart once per sample. On a dense chart 8 samples took ~80 ms a frame, so a 0.7 s seek animation showed ~13 frames
+// and looked stuck. The count adapts to the gap between blurred frames (halved when slow, +1 when fast) and is kept for the next jump.
+let blurSamples = BLUR_MAX_SAMPLES;
+let lastBlurAt = -Infinity;
+function blurSampleCount(now) {
+  blurSamples = adaptBlurSamples(blurSamples, now - lastBlurAt);
+  lastBlurAt = now;
+  return blurSamples;
+}
 const seekAnimMs = (dist) => Math.min(700, 280 + dist * 25); // longer for longer jumps, 0.7 s at most
 function visualChartTime(ct) {
   const now = performance.now();
@@ -3188,7 +3197,7 @@ function visualChartTime(ct) {
     const from = vis.anim ? vis.shown : vis.last;
     vis.anim = { from, t0: now, dur: pendingSeekDur ?? seekAnimMs(Math.abs(ct - from)) };
   }
-  pendingSeekDur = null; // (a duration set for a jump that was too short to animate must not leak into a later one)
+  if (!player.jumpPending) pendingSeekDur = null; // (a duration set for a jump that was too short to animate must not leak into a later one; a loop wrap's jump comes when it is heard)
   vis.last = ct;
   const before = vis.shown;
   if (vis.anim) {
@@ -3281,18 +3290,18 @@ function frame(frameTs) {
         const ahead = ((player.outputLatency || 0) + 0.01) * player.rate;
         if (shouldWrap(loop, loopPrev, t, ahead)) {
           const delay = prefs.get('playback.loopRestartDelay');
-          if (delay > 0) holdAtLoopEnd(delay); else t = wrapLoop();
+          if (delay > 0) holdAtLoopEnd(delay); else { wrapLoop(); t = player.currentTime(); } // (still the old audio until the restart is heard)
         }
       }
       loopPrev = t;
       const wantLoopEnd = loop ? loop.end : null; // (the notes after the end of a loop are disabled on the fretboards)
       if (highway.loopEnd !== wantLoopEnd) { highway.loopEnd = wantLoopEnd; highway.invalidate(); }
-      if (replay && t >= replay.to) clearRewind(); // the song has passed the pause point: the stretch is live again
+      if (replay && t >= replay.to && !player.jumpPending) clearRewind(); // the song has passed the pause point: the stretch is live again
       if (previewStop != null && (!player.playing || t >= previewStop)) {
         if (player.playing) { player.pause(); syncPlayButton(); }
         clearPreview();
       }
-      if (player.playing && t >= player.duration) { // the song ran out by itself
+      if (player.playing && t >= player.duration && !player.jumpPending) { // the song ran out by itself
         player.pause();
         setEnded(true);
         syncPlayButton();
@@ -3306,9 +3315,11 @@ function frame(frameTs) {
     else {
       const chartTime = listenMode ? 0 : t - settings.chartDelay; // (listening only: the chart stays at its start)
       const shownTime = guarded('visual time', () => visualChartTime(chartTime)) ?? chartTime;
+      highway.litLag = shownTime - chartTime; // (a backward seek animation lights none of the notes it sweeps over)
       if (vis.anim && Math.abs(vis.step) > MOTION_BLUR_MIN_STEP && motionPref('highway.motionBlur')) { // a fast jump: blur the motion
         const span = Math.max(-0.6, Math.min(0.6, vis.step * 0.85)); // the exposure: most of the frame, within limits
-        draw(() => highway.renderBlur(Array.from({ length: 8 }, (_, k) => shownTime - span * (1 - k / 7))));
+        const n = blurSampleCount(frameTs || frameStart);
+        draw(() => highway.renderBlur(Array.from({ length: n }, (_, k) => shownTime - span * (1 - k / (n - 1)))));
       } else if (canSkipDraw(frameStart, shownTime)) { // idle: the panes are unchanged; a visualizer behind them (own canvas) keeps moving
         if (highway.visualizer) draw(() => highway.drawBackground(shownTime));
       } else {

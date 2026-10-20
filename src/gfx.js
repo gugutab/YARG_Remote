@@ -105,8 +105,13 @@ export const heldPulse = (t) => HELD_SCALE + 0.025 * Math.sin(t * 9);
 // How much of the "active long note" look to show, 0..1: it fades in over HELD_FADE_IN seconds after the hit and
 // fades out over the exit (FADE_SEC) after the tail ends, so nothing pops.
 export const HELD_FADE_IN = 0.2;
+// Notes the playing position has not reached are never lit: while a seek animation sweeps the drawn time BACK (the loop
+// wrap, a backward seek) the notes it passes over must not flash or glow as if hit. `litFrom` = drawn time - real time
+// when that is positive, else 0; a note is lit only once `t - n.time >= litFrom` (set per frame by Highway.draw).
+export let litFrom = 0;
+export function setLitLag(lag) { litFrom = lag > 0 ? lag : 0; }
 export function heldAmount(n, t) {
-  if (!(n.length > 0) || t < n.time) return 0;
+  if (!(n.length > 0) || t - n.time < litFrom) return 0;
   const end = n.time + n.length;
   const x = Math.min(1, (t - n.time) / HELD_FADE_IN);
   const rampIn = x * x * (3 - 2 * x); // smoothstep
@@ -212,6 +217,16 @@ export function fillTailHalo(g, color, cx, half, reach, yTop, yBot, strength, wi
 const tailHaloGradients = new Map(); // colour -> [{ half, reach, lin, rad }]
 let tailHaloCount = 0;
 
+// Motion blur samples per frame (app.js blurSampleCount): halved after a blurred frame slower than BLUR_SLOW_MS, one more after one faster than
+// BLUR_FAST_MS; a gap over 100 ms is not a run of blurred frames (the next jump starts from the count learnt before).
+export const BLUR_MAX_SAMPLES = 8;
+const BLUR_SLOW_MS = 25; // (under 40 fps)
+const BLUR_FAST_MS = 18;
+export function adaptBlurSamples(n, gapMs) {
+  if (!(gapMs < 100)) return n;
+  if (gapMs > BLUR_SLOW_MS) return Math.max(2, n >> 1);
+  return gapMs < BLUR_FAST_MS ? Math.min(BLUR_MAX_SAMPLES, n + 1) : n;
+}
 export const HIT_FLASH_SEC = 0.14; // how long a hit pad stays lit after a note hit
 export const BAR_FLASH_SEC = 0.24; // ... after a pedal or open hit (it lights every pad)
 
@@ -563,6 +578,7 @@ export function rebuildYNote(cut = YNOTE_CUT) {
   });
   ynShared = null; // (capV starts at the top row)
   bodyGradients.clear(); // (so does every body gloss)
+  ynSprites.clear(); // (and every cached note picture)
   return c;
 }
 
@@ -660,13 +676,63 @@ function bodyGradient(g, color) {
   }
   return gr;
 }
+const ynSprites = new Map(); // cached flat notes (ynSprite)
 rebuildYNote(YNOTE_CUT); // (after the gradient caches it resets exist)
 
 // Draws a rectangular note centred at (x, y) with half width hw and half height hh (the box of the 'ynote' outline). `bodyColor` is the body's flat colour (lane
 // colour, star power tint, held / exit tint), `laneColor` the plain lane colour (the strips of a star power tap). `taper` is the perspective taper per px of row
 // (TAPER_GAIN / dist in 3D, 0 in 2D) and `side` scales the height of the base under the note (how much of the front face the view shows). Uses the caller's
 // globalAlpha and filter.
-export function drawYNote(g, x, y, hw, hh, n, laneColor, bodyColor, taper = 0, side = 1) {
+// `cacheable`: the caller's colours are steady from frame to frame (not a held or exiting note's changing tint); a flat (2D) note is then drawn from a
+// cached picture of itself (ynSprite) when nothing in the canvas state would make that look different.
+export function drawYNote(g, x, y, hw, hh, n, laneColor, bodyColor, taper = 0, side = 1, cacheable = false) {
+  if (cacheable && taper === 0 && g.globalAlpha === 1 && g.filter === 'none' && g.globalCompositeOperation === 'source-over' && typeof g.getTransform === 'function'
+    && ynSprite(g, x, y, hw, hh, n, laneColor, bodyColor, side)) return;
+  drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side);
+}
+
+// Sprites of flat notes. A note is ~13 gradient fills and ~10 polygons; in 2D every note of one kind in one lane has the same size, so it is drawn once into a
+// small canvas, at the same device-pixel fraction (quantised to 1/YN_SPRITE_Q px) as on screen, and copied at a whole-pixel offset (no resampling). Only
+// under a plain scale + translate, full opacity, no filter, source-over; the layered fills composite into transparency first, which differs from painting
+// them over the board by rounding only. Keyed by everything the picture depends on; cleared when it grows past YN_SPRITE_MAX or the note's cut changes.
+const YN_SPRITE_Q = 8;
+const YN_SPRITE_MAX = 800; // (8 fractions x lanes x note kinds x panes; a few MB)
+function ynSprite(g, x, y, hw, hh, n, laneColor, bodyColor, side) {
+  const m = g.getTransform();
+  if (m.b !== 0 || m.c !== 0 || !(m.a > 0) || !(m.d > 0)) return false;
+  const dx = m.a * x + m.e;
+  const dy = m.d * y + m.f;
+  let ix = Math.floor(dx);
+  let iy = Math.floor(dy);
+  let fx = Math.round((dx - ix) * YN_SPRITE_Q);
+  let fy = Math.round((dy - iy) * YN_SPRITE_Q);
+  if (fx === YN_SPRITE_Q) { fx = 0; ix++; }
+  if (fy === YN_SPRITE_Q) { fy = 0; iy++; }
+  const dark = n.tap || n.ghost;
+  const key = `${bodyColor}|${dark && n.sp ? laneColor : ''}|${n.sp ? 1 : 0}${n.tap ? 1 : 0}${n.ghost ? 1 : 0}${n.hopo || n.accent ? 1 : 0}|${hw}|${hh}|${side}|${m.a}|${m.d}|${fx}|${fy}`;
+  let sp = ynSprites.get(key);
+  if (!sp) {
+    // the note's extent around (x, y), in note units: u within +-100 design units (base and shadow end ~96), v from the cut top to under the floor shadow
+    const sy = hh / YN_HH;
+    const mid = (YT - YN_CY + YN_BASE_V) / 2;
+    const vMax = Math.max(Math.abs(YT - YN_CY - mid), Math.abs(baseRow(96.5, side) + 3.4 * Math.max(0.5, side) - mid), Math.abs(baseRow(96, side) - mid));
+    const X = Math.ceil((100 * hw / YN_HW) * m.a) + 3;
+    const Y = Math.ceil(vMax * sy * m.d) + 3;
+    const canvas = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(2 * X, 2 * Y) : Object.assign(document.createElement('canvas'), { width: 2 * X, height: 2 * Y });
+    const sg = canvas.getContext('2d');
+    sg.setTransform(m.a, 0, 0, m.d, X + fx / YN_SPRITE_Q, Y + fy / YN_SPRITE_Q);
+    drawYNoteDirect(sg, 0, 0, hw, hh, n, laneColor, bodyColor, 0, side);
+    if (ynSprites.size >= YN_SPRITE_MAX) ynSprites.clear();
+    sp = { canvas, X, Y };
+    ynSprites.set(key, sp);
+  }
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.drawImage(sp.canvas, ix - sp.X, iy - sp.Y);
+  g.setTransform(m);
+  return true;
+}
+
+function drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side) {
   const k = taper * (hh / YN_HH); // taper per design unit of row
   const detail = hw >= 24 ? 2 : hw >= 9 ? 1 : 0; // the small parts only where they have pixels to live in
   const base = ynGradients(g, side, n.sp);

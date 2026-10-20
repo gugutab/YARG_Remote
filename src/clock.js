@@ -20,6 +20,16 @@ export function positionAt(history, T, rate) {
   return a.pos + ((b.pos - a.pos) * (T - a.time)) / span;
 }
 
+// A jump to `to` at audio time `now` that keeps what is still to be heard: the audio rendered before `now` reaches the speakers
+// after the output latency, so positions asked for times before `now` (the heard time) still follow the old history and the
+// jump shows only when the new audio is heard. Used by the loop wrap so the chart reaches B before going back.
+export function jumpHistory(history, now, rate, to) {
+  const kept = history.filter((h) => h.time < now);
+  if (kept.length) kept.push({ time: now, pos: positionAt(history, now, rate) });
+  kept.push({ time: now, pos: to });
+  return kept;
+}
+
 // Keeps roughly the last `seconds` of audio time.
 export function trimHistory(history, seconds = 3) {
   const newest = history[history.length - 1];
