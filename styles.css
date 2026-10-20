@@ -8,6 +8,13 @@
   --accent: #2f80ed;
   --lib-w: 320px;
   --bar-h: 112px;
+  --radius: 10px;
+  --lib-gap: 12px;
+  --content-max: 1400px;
+  --lib-left: max(var(--lib-gap), calc((100% - var(--content-max)) / 2));
+  --scroll-bg: color-mix(in srgb, var(--bg) 62%, transparent);
+  --pinned-bg: color-mix(in srgb, color-mix(in srgb, var(--panel-2) 38%, var(--panel)) 60%, transparent);
+  --head-h: 62px;
 }
 
 @media (prefers-color-scheme: light) {
@@ -77,15 +84,15 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 .search input { width: 100%; padding-left: 32px; }
 .count { color: var(--muted); font-size: 12px; }
 /* Windowed list: rows are absolutely positioned inside the scrolling list (heights match ROW_H / HEAD_H in virtuallist.js) */
-.songs-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
-#songs { position: relative; list-style: none; margin: 0; overflow: auto; flex: 1; min-height: 0; }
-#songs li { position: absolute; left: 0; box-sizing: border-box; }
+.songs-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; --rail-w: 28px; }
+#songs { position: relative; list-style: none; margin: 0; overflow: auto; flex: 1; min-height: 0; scrollbar-width: none; --cols: 1; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 26px); mask-image: linear-gradient(to bottom, transparent 0, #000 26px); }
+#songs li { position: absolute; left: 0; box-sizing: border-box; right: var(--rail-w); }
 #songs li.spacer { position: static; pointer-events: none; }
-:is(#songs, #endNext) li.row { display: flex; align-items: center; gap: 10px; padding: 6px 0 6px 6px; border-bottom: 1px solid var(--line); cursor: pointer; }
+:is(#songs, #endNext) li.row { display: flex; align-items: center; gap: 10px; padding: 6px 0 6px 6px; border-bottom: 1px solid var(--line); cursor: pointer; right: auto; left: calc((100% - var(--rail-w)) / var(--cols) * var(--col, 0)); width: calc((100% - var(--rail-w)) / var(--cols)); }
 :is(#songs, #endNext) li.row:hover { background: var(--panel-2); }
 :is(#songs, #endNext) li.row.active { background: var(--panel-2); }
-:is(#songs, #endNext) li.row.active::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); z-index: 1; } /* drawn over the thumbnail: the rows have no horizontal padding */
-#songs li.divider { display: flex; align-items: center; font-weight: 700; letter-spacing: .08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:is(#songs, #endNext) li.row.active::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); z-index: 1; display: none; } /* drawn over the thumbnail: the rows have no horizontal padding */
+#songs li.divider { display: flex; align-items: center; font-weight: 700; letter-spacing: .08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; right: auto; left: 0; width: calc(100% - var(--rail-w)); }
 .group-label { position: absolute; z-index: 2; top: 0; left: 0; height: 26px; display: flex; align-items: center; padding: 0 10px; box-sizing: border-box; font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--accent); background: var(--bg); border-bottom: 1px solid var(--line); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .thumb { flex: none; width: 42px; height: 42px; border-radius: 6px; background: var(--panel-2); overflow: hidden; }
 .thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -156,7 +163,7 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* Fullscreen / idle: the bar hides while playing and returns on mouse move */
-.app.immersive .topbar { position: absolute; left: 0; right: 0; top: 0; opacity: .96; transition: transform .2s ease; }
+.app.immersive .topbar { position: absolute; left: 0; right: 0; top: 0; opacity: .96; transition: transform .2s ease; z-index: 14; }
 .app.immersive.idle .topbar { transform: translateY(-100%); }
 
 button.icon.small-icon { width: 28px; height: 28px; }
@@ -166,7 +173,7 @@ button.icon.small-icon svg { width: 16px; height: 16px; }
 
 /* ---------- Song info screen ---------- */
 .info-scroll { flex: 1; min-height: 0; overflow: auto; padding: 16px; }
-.info-grid { margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; align-items: start; }
+.info-grid { margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; align-items: start; container-type: inline-size; }
 .info-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
 .info-card h3 { margin: 14px 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .info-card h3:first-child { margin-top: 0; }
@@ -175,12 +182,11 @@ button.icon.small-icon svg { width: 16px; height: 16px; }
 .info-head h2 { margin: 0; font-size: 26px; line-height: 1.15; overflow-wrap: anywhere; }
 .info-artist { color: var(--muted); font-size: 16px; }
 .info-quote { margin: 8px 0 0; font-style: italic; color: var(--muted); }
-.info-head .kv { grid-column: 2; }
+.info-head .kv { grid-column: 2; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 16px; }
 .info-head img[hidden] ~ .kv, .info-head img[hidden] ~ .info-head-text { grid-column: 1 / -1; }
 .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; font-size: 13px; }
 .kv dt { color: var(--muted); }
 .kv dd { margin: 0; overflow-wrap: anywhere; }
-.info-head .kv { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 16px; }
 .info-head .kv dt { grid-column: auto; }
 .cards { display: flex; flex-wrap: wrap; gap: 8px; }
 .card { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 10px; }
@@ -211,7 +217,7 @@ button.icon.small-icon svg { width: 16px; height: 16px; }
 }
 
 /* ---------- Info screen without the top bar, stem icons ---------- */
-.stem-btn { position: relative; width: 36px; height: 32px; display: inline-grid; place-items: center; padding: 0; background: var(--panel-2); border-radius: 8px; }
+.stem-btn { position: relative; width: 36px; height: 32px; display: inline-grid; place-items: center; padding: 0; background: var(--panel-2); border-radius: 8px; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
 .stem-btn svg { width: 18px; height: 18px; }
 .stem-btn .badge { position: absolute; right: 2px; bottom: 0; font-size: 10px; line-height: 1; color: var(--accent); font-style: normal; }
 .mix-row.muted .stem-btn { color: #e5392b; border-color: #e5392b; }
@@ -244,13 +250,11 @@ button.icon.small-icon svg { width: 16px; height: 16px; }
 }
 
 /* Narrow header (small window, or the library drawer open): cover above the text so the chips have room */
-.info-grid { container-type: inline-size; }
 @container (max-width: 560px) {
   .info-head-text { grid-column: 1; }
 }
 
 button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
-.stem-btn { touch-action: manipulation; user-select: none; -webkit-user-select: none; }
 
 /* ---------- Chip-style selectors (same look as the song info chips) ---------- */
 .chip-select, .chip-btn {
@@ -327,7 +331,7 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
 }
 .seekbox input::-moz-range-track { height: 4px; }
 .seekbox input::-moz-range-progress { height: 4px; background: var(--accent); }
-.seekbox input::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; border: 0; background: #fff; box-shadow: 0 0 0 2px var(--accent); opacity: 0; transition: opacity .12s; }
+.seekbox input::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; border: 0; background: #fff; box-shadow: 0 0 0 2px var(--accent); opacity: 0; transition: opacity .12s; margin-top: -4px; }
 .seekbox input::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; border: 0; background: #fff; box-shadow: 0 0 0 2px var(--accent); opacity: 0; transition: opacity .12s; }
 .seekbox:hover input::-webkit-slider-thumb, .seekbox input:focus-visible::-webkit-slider-thumb, .seekbox input:active::-webkit-slider-thumb { opacity: 1; }
 .seekbox:hover input::-moz-range-thumb, .seekbox input:focus-visible::-moz-range-thumb, .seekbox input:active::-moz-range-thumb { opacity: 1; }
@@ -347,7 +351,6 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
 /* ---------- Round 7: info popup, difficulty badge, master volume ---------- */
 .now { display: flex; gap: 4px; }
 .now-text { flex: 0 1 auto; }
-.now > .pop-wrap { flex: none; }
 .info-pop { width: min(380px, calc(100vw - 16px)); gap: 10px; }
 .ip-head { display: flex; gap: 12px; align-items: center; }
 .ip-head img { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; }
@@ -368,7 +371,6 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
 .seekbox input::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--accent) var(--pct), transparent var(--pct)); border-radius: 0; }
 .seekbox input::-moz-range-track { background: transparent; border-radius: 0; }
 .seekbox input::-moz-range-progress { border-radius: 0; }
-.seekbox input::-webkit-slider-thumb { margin-top: -4px; }
 .seekbox:hover input::-webkit-slider-runnable-track { height: 6px; }
 .seekbox:hover input::-webkit-slider-thumb { margin-top: -3px; }
 .transport .section-wrap { margin-left: 8px; }
@@ -381,7 +383,7 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
 
 /* ---------- Round 9: mobile info header, top bar and info button alignment ---------- */
 .now { align-items: flex-start; }
-.now > .pop-wrap { align-self: flex-start; }
+.now > .pop-wrap { flex: none; align-self: flex-start; }
 .now > .pop-wrap > .icon { width: 24px; height: 24px; margin-top: -1px; }
 .now > .pop-wrap > .icon svg { width: 16px; height: 16px; }
 
@@ -447,11 +449,10 @@ button.icon.primary svg { width: 18px; height: 18px; }
 /* ---------- Round 14: no extra top margin in the lone details card; chart counts behind an info button ---------- */
 .info-card > .extra:first-child { margin-top: 0; }
 .icard-top { display: flex; align-items: center; gap: 4px; min-width: 0; }
-.icard-top .icard-head { flex: 0 1 auto; width: auto; }
-.icard-top .pips { margin-left: auto; flex: none; }
+.icard-top .icard-head { flex: 0 1 auto; width: auto; min-width: 0; overflow: hidden; }
+.icard-top .pips { margin-left: auto; flex: none; gap: 3px; }
 .kv.mini[hidden] { display: none; }
-.icard-top .icard-name { white-space: nowrap; }
-.icard-top .pips { gap: 3px; }
+.icard-top .icard-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .icard-top .pips i { width: 10px; }
 
 /* Round 15: floating buttons keep a background (button.icon is transparent and was winning on specificity) */
@@ -462,9 +463,9 @@ button.icon.stage-btn[aria-pressed="true"] { border-color: var(--accent); }
 /* ---------- Round 17: grouped stems ---------- */
 /* the last column is for the expand button of groups */
 .mix-group { display: flex; flex-direction: column; gap: 6px; }
-.mix-kids { display: flex; flex-direction: column; gap: 6px; padding-left: 8px; border-left: 2px solid var(--line); }
+.mix-kids { display: flex; flex-direction: column; gap: 6px; padding-left: 8px; border-left: 2px solid var(--line); margin-left: 10px; }
 .mix-kids[hidden] { display: none; }
-.expand-btn svg { transition: transform .15s ease; }
+.expand-btn svg { transition: transform .15s ease; width: 14px; height: 14px; }
 .expand-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
 .expand-btn[aria-expanded="true"] { color: var(--accent); }
 
@@ -472,7 +473,6 @@ button.icon.stage-btn[aria-pressed="true"] { border-color: var(--accent); }
 .mix-row { grid-template-columns: 36px 1fr 40px 28px; } /* back to four columns: rows without a group button reserve nothing */
 /* the group slider gets shorter by the button's width */
 .expand-btn { width: 24px; height: 28px; }
-.expand-btn svg { width: 14px; height: 14px; }
 
 /* Custom sliders: a 4 px track filled up to the thumb (--p) and a translucent 2 px marker at the default (--def),
    like the section marks on the seek bar. */
@@ -502,35 +502,29 @@ button.icon.stage-btn[aria-pressed="true"] { border-color: var(--accent); }
 .mix-row.muted input[type="range"] { opacity: .4; }
 
 /* Round 19: the group button is only as wide as its arrow (no horizontal padding; it also beat the 28 px rule of small-icon buttons) */
-button.icon.small-icon.expand-btn { min-width: 0; padding: 0; height: 28px; }
+button.icon.small-icon.expand-btn { min-width: 0; padding: 0; height: 28px; margin-inline: -6px; width: 24px; }
 
 /* Round 20: tighter outer spacing: the 8 px grid gaps around the arrow shrink to 2 px (negative margins let the
    auto column collapse while the 14 px arrow straddles the gaps) */
 .mix-row.has-expand { grid-template-columns: 36px auto 1fr 40px 28px; }
-button.icon.small-icon.expand-btn { margin-inline: -6px; }
 
 /* Round 21: the arrow is 18 px wide (same 2 px outer spacing as before) */
 
 /* Round 22: the arrow is 20 px wide */
 
 /* Round 23: the arrow is 24 px wide */
-button.icon.small-icon.expand-btn { width: 24px; }
-button.icon.small-icon.expand-btn svg { width: 24px; height: 24px; }
+button.icon.small-icon.expand-btn svg { width: 24px; height: 24px; padding: 2px; box-sizing: border-box; }
 
 /* Round 24: 2 px of inner margin inside the arrow icon (the 24 px box stays; the glyph is drawn 20 px) */
-button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
 
 /* Round 25: the line under the group icon (and the sub-rows with it) sits 4 px further right; the sub-rows' column
    gaps shrink by 4 px in total so the sub-sliders keep their width and the value/reset columns stay aligned */
 
 /* Round 26: the other way: the line under the group icon (with the sub-rows) sits 4 px LEFT of where it was
    (margin 14 -> 10), which gives the sub-sliders 4 px more width; the column gaps go back to 8 px */
-.mix-kids { margin-left: 10px; }
 .mix-kids .mix-row { column-gap: 8px; }
 
 /* Long instrument names (e.g. "Drums (Pro 7 lanes)") shrink with an ellipsis instead of covering the info button and level */
-.icard-top .icard-head { min-width: 0; overflow: hidden; }
-.icard-top .icard-name { overflow: hidden; text-overflow: ellipsis; }
 
 /* Round 40: the cards under the instruments fit together without gaps: settings and the extra properties stack on the
    left, the taller volume card takes the right column; one column when the area is narrow */
@@ -562,12 +556,10 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
 /* Library list: the native scrollbar is hidden; the rail on the right is the scrollbar (thumb), the group index (ticks
    and short labels) and a quick-navigation strip (press or drag). --rail-w also sets the right edge of the rows and
    of the sticky group label, so they always line up. */
-.songs-wrap { --rail-w: 28px; } /* 24 + RAIL_PAD (virtuallist.js) */
-#songs { scrollbar-width: none; }
+/* 24 + RAIL_PAD (virtuallist.js) */
 #songs::-webkit-scrollbar { display: none; }
-#songs li { right: var(--rail-w); }
 .group-label { right: var(--rail-w); }
-.rail { position: absolute; top: 0; right: 0; bottom: 0; width: var(--rail-w); touch-action: none; cursor: pointer; user-select: none; }
+.rail { position: absolute; top: 0; right: 0; bottom: 0; width: var(--rail-w); touch-action: none; cursor: pointer; user-select: none; z-index: 5; }
 .rail canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .rail-thumb { position: absolute; width: 14px; right: 0; /* flush with the sidebar edge */ top: 0; border-radius: 6px; background: color-mix(in srgb, var(--accent) 16%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent); pointer-events: none; transition: background .15s; }
 .rail:hover .rail-thumb, .rail.dragging .rail-thumb { background: color-mix(in srgb, var(--accent) 30%, transparent); }
@@ -601,7 +593,7 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
 .chip[aria-pressed="true"] svg, .chip.on svg { color: var(--accent); }
 .active-filters { display: flex; flex-wrap: wrap; gap: 5px; }
 .active-filters[hidden] { display: none; }
-.active-filters .chip { min-height: 24px; padding: 0 6px 0 9px; font-size: 11.5px; }
+.active-filters .chip { min-height: 24px; padding: 0 6px 0 9px; font-size: 11.5px; padding-left: 7px; }
 .active-filters .chip svg { width: 12px; height: 12px; }
 .lib-bar { display: flex; align-items: center; gap: 6px; }
 .lib-bar .chip-select select { max-width: 96px; padding: 0 16px 0 0; border: 0; font-size: 13px; }
@@ -644,7 +636,6 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
 .popover::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 @supports not selector(::-webkit-scrollbar) { .popover { scrollbar-width: thin; scrollbar-color: var(--line) transparent; } }
 
-.active-filters .chip { padding-left: 7px; }
 .active-filters .chip svg.kind { width: 16px; height: 16px; color: var(--accent); }
 .active-filters .chip svg.x { width: 12px; height: 12px; color: var(--muted); }
 
@@ -702,10 +693,9 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
 /* Normal cards: the artist and, to its right, one small icon per instrument the song has */
 .song-sub { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .song-sub .song-artist { flex: 1 1 auto; min-width: 0; }
-.song-icons { display: flex; flex: none; margin-left: auto; }
-.song-icons { gap: 6px; align-items: center; }
+.song-icons { display: flex; flex: none; margin-left: auto; gap: 6px; align-items: center; }
 .song-icons .inst svg { width: 15px; height: 15px; } /* with the pack name above, the icons fill the height of the right side */
-:is(#songs, #endNext) li.row.normal .song-text { flex: 1; }
+:is(#songs, #endNext) li.row.normal .song-text { flex: 1; align-self: stretch; justify-content: space-between; gap: 0; padding: 5px 0; }
 
 /* Round 60: on large screens the album image of the detail screen is twice as big (160 -> 320 px) */
 @media (min-width: 1800px) {
@@ -727,7 +717,6 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
 .songs-wrap.even-rail { --rail-w: 42px; }
 
 /* Round 62: the rail's name bubble opens to the right of the rail when there is room (it then floats over the stage) */
-.rail { z-index: 5; }
 .rail-bubble.right { right: auto; left: calc(100% + 6px); }
 
 .inst-tip { position: fixed; z-index: 60; display: flex; align-items: center; gap: 8px; padding: 5px 9px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 4px 14px rgba(0, 0, 0, .4); font-size: 12px; pointer-events: none; white-space: nowrap; }
@@ -764,9 +753,6 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
 @supports not selector(::-webkit-scrollbar) { .active-filters { scrollbar-width: thin; scrollbar-color: var(--line) transparent; } }
 
 /* Several columns (the wide library): each card takes 1/--cols of the width left of the rail; headers take all of it */
-#songs { --cols: 1; }
-:is(#songs, #endNext) li.row { right: auto; left: calc((100% - var(--rail-w)) / var(--cols) * var(--col, 0)); width: calc((100% - var(--rail-w)) / var(--cols)); }
-#songs li.divider { right: auto; left: 0; width: calc(100% - var(--rail-w)); }
 
 
 
@@ -794,7 +780,6 @@ body.resizing { cursor: col-resize; user-select: none; }
 }
 
 /* ---------- Round 70: settings page and theme studio ---------- */
-:root { --radius: 10px; }
 [data-motion="off"] *, [data-motion="off"] *::before, [data-motion="off"] *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 .info-card, .popover, .icard, .filter-panel, .settings-page .sp-row, .ts-card { border-radius: var(--radius); }
 body.settings-open { overflow: hidden; }
@@ -936,7 +921,7 @@ body.settings-open { overflow: hidden; }
 /* the Listen card (details screen) */
 #info[data-hide~="listen"] .card-listen { display: none; }
 .listen { display: flex; align-items: center; gap: 12px; }
-.listen .icon.primary { width: 36px; height: 36px; flex: none; }
+.listen .icon.primary { width: 36px; height: 36px; flex: none; position: relative; }
 .listen input[type="range"] { flex: 1; min-width: 60px; accent-color: var(--accent); }
 .listen-seek { position: relative; flex: 1; min-width: 60px; display: flex; align-items: center; padding-bottom: 8px; }
 .listen-seek input[type="range"] { width: 100%; position: relative; z-index: 1; }
@@ -973,9 +958,9 @@ body.settings-open { overflow: hidden; }
 .pane-tag svg { flex: none; fill: currentColor; }
 .pane-tag .chev { width: 6px; height: 6px; margin: -3px 0 0 2px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor; transform: rotate(45deg); opacity: .75; flex: none; }
 .pane-tag[aria-expanded="true"] .chev { transform: rotate(-135deg); margin-top: 3px; }
-.pane-menu { display: flex; flex-direction: column; }
+.pane-menu { display: flex; flex-direction: column; gap: 8px; padding: 10px; }
 .pane-menu[hidden] { display: none; }
-#paneMenuDyn { display: flex; flex-direction: column; }
+#paneMenuDyn { display: flex; flex-direction: column; gap: 8px; }
 .pm-view { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
 .pm-view:not(:has(.fp-group:not([hidden]))) { display: none; }
 /* the top bar's play button lights up under the pointer */
@@ -983,8 +968,6 @@ button.icon.primary:hover:not(:disabled) { filter: brightness(1.18); box-shadow:
 button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 
 /* ---------- compact instrument menu, and the chooser that fills a slot ---------- */
-.pane-menu { gap: 8px; padding: 10px; }
-#paneMenuDyn { gap: 8px; }
 .pane-menu .fp-group { gap: 3px; }
 .pane-menu .seg button { padding: 4px 8px; font-size: 12px; }
 .pm-actions { display: flex; gap: 6px; }
@@ -1077,7 +1060,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .pane-tag span { display: none; }
 
 /* The top bar is a glass window over the background of the fretboards (the visualizer shows through) */
-.topbar { border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }
+.topbar { border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); transition: height .2s ease; }
 
 /* In the glass top bar the section selector and the button hovers are see-through too */
 .topbar .chip-btn, .topbar .chip-select { background: transparent; border-color: color-mix(in srgb, var(--line) 60%, transparent); }
@@ -1086,7 +1069,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .topbar button.icon.primary:hover { background: var(--accent); filter: brightness(1.12); }
 
 /* ---------- The "hide the top bar" button now makes the bar compact: half the height, one row ---------- */
-.topbar { transition: height .2s ease; }
 .app.bar-hidden { --bar-h: 56px; }
 .app.bar-hidden .topbar { padding: 4px 10px 4px 6px; }
 .app.bar-hidden .tb-cover { width: 44px; height: 44px; border-radius: 7px; }
@@ -1112,7 +1094,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 /* ---------- Mobile top bar ---------- */
 @media (max-width: 700px) {
   /* extended: the cover comes back, and the top row (title with its info icon, artist) is centred */
-  .app:not(.bar-hidden) .tb-cover:not([hidden]) { display: block; }
   /* compact: every button sits at the right edge */
   .app.bar-hidden .topbar > .tb-main { grid-column: 1 / -1; justify-content: flex-end; } /* the whole width, so the buttons can reach the right edge */
 }
@@ -1127,9 +1108,8 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
   /* compact: icons centred vertically between the top edge and the seek line, title and artist shown, prev/next hidden to make room */
   .app.bar-hidden .topbar { padding: 6px 10px 14px 6px; align-items: center; }
   .app.bar-hidden .tb-main, .app.bar-hidden .tb-top, .app.bar-hidden .tb-bottom { align-items: center; }
-  .app.bar-hidden .now-text { max-width: 110px; text-align: left; }
-  .app.bar-hidden .now-title { line-height: 1.2; }
-  .app.bar-hidden .now-artist { display: block; font-size: 10px; line-height: 1.2; }
+  .app.bar-hidden .now-title { line-height: 1.2; grid-area: 1 / 1; }
+  .app.bar-hidden .now-artist { display: block; font-size: 10px; line-height: 1.2; grid-area: 2 / 1 / 3 / 3; }
   .app.bar-hidden #back, .app.bar-hidden #forward { display: none; }
 }
 
@@ -1137,10 +1117,8 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 @media (max-width: 700px) {
   .app.bar-hidden .tb-top { margin-left: 0; }
   .app.bar-hidden .now { display: grid; justify-content: start; align-items: center; }
-  .app.bar-hidden .now-text { display: contents; }
-  .app.bar-hidden .now-title { grid-area: 1 / 1; }
+  .app.bar-hidden .now-text { max-width: 110px; text-align: left; display: contents; }
   .app.bar-hidden .now .pop-wrap { grid-area: 1 / 2; }
-  .app.bar-hidden .now-artist { grid-area: 2 / 1 / 3 / 3; }
   .app.bar-hidden .now #infoBtn { width: 22px; height: 22px; }
   .app.bar-hidden .now #infoBtn svg { width: 14px; height: 14px; }
 }
@@ -1148,10 +1126,9 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 /* ---------- Compact bar on wider screens: the artist is shown and the info icon sits on the title line ---------- */
 @media (min-width: 701px) {
   .app.bar-hidden .now-artist { display: block; font-size: 11px; line-height: 1.2; }
-  .app.bar-hidden .now-title { line-height: 1.2; }
   .app.bar-hidden .now { display: grid; grid-template-columns: auto auto; justify-content: start; align-items: center; }
   .app.bar-hidden .now-text { display: contents; }
-  .app.bar-hidden .now-title { grid-area: 1 / 1; max-width: 200px; }
+  .app.bar-hidden .now-title { line-height: 1.2; grid-area: 1 / 1; max-width: 200px; }
   .app.bar-hidden .now .pop-wrap { grid-area: 1 / 2; }
   .app.bar-hidden .now-artist { grid-area: 2 / 1 / 3 / 3; max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .app.bar-hidden .now #infoBtn { width: 24px; height: 24px; }
@@ -1167,7 +1144,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 /* ---------- Mobile extended bar, third layout: cover on the left over two rows, title/artist and transport next to it, tools in two columns ---------- */
 @media (max-width: 700px) {
   .app:not(.bar-hidden) .topbar { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: 1fr 1fr; column-gap: 8px; padding: 4px 6px 4px 6px; }
-  .app:not(.bar-hidden) .tb-cover:not([hidden]) { grid-column: 1; grid-row: 1 / 3; width: 76px; height: 76px; align-self: center; border-radius: 8px; }
+  .app:not(.bar-hidden) .tb-cover:not([hidden]) { display: block; grid-column: 1; grid-row: 1 / 3; width: 76px; height: 76px; align-self: center; border-radius: 8px; }
   .app:not(.bar-hidden) .topbar > .tb-main { display: contents; }
   .app:not(.bar-hidden) .tb-top { grid-column: 2; grid-row: 1; justify-content: flex-start; text-align: left; align-self: center; }
   .app:not(.bar-hidden) .now, .app:not(.bar-hidden) .now-text { justify-content: flex-start; text-align: left; }
@@ -1195,7 +1172,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
   /* extended: the time text next to the transport */
   .app:not(.bar-hidden) .transport .time { display: inline; margin-left: 4px; font-size: 11px; white-space: nowrap; }
   /* compact: the time wraps onto two lines ("0:00 /" over "6:09") */
-  .app.bar-hidden .topbar .transport .time { display: block; font-size: 11px; line-height: 1.2; white-space: normal; text-align: left; }
+  .app.bar-hidden .topbar .transport .time { display: block; font-size: 11px; line-height: 1.2; white-space: normal; text-align: left; width: auto; margin-left: 8px; }
 }
 @container song (max-width: 520px) {
   /* not enough room: the section selector shows only its icon, or nothing in the compact bar */
@@ -1205,16 +1182,14 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 
 /* ---------- Mobile compact bar, sixth pass: the time on two lines without the slash, a gap after play, a bigger title ---------- */
 @media (max-width: 700px) {
-  .app.bar-hidden .topbar .transport .time { width: auto; margin-left: 8px; }
   .app.bar-hidden .topbar .transport .time #timeNow, .app.bar-hidden .topbar .transport .time #timeTotal { display: block; }
   .app.bar-hidden .topbar .transport .time .time-sep { display: none; }
-  .app.bar-hidden .now-title { font-size: 14px; }
 }
 
 /* ---------- Mobile compact bar, seventh pass: the title may use all the room that is left before it is cut ---------- */
 @media (max-width: 700px) {
   .app.bar-hidden .now { grid-template-columns: minmax(0, auto) auto; max-width: 100%; }
-  .app.bar-hidden .now-title { max-width: none; min-width: 0; }
+  .app.bar-hidden .now-title { font-size: 14px; max-width: none; min-width: 0; }
   .app.bar-hidden .now-artist { max-width: none; min-width: 0; }
 }
 
@@ -1274,7 +1249,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
   .app:not(.bar-hidden) .tp-row { display: flex; align-items: center; justify-content: center; gap: 2px; }
   .app:not(.bar-hidden) .transport .time { margin-left: 0; margin-right: 8px; }
   /* the title may take two lines */
-  .app:not(.bar-hidden) .now-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.25; }
+  .app:not(.bar-hidden) .now-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.25; text-wrap: balance; }
 }
 
 /* ---------- Extended bar, wide main area: the transport is centred on the bar itself (a symmetric 5-column grid), with bigger buttons and the time row close to the seek bar ---------- */
@@ -1294,7 +1269,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 }
 
 /* ---------- Compact bar, any width: the buttons and the time never shrink; the title block takes only what it needs ---------- */
-.app.bar-hidden .tb-top { flex: 0 1 auto; }
+.app.bar-hidden .tb-top { flex: 0 1 auto; min-width: 0; overflow: hidden; }
 .app.bar-hidden .transport { flex: 0 0 auto; }
 .app.bar-hidden .transport .icon, .app.bar-hidden .tools .icon { flex: none; }
 .app.bar-hidden .transport .time { flex: none; }
@@ -1307,12 +1282,11 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 
 /* Compact bar: the info icon is taller than the title line and made the first row of the title block taller than the text, which dropped the
    title and artist ~3 px below the buttons; its margins cancel that, so the text block is centred on the same line as the buttons */
-.app.bar-hidden .now .pop-wrap { margin-block: -4px; }
+.app.bar-hidden .now .pop-wrap { margin-block: -4px; display: flex; align-items: center; align-self: center; margin-left: -2px; }
 
 /* ---------- Compact bar: type sizes that use the room, a better info icon, more air before the expand button ---------- */
 /* the info icon: a flex box (no inline line-box offsets), centred on the title line, closer to the text */
-.app.bar-hidden .now .pop-wrap { display: flex; align-items: center; align-self: center; margin-left: -2px; }
-.app.bar-hidden .now { column-gap: 0; }
+.app.bar-hidden .now { column-gap: 0; row-gap: 3px; }
 /* type: bigger when there is room (the main area's width decides) */
 @container song (min-width: 421px) {
   .app.bar-hidden .now-title { font-size: 15px; }
@@ -1327,29 +1301,25 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
   .app.bar-hidden .now-artist { font-size: 11px; }
 }
 /* the expand / compact button gets twice the usual air on its left when the row has room; in a tight row it shrinks back */
-.app.bar-hidden .tools #barHide { margin-left: 12px; }
+.app.bar-hidden .tools #barHide { margin-left: 12px; flex: none; }
 @container song (max-width: 420px) { .app.bar-hidden .tools #barHide { margin-left: 2px; } }
 @container song (min-width: 421px) and (max-width: 520px) { .app.bar-hidden .tools #barHide { margin-left: 6px; } }
 
 /* Compact bar: 3 px more between the title and the artist */
-.app.bar-hidden .now { row-gap: 3px; }
 
 /* Extended bar, wide main area: a bigger artist line, and the two lines of a long title are balanced */
 @container song (min-width: 800px) {
-  .app:not(.bar-hidden) .now-artist { font-size: 15px; }
-  .app:not(.bar-hidden) .now-title { text-wrap: balance; }
+  .app:not(.bar-hidden) .now-artist { font-size: 15px; margin-top: 5px; }
 }
 
 /* Extended bar, wide main area: the info icon sits on the first line of the title, close to its text */
 @container song (min-width: 800px) {
-  .app:not(.bar-hidden) .now { align-items: flex-start; }
+  .app:not(.bar-hidden) .now { align-items: flex-start; gap: 0; }
 }
 
 /* ---------- The expand / compact button is the priority: in a tight compact bar the title gives way, never the buttons ---------- */
-.app.bar-hidden .tb-top { min-width: 0; overflow: hidden; }
 .app.bar-hidden .tb-bottom { flex: 1 0 auto; min-width: auto; }
 .app.bar-hidden .tools { flex: none; }
-.app.bar-hidden .tools #barHide { flex: none; }
 @container song (max-width: 700px) {
   .app.bar-hidden .tb-bottom { flex: 1 0 auto; min-width: auto; }
 }
@@ -1365,7 +1335,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 /* The third line of the title block (pack - charter): only in the open bar of a wide main area */
 .now-tertiary { display: none; }
 @container song (min-width: 800px) {
-  .app:not(.bar-hidden) .now-tertiary:not(:empty) { display: block; font-size: 12px; color: var(--muted); opacity: .8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
 /* Wide open bar: the text block is bottom-aligned with the album art, and the info icon sits beside the longest line of a two-line title */
@@ -1374,10 +1343,8 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 
 /* Wide open bar: the info icon is centred on the longest title line and hugs the text; more air between title, artist and pack - charter */
 @container song (min-width: 800px) {
-  .app:not(.bar-hidden) .now { gap: 0; }
   .app:not(.bar-hidden) .now .pop-wrap { margin-top: var(--info-offset, -2px); margin-left: -2px; }
-  .app:not(.bar-hidden) .now-artist { margin-top: 5px; }
-  .app:not(.bar-hidden) .now-tertiary:not(:empty) { margin-top: 4px; }
+  .app:not(.bar-hidden) .now-tertiary:not(:empty) { display: block; font-size: 12px; color: var(--muted); opacity: .8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 4px; }
 }
 
 /* ---------- The bar at the bottom (the default): the seek bar sits on its top edge ---------- */
@@ -1389,7 +1356,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .app.immersive.bar-bottom .topbar { top: auto; bottom: 0; }
 .app.immersive.idle.bar-bottom .topbar { transform: translateY(100%); }
 /* the compact bar's padding is mirrored (the seek line is above the content now) */
-.app.bar-bottom.bar-hidden .topbar { padding-top: 10px; }
+.app.bar-bottom.bar-hidden .topbar { padding-top: 10px; padding-bottom: 12px; }
 /* wide open bar: the time row stays next to the seek bar, which is above the buttons now */
 @container song (min-width: 800px) {
 }
@@ -1398,7 +1365,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .app.bar-bottom .bar-hide svg { transform: none; }
 .app.bar-bottom.bar-hidden .bar-hide svg { transform: rotate(180deg); }
 .app.bar-bottom .topbar { padding-bottom: 16px; height: calc(var(--bar-h) + 8px); }
-.app.bar-bottom.bar-hidden .topbar { padding-bottom: 12px; }
 
 /* Wide open bar: back to vertically centred (text block and the play/time rows), also with the bar at the bottom */
 @container song (min-width: 800px) {
@@ -1485,7 +1451,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
    Same glass as the player bar: translucent --panel, the blur on ::before. A backdrop-filter / filter on the aside itself would make it
    the containing block of position: fixed descendants (see the top bar). It moves with transform only while it slides (that is also a
    containing block, but nothing fixed is open then); once open, transform is none. */
-:root { --lib-gap: 12px; } /* = WIN_MARGIN in src/windowframe.js (test/css-js-constants.test.js) */
+/* = WIN_MARGIN in src/windowframe.js (test/css-js-constants.test.js) */
 .library { display: flex; flex-direction: row; padding: 0; min-height: 0; } /* two panes side by side: the list and the song details (the window itself: .win-frame) */
 /* the list pane: the old library column */
 .lib-list { position: relative; flex: none; width: var(--list-w, var(--lib-w)); min-width: 0; min-height: 0; display: flex; flex-direction: column; }
@@ -1528,7 +1494,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 }
 
 /* Immersive: the player bar is an overlay over the stage; it stays above the library window */
-.app.immersive .topbar { z-index: 14; }
 
 /* ================= End of song: a glass window that replaces the fretboards =================
    Inside .stage like the library window and the details, centred in the part the library leaves free (--lib-inset). The canvas and
@@ -1596,10 +1561,10 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
    window animates (the window clips it). Never put a backdrop-filter/filter/transform on the pane: fixed popovers live in <body>, but keep it so. */
 .info { position: relative; flex: none; width: var(--info-w, 380px) /* = INFO_MIN_W in src/app.js */; min-width: 0; min-height: 0; display: flex; border-left: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
 .info-window { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; color: var(--text); outline: none; }
-.info-top { flex: none; display: flex; gap: 10px; padding: 8px 8px 8px 16px; background: color-mix(in srgb, var(--panel) 30%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
-.info-top-text { flex: 1; min-width: 0; display: flex; }
-.info-top-text strong { min-width: 0; }
-.info-top-text span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; min-width: 0; }
+.info-top { flex: none; display: flex; gap: 10px; padding: 8px 8px 8px 16px; background: color-mix(in srgb, var(--panel) 30%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); align-items: center; padding-block: 10px; }
+.info-top-text { flex: 1; min-width: 0; display: flex; overflow: hidden; }
+.info-top-text strong { min-width: 0; font-size: 18px; line-height: 1.2; }
+.info-top-text span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; min-width: 0; font-size: 14px; line-height: 1.2; }
 .info-top-text span:empty { display: none; }
 .info-top .icon { flex: none; }
 /* the cards sit on the window's glass: a light tint, no blur of their own */
@@ -1617,14 +1582,10 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .app.viz-glass .bg-glass { display: block; }
 
 /* ---------- One maximum size for the floating windows: the content area, 1400 px centred (like the player bar) ---------- */
-:root { --content-max: 1400px; } /* (on :root: the settings page lives outside .app) = CONTENT_MAX in src/windowframe.js */
-:root { --lib-left: max(var(--lib-gap), calc((100% - var(--content-max)) / 2)); }
+/* (on :root: the settings page lives outside .app) = CONTENT_MAX in src/windowframe.js */
 
 /* ---------- Details pane: never narrower than one column (layoutWindow in app.js), one-column header, bigger title block ---------- */
-.info-top { align-items: center; padding-block: 10px; }
 .info-top-text { flex-direction: column; align-items: flex-start; gap: 2px; }
-.info-top-text strong { font-size: 18px; line-height: 1.2; }
-.info-top-text span { font-size: 14px; line-height: 1.2; }
 /* one column of cards: the cover spans the whole window width and the title/artist beside it are dropped (the window header has them) */
 @container (max-width: 651px) {
   .info-head { grid-template-columns: 1fr; }
@@ -1652,13 +1613,12 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .bar-ghost.leaving { opacity: 0; }
 :root[data-motion="on"] .app.stage-reveal #topbar, :root[data-motion="on"] .app.stage-reveal #highway, :root[data-motion="on"] .app.stage-reveal #paneTags { animation: stage-in .35s ease backwards; }
 @keyframes stage-in { from { opacity: 0; } to { opacity: 1; } }
-.info-top-text { overflow: hidden; }
 .info-top-text strong, .info-top-text span { max-width: 100%; }
 
 /* ---------- Details: two-line title in the window header; the album art fills its card edge to edge ---------- */
-.info-top-text strong { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; text-overflow: ellipsis; overflow-wrap: anywhere; }
+.info-top-text strong { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; text-overflow: ellipsis; overflow-wrap: anywhere; text-wrap: balance; }
 #info .info-head { padding: 0; overflow: hidden; align-items: stretch; gap: 0; }
-#info .info-head img, #info[data-cover] .info-head img { margin: 0; }
+#info .info-head img, #info[data-cover] .info-head img { margin: 0; border-radius: 0 var(--radius, 10px) var(--radius, 10px) 0; }
 #info .info-head-text { padding: 14px; min-width: 0; }
 #info.compact .info-head-text { padding: 10px 12px; }
 @container (min-width: 652px) {
@@ -1666,7 +1626,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 }
 
 /* The art's corners that face the text (not the ones on the card's edge, which the card clips) are rounded */
-#info .info-head img, #info[data-cover] .info-head img { border-radius: 0 var(--radius, 10px) var(--radius, 10px) 0; } /* side by side: the right corners */
+/* side by side: the right corners */
 @container (max-width: 651px) {
   #info .info-head img, #info[data-cover] .info-head img { border-radius: 0 0 var(--radius, 10px) var(--radius, 10px); } /* one column: the bottom corners */
 }
@@ -1678,7 +1638,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 }
 
 /* Details: balanced two-line title; the footer is only the (extended) Play button - the loading screen already shows the progress, an error still shows its text */
-.info-top-text strong { text-wrap: balance; }
 #infoProgress:not([data-state="error"]) { display: none; }
 .info-actions { justify-content: stretch; }
 .info-actions .cta { flex: 1; justify-content: center; min-height: 44px; }
@@ -1738,8 +1697,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 /* readable over the visualizer */
 
 /* End window: the instrument tables use the row's width (up to 320 px each), left to right, not centred */
-.end-cards { grid-template-columns: repeat(auto-fit, minmax(230px, 380px)); } /* each card between 230 and 380 px: they share the row and wrap, left to right, no spreading gaps */
-.end-cards { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start; }
+.end-cards { grid-template-columns: repeat(auto-fit, minmax(230px, 380px)); display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start; } /* each card between 230 and 380 px: they share the row and wrap, left to right, no spreading gaps */
 .end-cards[hidden] { display: none; }
 .end-inst { flex: 1 1 230px; min-width: 230px; max-width: 380px; } /* grow from 230 to 380 px to fill the row, wrap when there is no room */
 
@@ -1750,22 +1708,19 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 /* Wide screens: the volume button shows the master level and the speed button the speed; the tools breathe */
 .tool-val { display: none; }
 @container song (min-width: 800px) {
-  .tools button.icon:has(.tool-val) { display: inline-flex; align-items: center; justify-content: center; }
-  .tool-val { display: inline; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .tools button.icon:has(.tool-val) { display: inline-flex; align-items: center; justify-content: center; min-width: 0; width: auto; gap: 7px; padding: 0 8px; }
+  .tool-val { display: inline; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; text-align: left; min-width: 0; }
   .tools button.icon:hover .tool-val, .tools button.icon[aria-expanded="true"] .tool-val { color: var(--text); }
 }
 @container song (min-width: 800px) {
   /* room for "150%", "Muted" and "0.25×" without the button changing size */
-  .tool-val { text-align: left; }
 }
 @container song (min-width: 800px) {
-  .tools button.icon:has(.tool-val) { min-width: 0; width: auto; gap: 7px; } /* as wide as icon + text need */
-  .tool-val { min-width: 0; }
+  /* as wide as icon + text need */
 }
 /* Wide bar tools: every button is as wide as its content + 8 px each side, so the hover highlight hugs it and the visible gaps are even (8 + 10 + 8 between neighbours) */
 @container song (min-width: 800px) {
   .tools button.icon { width: auto; min-width: 0; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
-  .tools button.icon:has(.tool-val) { padding: 0 8px; }
 }
 
 /* Wide screens, snug tools: 6 px of padding around each button's content, 12 px between buttons (an even 24 px between the visible items) */
@@ -1808,7 +1763,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 
 
 /* The Listen card while it loads the audio: a spinner ring on the play button */
-.listen .icon.primary { position: relative; }
 .listen .icon.primary.loading svg { opacity: 0; }
 .listen .icon.primary.loading::after { content: ""; position: absolute; inset: 8px; border-radius: 50%; border: 2px solid color-mix(in srgb, currentColor 30%, transparent); border-top-color: currentColor; animation: listen-spin .8s linear infinite; }
 @keyframes listen-spin { to { transform: rotate(360deg); } }
@@ -1827,10 +1781,9 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
   border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
 }
 .lib-close { grid-area: close; width: 32px; height: 32px; }
-.lib-close svg { width: 18px; height: 18px; }
+.lib-close svg { width: 18px; height: 18px; transform: rotate(90deg); }
 .lib-title { grid-area: title; display: flex; flex-direction: column; min-width: 0; }
 .lib-title strong { font-size: 17px; letter-spacing: .01em; }
-.lib-title .count { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lib-header .search { grid-area: search; }
 .lib-header .lib-bar { grid-area: bar; }
 .lib-header .lib-tools { grid-area: tools; display: flex; gap: 2px; }
@@ -1848,18 +1801,17 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .lib-header .lib-bar .view-seg { margin-left: auto; }
 
 /* The list: song cards (the row keeps its box; the card is drawn inside it, so the virtual list's geometry is unchanged) */
-.songs-wrap { border-top: 0; margin-left: 0; margin-right: 0; }
+.songs-wrap { border-top: 0; margin-left: 0; margin-right: 0; padding-left: 8px; }
 #songs { padding: 0; }
 :is(#songs, #endNext) li.row { border: 0 !important; background: none !important; isolation: isolate; padding-left: 12px; padding-right: 10px; }
-:is(#songs, #endNext) li.row::after { content: ""; position: absolute; z-index: -1; transition: background .12s, border-color .12s; pointer-events: none; }
-:is(#songs, #endNext) li.row.active::before { display: none; }
+:is(#songs, #endNext) li.row::after { content: ""; position: absolute; z-index: -1; transition: background .12s, border-color .12s; pointer-events: none; border-color: color-mix(in srgb, var(--line) 80%, transparent); border-radius: 10px; border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); box-shadow: none; inset: 4px; }
 :is(#songs, #endNext) li.row .thumb { border-radius: 8px; }
 #songs li.divider { background: none; border-bottom: 0; padding: 0 14px; gap: 10px; font-size: 11px; color: var(--accent); }
 #songs li.divider::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, var(--line) 80%, transparent); }
-.library .group-label { border-bottom: 0; padding: 0 14px; }
+.library .group-label { border-bottom: 0; padding: 0 14px; right: var(--rail-w); -webkit-backdrop-filter: blur(8px); -webkit-backdrop-filter: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 #empty.hint, .library .hint { padding-inline: 12px; }
 .library #status { margin: 0 12px 8px; }
-.songs-wrap { padding-left: 8px; } /* the cards line up with the header's padding */
+/* the cards line up with the header's padding */
 :is(#songs, #endNext) li.row.large, :is(#songs, #endNext) li.row.normal { padding-left: 12px; padding-right: 10px; }
 
 #songs mark.hit { background: color-mix(in srgb, var(--accent) 32%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; margin: 0 -1px; }
@@ -1870,29 +1822,24 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 
 /* Library list: the sub-headers line up with the card edge; the cards have the same gap (6 px) all round */
 #songs li.divider, .library .group-label { padding-left: 4px; padding-right: 4px; }
-.library .group-label { right: var(--rail-w); }
 :is(#songs, #endNext) li.row.normal, :is(#songs, #endNext) li.row.large { padding-left: 10px; padding-right: 10px; }
-.song-top { align-items: baseline; }
+.song-top { align-items: baseline; gap: 8px; }
 .song-packtag { margin-top: 0; padding-right: 0; }
 .song-icons { padding-right: 0; }
 
 /* Cards: small (compact) gets 2 px more inner margin; medium (normal) has its art flush with the card, 46 px, and the text split between the top and the bottom */
 :is(#songs, #endNext) li.row.compact { padding-left: 14px; padding-right: 12px; }
-:is(#songs, #endNext) li.row.normal { gap: 12px; } /* 3 px inset + 1 px border: the art touches the card's edge */
-:is(#songs, #endNext) li.row.normal .thumb { border-radius: 11px 6px 6px 11px; }
-:is(#songs, #endNext) li.row.normal .song-text { align-self: stretch; justify-content: space-between; gap: 0; }
+:is(#songs, #endNext) li.row.normal { gap: 12px; padding-right: 14px; } /* 3 px inset + 1 px border: the art touches the card's edge */
+:is(#songs, #endNext) li.row.normal .thumb { border-radius: 11px 6px 6px 11px; width: calc(50px * var(--card-scale, 1)); height: calc(50px * var(--card-scale, 1)); }
 :is(#songs, #endNext) li.row.normal .song-sub { margin-top: auto; }
 
 /* Medium: art 50 px; the pack tag's top lines up with the title's top. Large: the art fills the card's height, flush like the medium one */
-:is(#songs, #endNext) li.row.normal .thumb { width: calc(50px * var(--card-scale, 1)); height: calc(50px * var(--card-scale, 1)); }
 :is(#songs, #endNext) li.row.normal .song-top { align-items: flex-start; }
 :is(#songs, #endNext) li.row.normal .song-packtag { line-height: 1.35; }
-:is(#songs, #endNext) li.row.large { gap: 12px; align-items: stretch; }
-:is(#songs, #endNext) li.row.large .thumb { border-radius: 11px 6px 6px 11px; }
+:is(#songs, #endNext) li.row.large { gap: 12px; align-items: stretch; padding-right: 12px; }
+:is(#songs, #endNext) li.row.large .thumb { border-radius: 11px 6px 6px 11px; width: calc(var(--row-h) - 10px); height: calc(var(--row-h) - 10px); }
 
 /* Medium: bigger instrument icons and more room on the top, bottom and right for everything inside */
-:is(#songs, #endNext) li.row.normal { padding-right: 14px; }
-:is(#songs, #endNext) li.row.normal .song-text { padding: 5px 0; }
 :is(#songs, #endNext) li.row.normal .song-icons .inst svg { width: calc(var(--card-icon, 15px) + 3px); height: calc(var(--card-icon, 15px) + 3px); }
 :is(#songs, #endNext) li.row.normal .song-icons { gap: 7px; }
 /* Large: the length at the title's right corner, the pack and the instruments at the bottom of the card */
@@ -1900,7 +1847,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .song-len { flex: none; color: var(--muted); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 :is(#songs, #endNext) li.row.large .song-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
 :is(#songs, #endNext) li.row.large .song-insts { margin-top: 0; }
-:is(#songs, #endNext) li.row.large { padding-right: 12px; }
 :is(#songs, #endNext) li.row.large .song-text { padding: 3px 0 7px; }
 
 .song-packtag.short { flex: none; max-width: none; } /* a short pack code is never cut: the title gives way */
@@ -1911,7 +1857,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 
 .song-meta[hidden] { display: none; }
 
-.song-top { gap: 8px; } /* (fitPacks reads this gap) */
+/* (fitPacks reads this gap) */
 :is(#songs, #endNext) li.row.normal .song-top .song-title { min-width: 0; } /* the title is what gives way (ellipsis) when even the short code leaves it too little */
 
 /* ---------- The dock stays on the left edge; it shows which windows are open ---------- */
@@ -1919,7 +1865,7 @@ body.details-open .edge-dock { display: flex; } /* (it used to hide while the de
 .edge-dock { width: 24px; }
 .edge-dock.open { width: 58px; }
 body.settings-open .edge-dock { z-index: 85; } /* above the settings window and its dim layer */
-.edge-dock.has-open::after { content: ""; position: absolute; top: 8px; left: 50%; width: 6px; height: 6px; margin-left: -4px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); pointer-events: none; }
+.edge-dock.has-open::after { content: ""; position: absolute; top: 8px; left: 50%; width: 6px; height: 6px; margin-left: -4px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); pointer-events: none; display: none; }
 .edge-dock.open.has-open::after { opacity: 0; }
 .dock-btn.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent); }
 
@@ -1933,23 +1879,21 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .edge-dock.has-open { border-color: var(--line); }
 .edge-dock.has-open .dock-handle { color: var(--muted); }
 .edge-dock.has-open:hover .dock-handle { color: var(--accent); }
-.edge-dock.has-open::after { display: none; }
 
 /* Open / close: the window glides in from the left edge (where the dock is), grows from 96 % and fades in; closing is the same backwards, a little quicker */
 @keyframes settings-in { from { opacity: 0; transform: translateX(-36px) scale(.96); } to { opacity: 1; transform: none; } }
 
 /* Song cards: the hovered card gets an accent border and a lighter face (the open one keeps its stronger tint) */
 
-.lib-close svg { transform: rotate(90deg); } /* the dock handle's chevron, pointing left: the same kind of arrow as the handle */
+/* the dock handle's chevron, pointing left: the same kind of arrow as the handle */
 /* Library title: more room between "Library" and the count, and a line box tall enough for the descenders (the overflow clip cut them) */
 .lib-title { gap: 4px; line-height: 1.2; }
-.lib-title .count { line-height: 1.4; padding-bottom: 1px; }
+.lib-title .count { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; padding-bottom: 1px; }
 
 /* Settings' pattern: the headers stay dark and the content area is lighter. The library list and the details content get the same lift
    (a light layer over the window), and the cards inside are lighter again, like the settings rows. */
 
 /* Tone pass: three clear steps. Header (dark strip) < content (lighter layer) < cards (raised, panel-2). The sticky group label matches the content. */
-:is(#songs, #endNext) li.row::after { border-color: color-mix(in srgb, var(--line) 80%, transparent); }
 .info-card { background: color-mix(in srgb, var(--panel-2) 94%, transparent); border-color: color-mix(in srgb, var(--line) 80%, transparent); }
 
 /* No ghosts behind the glass: while the wide library window covers the stage, the stage's own pane tags do not peek out at its corners;
@@ -1978,32 +1922,25 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 }
 
 /* Song cards in the style of the end-of-song window's buttons: 10 px corners, translucent raised face, hairline border, accent wash on hover */
-:is(#songs, #endNext) li.row::after { border-radius: 10px; border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); box-shadow: none; }
-:is(#songs, #endNext) li.row:hover::after { border-color: color-mix(in srgb, var(--line) 80%, transparent); box-shadow: none; }
-:is(#songs, #endNext) li.row.active::after { border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
+:is(#songs, #endNext) li.row:hover::after { border-color: color-mix(in srgb, var(--line) 80%, transparent); box-shadow: none; background: color-mix(in srgb, var(--accent) 18%, color-mix(in srgb, var(--panel-2) 80%, transparent)); }
+:is(#songs, #endNext) li.row.active::after { border-color: color-mix(in srgb, var(--accent) 70%, transparent); background: color-mix(in srgb, var(--accent) 26%, color-mix(in srgb, var(--panel-2) 80%, transparent)); }
 :is(#songs, #endNext) li.row.active:hover::after { border-color: var(--accent); }
 :is(#songs, #endNext) li.row.normal .thumb, :is(#songs, #endNext) li.row.large .thumb { border-radius: 9px 5px 5px 9px; }
 
 /* More see-through window: the body of the library and the details lets the stage show (blurred); the headers stay dense so they stand out. */
 .lib-header, .info-top { background: color-mix(in srgb, var(--panel) 90%, transparent); }
-.library .group-label { -webkit-backdrop-filter: blur(8px); }
 
 /* Cards: a more solid face, and the same 8 px gap between cards in both directions (4 px of the row on each side) */
-:is(#songs, #endNext) li.row::after { inset: 4px; }
 :is(#songs, #endNext) li.row.normal { padding: 5px 14px 5px 5px; }
 :is(#songs, #endNext) li.row.large { padding: 5px 12px 5px 5px; }
 :is(#songs, #endNext) li.row.compact { padding: 4px 12px 4px 14px; }
-:is(#songs, #endNext) li.row.large .thumb { width: calc(var(--row-h) - 10px); height: calc(var(--row-h) - 10px); }
 
 /* Cards at 80 % opacity: the song cards and the details' cards (info cards and the instrument cards) */
 :is(#songs, #endNext) li.row::after { background: color-mix(in srgb, var(--panel-2, var(--panel)) 80%, transparent); }
-:is(#songs, #endNext) li.row:hover::after { background: color-mix(in srgb, var(--accent) 18%, color-mix(in srgb, var(--panel-2) 80%, transparent)); }
-:is(#songs, #endNext) li.row.active::after { background: color-mix(in srgb, var(--accent) 26%, color-mix(in srgb, var(--panel-2) 80%, transparent)); }
 .info-card, #info .icard { background: color-mix(in srgb, var(--panel-2) 80%, transparent); }
 
 /* Pinned and in-list sub-headers: a touch larger; the pinned one starts a little further left; the list scroll area has the pinned label's background (60 % panel). */
 #songs li.divider, .library .group-label { font-size: 13px; }
-.library .group-label { -webkit-backdrop-filter: none; }
 .songs-wrap { background: color-mix(in srgb, var(--panel) 60%, transparent); }
 
 /* Window body: 15 points less transparent (50 % -> 65 % opaque) */
@@ -2019,30 +1956,21 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 
 /* One scroll-area background for the library list and the details (a lighter layer than the headers); the pinned sub-header has none of its own:
    the cards that scroll under it fade out (a mask on the list), so it is the same surface. */
-.library .group-label { -webkit-backdrop-filter: none; backdrop-filter: none; }
-#songs { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 26px); mask-image: linear-gradient(to bottom, transparent 0, #000 26px); }
 
 /* Scroll areas (library list and details) and the pinned sub-header share one dark translucent background P. The list paints P everywhere
    except under the pinned label, which paints P itself (so the two never stack into a darker band). */
-:root { --scroll-bg: color-mix(in srgb, var(--bg) 62%, transparent); }
 .songs-wrap, .info-scroll { background: var(--scroll-bg); }
 .songs-wrap:has(.group-label:not([hidden])) { background: linear-gradient(var(--scroll-bg), var(--scroll-bg)) 0 100% / 100% calc(100% - 26px) no-repeat; }
 
 /* The "scroll" is the letter rail at the list's right edge: it gets the pinned sub-header's background (P), and the list/details scroll areas
    go back to the plain window body (no extra layer), so the library and the details look the same. */
 .songs-wrap, .info-scroll, .songs-wrap:has(.group-label:not([hidden])) { background: none; }
-.library .group-label { background: var(--pinned-bg); }
 .rail { background: var(--pinned-bg); }
 /* 20 % transparent */
-:root { --pinned-bg: color-mix(in srgb, color-mix(in srgb, var(--panel-2) 38%, var(--panel)) 60%, transparent); } /* 40 % transparent */
+/* 40 % transparent */
 
 /* The loading screen is a glass window (the same look as the end-of-song window and the library) centred over the stage */
 .load-screen h2, .load-screen p { text-shadow: none; }
-.ls-card {
-  position: relative; display: flex; flex-direction: column; align-items: center; text-align: center;
-  background: color-mix(in srgb, var(--panel) 78%, transparent); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
-  border-radius: 14px; box-shadow: 0 10px 34px rgba(0, 0, 0, .4); color: var(--text);
-}
 .ls-card::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
 :root[data-motion="on"] .load-screen:not([hidden]) .ls-card { animation: settings-in .34s cubic-bezier(.22, 1, .36, 1) backwards; }
 
@@ -2051,24 +1979,28 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
   .info-head { grid-template-rows: auto 1fr; }
   .info-head img { grid-row: 1 / span 2; align-self: stretch; height: auto; min-height: 180px; }
   .info-head .info-head-text { grid-row: 1; }
-  .info-head .card-listen { grid-column: 2; grid-row: 2; align-self: end; margin: 0; padding: 12px 14px 14px 0; border-top: 0; }
+  .info-head .card-listen { grid-column: 2; grid-row: 2; align-self: end; margin: 0; padding: 12px 14px 14px 0; border-top: 0; padding-left: 14px; }
   .info-head .card-listen .card-head { margin-bottom: 6px; }
 }
-@container (min-width: 760px) { .info-head .card-listen { padding-left: 14px; } }
+@container (min-width: 760px) { }
 
 /* Loading: a bigger cover in a slightly wider window; the pinned sub-header's background reaches the window's left edge (the label text stays on the cards' edge) */
-.ls-card { width: min(540px, 100%); }
-.library .group-label { left: 0; padding-left: 12px; }
+.library .group-label { background: var(--pinned-bg); left: 0; padding-left: 12px; }
 
 /* Loading: the cover spans the whole window horizontally (flush to the top and the sides); the texts keep their side margins */
-.ls-card { padding: 0 0 22px; overflow: hidden; gap: 14px; }
+.ls-card {
+  position: relative; display: flex; flex-direction: column; align-items: center; text-align: center;
+  background: color-mix(in srgb, var(--panel) 78%, transparent); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: 14px; box-shadow: 0 10px 34px rgba(0, 0, 0, .4); color: var(--text);
+  width: min(540px, 100%);
+  padding: 0 0 22px; overflow: hidden; gap: 14px;
+}
 .ls-card img { width: 100%; max-height: 52vh; aspect-ratio: 1; object-fit: cover; border-radius: 0; box-shadow: none; }
 .ls-card h2, .ls-card p { margin-inline: 28px; }
 .ls-card .ls-bar { width: calc(100% - 56px); }
 
 /* The two window headers (library and details) are the same height, so their bottom lines meet: --head-h. In a narrow list pane (details open beside it) the
    library header's first row is that height, its line is drawn under it, and the search / sort row sits below as a toolbar. */
-:root { --head-h: 62px; }
 .info-top { box-sizing: border-box; height: var(--head-h); }
 .lib-header { box-sizing: border-box; min-height: var(--head-h); }
 @media (min-width: 701px) { .lib-header { padding-block: 0; } }
@@ -2123,7 +2055,8 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
   position: absolute; z-index: 5; top: 12%; left: calc(50% + var(--lib-inset, 0px) / 2); width: max-content; max-width: min(640px, 90%);
   display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "cover main" "insts insts" "picker picker"; align-items: center; gap: 12px 18px; padding: 16px 22px; text-align: left;
   background: color-mix(in srgb, var(--panel) 70%, transparent); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius: 14px;
-  box-shadow: 0 10px 34px rgba(0, 0, 0, .35); color: var(--text); pointer-events: none; opacity: 0; visibility: hidden; 
+  box-shadow: 0 10px 34px rgba(0, 0, 0, .35); color: var(--text); pointer-events: none; opacity: 0; visibility: hidden;
+  --si-fill: color-mix(in srgb, var(--accent) 88%, #000); --si-dim-fill: color-mix(in srgb, var(--accent) 30%, transparent); --si-dim-accent: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .song-info.show { opacity: 1; visibility: visible; }
 .song-info::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
@@ -2140,7 +2073,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .si-inst svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
 .si-inst .mini-pips { margin-left: 2px; }
 /* paused: the window is a control surface: the Play button and, below the difficulties, the instrument cards of the song details */
-.si-play { margin-top: 12px; }
 .song-info.paused { pointer-events: auto; }
 .si-picker { grid-area: picker; display: none; width: 100%; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); text-align: left; }
 /* A wide stage: the cover grows and the instruments sit in a column to the right of the text (the horizontal room is used instead of stacking) */
@@ -2271,26 +2203,29 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 }
 
 /* The Play button of the start screen drains over the start time (--si-ms): a lighter layer shrinks to the right until the song starts */
-.si-play.counting::after { content: ""; position: absolute; inset: 0; background: rgba(255, 255, 255, .3); transform-origin: right center; animation: si-count var(--si-ms, 3s) linear forwards; pointer-events: none; }
+.si-play.counting::after { content: ""; position: absolute; inset: 0; background: rgba(255, 255, 255, .3); transform-origin: right center; animation: si-count var(--si-ms, 3s) linear forwards; pointer-events: none; z-index: 1; }
 @keyframes si-count { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 .song-info.starting .si-insts { display: none; }
 
 /* The Play button of the start screen while the audio loads: a spinner in front of the progress text, not clickable */
 .si-play.loading svg { display: none; }
-.si-play.loading::before { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .35); border-top-color: #fff; animation: si-spin .8s linear infinite; }
+.si-play.loading::before { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .35); border-top-color: #fff; animation: si-spin .8s linear infinite; margin-right: 0; flex: none; content: none; }
 @keyframes si-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .si-play.loading::before { animation-duration: 2.4s; } }
 
 /* The Play / loading button of the start screen keeps one size (Play, the percentage and the spinner all fit) and its content is centred */
-.si-play { justify-content: center; align-items: center; gap: 8px; text-align: center; }
+.si-play {
+  margin-top: 12px; justify-content: center; align-items: center; gap: 8px; text-align: center;
+  grid-area: play; align-self: center; margin: 0 8px 0 0; display: none; position: relative; overflow: hidden; width: 176px; height: 60px; padding: 0; border: 0; border-radius: 12px;
+  font-size: 19px; font-variant-numeric: tabular-nums; background: var(--si-fill); transition: background .3s;
+  color: var(--accent-text, #fff); font-weight: 700;
+}
 .si-play svg, .si-play span { position: relative; z-index: 1; }
-.si-play.loading::before { margin-right: 0; flex: none; }
 .si-play span { min-width: 3ch; text-align: center; font-variant-numeric: tabular-nums; }
 
 /* ================= The start / pause screen after the "Seletor de Instrumentos" design =================
    A header row (cover, title block, the Play button on the right), a hairline, then one row of instrument tiles: the name with an on/off dot, the song's level
    bar under it, and at the bottom the type and difficulty selectors. The Play button loads like a progress bar and then becomes the Play button. */
-.song-info { --si-fill: color-mix(in srgb, var(--accent) 88%, #000); --si-dim-fill: color-mix(in srgb, var(--accent) 30%, transparent); --si-dim-accent: color-mix(in srgb, var(--accent) 45%, transparent); }
 .song-info.paused { width: min(1100px, 94%); max-width: none; gap: 24px 32px; padding: 28px 24px 24px; align-items: start; }
 .song-info.paused .si-cover { width: 184px; height: 184px; border-radius: 20px; box-shadow: none; }
 .song-info.paused .si-main { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
@@ -2299,34 +2234,29 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .song-info.paused .si-details { font-size: 15px; gap: 0 20px; margin: 0; }
 
 /* the Play button: 176 x 60, on the right of the header */
-.si-play { grid-area: play; align-self: center; margin: 0 8px 0 0; display: none; position: relative; overflow: hidden; width: 176px; height: 60px; padding: 0; border: 0; border-radius: 12px;
-  font-size: 19px; font-variant-numeric: tabular-nums; background: var(--si-fill); transition: background .3s; }
 .song-info.paused .si-play { display: flex; align-items: center; justify-content: center; }
-.si-play .si-fill { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--p, 1) * 100%); background: var(--si-fill); min-width: 0; }
-.si-play .si-play-in { position: relative; display: flex; align-items: center; gap: 10px; }
+.si-play .si-fill { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--p, 1) * 100%); background: var(--si-fill); min-width: 0; transition: width .6s cubic-bezier(.22, 1, .36, 1); will-change: width; }
+.si-play .si-play-in { position: relative; display: flex; align-items: center; gap: 10px; z-index: 2; }
 .si-play #siPlayText { min-width: 0; }
-.si-play.loading { opacity: 1; cursor: default; }
+.si-play.loading { opacity: 1; cursor: default; background: var(--accent-track, #0d2442); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
 .si-play.loading .si-play-in svg { display: none; }
-.si-play.loading::before { content: none; }
 .si-play:hover:not(:disabled) { filter: brightness(1.15); }
 /* UX review: the loading state reads as loading, not as a disabled button. The label says "Loading 60%" (app.js); the text is --accent-text (white, or dark on a
    light accent) in 19 px bold (WCAG large text) on the fill, and the unfilled part is --accent-track (themes.js accentTrack: the accent pulled far away from
    the text colour), so the text passes AA on both parts in every preset theme (test/ux.test.js). */
-.si-play { color: var(--accent-text, #fff); font-weight: 700; }
-.si-play.loading { background: var(--accent-track, #0d2442); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
 
 /* the instrument tiles */
 .song-info.paused .si-picker { flex-wrap: wrap; align-items: stretch; padding: 24px 0 0; border-top: 1px solid rgba(255, 255, 255, .09); }
-.si-picker .icard { box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1.5px solid rgba(255, 255, 255, .09); border-radius: 12px; background: rgba(255, 255, 255, .03); box-shadow: none; }
+.si-picker .icard { box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1.5px solid rgba(255, 255, 255, .09); border-radius: 12px; background: rgba(255, 255, 255, .03); box-shadow: none; container-type: inline-size; container-name: itile; }
 .si-picker .icard[data-key="drums"] { flex-grow: 1.3; }
 .si-picker .icard[data-active="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); box-shadow: none; }
 .si-picker .icard-top { display: flex; flex-wrap: wrap; gap: 10px; }
 .si-picker .icard-top .icard-head { width: 100%; height: 28px; padding: 0; font-size: 17px; font-weight: 700; color: var(--muted); gap: 8px; }
 .si-picker .icard-head[aria-pressed="true"] { color: var(--accent); }
 .si-picker .icard-name { flex: 0 1 auto; white-space: nowrap; }
-.si-picker .icard-dot { margin-left: auto; flex: none; box-sizing: border-box; width: 10px; height: 10px; border-radius: 50%; background: transparent; border: 1.5px solid #7d716b; }
+.si-picker .icard-dot { margin-left: auto; flex: none; box-sizing: border-box; width: 10px; height: 10px; border-radius: 50%; background: transparent; border: 1.5px solid #7d716b; display: block; }
 .si-picker .icard[data-active="true"] .icard-dot { background: var(--accent); border: 0; box-shadow: 0 0 0 3px var(--si-dim-fill); }
-.icard-dot { display: none; } .si-picker .icard-dot { display: block; }
+.icard-dot { display: none; } 
 /* the song's level bar moves under the name, full width */
 .si-picker .icard-top .pips { order: 3; width: 100%; margin: 0; display: flex; gap: 3px; }
 .si-picker .pips i { flex: 1 1 0; width: auto; height: 6px; border-radius: 2px; background: rgba(255, 255, 255, .12); }
@@ -2354,7 +2284,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 
 /* Start / pause screen: a larger play icon, a smoother loading fill, and a hover on the instrument tiles that changes the background only (the border stays) */
 .si-play .si-play-in svg { width: 26px; height: 26px; }
-.si-play .si-fill { transition: width .6s cubic-bezier(.22, 1, .36, 1); will-change: width; }
 .si-picker .icard, .si-picker .icard:hover { transition: background .18s ease; }
 .si-picker .icard[data-active="true"], .si-picker .icard[data-active="true"]:hover { border-color: var(--accent); }
 .si-picker .icard[data-active="false"], .si-picker .icard[data-active="false"]:hover { border-color: rgba(255, 255, 255, .09); }
@@ -2373,8 +2302,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 
 /* the window keeps its content while it fades out and is not clickable meanwhile; the draining overlay of the Play button sits above its fill */
 .song-info.closing { pointer-events: none; }
-.si-play.counting::after { z-index: 1; }
-.si-play .si-play-in { z-index: 2; }
 
 /* The song window enters and leaves like the library and settings windows: it slides in from the left (36 px) growing from 96 %, fading in; leaving is the same motion
    backwards, a little quicker. (It is centred with translateX(-50%), which the motion keeps.) */
@@ -2388,7 +2315,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 
 /* "lanes" becomes "ln" in the drum type selector when the tile is narrow (the container query is on the tile) */
 .ln-abbr { display: none; }
-.si-picker .icard { container-type: inline-size; container-name: itile; }
 @container itile (max-width: 244px) { /* first the type buttons tighten (smaller text, less padding) so the full labels still fit */
   .seg-modes button { font-size: 12px; padding: 0 3px; }
 }
@@ -2403,7 +2329,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* The header row (cover, title block, Play) is its own container: the Play button sits to the right of the title while there is room and goes below it, full width,
    only when there is not (the old rule was a fixed window width). While the window is not the pause screen the wrapper disappears (display: contents). */
 .song-info:not(.paused) .si-head, .song-info:not(.paused) .si-head-row { display: contents; }
-.song-info.paused { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "picker"; }
+.song-info.paused { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "picker"; top: clamp(12px, 12%, 90px); max-height: calc(100% - clamp(12px, 12%, 90px) - 12px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 45%, transparent) transparent; }
 .song-info.paused .si-head { grid-area: head; container-type: inline-size; container-name: sihead; }
 .song-info.paused .si-head-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "cover main play"; gap: 24px 32px; align-items: start; }
 .song-info.paused .si-head-row .si-play { width: 176px; justify-self: end; margin: 0 8px 0 0; } /* (beside the title: the fixed size, whatever the window width) */
@@ -2440,7 +2366,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 }
 
 /* The pause / start window never runs off the stage: on a short stage it takes the height that is left and scrolls inside (thin scrollbar in the app's tones) */
-.song-info.paused { top: clamp(12px, 12%, 90px); max-height: calc(100% - clamp(12px, 12%, 90px) - 12px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 45%, transparent) transparent; }
 
 /* The Listen card's Preview checkbox in the app's look (it was the browser's own): a 16 px rounded box, the accent when checked, a check mark */
 .listen-preview input[type="checkbox"] {
@@ -2463,10 +2388,10 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
    song details (.icards) and to the stage's "Choose an instrument" slots (.pc-cards). Generated from the .si-picker rules above, minus their sizing. */
 :root { --si-fill: color-mix(in srgb, var(--accent) 88%, #000); --si-dim-fill: color-mix(in srgb, var(--accent) 30%, transparent); --si-dim-accent: color-mix(in srgb, var(--accent) 45%, transparent); }
 :is(.icards, .pc-cards) .icard-dot { display: block; }
-:is(.icards, .pc-cards) .icard { box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1.5px solid rgba(255, 255, 255, .09); border-radius: 12px; background: rgba(255, 255, 255, .03); box-shadow: none; }
+:is(.icards, .pc-cards) .icard { box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1.5px solid rgba(255, 255, 255, .09); border-radius: 12px; background: rgba(255, 255, 255, .03); box-shadow: none; container-type: inline-size; container-name: itile; }
 :is(.icards, .pc-cards) .icard[data-active="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); box-shadow: none; }
 :is(.icards, .pc-cards) .icard-top { display: flex; flex-wrap: wrap; gap: 10px; }
-:is(.icards, .pc-cards) .icard-top .icard-head { width: 100%; height: 28px; padding: 0; font-size: 17px; font-weight: 700; color: var(--muted); gap: 8px; }
+:is(.icards, .pc-cards) .icard-top .icard-head { width: 100%; height: 28px; padding: 0; font-size: 17px; font-weight: 700; color: var(--muted); gap: 8px; overflow: visible; padding-right: 3px; }
 :is(.icards, .pc-cards) .icard-head[aria-pressed="true"] { color: var(--accent); }
 :is(.icards, .pc-cards) .icard-name { flex: 0 1 auto; white-space: nowrap; }
 :is(.icards, .pc-cards) .icard-dot { margin-left: auto; flex: none; box-sizing: border-box; width: 10px; height: 10px; border-radius: 50%; background: transparent; border: 1.5px solid #7d716b; }
@@ -2491,20 +2416,17 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 :is(.icards, .pc-cards) .icard[data-active="false"], :is(.icards, .pc-cards) .icard[data-active="false"]:hover { border-color: rgba(255, 255, 255, .09); }
 :is(.icards, .pc-cards) .icard[data-active="true"]:hover { background: color-mix(in srgb, var(--accent) 20%, var(--panel)); }
 :is(.icards, .pc-cards) .icard[data-active="false"]:hover { background: rgba(255, 255, 255, .08); }
-:is(.icards, .pc-cards) .icard { container-type: inline-size; container-name: itile; }
 .icards { align-items: stretch; } .icards .icard-top + .seg { margin-top: auto; }
 /* the on/off dot's halo is not clipped by the tile head; the details tiles may get narrow (the selectors shrink with them) */
-:is(.icards, .pc-cards) .icard-top .icard-head { overflow: visible; padding-right: 3px; }
 .icards .icard { min-width: 0; }
 .icards .seg button { padding-inline: 2px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 /* The tool row at the bottom of the instrument tiles (volume, neck speed, chart delay, 2D / 3D, circles / rectangles) and its small slider window */
 .icard-top + .icard-tools { margin-top: auto; }
-.tile-tool { place-items: center; color: #9a8d87; cursor: pointer; }
-.tile-tool svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tile-tool svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; width: 16px; height: 16px; }
 .tile-tool:hover:not(:disabled) { color: var(--text); }
 .tile-tool[aria-expanded="true"] { background: var(--si-fill, var(--accent)); color: #fff; }
-.tile-tool[data-mod="true"] { color: var(--accent); }
+.tile-tool[data-mod="true"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 .tile-tool:disabled { opacity: .35; cursor: default; }
 .tile-tool:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .tile-pop { position: fixed; z-index: 80; width: 260px; max-width: calc(100vw - 16px); padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -2513,29 +2435,23 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .tile-pop .pm-range { display: grid; grid-template-columns: minmax(0, 1fr) 46px 28px; gap: 4px; align-items: center; }
 
 /* tool buttons with a value: the icon above, the value (volume, neck, delay, view) under it */
-.tile-tool { align-content: center; }
-.tile-tool { display: flex; align-items: center; justify-content: center; }
-.tile-tool svg { width: 16px; height: 16px; }
-.tile-tool .tt-val { font-size: 11px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tile-tool { place-items: center; color: #9a8d87; cursor: pointer; align-content: center; display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; }
 .tp-segs { display: flex; flex-direction: column; gap: 8px; }
 .tp-segs .seg { display: flex; }
 .tp-segs .seg button { flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .tp-segs .seg svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; }
 .pm-range output { white-space: nowrap; }
 /* tool buttons: the value to the right of the icon; the row wraps when the tile is narrow */
-.tile-tool { flex: 1 1 auto; flex-direction: row; }
 .tile-tool .tt-val:empty { display: none; }
 /* at most two lines: when the four buttons no longer fit side by side, they go two by two */
-.tile-tool { min-width: 0; }
 .tile-tool[aria-expanded="true"], .tile-tool[aria-expanded="true"][data-mod="true"] { background: var(--si-fill, var(--accent)); color: #fff; }
 /* the tile's content stays at the top; only the tool row sits at the bottom */
 .si-picker .icard-top + .seg, :is(.icards, .pc-cards) .icard-top + .seg, .icards .icard-top + .seg { margin-top: 0; }
 .si-picker .icard-tools, :is(.icards, .pc-cards) .icard-tools, .icard-top + .icard-tools { margin-top: auto; }
 /* the tool row as chips: no dark tray like the type / difficulty selectors, each tool a rounded outline pill */
 .icard-tools { background: transparent; padding: 0; gap: 6px; border-radius: 0; }
-.tile-tool { border-radius: 999px; border: 1px solid rgba(255, 255, 255, .16); background: transparent; }
+.tile-tool { flex: 1 1 auto; flex-direction: row; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .16); background: transparent; gap: 3px; }
 .tile-tool:hover:not(:disabled) { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .28); }
-.tile-tool[data-mod="true"] { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 .tile-tool[aria-expanded="true"], .tile-tool[aria-expanded="true"][data-mod="true"] { border-color: transparent; }
 .tile-tool[aria-expanded="true"]:hover:not(:disabled) { background: var(--si-fill, var(--accent)); color: #fff; border-color: transparent; }
 
@@ -2548,14 +2464,13 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .icard-remove svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
 .icard-remove:hover { background: rgba(255, 90, 90, .18); color: #ff8a8a; }
 .icard-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.pane-menu .pm-actions { gap: 6px; }
 .pane-menu .pm-actions .chip-btn { flex: 1 1 0; }
 .pm-tile .icard-dot { display: none; }
 
 /* the corner button of the stage menu's tile: a context menu (swap / remove / add) */
 .icard-more svg { fill: currentColor; stroke: none; }
 .icard-more[aria-expanded="true"] { background: rgba(255, 255, 255, .14); color: var(--text); }
-.pane-menu .pm-actions { display: none; }
+.pane-menu .pm-actions { gap: 6px; display: none; }
 .tile-pop:has(.ctx-list) { width: auto; min-width: 180px; padding: 4px; gap: 0; }
 .ctx-list { display: flex; flex-direction: column; }
 .ctx-item { text-align: left; padding: 8px 12px; border: 0; border-radius: 7px; background: transparent; color: var(--text); font-size: 13px; cursor: pointer; }
@@ -2580,23 +2495,17 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* the pause / start screen's tiles: a grid of equal columns (--icols, from layoutPicker in app.js) instead of free-growing flex items */
 .song-info.paused .si-picker { display: grid; grid-template-columns: repeat(var(--icols, 4), minmax(0, 1fr)); gap: 10px; }
 .si-picker .icard, .si-picker .icard[data-key="drums"] { min-width: 0; flex: none; }
-.tile-tool { gap: 3px; }
 
 /* the tool row is always one line: the chips shrink (padding, then the value is cut) instead of wrapping */
 .icard-tools { display: flex !important; flex-wrap: nowrap; }
-.tile-tool { overflow: hidden; }
-.tile-tool .tt-val { min-width: 0; overflow: hidden; }
-.tile-tool .tt-val { text-overflow: clip; }
-.icard-tools.units-cut .tile-tool { gap: 1px; }
-.tile-tool { padding: 0 4px; }
+.tile-tool .tt-val { font-size: 11px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: clip; padding-right: 2px; margin-right: -2px; }
+.icard-tools.units-cut .tile-tool { gap: 1px; padding-left: 4px; }
+.tile-tool { padding: 0 4px; height: 32px; }
 /* the 2 px smaller left padding only for chips that have a value (the ones without a label keep their padding); the value's visible area is 2 px wider at the right */
-.icard-tools.units-cut .tile-tool { padding-left: 4px; }
 .icard-tools.units-cut .tile-tool:has(.tt-val:not(:empty)) { padding-left: 2px; }
-.tile-tool .tt-val { padding-right: 2px; margin-right: -2px; }
 /* UX review: small targets are at least 32 px. The chips are 32 px tall (still one line, fitTileTools unchanged); the reset icons grow to 32 x 32 with a -2 px
    margin, so their margin box stays the 28 px grid track of the mixer, speed and pane rows (the extra 2 px per side sits in the grid gaps); the pause panel's
    speed steps are 32 x 32. */
-.tile-tool { height: 32px; }
 button.icon.small-icon.reset { min-width: 32px; min-height: 32px; margin: -2px; }
 button.icon.small-icon.sp-reset, #ppSlower, #ppFaster { min-width: 32px; min-height: 32px; }
 /* The stage menu of an instrument is only the tile: no window behind it, and the tile is not clickable there */
