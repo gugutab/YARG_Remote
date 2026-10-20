@@ -53,8 +53,6 @@ import {
 } from './gfx.js';
 export { firstVisibleIndex } from './gfx.js';
 import { renderLanes3D } from './highway3d.js';
-import { drawNoteSprite, onNoteSpriteReady, noteView } from './notesprite.js';
-const NOTE_VIEW_2D = noteView(50); // the flat view looks at the board from above: more of the face, less of the side
 import { buildKaraokeLines, karaokeAt, syllableProgress } from './karaoke.js';
 import { countdownColors, vocalColors, mixHex } from './uicolors.js';
 import { waitCountdowns, countdownAt, countdownAlpha, measureStarts, measuresLeft, COUNTDOWN_HIDE_SEC } from './countdown.js';
@@ -150,7 +148,6 @@ export class Highway {
     this.weightScratch = [];
     this.rectPool = []; // the objects of paneRects
     this.vocalView = 'track'; // 'track' (notes + lyrics) or 'karaoke' (the lyrics alone)
-    onNoteSpriteReady(() => this.invalidate()); // (a paused chart redraws when a note sprite finishes loading)
     this._fillBand = false; // the green band during a drum fill (setting highway.fillBand, off by default; the big rock ending band always shows)
     this._starPowerBand = false; // the gold band under a star power phrase (setting highway.starPowerBand, off by default)
     this._trackOpacity = 0.75; // how opaque the board of a fretboard is (setting highway.trackOpacity)
@@ -1408,8 +1405,6 @@ export class Highway {
         g.restore();
         g.globalCompositeOperation = 'source-over';
       }
-      const sprited = !n.cymbal && this.noteStyle === 'rect' && drawNoteSprite(g, n, colors[n.lane], cx, cy, r * wide * NOTE_RECT_W, white, NOTE_VIEW_2D); // the SVG note design (notesprite.js), once its sprite is ready
-      if (!sprited) {
       g.beginPath();
       const disc = n.cymbal && this.noteStyle === 'rect'; // the rectangular style draws a cymbal as YARG's chrome disc (the circle style keeps the triangle)
       if (disc) noteShape(g, cx, cy, r * 0.95, r * 0.95, 'round');
@@ -1428,7 +1423,6 @@ export class Highway {
         noteShape(g, cx, cy, r * 0.35, r * 0.35, this.noteStyle);
         g.fillStyle = k === 0 ? HOPO_DOT : `rgba(255,255,255,${0.9 * (1 - k)})`;
         g.fill();
-      }
       }
     }
     g.globalAlpha = 1;
