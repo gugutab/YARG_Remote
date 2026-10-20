@@ -150,6 +150,56 @@ let remote = false; // library comes from server.mjs (/api/library); no folder p
 let detached = false; // list restored from storage without file access (browsers without showDirectoryPicker)
 let pendingSongId = null; // song clicked while detached; opened once the folder is picked again
 
+// ---------- state ----------
+// Mutable state that several areas of this file read and write, declared before any of them runs (no declaration-order hazards).
+// Listen card preview
+let previewStop = null; // chart-clock second where the preview ends, or null when none is running
+let previewStart = 0; // ... and where it starts (the band on the Listen slider shows [previewStart, previewStop])
+// song opening (deep links, "play next", the remembered pick)
+let pendingInstruments = null; // the instruments of a link, applied once the chart is read
+let openingSong = false; // while a song is being opened its first chart is not a choice of the user: it must not overwrite the memory
+let loadAudioWithSong = false; // a #/song/<id>/play link: the audio loads with the song, like a Play press would
+// stage hold and audio load
+let holdStage = false;
+let listenMode = false; // the audio was loaded by the Listen card and no real Play happened: the fretboards stay at the start (the sound does not drive the visualizer)
+let stageEverLive = false; // a song has been played (or opened with /play) since the page loaded: until then the player bar is not shown
+let loadingBackdrop = 0; // while the held song's audio loads: when it started (the background visualizer keeps animating behind the loading screen)
+let audioLoad = null; // { song, promise } while a load runs
+// sections, mixer, visualizer, instrument menu
+let activeSection = -2; // index shown as current in the section chip and list
+let stemStates = []; // { stem, value, muted, group, views[] }: one state per stem, shown in the menu and on the info screen
+let groupList = []; // { key, label, members[], value, muted, expanded, views[] }: stems of one instrument, collapsed by default
+let vizAll = null; // the equalizer's source: every instrument of the song (the ones on screen are marked); null = rebuild
+let menuKey = null; // the instrument whose menu is open
+// A-B loop and speed trainer
+let loop = null; // { start, end } or null
+let trainer = null; // the speed trainer while it runs ({ speed, passes, done }, trainer.js): practice.trainer is on and so is a loop
+let loopPrev = null; // the previous frame's time, to tell a wrap from a seek
+let loopWait = null; // { until, timer, shown } while the wait runs
+let loopHeld = false; // the user paused during the wait: the next Play does the wrap itself (the hold was served for this pass)
+// resume rewind, seek animation
+let pausedAt = null; // where the song was paused by the user (null: not a resume from a pause)
+let resumeTimer = 0;
+let replay = null; // { from, to }: the replayed stretch while it runs
+let internalSeek = false;
+let pendingSeekDur = null; // set by seekTo: the duration the audio scrub takes, so the fretboards' animation lasts the same
+// start delay, start screen, pause screens, focus loss
+let startDone = null; // resolves the wait of a start delay that is running (a cancel resolves it too)
+let startCancelled = false;
+let startScreenOn = false;
+let holdActive = false;
+let infoShownFor = null; // the song whose overlay was shown (a first play of another song shows it again)
+let pauseInfoShown = false;
+let piDismissed = false;
+let pausePanelShown = false;
+let ppDismissed = false;
+let focusLost = false;
+let flashEl = null;
+// end of song
+let ended = false;
+let endDismissed = false;
+let endShown = false;
+
 // ---------- Settings and theme (applied first, so the first frame already has the right colours) ----------
 const prefs = createSettings({ defaults: PREF_DEFAULTS, validate: buildValidator(SECTIONS), renames: RENAMES, version: SETTINGS_VERSION, storage: (() => { try { return localStorage; } catch { return null; } })() });
 const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -351,8 +401,6 @@ els.npSeek.addEventListener('input', () => {
 
 // Preview button of the Listen card: plays the window song.ini defines (preview_start_time .. preview_end_time).
 // The times are positions in the audio file; the chart clock is the file position minus the audio delay.
-let previewStop = null; // chart-clock second where the preview ends, or null when none is running
-let previewStart = 0; // ... and where it starts (the band on the Listen slider shows [previewStart, previewStop])
 function paintPreviewBand() {
   const on = previewStop != null && player.duration > 0;
   els.npBand.hidden = !on;
@@ -833,24 +881,18 @@ function fitTitleWidth() {
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => requestAnimationFrame(fitTitleWidth)).observe(document.querySelector('.main'));
 
 // ---------- Song and chart selection ----------
-let pendingInstruments = null; // the instruments of a link, applied once the chart is read
 // The instruments and difficulties used last (src/lastpick.js): offered again on the next song unless a link or "play next" names them.
 let lastPick = parsePick(store.get('lastPick'));
-let openingSong = false; // while a song is being opened its first chart is not a choice of the user: it must not overwrite the memory
 function saveLastPick() {
   if (openingSong || !current?.screen || !prefs.get('general.rememberInstruments')) return;
   const off = instrumentGroups().filter((g) => !isOn(g)).map((g) => g.key);
   lastPick = rememberPick(lastPick, current.screen, off);
   store.set('lastPick', serializePick(lastPick));
 }
-let loadAudioWithSong = false; // a #/song/<id>/play link: the audio loads with the song, like a Play press would
 // Picking a song opens its details, and the player bar and the fretboards keep showing what they showed (a frozen picture of the last
 // song) until the audio starts to load (or the details close): then the new song fades in. The chart itself loads in the background.
-let holdStage = false;
-let listenMode = false; // the audio was loaded by the Listen card and no real Play happened: the fretboards stay at the start (the sound does not drive the visualizer)
 let ghostObserver = null;
 let barGhost = null; // a still copy of the player bar, laid over the real one while the stage is held
-let stageEverLive = false; // a song has been played (or opened with /play) since the page loaded: until then the player bar is not shown
 function holdStageNow() {
   if (holdStage) return;
   if (!stageEverLive) { holdStage = true; els.app.classList.add('stage-held'); return; } // nothing was ever shown: hold with no picture to keep (the bar stays away)
@@ -886,7 +928,6 @@ function dropGhost() {
   barGhost?.remove();
   barGhost = null;
 }
-let loadingBackdrop = 0; // while the held song's audio loads: when it started (the background visualizer keeps animating behind the loading screen)
 function stageLoading() {
   if (!holdStage) return;
   loadingBackdrop = performance.now();
@@ -1062,7 +1103,6 @@ async function selectSong(song) {
 }
 
 // The audio (the heavy part) loads on demand: Play, the Listen card or Space. A loading screen covers the stage meanwhile.
-let audioLoad = null; // { song, promise } while a load runs
 // `listen`: the Listen card only wants the sound: no loading screen, the stage (bar, fretboards, background) stays as it is and the progress
 // shows in the card. A later full Play on a load still running upgrades it to the normal one (loading screen).
 function refreshStemFailures() {
@@ -1632,7 +1672,6 @@ function updateChart() {
 els.instrument.addEventListener('change', () => { fillDifficultyOptions(); updateChart(); });
 els.difficulty.addEventListener('change', updateChart);
 
-let activeSection = -2; // index shown as current in the section chip and list
 
 // Sections: the hidden select keeps the state, the chip and its list (same look as the instrument list) show it.
 function fillSectionOptions() {
@@ -1721,8 +1760,6 @@ function savedMaster() {
   const v = Number(store.get('master'));
   return store.get('master') !== null && Number.isFinite(v) ? Math.min(1.5, Math.max(0, v)) : 1;
 }
-let stemStates = []; // { stem, value, muted, group, views[] }: one state per stem, shown in the menu and on the info screen
-let groupList = []; // { key, label, members[], value, muted, expanded, views[] }: stems of one instrument, collapsed by default
 
 const silent = (st) => st.muted || Boolean(st.group?.muted); // not audible because of its own or its group's mute
 const groupSilent = (g) => g.muted || g.members.every((m) => m.muted);
@@ -2215,9 +2252,6 @@ els.seekbox.addEventListener('wheel', (e) => {
 // section starts, the song start and end; Alt turns them off); a band shows the region.
 // Wrap rule: playback jumps back to the start only when it leaves the END of the region from INSIDE it. A loop is
 // dormant while playback is outside the region (after a seek before or past it) and re-arms once playback enters it.
-let loop = null; // { start, end } or null
-let trainer = null; // the speed trainer while it runs ({ speed, passes, done }, trainer.js): practice.trainer is on and so is a loop
-let loopPrev = null; // the previous frame's time, to tell a wrap from a seek
 let loopDrag = null;
 const LOOP_SNAP_PX = 10;
 const sectionStartsPlayer = () => (chart?.sections ?? []).map((s) => s.time + settings.chartDelay);
@@ -2259,8 +2293,6 @@ function setLoopHere(which) {
 }
 // Loop restart delay (YARG's practice restart delay): at the loop end the song pauses (the play button keeps its playing state, the fretboards stay at the end)
 // for playback.loopRestartDelay seconds, then restarts like a normal wrap. Play/pause, a seek, a loop change, a focus-loss pause or closing the song cancel it.
-let loopWait = null; // { until, timer, shown } while the wait runs
-let loopHeld = false; // the user paused during the wait: the next Play does the wrap itself (the hold was served for this pass)
 function cancelLoopWait() {
   if (!loopWait) return;
   clearInterval(loopWait.timer);
@@ -2457,11 +2489,7 @@ function seekPlain(t) {
 // pause point are drawn disabled (YARG judges no input until the song has passed the pause point). Not with a loop, after a seek, or when the setting is off.
 const PAUSE_REWIND_SEC = 1;
 const REWIND_ANIM_MS = 500;
-let pausedAt = null; // where the song was paused by the user (null: not a resume from a pause)
 let rewindLimit = -Infinity;
-let resumeTimer = 0;
-let replay = null; // { from, to }: the replayed stretch while it runs
-let internalSeek = false;
 function rememberPause() {
   const t = player.currentTime();
   if (!replay) { // (pausing again during the replay keeps the first pause's point and limit)
@@ -2566,9 +2594,6 @@ async function togglePlay() {
 // timer: startDone resolves the wait early and startCancelled tells it not to play). The overlay fades in with the wait (or with the first play of a song when
 // there is no delay) and out INFO_*_MS after the sound starts, unless playback.keepSongInfo; closing the song or opening another hides it at once.
 let startTimer = 0;
-let startDone = null; // resolves the wait of a start delay that is running (a cancel resolves it too)
-let startCancelled = false;
-let infoShownFor = null; // the song whose overlay was shown (a first play of another song shows it again)
 let infoTimer = 0;
 function showSongInfo(hideMs) {
   const song = current?.song;
@@ -2621,7 +2646,6 @@ function scheduleInfoHide(ms) {
 }
 // The start screen: the first play of a song shows the pause screen (the song window with the instrument cards, the stage darkened) for START_SCREEN_SEC; its
 // Play button drains as the time runs out and starts the song at once when pressed; when the time is up the song starts by itself.
-let startScreenOn = false;
 // `sec` null: the audio is still loading, the Play button is a loader (text and spinner); a number: it is loaded, the button is Play and drains over `sec`.
 function showStartScreen(sec) {
   startScreenOn = true;
@@ -2659,7 +2683,6 @@ function endStartScreen() {
 // The load finished without the browser having the focus: no autostart at all (not even when the focus comes back); the screen waits with its Play button ready.
 // Resolves true when Play is pressed (the screen's button or the bar's), false when the wait is cancelled.
 let holdClicked = false;
-let holdActive = false;
 function waitForPlay() {
   startCancelled = false;
   holdClicked = false;
@@ -2730,7 +2753,6 @@ async function startAfterDelay(plan) {
 // Focus loss (YARG's PauseOnFocusLoss / MuteOnFocusLoss): the window or the tab goes away. Pause is the same as the user's (rememberPause, so Play
 // resumes with the rewind) and only for the song's own player, never the Listen card's or another song's sound; nothing resumes by itself. Mute silences the
 // master output without touching the saved volume or mute, and is undone on return.
-let focusLost = false;
 function onFocusLoss() {
   if (focusLost) return;
   focusLost = true;
@@ -2787,9 +2809,6 @@ function syncPlayButton() {
 // general.endScreen, a glass window (#endScreen) replaces the fretboards: facts about each instrument on screen (songstats.js) and a few
 // songs to play next (recommend.js). Any seek (the player's onSeek hook), a restart, Play or a song change clears the state; Esc only
 // hides the window (the buttons stay Restart). The canvas is hidden by CSS (.song-ended), so the background visualizer keeps running.
-let ended = false;
-let endDismissed = false;
-let endShown = false;
 const NEXT_COUNT = 20;
 player.onSeek = () => { cancelLoopWait(); loopHeld = false; metronome.reset(); setEnded(false); cancelStartWait(); if (!internalSeek) clearRewind(); }; // (a seek of the user ends a rewind; the rewind's own seek does not)
 
@@ -2967,7 +2986,6 @@ els.vocalChoice.addEventListener('click', (e) => { const b = e.target.closest('[
 // ---------- Instrument tags: a tag over every chart opens a menu for that instrument ----------
 // The charts are canvas drawings, so the tags are real buttons that follow the rectangles the highway reports (paneRects).
 const paneTags = new Map();
-let menuKey = null; // the instrument whose menu is open
 const seenTags = new Set(); // (reused: one Set per frame was garbage)
 function syncPaneTags() {
   const seen = seenTags;
@@ -3527,7 +3545,6 @@ els.barHide.addEventListener('click', () => setBarHidden(!els.app.classList.cont
 // One animated background behind every fretboard (src/visualizers.js, Highway.setVisualizer). The picker is a popover from the
 // tools row; the choice and its blur live in prefs (highway.visualizer, highway.visualizerBlur).
 let vizSrc = null;
-let vizAll = null; // the equalizer's source: every instrument of the song (the ones on screen are marked); null = rebuild
 const vizSongInfo = () => {
   const ini = current.song.ini || {};
   return { title: plainText(current.song.title), artist: plainText(current.song.artist), genre: ini.genre, year: ini.year, length: (Number(ini.song_length) || 0) / 1000, bpmRange: bpmRange(current.midi?.tempos) };
@@ -3748,7 +3765,6 @@ let vis = { shown: null, last: null, anim: null, chart: null, step: 0 };
 const MOTION_BLUR_MIN_STEP = 0.06; // seconds of song per frame from which the jump is blurred
 const SEEK_JUMP_SEC = 0.75; // a bigger step between two frames than playback or a drag can make
 const seekAnimMs = (dist) => Math.min(700, 280 + dist * 25); // longer for longer jumps, 0.7 s at most
-let pendingSeekDur = null; // set by seekTo: the duration the audio scrub takes, so the fretboards' animation lasts the same
 function visualChartTime(ct) {
   const now = performance.now();
   if (!motionPref('highway.seekAnimation') || vis.chart !== chart || vis.last === null) {
@@ -4018,8 +4034,6 @@ syncMetPop();
 // The song information window while paused (setting playback.pauseInfo): the same window as at the start of a song, now with a Play button and the instruments as
 // on/off buttons. It follows the same rules as the quick settings panel (pausePanelWanted) and gives way to that panel when it is enabled; it goes when the sound
 // resumes, on a seek, on Esc (until the next pause) or when a blocker appears.
-let pauseInfoShown = false;
-let piDismissed = false;
 // Also before the song was ever played (a link to a song opens it paused at the start): the same screen, with its Play button, until the first Play.
 const preStartScreen = () => !!chart && !!current && !current.started && !startDone && !ended && !listenMode && player.currentTime() < 0.5;
 function syncPauseInfo() {
@@ -4050,8 +4064,6 @@ function syncPauseInfo() {
     fadeOutInfo();
   }
 }
-let pausePanelShown = false;
-let ppDismissed = false;
 let ppTimer = 0;
 function syncPausePanel() {
   if (!pausePanelShown && !ppTimer && !prefs.get('playback.pausePanel')) return;
@@ -4084,7 +4096,6 @@ els.ppMetronome.addEventListener('click', () => prefs.set('audio.metronome', !pr
 els.ppVolume.addEventListener('input', () => { masterState.value = Number(els.ppVolume.value); masterState.muted = false; applyStem(masterState); });
 els.ppResume.addEventListener('click', () => togglePlay());
 // A small note over the player for a moment (the speed after a shortcut).
-let flashEl = null;
 function flashNote(text) {
   if (!flashEl) {
     flashEl = document.createElement('div');
