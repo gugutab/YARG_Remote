@@ -192,7 +192,7 @@ function applyThemeSetting() {
   applyUiColors();
   try { // read by the inline script in index.html before the first paint
     const css = {};
-    for (const k of ['--bg', '--panel', '--panel-2', '--line', '--text', '--muted', '--accent', '--accent-text', '--stage', '--stage-rgb', 'color-scheme']) css[k] = document.documentElement.style.getPropertyValue(k);
+    for (const k of ['--bg', '--panel', '--panel-2', '--line', '--text', '--muted', '--accent', '--accent-text', '--accent-track', '--stage', '--stage-rgb', 'color-scheme']) css[k] = document.documentElement.style.getPropertyValue(k);
     localStorage.setItem('yargremote.themeCache', JSON.stringify({ scheme: theme.scheme, css }));
   } catch { /* the cache is optional */ }
 }
@@ -1095,7 +1095,7 @@ function renderLoadState() {
   els.loadScreen.hidden = true; // (the loading window is replaced by the start screen: its Play button is the loader)
   if (screen) {
     if (!startScreenOn && current && !infoOpen) { showSongInfo(null); showStartScreen(null); } // (a load that nobody opened the screen for)
-    if (startScreenOn && els.siPlay.classList.contains('loading')) { els.siPlayText.textContent = `${Math.round(fraction * 100)}%`; els.siPlay.style.setProperty('--p', String(fraction)); }
+    if (startScreenOn && els.siPlay.classList.contains('loading')) { els.siPlayText.textContent = `Loading ${Math.round(fraction * 100)}%`; els.siPlay.style.setProperty('--p', String(fraction)); }
   } else if (state === 'error') endStartScreen();
   else if (state === 'ready' && startScreenOn && !startDone && current && !current.started) endStartScreen(); // loaded with nobody pressing Play (a link without autostart): the pre-start screen takes the window back, its Play button ready
   const overlay = !infoOpen && !screen && state === 'error';
@@ -2521,7 +2521,7 @@ function showStartScreen(sec) {
   els.siPlay.classList.toggle('loading', loading);
   els.siPlay.disabled = loading;
   els.siPlay.classList.remove('counting');
-  if (loading) { els.siPlayText.textContent = '0%'; els.siPlay.style.setProperty('--p', '0'); }
+  if (loading) { els.siPlayText.textContent = 'Loading 0%'; els.siPlay.style.setProperty('--p', '0'); }
   else if (hold) { els.siPlayText.textContent = 'Play'; els.siPlay.style.setProperty('--p', '1'); }
   else {
     els.siPlay.style.setProperty('--p', '1');
