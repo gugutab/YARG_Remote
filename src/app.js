@@ -35,6 +35,7 @@ import { createThumbs, renderCoverThumb } from './thumbs.js';
 import { chartFacts, factRows } from './songstats.js';
 import { recommend } from './recommend.js';
 import { snapPoints, snapTime, clampLoop, currentSectionRange, sectionRange, loopForSection, shouldWrap, MIN_LOOP } from './looprange.js';
+import { trainerConfig, startTrainer, nextTrainerState, trainerStatus, stepNote } from './trainer.js';
 import { VISUALIZERS, createDriver as createVisualizerDriver } from './visualizers.js';
 
 const $ = (id) => document.getElementById(id);
@@ -2162,6 +2163,7 @@ els.seekbox.addEventListener('wheel', (e) => {
 // Wrap rule: playback jumps back to the start only when it leaves the END of the region from INSIDE it. A loop is
 // dormant while playback is outside the region (after a seek before or past it) and re-arms once playback enters it.
 let loop = null; // { start, end } or null
+let trainer = null; // the speed trainer while it runs ({ speed, passes, done }, trainer.js): practice.trainer is on and so is a loop
 let loopPrev = null; // the previous frame's time, to tell a wrap from a seek
 let loopDrag = null;
 const LOOP_SNAP_PX = 10;
@@ -2174,9 +2176,11 @@ function setLoop(range) {
   cancelLoopWait();
   loopHeld = false;
   if (range) clearRewind();
+  const had = !!loop;
   loop = range && seekMax() > 0 ? range : null;
   loopPrev = null;
   paintLoop();
+  if (!loop) stopTrainer(); else if (!had) beginTrainer(); // (moving a handle keeps the trainer's progress)
 }
 function paintLoop() {
   const on = !!loop;
@@ -2239,6 +2243,7 @@ async function finishLoopWait() {
 // The restart itself: one second before the loop start (the same rewind as after a pause) with the notes of that second drawn disabled, until the song
 // reaches the start. Returns the new player time.
 function wrapLoop() {
+  trainerPass(); // (before the seek: a speed step starts with the new pass)
   const back = prefs.get('playback.resumeRewind') ? Math.max(0, loop.start - PAUSE_REWIND_SEC) : loop.start;
   internalSeek = true;
   player.seek(back); // the audio restarts at once (no scrub)...
@@ -2263,6 +2268,47 @@ function loopSectionRow(i) {
   if (sec) { setLoop(loopForSection(loop, sec)); rewindIntoLoop(); }
 }
 els.loopBtn.addEventListener('click', toggleLoop);
+
+// Speed trainer (setting practice.trainer; rules in trainer.js): while a loop runs, every completed pass (a wrap, counted in wrapLoop, so
+// the restart delay and a pause during it count once) moves it on; after practice.trainerPasses passes the speed goes up one step through
+// setSetting (the audio stretch follows). Starting it (a new loop, or the setting turned on during one) sets the start speed; ending the
+// loop (R, a seek out of it, another song) or turning it off keeps the speed reached. It only reads the wait/rewind state, never changes it.
+const trainerCfg = () => trainerConfig((id) => prefs.get(id));
+function beginTrainer() {
+  trainer = null;
+  if (loop && prefs.get('practice.trainer')) {
+    trainer = startTrainer(trainerCfg());
+    setSetting('speed', trainer.speed);
+    flashNote(`Speed trainer: ${stepNote(trainer)}`);
+  }
+  paintTrainer();
+}
+function stopTrainer() {
+  trainer = null;
+  paintTrainer();
+}
+function trainerPass() {
+  if (!trainer) return;
+  trainer = nextTrainerState(trainer, { type: 'wrap', speed: settings.speed }, trainerCfg());
+  if (trainer.stepped) { setSetting('speed', trainer.speed); flashNote(stepNote(trainer)); }
+  paintTrainer();
+}
+// The trainer row of the speed popover: an On/Off switch bound to practice.trainer and a status line (pass count, speed, target).
+const trainerBox = document.createElement('div');
+trainerBox.className = 'fp-group trainer-box';
+trainerBox.innerHTML = '<span class="fp-label">Speed trainer</span><div class="seg fret-seg" role="group" aria-label="Speed trainer"><button type="button" data-value="true">On</button><button type="button" data-value="false">Off</button></div><div class="trainer-status" role="status"></div>';
+for (const b of trainerBox.querySelectorAll('button')) b.addEventListener('click', () => prefs.set('practice.trainer', b.dataset.value === 'true'));
+els.settingsPop.append(trainerBox);
+const trainerStatusEl = trainerBox.querySelector('.trainer-status');
+function paintTrainer() {
+  const on = prefs.get('practice.trainer');
+  for (const b of trainerBox.querySelectorAll('button')) b.setAttribute('aria-pressed', String(String(on) === b.dataset.value));
+  if (trainer) trainer = nextTrainerState(trainer, { type: 'paint', speed: settings.speed }, trainerCfg()); // (the speed may have been moved by hand, the target changed)
+  setText(trainerStatusEl, trainerStatus({ on, looping: !!loop, state: trainer, cfg: trainerCfg() }));
+  els.settingsBtn.classList.toggle('trainer-on', !!trainer);
+}
+els.settingsPop.addEventListener('input', paintTrainer); // (the speed slider)
+els.settingsBtn.addEventListener('click', paintTrainer);
 
 // Dragging a handle (mouse and touch): pointer capture keeps the move events on the handle; the seek input is untouched.
 function timeAtClientX(x) {
@@ -3988,6 +4034,8 @@ const EFFECTS = {
   'audio.metronome': (v) => { metronome.setEnabled(v); paintMetronome(v); syncMetPop(); },
   'audio.metronomeVolume': (v) => { metronome.setVolume(v); syncMetPop(); },
   'audio.metronomeSound': (v) => { metronome.setSound(v); syncMetPop(); },
+  'practice.trainer': (v) => { if (!v) stopTrainer(); else if (!trainer) beginTrainer(); },
+  'practice.trainerStart': () => paintTrainer(), 'practice.trainerTarget': () => paintTrainer(), 'practice.trainerStep': () => paintTrainer(), 'practice.trainerPasses': () => paintTrainer(),
   'highway.lyricsAbove': (v) => { highway.sheetPeek = v / 100; },
   'highway.countdown': (v) => { highway.countdowns = v; },
   'highway.countdownColors': applyUiColors,

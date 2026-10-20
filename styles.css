@@ -2680,6 +2680,10 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .met-pop .met-volume { display: grid; grid-template-columns: auto minmax(0, 1fr) 40px; align-items: center; gap: 8px; }
 .met-pop .met-volume output { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
 .met-pop .met-volume > span { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+/* Speed trainer row of the speed popover (app.js paintTrainer); the speed button is tinted while the trainer runs */
+.trainer-box { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.trainer-status { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; max-width: 280px; }
+#settingsBtn.trainer-on { color: var(--accent); }
 /* While the bottom bar is held back (loading, the start screen) its slot is dimmed like the rest of the stage, instead of showing the plain page behind it */
 .app.stage-held:has(.pause-dim.show) #topbar { visibility: visible; }
 .app.stage-held:has(.pause-dim.show) #topbar > * { visibility: hidden; }
