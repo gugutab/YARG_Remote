@@ -77,16 +77,16 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 .search input { width: 100%; padding-left: 32px; }
 .count { color: var(--muted); font-size: 12px; }
 /* Windowed list: rows are absolutely positioned inside the scrolling list (heights match ROW_H / HEAD_H in virtuallist.js) */
-.songs-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
-#songs { position: relative; list-style: none; margin: 0; padding: 0; overflow: auto; flex: 1; min-height: 0; }
+.songs-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+#songs { position: relative; list-style: none; margin: 0; overflow: auto; flex: 1; min-height: 0; }
 #songs li { position: absolute; left: 0; box-sizing: border-box; }
 #songs li.spacer { position: static; pointer-events: none; }
 :is(#songs, #endNext) li.row { display: flex; align-items: center; gap: 10px; padding: 6px 0 6px 6px; border-bottom: 1px solid var(--line); cursor: pointer; }
 :is(#songs, #endNext) li.row:hover { background: var(--panel-2); }
 :is(#songs, #endNext) li.row.active { background: var(--panel-2); }
 :is(#songs, #endNext) li.row.active::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); z-index: 1; } /* drawn over the thumbnail: the rows have no horizontal padding */
-#songs li.divider { display: flex; align-items: center; padding: 0 10px; font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--accent); background: var(--bg); border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.group-label { position: absolute; z-index: 2; top: 0; left: 0; right: 0; height: 26px; display: flex; align-items: center; padding: 0 10px; box-sizing: border-box; font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--accent); background: var(--bg); border-bottom: 1px solid var(--line); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#songs li.divider { display: flex; align-items: center; font-weight: 700; letter-spacing: .08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.group-label { position: absolute; z-index: 2; top: 0; left: 0; height: 26px; display: flex; align-items: center; padding: 0 10px; box-sizing: border-box; font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--accent); background: var(--bg); border-bottom: 1px solid var(--line); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .thumb { flex: none; width: 42px; height: 42px; border-radius: 6px; background: var(--panel-2); overflow: hidden; }
 .thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .song-text { display: flex; flex-direction: column; min-width: 0; }
@@ -121,8 +121,7 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 .row input { min-width: 0; accent-color: var(--accent); }
 .row output { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
 .mixer { display: flex; flex-direction: column; gap: 6px; }
-.mix-row { display: grid; grid-template-columns: 28px 84px 1fr 40px 28px; align-items: center; gap: 8px; font-size: 13px; }
-.mix-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mix-row { display: grid; align-items: center; gap: 8px; font-size: 13px; }
 .mix-val { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
 .mix-row input { min-width: 0; accent-color: var(--accent); }
 
@@ -168,11 +167,11 @@ button.icon.small-icon svg { width: 16px; height: 16px; }
 /* ---------- Song info screen ---------- */
 .info-scroll { flex: 1; min-height: 0; overflow: auto; padding: 16px; }
 .info-grid { margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; align-items: start; }
-.info-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
+.info-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
 .info-card h3 { margin: 14px 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .info-card h3:first-child { margin-top: 0; }
-.info-head { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; align-items: start; }
-.info-head img { width: 140px; height: 140px; object-fit: cover; border-radius: 10px; grid-row: 1 / span 2; }
+.info-head { grid-column: 1 / -1; }
+.info-head img { object-fit: cover; border-radius: 10px; }
 .info-head h2 { margin: 0; font-size: 26px; line-height: 1.15; overflow-wrap: anywhere; }
 .info-artist { color: var(--muted); font-size: 16px; }
 .info-quote { margin: 8px 0 0; font-style: italic; color: var(--muted); }
@@ -193,7 +192,7 @@ button.icon.small-icon svg { width: 16px; height: 16px; }
 .extra { margin-top: 12px; font-size: 13px; }
 .extra summary { cursor: pointer; color: var(--muted); }
 .extra .kv { margin-top: 8px; }
-.info-actions { flex: none; display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--line); background: var(--panel); }
+.info-actions { flex: none; display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--line); }
 .progress { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .progress .bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .progress .bar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s ease; }
@@ -206,15 +205,12 @@ button.icon.small-icon svg { width: 16px; height: 16px; }
 .info .row { grid-template-columns: 92px 1fr 52px 28px; margin-bottom: 6px; }
 .info .mixer { max-height: none; overflow: visible; } /* no inner scroll: the whole info screen scrolls */
 @media (max-width: 700px) {
-  .info-head { grid-template-columns: 1fr; }
-  .info-head img { width: 96px; height: 96px; grid-row: auto; }
   .info-head .kv { grid-column: 1; }
   .info-actions { flex-wrap: wrap; }
   .info-grid { grid-template-columns: 1fr; }
 }
 
 /* ---------- Info screen without the top bar, stem icons ---------- */
-.mix-row { grid-template-columns: 36px 1fr 40px 28px; }
 .stem-btn { position: relative; width: 36px; height: 32px; display: inline-grid; place-items: center; padding: 0; background: var(--panel-2); border-radius: 8px; }
 .stem-btn svg { width: 18px; height: 18px; }
 .stem-btn .badge { position: absolute; right: 2px; bottom: 0; font-size: 10px; line-height: 1; color: var(--accent); font-style: normal; }
@@ -229,11 +225,9 @@ button.icon.small-icon svg { width: 16px; height: 16px; }
 .info-head-text { min-width: 0; grid-column: 2; }
 .info-head img[hidden] + .info-head-text { grid-column: 1 / -1; }
 .chips-v { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: 8px; }
-.chip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-height: 32px; padding: 4px 12px 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); font-size: 13px; }
-.chip svg { width: 18px; height: 18px; color: var(--accent); }
+.chip { max-width: 100%; }
 .chip-label { color: var(--muted); }
 .chip-value { font-weight: 600; overflow-wrap: anywhere; }
-.icards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
 .icard { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); min-width: 0; }
 .icard[data-active="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .icard-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 2px; border: 0; background: transparent; font-weight: 600; }
@@ -246,17 +240,13 @@ button.icon.small-icon svg { width: 16px; height: 16px; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text, #fff); }
 .kv.mini { grid-template-columns: max-content 1fr max-content 1fr; gap: 3px 10px; font-size: 12px; }
 @media (max-width: 700px) {
-  .info-head { grid-template-columns: 1fr; }
-  .info-head img { width: 110px; height: 110px; }
   .info-head-text { grid-column: 1; }
-  .icards { grid-template-columns: 1fr; }
 }
 
 /* Narrow header (small window, or the library drawer open): cover above the text so the chips have room */
 .info-grid { container-type: inline-size; }
 @container (max-width: 560px) {
   .info-head-text { grid-column: 1; }
-  .info-head { grid-template-columns: 1fr; }
 }
 
 button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
@@ -304,21 +294,19 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
   align-items: stretch;
   gap: 0 10px;
   padding: 8px 10px 8px 6px;
-  border-bottom: 1px solid var(--line);
   min-width: 0;
 }
 .tb-cover { align-self: center; width: 92px; height: 92px; object-fit: cover; border-radius: 10px; }
 .tb-cover[hidden] { display: none; }
-.tb-main { min-width: 0; display: grid; grid-template-rows: 1fr auto 1fr; }
+.tb-main { min-width: 0; display: grid; }
 .tb-top, .tb-bottom { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .tb-top { justify-content: space-between; }
-.tb-bottom { justify-content: space-between; }
 .brand { font-weight: 700; }
 .now { min-width: 0; flex: 1 1 auto; }
 .now-text { min-width: 0; }
 .now-title { font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .now-artist { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chips { display: flex; gap: 6px; flex: none; }
+.chips { flex: none; }
 .transport { display: flex; align-items: center; gap: 2px; }
 .transport .time { margin-left: 8px; }
 .time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
@@ -328,24 +316,21 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
 .chip-btn:disabled { opacity: .5; cursor: default; }
 
 /* the seek bar: a thin line across the bar that divides the two rows */
-.seekbox { display: block; height: 14px; margin: 0 -10px 0 0; position: relative; }
+.seekbox { display: block; }
 .seekbox input {
   --pct: 0%;
-  -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 14px; margin: 0; padding: 0;
+  -webkit-appearance: none; appearance: none; display: block; width: 100%; margin: 0; padding: 0;
   background: transparent; cursor: pointer; border: 0; border-radius: 0;
 }
 .seekbox input::-webkit-slider-runnable-track {
-  height: 4px; border-radius: 2px;
-  background: linear-gradient(to right, var(--accent) var(--pct), var(--line) var(--pct));
+  height: 4px; 
 }
-.seekbox input::-moz-range-track { height: 4px; border-radius: 2px; background: var(--line); }
-.seekbox input::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
-.seekbox input::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; border: 0; background: #fff; box-shadow: 0 0 0 2px var(--accent); opacity: 0; transition: opacity .12s; }
+.seekbox input::-moz-range-track { height: 4px; }
+.seekbox input::-moz-range-progress { height: 4px; background: var(--accent); }
+.seekbox input::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; border: 0; background: #fff; box-shadow: 0 0 0 2px var(--accent); opacity: 0; transition: opacity .12s; }
 .seekbox input::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; border: 0; background: #fff; box-shadow: 0 0 0 2px var(--accent); opacity: 0; transition: opacity .12s; }
 .seekbox:hover input::-webkit-slider-thumb, .seekbox input:focus-visible::-webkit-slider-thumb, .seekbox input:active::-webkit-slider-thumb { opacity: 1; }
 .seekbox:hover input::-moz-range-thumb, .seekbox input:focus-visible::-moz-range-thumb, .seekbox input:active::-moz-range-thumb { opacity: 1; }
-.seekbox:hover input::-webkit-slider-runnable-track { height: 6px; }
-.seekbox:hover input::-webkit-slider-thumb { margin-top: -3px; }
 
 /* section list: same rows as the instrument list, with the start time */
 .prow-time { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; min-width: 38px; }
@@ -355,13 +340,12 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
 @media (max-width: 700px) {
   :root { --bar-h: 92px; }
   .tb-cover { display: none; }
-  .topbar { gap: 0 6px; grid-template-columns: auto minmax(0, 1fr); padding-left: 2px; }
-  .transport .time { display: none; }
+  .topbar { gap: 0 6px; }
   #fullscreen { display: none; }
 }
 
 /* ---------- Round 7: info popup, difficulty badge, master volume ---------- */
-.now { display: flex; align-items: center; gap: 4px; }
+.now { display: flex; gap: 4px; }
 .now-text { flex: 0 1 auto; }
 .now > .pop-wrap { flex: none; }
 .info-pop { width: min(380px, calc(100vw - 16px)); gap: 10px; }
@@ -388,7 +372,7 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
 .seekbox:hover input::-webkit-slider-runnable-track { height: 6px; }
 .seekbox:hover input::-webkit-slider-thumb { margin-top: -3px; }
 .transport .section-wrap { margin-left: 8px; }
-.stage-btn { position: absolute; top: 10px; right: 10px; z-index: 3; background: rgba(13, 17, 23, 0.55); border: 1px solid var(--line); color: #e6edf3; border-radius: 10px; }
+.stage-btn { position: absolute; top: 10px; z-index: 3; background: rgba(13, 17, 23, 0.55); border: 1px solid var(--line); color: #e6edf3; border-radius: 10px; }
 .stage-btn:hover { background: rgba(13, 17, 23, 0.8); }
 .stage-btn[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
 @media (max-width: 700px) {
@@ -425,10 +409,9 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
   .tb-bottom { gap: 4px; }
   .transport { min-width: 0; gap: 0; flex: 1 1 auto; }
   .transport .icon { width: 32px; height: 32px; }
-  .transport .icon.primary { width: 36px; height: 36px; }
   .transport .time { display: inline; margin-left: 4px; font-size: 12px; white-space: nowrap; }
   .transport .section-wrap { display: block; margin-left: 4px; min-width: 0; }
-  .section-wrap .chip-btn { max-width: 96px; min-height: 28px; padding: 0 6px; }
+  .section-wrap .chip-btn { min-height: 28px; padding: 0 6px; }
   .tools { flex: none; }
   .tools .icon { width: 32px; height: 32px; }
   .tb-top { gap: 6px; }
@@ -464,7 +447,7 @@ button.icon.primary svg { width: 18px; height: 18px; }
 /* ---------- Round 14: no extra top margin in the lone details card; chart counts behind an info button ---------- */
 .info-card > .extra:first-child { margin-top: 0; }
 .icard-top { display: flex; align-items: center; gap: 4px; min-width: 0; }
-.icard-top .icard-head { flex: 0 1 auto; width: auto; min-width: 0; }
+.icard-top .icard-head { flex: 0 1 auto; width: auto; }
 .icard-top .pips { margin-left: auto; flex: none; }
 .kv.mini[hidden] { display: none; }
 .icard-top .icard-name { white-space: nowrap; }
@@ -477,9 +460,9 @@ button.icon.stage-btn:hover { background: rgba(13, 17, 23, 0.8); }
 button.icon.stage-btn[aria-pressed="true"] { border-color: var(--accent); }
 
 /* ---------- Round 17: grouped stems ---------- */
-.mix-row { grid-template-columns: 36px 1fr 40px 28px 28px; } /* the last column is for the expand button of groups */
+/* the last column is for the expand button of groups */
 .mix-group { display: flex; flex-direction: column; gap: 6px; }
-.mix-kids { display: flex; flex-direction: column; gap: 6px; margin-left: 14px; padding-left: 8px; border-left: 2px solid var(--line); }
+.mix-kids { display: flex; flex-direction: column; gap: 6px; padding-left: 8px; border-left: 2px solid var(--line); }
 .mix-kids[hidden] { display: none; }
 .expand-btn svg { transition: transform .15s ease; }
 .expand-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
@@ -487,7 +470,7 @@ button.icon.stage-btn[aria-pressed="true"] { border-color: var(--accent); }
 
 /* ---------- Round 18: expand button beside the icon, sliders with a default-value marker ---------- */
 .mix-row { grid-template-columns: 36px 1fr 40px 28px; } /* back to four columns: rows without a group button reserve nothing */
-.mix-row.has-expand { grid-template-columns: 36px 24px 1fr 40px 28px; } /* the group slider gets shorter by the button's width */
+/* the group slider gets shorter by the button's width */
 .expand-btn { width: 24px; height: 28px; }
 .expand-btn svg { width: 14px; height: 14px; }
 
@@ -519,9 +502,7 @@ button.icon.stage-btn[aria-pressed="true"] { border-color: var(--accent); }
 .mix-row.muted input[type="range"] { opacity: .4; }
 
 /* Round 19: the group button is only as wide as its arrow (no horizontal padding; it also beat the 28 px rule of small-icon buttons) */
-.mix-row.has-expand { grid-template-columns: 36px 14px 1fr 40px 28px; }
-button.icon.small-icon.expand-btn { width: 14px; min-width: 0; padding: 0; height: 28px; }
-button.icon.small-icon.expand-btn svg { width: 14px; height: 14px; }
+button.icon.small-icon.expand-btn { min-width: 0; padding: 0; height: 28px; }
 
 /* Round 20: tighter outer spacing: the 8 px grid gaps around the arrow shrink to 2 px (negative margins let the
    auto column collapse while the 14 px arrow straddles the gaps) */
@@ -529,12 +510,8 @@ button.icon.small-icon.expand-btn svg { width: 14px; height: 14px; }
 button.icon.small-icon.expand-btn { margin-inline: -6px; }
 
 /* Round 21: the arrow is 18 px wide (same 2 px outer spacing as before) */
-button.icon.small-icon.expand-btn { width: 18px; }
-button.icon.small-icon.expand-btn svg { width: 18px; height: 18px; }
 
 /* Round 22: the arrow is 20 px wide */
-button.icon.small-icon.expand-btn { width: 20px; }
-button.icon.small-icon.expand-btn svg { width: 20px; height: 20px; }
 
 /* Round 23: the arrow is 24 px wide */
 button.icon.small-icon.expand-btn { width: 24px; }
@@ -545,8 +522,6 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
 
 /* Round 25: the line under the group icon (and the sub-rows with it) sits 4 px further right; the sub-rows' column
    gaps shrink by 4 px in total so the sub-sliders keep their width and the value/reset columns stay aligned */
-.mix-kids { margin-left: 18px; }
-.mix-kids .mix-row { column-gap: calc(8px - 4px / 3); }
 
 /* Round 26: the other way: the line under the group icon (with the sub-rows) sits 4 px LEFT of where it was
    (margin 14 -> 10), which gives the sub-sliders 4 px more width; the column gaps go back to 8 px */
@@ -572,7 +547,7 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
   .info-cols > .card-adjust, .info-cols > .card-volume, .info-cols > .card-extra { grid-column: 1; grid-row: auto; }
 }
 /* Instrument cards pack into columns, each as tall as its content: no gaps between cards of different heights */
-.icards { display: grid; grid-template-columns: repeat(var(--icols, 1), minmax(0, 1fr)); gap: 10px; align-items: start; } /* --icols: see layoutInstrumentCards() */
+.icards { display: grid; grid-template-columns: repeat(var(--icols, 1), minmax(0, 1fr)); gap: 10px; } /* --icols: see layoutInstrumentCards() */
 .icards > .icard { margin: 0; }
 
 /* "Other song.ini properties": as many columns as fit (each at least 190 px) */
@@ -596,7 +571,7 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
 .rail canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .rail-thumb { position: absolute; width: 14px; right: 0; /* flush with the sidebar edge */ top: 0; border-radius: 6px; background: color-mix(in srgb, var(--accent) 16%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent); pointer-events: none; transition: background .15s; }
 .rail:hover .rail-thumb, .rail.dragging .rail-thumb { background: color-mix(in srgb, var(--accent) 30%, transparent); }
-.rail-bubble { position: absolute; right: calc(var(--rail-w) + 6px); transform: translateY(-50%); max-width: 220px; padding: 4px 9px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 4px 14px rgba(0, 0, 0, .4); font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.rail-bubble { position: absolute; right: calc(var(--rail-w) + 6px); transform: translateY(-50%); padding: 4px 9px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 4px 14px rgba(0, 0, 0, .4); font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: none; }
 .rail.off { visibility: hidden; }
 
 /* ---------- Round 50: search, filters and card styles ---------- */
@@ -637,12 +612,9 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
 .view-seg button[aria-pressed="true"] { color: var(--accent-text, #fff); }
 
 /* Card styles of the song list (row heights live in virtuallist.js ROW_HEIGHTS) */
-:is(#songs, #endNext) li.row.compact { padding: 0 0 0 6px; }
 .song-line { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .song-line .song-title, .song-line .song-artist { display: inline; font-size: 13px; }
 .song-line .song-artist { font-weight: 400; }
-:is(#songs, #endNext) li.row.large { gap: 12px; padding: 8px 0 8px 6px; align-items: flex-start; }
-:is(#songs, #endNext) li.row.large .thumb { width: 92px; height: 92px; border-radius: 8px; }
 :is(#songs, #endNext) li.row.large .song-text { flex: 1; gap: 2px; padding-top: 1px; }
 :is(#songs, #endNext) li.row.large .song-title { font-size: 15px; }
 :is(#songs, #endNext) li.row.large .song-artist { font-size: 13px; }
@@ -724,13 +696,13 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
 
 /* Round 59: the results list bleeds to the left edge of the library panel (the panel's 10 px padding is cancelled on that
    side only; the scrollbar rail keeps its place); the group headers get their own inner padding instead */
-.songs-wrap { margin-left: -10px; margin-right: -10px; } /* the rail also reaches the panel's right edge */
+/* the rail also reaches the panel's right edge */
 .status:empty { display: none; } /* no empty strip under the list */
 
 /* Normal cards: the artist and, to its right, one small icon per instrument the song has */
 .song-sub { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .song-sub .song-artist { flex: 1 1 auto; min-width: 0; }
-.song-icons { display: flex; gap: 5px; flex: none; margin-left: auto; padding-right: 4px; }
+.song-icons { display: flex; flex: none; margin-left: auto; }
 .song-icons { gap: 6px; align-items: center; }
 .song-icons .inst svg { width: 15px; height: 15px; } /* with the pack name above, the icons fill the height of the right side */
 :is(#songs, #endNext) li.row.normal .song-text { flex: 1; }
@@ -747,9 +719,9 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
 .song-pack span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Normal cards: the title with the pack at the top right */
-.song-top { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.song-top { display: flex; min-width: 0; }
 .song-top .song-title { flex: 1 1 auto; min-width: 0; }
-.song-packtag { flex: 0 1 auto; max-width: 42%; padding-right: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; font-weight: 600; color: var(--accent); }
+.song-packtag { white-space: nowrap; font-size: 10.5px; font-weight: 600; color: var(--accent); }
 
 /* Pack sort: the rail is wider so every pack has a readable code */
 .songs-wrap.even-rail { --rail-w: 42px; }
@@ -766,7 +738,7 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
 
 /* Round 63: the instrument icons are 15px in the normal and in the large card; the pack tag sits at the top of the normal card */
 .song-insts .inst svg { width: 15px; height: 15px; }
-.song-packtag { margin-top: -6px; } /* the text block is centred in the 56px card (11px from the top): the pack sits 4px from the top edge */
+/* the text block is centred in the 56px card (11px from the top): the pack sits 4px from the top edge */
 
 /* Sort direction is an arrow, not A->Z: it also applies to year and length */
 .sort-dir { padding: 0 8px; }
@@ -795,7 +767,6 @@ button.icon.small-icon.expand-btn svg { padding: 2px; box-sizing: border-box; }
 #songs { --cols: 1; }
 :is(#songs, #endNext) li.row { right: auto; left: calc((100% - var(--rail-w)) / var(--cols) * var(--col, 0)); width: calc((100% - var(--rail-w)) / var(--cols)); }
 #songs li.divider { right: auto; left: 0; width: calc(100% - var(--rail-w)); }
-#songs.multi li.row { border-right: 1px solid var(--line); }
 
 
 
@@ -928,7 +899,6 @@ body.settings-open { overflow: hidden; }
 .sp-group[hidden] { display: none; }
 /* cards: sizes follow the card settings (--card-scale, --card-icon are set on the list) */
 :is(#songs, #endNext) li.row:not(.large) .thumb { width: calc(42px * var(--card-scale, 1)); height: calc(42px * var(--card-scale, 1)); }
-:is(#songs, #endNext) li.row.large .thumb { width: calc(92px * var(--card-scale, 1)); height: calc(92px * var(--card-scale, 1)); }
 .song-icons .inst svg, .song-insts .inst svg { width: var(--card-icon, 15px); height: var(--card-icon, 15px); }
 .songs-wrap.no-rail { --rail-w: 8px; }
 .songs-wrap.no-rail .rail { display: none; }
@@ -976,7 +946,7 @@ body.settings-open { overflow: hidden; }
 .card-listen { grid-column: 1 / -1; }
 
 /* loading screen: shown over the song panel while the audio loads after Play */
-.load-screen { position: absolute; inset: 0; z-index: 11; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; background: var(--bg); }
+.load-screen { position: absolute; inset: 0; z-index: 11; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; }
 .load-screen[hidden] { display: none; }
 .load-screen img { width: min(220px, 40%); aspect-ratio: 1; object-fit: cover; border-radius: var(--radius, 10px); box-shadow: 0 10px 40px rgba(0, 0, 0, .45); }
 .load-screen h2 { margin: 0; font-size: 20px; }
@@ -988,7 +958,7 @@ body.settings-open { overflow: hidden; }
 .icard[data-pinned="true"] { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .prow[data-pinned="true"] .prow-name { color: var(--accent); }
 
-.card-listen .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 0 0 8px; }
+.card-listen .card-head { justify-content: space-between; margin: 0 0 8px; }
 .card-listen .card-head h3 { margin: 0; }
 .listen-preview { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; height: 16px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); cursor: pointer; user-select: none; }
 .listen-preview input { accent-color: var(--accent); margin: 0; width: 14px; height: 14px; cursor: pointer; }
@@ -998,22 +968,22 @@ body.settings-open { overflow: hidden; }
 
 /* ---------- instrument tags over the charts, and their menu ---------- */
 .pane-tags { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
-.pane-tag { position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px 0 8px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, .14); background: rgba(13, 17, 23, .3); color: #e6edf3; font: 600 12px/1 var(--font, system-ui); cursor: pointer; pointer-events: auto; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); white-space: nowrap; }
+.pane-tag { position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; border: 1px solid rgba(255, 255, 255, .14); background: rgba(13, 17, 23, .3); color: #e6edf3; font: 600 12px/1 var(--font, system-ui); cursor: pointer; pointer-events: auto; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); white-space: nowrap; }
 .pane-tag:hover, .pane-tag[aria-expanded="true"] { background: rgba(13, 17, 23, .55); border-color: var(--accent); }
-.pane-tag svg { width: 16px; height: 16px; flex: none; fill: currentColor; }
+.pane-tag svg { flex: none; fill: currentColor; }
 .pane-tag .chev { width: 6px; height: 6px; margin: -3px 0 0 2px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor; transform: rotate(45deg); opacity: .75; flex: none; }
 .pane-tag[aria-expanded="true"] .chev { transform: rotate(-135deg); margin-top: 3px; }
-.pane-menu { width: min(300px, calc(100vw - 16px)); display: flex; flex-direction: column; gap: 12px; }
+.pane-menu { display: flex; flex-direction: column; }
 .pane-menu[hidden] { display: none; }
-#paneMenuDyn { display: flex; flex-direction: column; gap: 12px; }
-.pm-view { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+#paneMenuDyn { display: flex; flex-direction: column; }
+.pm-view { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
 .pm-view:not(:has(.fp-group:not([hidden]))) { display: none; }
 /* the top bar's play button lights up under the pointer */
 button.icon.primary:hover:not(:disabled) { filter: brightness(1.18); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
 button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 
 /* ---------- compact instrument menu, and the chooser that fills a slot ---------- */
-.pane-menu { width: min(240px, calc(100vw - 16px)); gap: 8px; padding: 10px; }
+.pane-menu { gap: 8px; padding: 10px; }
 #paneMenuDyn { gap: 8px; }
 .pane-menu .fp-group { gap: 3px; }
 .pane-menu .seg button { padding: 4px 8px; font-size: 12px; }
@@ -1099,13 +1069,12 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .seekbox.animating input::-moz-range-thumb { opacity: 1; }
 
 /* Neck speed and chart delay of one window, in its instrument menu */
-.pane-menu .pm-range { display: grid; grid-template-columns: 1fr 52px 22px; align-items: center; gap: 6px; }
+.pane-menu .pm-range { display: grid; align-items: center; }
 .pane-menu .pm-range output { text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
 .pane-menu .pm-range .reset:disabled { opacity: .3; }
 
 /* The instrument tag shows only the icon and the arrow (the name is its tooltip and accessible label) */
 .pane-tag span { display: none; }
-.pane-tag { gap: 5px; padding: 0 8px; }
 
 /* The top bar is a glass window over the background of the fretboards (the visualizer shows through) */
 .topbar { border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }
@@ -1122,8 +1091,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .app.bar-hidden .topbar { padding: 4px 10px 4px 6px; }
 .app.bar-hidden .tb-cover { width: 44px; height: 44px; border-radius: 7px; }
 .app.bar-hidden .tb-main { display: flex; align-items: center; gap: 10px; grid-template-rows: none; }
-.app.bar-hidden .tb-top { flex: 0 1 230px; min-width: 0; }
-.app.bar-hidden .tb-bottom { flex: 1 1 auto; min-width: 0; }
 .app.bar-hidden .now-artist { display: none; }
 .app.bar-hidden .now-title { font-size: 13px; }
 .app.bar-hidden .topbar button.icon, .app.bar-hidden .topbar button.icon.primary { width: 30px; height: 30px; }
@@ -1135,43 +1102,33 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .app.bar-hidden .bar-hide svg { transform: none; } /* points down: expand */
 @container song (max-width: 600px) { /* compact bar in a narrow window: only what fits */
   .app.bar-hidden #sectionText { display: none; }
-  .app.bar-hidden .tb-top { flex: 0 0 auto; }
   .app.bar-hidden .tools { gap: 0; }
 }
 
 /* The blur of the glass top bar lives on a pseudo-element: a backdrop-filter on the bar itself makes it the containing block of the
    position: fixed popovers inside it (they were placed relative to the bar and pushed the page sideways). */
-.topbar::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.topbar::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; -webkit-backdrop-filter: blur(12px); }
 
 /* ---------- Mobile top bar ---------- */
 @media (max-width: 700px) {
   /* extended: the cover comes back, and the top row (title with its info icon, artist) is centred */
-  .app:not(.bar-hidden) .topbar { grid-template-columns: auto minmax(0, 1fr); }
-  .app:not(.bar-hidden) .tb-cover:not([hidden]) { display: block; grid-column: 1; grid-row: 1; width: 40px; height: 40px; align-self: center; border-radius: 8px; }
-  .app:not(.bar-hidden) .tb-top { justify-content: center; text-align: center; }
-  .app:not(.bar-hidden) .now { justify-content: center; }
-  .app:not(.bar-hidden) .now-text { text-align: center; }
+  .app:not(.bar-hidden) .tb-cover:not([hidden]) { display: block; }
   /* compact: every button sits at the right edge */
   .app.bar-hidden .topbar > .tb-main { grid-column: 1 / -1; justify-content: flex-end; } /* the whole width, so the buttons can reach the right edge */
-  .app.bar-hidden .tb-top { flex: 0 0 auto; margin-left: auto; }
-  .app.bar-hidden .tb-bottom { flex: 0 1 auto; justify-content: flex-end; }
 }
 
 /* ---------- Mobile top bar, second pass ---------- */
 @media (max-width: 700px) {
   /* extended: the cover and the title/artist form one group, centred in the bar */
-  .app:not(.bar-hidden) .topbar { grid-template-columns: 1fr auto auto 1fr; }
-  .app:not(.bar-hidden) .tb-cover:not([hidden]) { grid-column: 2; }
   .app:not(.bar-hidden) .topbar > .tb-main { grid-column: auto; }
-  .app:not(.bar-hidden) .tb-top { grid-column: 3; justify-content: flex-start; text-align: left; }
   .app:not(.bar-hidden) .now { justify-content: flex-start; }
   .app:not(.bar-hidden) .now-text { text-align: left; }
   .app:not(.bar-hidden) .tb-bottom { grid-column: 1 / -1; }
   /* compact: icons centred vertically between the top edge and the seek line, title and artist shown, prev/next hidden to make room */
   .app.bar-hidden .topbar { padding: 6px 10px 14px 6px; align-items: center; }
   .app.bar-hidden .tb-main, .app.bar-hidden .tb-top, .app.bar-hidden .tb-bottom { align-items: center; }
-  .app.bar-hidden .now-text { display: block; max-width: 110px; text-align: left; }
-  .app.bar-hidden .now-title { font-size: 12px; line-height: 1.2; }
+  .app.bar-hidden .now-text { max-width: 110px; text-align: left; }
+  .app.bar-hidden .now-title { line-height: 1.2; }
   .app.bar-hidden .now-artist { display: block; font-size: 10px; line-height: 1.2; }
   .app.bar-hidden #back, .app.bar-hidden #forward { display: none; }
 }
@@ -1179,12 +1136,11 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 /* ---------- Mobile compact bar, third pass: the title starts at the left edge and the info icon sits on the title line ---------- */
 @media (max-width: 700px) {
   .app.bar-hidden .tb-top { margin-left: 0; }
-  .app.bar-hidden .tb-bottom { margin-left: auto; }
-  .app.bar-hidden .now { display: grid; grid-template-columns: auto auto; justify-content: start; align-items: center; column-gap: 2px; row-gap: 0; }
+  .app.bar-hidden .now { display: grid; justify-content: start; align-items: center; }
   .app.bar-hidden .now-text { display: contents; }
-  .app.bar-hidden .now-title { grid-area: 1 / 1; max-width: 96px; }
+  .app.bar-hidden .now-title { grid-area: 1 / 1; }
   .app.bar-hidden .now .pop-wrap { grid-area: 1 / 2; }
-  .app.bar-hidden .now-artist { grid-area: 2 / 1 / 3 / 3; max-width: 120px; }
+  .app.bar-hidden .now-artist { grid-area: 2 / 1 / 3 / 3; }
   .app.bar-hidden .now #infoBtn { width: 22px; height: 22px; }
   .app.bar-hidden .now #infoBtn svg { width: 14px; height: 14px; }
 }
@@ -1193,7 +1149,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 @media (min-width: 701px) {
   .app.bar-hidden .now-artist { display: block; font-size: 11px; line-height: 1.2; }
   .app.bar-hidden .now-title { line-height: 1.2; }
-  .app.bar-hidden .now { display: grid; grid-template-columns: auto auto; justify-content: start; align-items: center; column-gap: 4px; row-gap: 0; }
+  .app.bar-hidden .now { display: grid; grid-template-columns: auto auto; justify-content: start; align-items: center; }
   .app.bar-hidden .now-text { display: contents; }
   .app.bar-hidden .now-title { grid-area: 1 / 1; max-width: 200px; }
   .app.bar-hidden .now .pop-wrap { grid-area: 1 / 2; }
@@ -1239,7 +1195,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
   /* extended: the time text next to the transport */
   .app:not(.bar-hidden) .transport .time { display: inline; margin-left: 4px; font-size: 11px; white-space: nowrap; }
   /* compact: the time wraps onto two lines ("0:00 /" over "6:09") */
-  .app.bar-hidden .topbar .transport .time { display: block; width: 3.4em; margin-left: 2px; font-size: 11px; line-height: 1.2; white-space: normal; text-align: left; }
+  .app.bar-hidden .topbar .transport .time { display: block; font-size: 11px; line-height: 1.2; white-space: normal; text-align: left; }
 }
 @container song (max-width: 520px) {
   /* not enough room: the section selector shows only its icon, or nothing in the compact bar */
@@ -1257,7 +1213,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 
 /* ---------- Mobile compact bar, seventh pass: the title may use all the room that is left before it is cut ---------- */
 @media (max-width: 700px) {
-  .app.bar-hidden .tb-top { flex: 1 1 0; min-width: 0; }
   .app.bar-hidden .now { grid-template-columns: minmax(0, auto) auto; max-width: 100%; }
   .app.bar-hidden .now-title { max-width: none; min-width: 0; }
   .app.bar-hidden .now-artist { max-width: none; min-width: 0; }
@@ -1272,8 +1227,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .tb-bottom { justify-content: flex-start; }
 .tb-bottom > .transport { margin-inline: auto; }
 @media (max-width: 700px) {
-  .app.bar-hidden .tb-top { flex: 0 1 auto; }
-  .app.bar-hidden .tb-bottom { flex: 1 1 auto; justify-content: flex-start; margin-left: 0; }
+  .app.bar-hidden .tb-bottom { justify-content: flex-start; margin-left: 0; }
 }
 
 /* ---------- Compact bar in a narrow main area: the rules follow the width of the main area, not of the window ----------
@@ -1281,12 +1235,12 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 @container song (max-width: 700px) {
   .app.bar-hidden .topbar { padding: 4px 4px 10px 6px; align-items: center; grid-template-rows: 1fr; } /* the content is centred between the top edge and the seek line, with or without the album art */
   .app.bar-hidden .tb-main, .app.bar-hidden .tb-top, .app.bar-hidden .tb-bottom { align-items: center; }
-  .app.bar-hidden .tb-top { flex: 0 1 auto; margin-left: 0; }
-  .app.bar-hidden .tb-bottom { flex: 1 1 auto; min-width: 0; justify-content: flex-start; margin-left: 0; gap: 0; }
-  .app.bar-hidden .transport { flex: 0 0 auto; min-width: 0; gap: 0; }
+  .app.bar-hidden .tb-top { margin-left: 0; }
+  .app.bar-hidden .tb-bottom { justify-content: flex-start; margin-left: 0; gap: 0; }
+  .app.bar-hidden .transport { min-width: 0; gap: 0; }
   .app.bar-hidden .transport .icon, .app.bar-hidden .transport .icon.primary, .app.bar-hidden .tools .icon { flex: none; width: 30px; height: 30px; }
   .app.bar-hidden #back, .app.bar-hidden #forward { display: none; }
-  .app.bar-hidden .now { display: grid; grid-template-columns: minmax(0, auto) auto; justify-content: start; align-items: center; column-gap: 2px; row-gap: 0; max-width: 100%; }
+  .app.bar-hidden .now { display: grid; grid-template-columns: minmax(0, auto) auto; justify-content: start; align-items: center; max-width: 100%; }
   .app.bar-hidden .now-text { display: contents; }
   .app.bar-hidden .now-title { grid-area: 1 / 1; max-width: none; min-width: 0; font-size: 14px; line-height: 1.2; }
   .app.bar-hidden .now .pop-wrap { grid-area: 1 / 2; }
@@ -1315,12 +1269,10 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 /* ---------- Extended bar in a wide main area (800 px or more): the transport is a centred two-row block between the title and the tools ---------- */
 @container song (min-width: 800px) {
   .app:not(.bar-hidden) .tb-main { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-rows: 1fr 1fr; column-gap: 16px; }
-  .app:not(.bar-hidden) .tb-top { grid-column: 1; grid-row: 1 / 3; align-self: center; }
   .app:not(.bar-hidden) .tb-bottom { display: contents; }
-  .app:not(.bar-hidden) .transport { grid-column: 2; grid-row: 1 / 3; align-self: center; margin: 0; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+  .app:not(.bar-hidden) .transport { flex-direction: column; align-items: center; justify-content: center; }
   .app:not(.bar-hidden) .tp-row { display: flex; align-items: center; justify-content: center; gap: 2px; }
   .app:not(.bar-hidden) .transport .time { margin-left: 0; margin-right: 8px; }
-  .app:not(.bar-hidden) .tools { grid-column: 3; grid-row: 1 / 3; align-self: center; justify-self: end; }
   /* the title may take two lines */
   .app:not(.bar-hidden) .now-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.25; }
 }
@@ -1330,7 +1282,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
   .app:not(.bar-hidden) .topbar { --cover-col: 92px; grid-template-columns: var(--cover-col) minmax(0, 1fr) auto minmax(0, 1fr) var(--cover-col); grid-template-rows: 1fr; column-gap: 10px; padding-left: max(8px, calc((100% - var(--bar-content-max)) / 2)); padding-right: max(8px, calc((100% - var(--bar-content-max)) / 2)); align-items: center; }
   .app:not(.bar-hidden) .topbar > .tb-cover { grid-column: 1; grid-row: 1; }
   .app:not(.bar-hidden) .topbar > .tb-main { display: contents; }
-  .app:not(.bar-hidden) .tb-top { grid-column: 2; grid-row: 1; align-self: center; }
+  .app:not(.bar-hidden) .tb-top { grid-column: 2; grid-row: 1; }
   .app:not(.bar-hidden) .transport { grid-column: 3; grid-row: 1; align-self: end; margin: 0 0 2px; gap: 10px; }
   .app:not(.bar-hidden) .tools { grid-column: 4 / 6; grid-row: 1; align-self: center; justify-self: end; }
   /* bigger prev / play / next */
@@ -1384,14 +1336,13 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 
 /* Extended bar, wide main area: a bigger artist line, and the two lines of a long title are balanced */
 @container song (min-width: 800px) {
-  .app:not(.bar-hidden) .now-artist { font-size: 15px; margin-top: 2px; }
+  .app:not(.bar-hidden) .now-artist { font-size: 15px; }
   .app:not(.bar-hidden) .now-title { text-wrap: balance; }
 }
 
 /* Extended bar, wide main area: the info icon sits on the first line of the title, close to its text */
 @container song (min-width: 800px) {
   .app:not(.bar-hidden) .now { align-items: flex-start; }
-  .app:not(.bar-hidden) .now .pop-wrap { margin-top: -2px; }
 }
 
 /* ---------- The expand / compact button is the priority: in a tight compact bar the title gives way, never the buttons ---------- */
@@ -1414,13 +1365,11 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 /* The third line of the title block (pack - charter): only in the open bar of a wide main area */
 .now-tertiary { display: none; }
 @container song (min-width: 800px) {
-  .app:not(.bar-hidden) .now-tertiary:not(:empty) { display: block; font-size: 12px; color: var(--muted); opacity: .8; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .app:not(.bar-hidden) .now-tertiary:not(:empty) { display: block; font-size: 12px; color: var(--muted); opacity: .8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
 /* Wide open bar: the text block is bottom-aligned with the album art, and the info icon sits beside the longest line of a two-line title */
 @container song (min-width: 800px) {
-  .app:not(.bar-hidden) .tb-top { align-self: end; }
-  .app:not(.bar-hidden) .now .pop-wrap { margin-top: calc(var(--info-offset, 0px) - 2px); }
 }
 
 /* Wide open bar: the info icon is centred on the longest title line and hugs the text; more air between title, artist and pack - charter */
@@ -1443,7 +1392,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .app.bar-bottom.bar-hidden .topbar { padding-top: 10px; }
 /* wide open bar: the time row stays next to the seek bar, which is above the buttons now */
 @container song (min-width: 800px) {
-  .app.bar-bottom:not(.bar-hidden) .transport { flex-direction: column-reverse; align-self: start; margin: 2px 0 0; }
 }
 
 /* Bar at the bottom: the expand/compact arrow is inverted (down = compact, up = expand) and the controls get more room above the window edge */
@@ -1540,7 +1488,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 :root { --lib-gap: 12px; } /* = WIN_MARGIN in src/windowframe.js (test/css-js-constants.test.js) */
 .library { display: flex; flex-direction: row; padding: 0; min-height: 0; } /* two panes side by side: the list and the song details (the window itself: .win-frame) */
 /* the list pane: the old library column */
-.lib-list { position: relative; flex: none; width: var(--list-w, var(--lib-w)); min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+.lib-list { position: relative; flex: none; width: var(--list-w, var(--lib-w)); min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .app.lib-closed .lib-list { display: none; }
 .library .group-label, #songs li.divider { background: color-mix(in srgb, var(--bg) 88%, transparent); }
 .sel-pop { z-index: 50; } /* above the library window and the phone drawer */
@@ -1611,9 +1559,8 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .end-btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; font-weight: 600; }
 .end-actions .cta svg, .end-btn svg { width: 18px; height: 18px; }
 
-.end-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
 .end-cards[hidden], .end-next[hidden] { display: none; }
-.end-inst { background: color-mix(in srgb, var(--panel-2, var(--panel)) 70%, transparent); border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+.end-inst { background: color-mix(in srgb, var(--panel-2, var(--panel)) 70%, transparent); border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); border-radius: 12px; padding: 12px 14px; }
 .end-inst-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .end-inst-head svg { width: 20px; height: 20px; color: var(--accent); }
 .end-inst-head strong { font-size: 14px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1649,14 +1596,14 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
    window animates (the window clips it). Never put a backdrop-filter/filter/transform on the pane: fixed popovers live in <body>, but keep it so. */
 .info { position: relative; flex: none; width: var(--info-w, 380px) /* = INFO_MIN_W in src/app.js */; min-width: 0; min-height: 0; display: flex; border-left: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
 .info-window { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; color: var(--text); outline: none; }
-.info-top { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 16px; background: color-mix(in srgb, var(--panel) 30%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
-.info-top-text { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
-.info-top-text strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.info-top-text span { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; min-width: 0; }
+.info-top { flex: none; display: flex; gap: 10px; padding: 8px 8px 8px 16px; background: color-mix(in srgb, var(--panel) 30%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.info-top-text { flex: 1; min-width: 0; display: flex; }
+.info-top-text strong { min-width: 0; }
+.info-top-text span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; min-width: 0; }
 .info-top-text span:empty { display: none; }
 .info-top .icon { flex: none; }
 /* the cards sit on the window's glass: a light tint, no blur of their own */
-.info-card { position: relative; background: color-mix(in srgb, var(--panel-2) 45%, transparent); border-color: color-mix(in srgb, var(--line) 70%, transparent); }
+.info-card { position: relative; }
 .info-grid { position: relative; z-index: 0; }
 .info-actions { position: relative; background: color-mix(in srgb, var(--panel) 30%, transparent); border-top-color: color-mix(in srgb, var(--line) 70%, transparent); }
 :root[data-motion="on"] .info:not([hidden]) .info-window { animation: info-in .2s ease backwards; /* (backwards only: a lingering animation would make the window a backdrop root and kill the blur) */ }
@@ -1711,7 +1658,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 /* ---------- Details: two-line title in the window header; the album art fills its card edge to edge ---------- */
 .info-top-text strong { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; text-overflow: ellipsis; overflow-wrap: anywhere; }
 #info .info-head { padding: 0; overflow: hidden; align-items: stretch; gap: 0; }
-#info .info-head img, #info[data-cover] .info-head img { border-radius: 0; margin: 0; }
+#info .info-head img, #info[data-cover] .info-head img { margin: 0; }
 #info .info-head-text { padding: 14px; min-width: 0; }
 #info.compact .info-head-text { padding: 10px 12px; }
 @container (min-width: 652px) {
@@ -1760,7 +1707,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .app.stage-loading #highway { visibility: hidden; } /* (the background canvas stays: the visualizer shows behind the loading screen) */
 
 /* End window: the instrument tables have a maximum width */
-.end-cards { grid-template-columns: repeat(auto-fit, minmax(230px, 320px)); justify-content: center; }
 
 /* ---------- Player bar: the standard glass of the windows, and balanced spacing in the expanded bar ---------- */
 .topbar { background: transparent; }
@@ -1789,11 +1735,10 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 
 /* The loading screen has no background of its own: the stage (the plain stage colour while the bar and tracks are held back) shows through */
 .load-screen { background: transparent; }
-.load-screen h2, .load-screen p { text-shadow: 0 1px 8px rgba(0, 0, 0, .85), 0 0 2px rgba(0, 0, 0, .6); } /* readable over the visualizer */
+/* readable over the visualizer */
 
 /* End window: the instrument tables use the row's width (up to 320 px each), left to right, not centred */
-.end-cards { justify-content: space-between; }
-.end-cards { grid-template-columns: repeat(auto-fit, minmax(230px, 380px)); justify-content: start; } /* each card between 230 and 380 px: they share the row and wrap, left to right, no spreading gaps */
+.end-cards { grid-template-columns: repeat(auto-fit, minmax(230px, 380px)); } /* each card between 230 and 380 px: they share the row and wrap, left to right, no spreading gaps */
 .end-cards { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start; }
 .end-cards[hidden] { display: none; }
 .end-inst { flex: 1 1 230px; min-width: 230px; max-width: 380px; } /* grow from 230 to 380 px to fill the row, wrap when there is no room */
@@ -1805,22 +1750,20 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 /* Wide screens: the volume button shows the master level and the speed button the speed; the tools breathe */
 .tool-val { display: none; }
 @container song (min-width: 800px) {
-  .tools { gap: 14px; }
-  .tools button.icon:has(.tool-val) { width: auto; min-width: 36px; padding: 0 10px; gap: 7px; display: inline-flex; align-items: center; justify-content: center; }
+  .tools button.icon:has(.tool-val) { display: inline-flex; align-items: center; justify-content: center; }
   .tool-val { display: inline; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
   .tools button.icon:hover .tool-val, .tools button.icon[aria-expanded="true"] .tool-val { color: var(--text); }
 }
 @container song (min-width: 800px) {
-  .tools button.icon:has(.tool-val) { min-width: 92px; padding: 0 16px; gap: 9px; } /* room for "150%", "Muted" and "0.25×" without the button changing size */
-  .tool-val { min-width: 3.4ch; text-align: left; }
+  /* room for "150%", "Muted" and "0.25×" without the button changing size */
+  .tool-val { text-align: left; }
 }
 @container song (min-width: 800px) {
-  .tools button.icon:has(.tool-val) { min-width: 0; width: auto; padding: 0 12px; gap: 7px; } /* as wide as icon + text need */
+  .tools button.icon:has(.tool-val) { min-width: 0; width: auto; gap: 7px; } /* as wide as icon + text need */
   .tool-val { min-width: 0; }
 }
 /* Wide bar tools: every button is as wide as its content + 8 px each side, so the hover highlight hugs it and the visible gaps are even (8 + 10 + 8 between neighbours) */
 @container song (min-width: 800px) {
-  .tools { gap: 10px; }
   .tools button.icon { width: auto; min-width: 0; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
   .tools button.icon:has(.tool-val) { padding: 0 8px; }
 }
@@ -1842,9 +1785,9 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 @media (min-width: 701px) { .stage-play { left: calc(var(--lib-inset, 0px) + (100% - var(--lib-inset, 0px)) / 2); } }
 
 /* ---------- The edge dock: one handle on the left edge; hover or click grows it and the Library and Settings buttons appear inside it ---------- */
-.edge-dock { position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 40; width: 26px; height: 76px; overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-left: 0; border-radius: 0 12px 12px 0; transition: width .2s ease, height .2s ease, background .15s, box-shadow .2s; }
+.edge-dock { position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 40; height: 76px; overflow: hidden; border: 1px solid var(--line); border-left: 0; border-radius: 0 12px 12px 0; transition: width .2s ease, height .2s ease, background .15s, box-shadow .2s; }
 .edge-dock[hidden] { display: none; }
-.edge-dock.open { width: 58px; height: 112px; background: color-mix(in srgb, var(--panel) 92%, transparent); box-shadow: 0 8px 26px rgba(0, 0, 0, .4); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.edge-dock.open { height: 112px; -webkit-backdrop-filter: blur(10px); }
 .dock-handle { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; display: grid; place-items: center; background: none; border: 0; color: var(--muted); cursor: pointer; }
 .dock-handle svg { width: 18px; height: 18px; transform: rotate(-90deg); transition: opacity .12s ease, color .15s; } /* points right: where the buttons come from */
 .edge-dock:hover .dock-handle, .dock-handle:focus-visible { color: var(--accent); }
@@ -1854,7 +1797,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .dock-btn { flex: none; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; background: none; border: 0; border-radius: 10px; color: var(--text); cursor: pointer; }
 .dock-btn:hover, .dock-btn:focus-visible { color: var(--accent); background: var(--panel-2); }
 .dock-btn svg { width: 20px; height: 20px; }
-body.details-open .edge-dock { display: none; } /* the details fill the window area: no dock over them */
+/* the details fill the window area: no dock over them */
 
 /* Large screens: the library window is centred and takes the whole content width (layoutWindow sets --win-w); nothing is pushed aside, so the
    welcome, load and end screens keep their own place behind it; its width is not draggable while the details are closed. */
@@ -1885,7 +1828,7 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 }
 .lib-close { grid-area: close; width: 32px; height: 32px; }
 .lib-close svg { width: 18px; height: 18px; }
-.lib-title { grid-area: title; display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.lib-title { grid-area: title; display: flex; flex-direction: column; min-width: 0; }
 .lib-title strong { font-size: 17px; letter-spacing: .01em; }
 .lib-title .count { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lib-header .search { grid-area: search; }
@@ -1895,13 +1838,12 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 .lib-header .lib-bar { gap: 8px; }
 .lib-header .lib-bar .chip-select, .lib-header .lib-bar .chip-btn, .lib-header .view-seg { background: color-mix(in srgb, var(--panel-2) 55%, transparent); }
 @media (min-width: 701px) {
-  .lib-header { grid-template-columns: auto auto 1fr auto auto; grid-template-areas: "close title search bar tools"; padding: 12px 16px; }
+  .lib-header { padding: 12px 16px; }
   .app.lib-wide .lib-header .search { justify-self: stretch; max-width: 560px; }
 }
 /* narrow list pane (the window is as wide as the pane): two rows, search under the title */
 .library .lib-list { container-type: inline-size; container-name: libpane; }
 @container libpane (max-width: 640px) {
-  .lib-header { grid-template-columns: auto 1fr auto !important; grid-template-areas: "close title tools" "search search search" "bar bar bar" !important; padding: 10px 12px !important; }
 }
 .lib-header .lib-bar .view-seg { margin-left: auto; }
 
@@ -1909,19 +1851,15 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 .songs-wrap { border-top: 0; margin-left: 0; margin-right: 0; }
 #songs { padding: 0; }
 :is(#songs, #endNext) li.row { border: 0 !important; background: none !important; isolation: isolate; padding-left: 12px; padding-right: 10px; }
-:is(#songs, #endNext) li.row::after { content: ""; position: absolute; z-index: -1; inset: 3px 4px; border-radius: 12px; background: color-mix(in srgb, var(--panel-2) 78%, transparent); border: 1px solid color-mix(in srgb, var(--line) 55%, transparent); transition: background .12s, border-color .12s; pointer-events: none; }
-:is(#songs, #endNext) li.row:hover::after { background: color-mix(in srgb, var(--panel-2) 90%, transparent); border-color: var(--line); }
-:is(#songs, #endNext) li.row.active::after { background: color-mix(in srgb, var(--accent) 16%, var(--panel-2)); border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
+:is(#songs, #endNext) li.row::after { content: ""; position: absolute; z-index: -1; transition: background .12s, border-color .12s; pointer-events: none; }
 :is(#songs, #endNext) li.row.active::before { display: none; }
-:is(#songs, #endNext) li.row.compact { padding-left: 14px; }
 :is(#songs, #endNext) li.row .thumb { border-radius: 8px; }
 #songs li.divider { background: none; border-bottom: 0; padding: 0 14px; gap: 10px; font-size: 11px; color: var(--accent); }
 #songs li.divider::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, var(--line) 80%, transparent); }
-.library .group-label { background: color-mix(in srgb, var(--panel) 92%, transparent); border-bottom: 0; padding: 0 14px; }
+.library .group-label { border-bottom: 0; padding: 0 14px; }
 #empty.hint, .library .hint { padding-inline: 12px; }
 .library #status { margin: 0 12px 8px; }
 .songs-wrap { padding-left: 8px; } /* the cards line up with the header's padding */
-.library .group-label { left: 8px; }
 :is(#songs, #endNext) li.row.large, :is(#songs, #endNext) li.row.normal { padding-left: 12px; padding-right: 10px; }
 
 #songs mark.hit { background: color-mix(in srgb, var(--accent) 32%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; margin: 0 -1px; }
@@ -1932,28 +1870,25 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 
 /* Library list: the sub-headers line up with the card edge; the cards have the same gap (6 px) all round */
 #songs li.divider, .library .group-label { padding-left: 4px; padding-right: 4px; }
-.library .group-label { left: 8px; right: var(--rail-w); }
+.library .group-label { right: var(--rail-w); }
 :is(#songs, #endNext) li.row.normal, :is(#songs, #endNext) li.row.large { padding-left: 10px; padding-right: 10px; }
-:is(#songs, #endNext) li.row.compact { padding-left: 12px; padding-right: 10px; }
 .song-top { align-items: baseline; }
 .song-packtag { margin-top: 0; padding-right: 0; }
 .song-icons { padding-right: 0; }
 
 /* Cards: small (compact) gets 2 px more inner margin; medium (normal) has its art flush with the card, 46 px, and the text split between the top and the bottom */
 :is(#songs, #endNext) li.row.compact { padding-left: 14px; padding-right: 12px; }
-:is(#songs, #endNext) li.row.normal { padding: 4px 10px 4px 5px; gap: 12px; } /* 3 px inset + 1 px border: the art touches the card's edge */
-:is(#songs, #endNext) li.row.normal .thumb { width: calc(46px * var(--card-scale, 1)); height: calc(46px * var(--card-scale, 1)); border-radius: 11px 6px 6px 11px; }
-:is(#songs, #endNext) li.row.normal .song-text { align-self: stretch; justify-content: space-between; padding: 3px 0; gap: 0; }
-:is(#songs, #endNext) li.row.normal .song-top { align-items: baseline; }
+:is(#songs, #endNext) li.row.normal { gap: 12px; } /* 3 px inset + 1 px border: the art touches the card's edge */
+:is(#songs, #endNext) li.row.normal .thumb { border-radius: 11px 6px 6px 11px; }
+:is(#songs, #endNext) li.row.normal .song-text { align-self: stretch; justify-content: space-between; gap: 0; }
 :is(#songs, #endNext) li.row.normal .song-sub { margin-top: auto; }
 
 /* Medium: art 50 px; the pack tag's top lines up with the title's top. Large: the art fills the card's height, flush like the medium one */
 :is(#songs, #endNext) li.row.normal .thumb { width: calc(50px * var(--card-scale, 1)); height: calc(50px * var(--card-scale, 1)); }
 :is(#songs, #endNext) li.row.normal .song-top { align-items: flex-start; }
 :is(#songs, #endNext) li.row.normal .song-packtag { line-height: 1.35; }
-:is(#songs, #endNext) li.row.large { padding: 4px 10px 4px 5px; gap: 12px; align-items: stretch; }
-:is(#songs, #endNext) li.row.large .thumb { width: calc(var(--row-h) - 8px); height: calc(var(--row-h) - 8px); border-radius: 11px 6px 6px 11px; }
-:is(#songs, #endNext) li.row.large .song-text { padding: 7px 0; }
+:is(#songs, #endNext) li.row.large { gap: 12px; align-items: stretch; }
+:is(#songs, #endNext) li.row.large .thumb { border-radius: 11px 6px 6px 11px; }
 
 /* Medium: bigger instrument icons and more room on the top, bottom and right for everything inside */
 :is(#songs, #endNext) li.row.normal { padding-right: 14px; }
@@ -1984,18 +1919,14 @@ body.details-open .edge-dock { display: flex; } /* (it used to hide while the de
 .edge-dock { width: 24px; }
 .edge-dock.open { width: 58px; }
 body.settings-open .edge-dock { z-index: 85; } /* above the settings window and its dim layer */
-.edge-dock.has-open { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
-.edge-dock.has-open .dock-handle { color: var(--accent); }
 .edge-dock.has-open::after { content: ""; position: absolute; top: 8px; left: 50%; width: 6px; height: 6px; margin-left: -4px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); pointer-events: none; }
 .edge-dock.open.has-open::after { opacity: 0; }
 .dock-btn.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent); }
 
 /* Wide library header: the search keeps its maximum width and the sort / card-style tools sit right next to it; the folder and refresh tools stay at the far right */
 @media (min-width: 701px) {
-  .lib-header { grid-template-columns: auto auto minmax(160px, 560px) auto 1fr auto; grid-template-areas: "close title search bar . tools"; }
 }
 @container libpane (max-width: 640px) {
-  .lib-header { grid-template-columns: auto 1fr auto !important; grid-template-areas: "close title tools" "search search search" "bar bar bar" !important; }
 }
 
 /* ---------- Round: the handle shows no open state; one animation for the library and the settings; stronger hover on song cards ---------- */
@@ -2008,8 +1939,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 @keyframes settings-in { from { opacity: 0; transform: translateX(-36px) scale(.96); } to { opacity: 1; transform: none; } }
 
 /* Song cards: the hovered card gets an accent border and a lighter face (the open one keeps its stronger tint) */
-:is(#songs, #endNext) li.row:hover::after { background: color-mix(in srgb, var(--accent) 9%, var(--panel-2)); border-color: color-mix(in srgb, var(--accent) 65%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
-:is(#songs, #endNext) li.row.active:hover::after { border-color: var(--accent); }
 
 .lib-close svg { transform: rotate(90deg); } /* the dock handle's chevron, pointing left: the same kind of arrow as the handle */
 /* Library title: more room between "Library" and the count, and a line box tall enough for the descenders (the overflow clip cut them) */
@@ -2018,15 +1947,9 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 
 /* Settings' pattern: the headers stay dark and the content area is lighter. The library list and the details content get the same lift
    (a light layer over the window), and the cards inside are lighter again, like the settings rows. */
-.songs-wrap, .info-scroll { background: color-mix(in srgb, var(--panel-2) 52%, transparent); }
-.info-card { background: color-mix(in srgb, var(--panel-2) 55%, transparent); }
 
 /* Tone pass: three clear steps. Header (dark strip) < content (lighter layer) < cards (raised, panel-2). The sticky group label matches the content. */
-.songs-wrap, .info-scroll { background: color-mix(in srgb, var(--panel-2) 38%, transparent); }
-:is(#songs, #endNext) li.row::after { background: color-mix(in srgb, var(--panel-2) 94%, transparent); border-color: color-mix(in srgb, var(--line) 80%, transparent); }
-:is(#songs, #endNext) li.row:hover::after { background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }
-:is(#songs, #endNext) li.row.active::after { background: color-mix(in srgb, var(--accent) 20%, var(--panel-2)); }
-.library .group-label { background: color-mix(in srgb, var(--panel-2) 38%, var(--panel)); }
+:is(#songs, #endNext) li.row::after { border-color: color-mix(in srgb, var(--line) 80%, transparent); }
 .info-card { background: color-mix(in srgb, var(--panel-2) 94%, transparent); border-color: color-mix(in srgb, var(--line) 80%, transparent); }
 
 /* No ghosts behind the glass: while the wide library window covers the stage, the stage's own pane tags do not peek out at its corners;
@@ -2038,7 +1961,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* Wide library header: the search is centred (equal flexible sides); the sort / card-style tools follow it, the folder and refresh tools end the row */
 .lib-left, .lib-right { display: contents; } /* (narrow panes: the items sit in the three-row grid as before) */
 @media (min-width: 701px) {
-  .lib-header { grid-template-columns: 1fr minmax(160px, 560px) 1fr; grid-template-areas: "left search right"; }
+  .lib-header { grid-template-areas: "left search right"; }
   .lib-left { grid-area: left; display: flex; align-items: center; gap: 10px; min-width: 0; }
   .lib-right { grid-area: right; display: flex; align-items: center; gap: 10px; min-width: 0; }
   .lib-right .lib-tools { margin-left: auto; }
@@ -2055,21 +1978,18 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 }
 
 /* Song cards in the style of the end-of-song window's buttons: 10 px corners, translucent raised face, hairline border, accent wash on hover */
-:is(#songs, #endNext) li.row::after { border-radius: 10px; background: color-mix(in srgb, var(--panel-2, var(--panel)) 60%, transparent); border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); box-shadow: none; }
-:is(#songs, #endNext) li.row:hover::after { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: color-mix(in srgb, var(--line) 80%, transparent); box-shadow: none; }
-:is(#songs, #endNext) li.row.active::after { background: color-mix(in srgb, var(--accent) 24%, transparent); border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
+:is(#songs, #endNext) li.row::after { border-radius: 10px; border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); box-shadow: none; }
+:is(#songs, #endNext) li.row:hover::after { border-color: color-mix(in srgb, var(--line) 80%, transparent); box-shadow: none; }
+:is(#songs, #endNext) li.row.active::after { border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
 :is(#songs, #endNext) li.row.active:hover::after { border-color: var(--accent); }
 :is(#songs, #endNext) li.row.normal .thumb, :is(#songs, #endNext) li.row.large .thumb { border-radius: 9px 5px 5px 9px; }
 
 /* More see-through window: the body of the library and the details lets the stage show (blurred); the headers stay dense so they stand out. */
 .lib-header, .info-top { background: color-mix(in srgb, var(--panel) 90%, transparent); }
-.songs-wrap, .info-scroll { background: none; }
-.library .group-label { background: color-mix(in srgb, var(--panel) 60%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.library .group-label { -webkit-backdrop-filter: blur(8px); }
 
 /* Cards: a more solid face, and the same 8 px gap between cards in both directions (4 px of the row on each side) */
-:is(#songs, #endNext) li.row::after { inset: 4px; background: color-mix(in srgb, var(--panel-2, var(--panel)) 88%, transparent); }
-:is(#songs, #endNext) li.row:hover::after { background: color-mix(in srgb, var(--accent) 18%, color-mix(in srgb, var(--panel-2) 88%, transparent)); }
-:is(#songs, #endNext) li.row.active::after { background: color-mix(in srgb, var(--accent) 26%, color-mix(in srgb, var(--panel-2) 88%, transparent)); }
+:is(#songs, #endNext) li.row::after { inset: 4px; }
 :is(#songs, #endNext) li.row.normal { padding: 5px 14px 5px 5px; }
 :is(#songs, #endNext) li.row.large { padding: 5px 12px 5px 5px; }
 :is(#songs, #endNext) li.row.compact { padding: 4px 12px 4px 14px; }
@@ -2083,14 +2003,13 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 
 /* Pinned and in-list sub-headers: a touch larger; the pinned one starts a little further left; the list scroll area has the pinned label's background (60 % panel). */
 #songs li.divider, .library .group-label { font-size: 13px; }
-.library .group-label { padding-left: 1px; background: color-mix(in srgb, var(--panel) 60%, transparent); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.library .group-label { -webkit-backdrop-filter: none; }
 .songs-wrap { background: color-mix(in srgb, var(--panel) 60%, transparent); }
 
 /* Window body: 15 points less transparent (50 % -> 65 % opaque) */
 
 /* The search shrinks first when the header gets tight: the side groups and the search may all be narrower than their content */
 @media (min-width: 701px) {
-  .lib-header { grid-template-columns: minmax(0, 1fr) minmax(90px, 560px) minmax(0, 1fr); }
   .lib-header .search, .lib-header .search input { min-width: 0; }
 }
 @media (min-width: 701px) {
@@ -2100,8 +2019,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 
 /* One scroll-area background for the library list and the details (a lighter layer than the headers); the pinned sub-header has none of its own:
    the cards that scroll under it fade out (a mask on the list), so it is the same surface. */
-.songs-wrap, .info-scroll { background: color-mix(in srgb, var(--panel-2) 55%, transparent); }
-.library .group-label { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.library .group-label { -webkit-backdrop-filter: none; backdrop-filter: none; }
 #songs { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 26px); mask-image: linear-gradient(to bottom, transparent 0, #000 26px); }
 
 /* Scroll areas (library list and details) and the pinned sub-header share one dark translucent background P. The list paints P everywhere
@@ -2109,26 +2027,23 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 :root { --scroll-bg: color-mix(in srgb, var(--bg) 62%, transparent); }
 .songs-wrap, .info-scroll { background: var(--scroll-bg); }
 .songs-wrap:has(.group-label:not([hidden])) { background: linear-gradient(var(--scroll-bg), var(--scroll-bg)) 0 100% / 100% calc(100% - 26px) no-repeat; }
-.library .group-label { background: var(--scroll-bg); }
 
 /* The "scroll" is the letter rail at the list's right edge: it gets the pinned sub-header's background (P), and the list/details scroll areas
    go back to the plain window body (no extra layer), so the library and the details look the same. */
-:root { --pinned-bg: color-mix(in srgb, var(--panel-2) 38%, var(--panel)); }
 .songs-wrap, .info-scroll, .songs-wrap:has(.group-label:not([hidden])) { background: none; }
 .library .group-label { background: var(--pinned-bg); }
 .rail { background: var(--pinned-bg); }
-:root { --pinned-bg: color-mix(in srgb, color-mix(in srgb, var(--panel-2) 38%, var(--panel)) 80%, transparent); } /* 20 % transparent */
+/* 20 % transparent */
 :root { --pinned-bg: color-mix(in srgb, color-mix(in srgb, var(--panel-2) 38%, var(--panel)) 60%, transparent); } /* 40 % transparent */
 
 /* The loading screen is a glass window (the same look as the end-of-song window and the library) centred over the stage */
 .load-screen h2, .load-screen p { text-shadow: none; }
 .ls-card {
-  position: relative; width: min(440px, 100%); display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 26px 28px 24px; text-align: center;
+  position: relative; display: flex; flex-direction: column; align-items: center; text-align: center;
   background: color-mix(in srgb, var(--panel) 78%, transparent); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   border-radius: 14px; box-shadow: 0 10px 34px rgba(0, 0, 0, .4); color: var(--text);
 }
 .ls-card::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-.ls-card img { width: min(200px, 60%); }
 :root[data-motion="on"] .load-screen:not([hidden]) .ls-card { animation: settings-in .34s cubic-bezier(.22, 1, .36, 1) backwards; }
 
 /* The first details card: with room (a wide card) the player sits beside the art, under the title and the chips, instead of under everything */
@@ -2143,7 +2058,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 
 /* Loading: a bigger cover in a slightly wider window; the pinned sub-header's background reaches the window's left edge (the label text stays on the cards' edge) */
 .ls-card { width: min(540px, 100%); }
-.ls-card img { width: min(320px, 72%); }
 .library .group-label { left: 0; padding-left: 12px; }
 
 /* Loading: the cover spans the whole window horizontally (flush to the top and the sides); the texts keep their side margins */
@@ -2186,7 +2100,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* Instrument cards are on/off switches: an off card is dimmer; its next difficulty (the last used) is outlined */
 .icard[data-active="false"] { opacity: .62; }
 .icard[data-active="false"]:hover { opacity: .9; }
-.seg button[data-next="true"] { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
 
 /* The Speed card: an icon instead of the word in front of the slider */
 .card-adjust .row-icon { width: 20px; height: 20px; color: var(--muted); }
@@ -2207,13 +2120,12 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 
 /* ================= Song information overlay (src/startinfo.js): fades in at the start of a song, out a few seconds later ================= */
 .song-info {
-  position: absolute; z-index: 5; top: 12%; left: calc(50% + var(--lib-inset, 0px) / 2); transform: translateX(-50%); width: max-content; max-width: min(640px, 90%);
+  position: absolute; z-index: 5; top: 12%; left: calc(50% + var(--lib-inset, 0px) / 2); width: max-content; max-width: min(640px, 90%);
   display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "cover main" "insts insts" "picker picker"; align-items: center; gap: 12px 18px; padding: 16px 22px; text-align: left;
   background: color-mix(in srgb, var(--panel) 70%, transparent); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius: 14px;
-  box-shadow: 0 10px 34px rgba(0, 0, 0, .35); color: var(--text); pointer-events: none; opacity: 0; visibility: hidden; transition: opacity .5s ease, visibility 0s linear .5s;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, .35); color: var(--text); pointer-events: none; opacity: 0; visibility: hidden; 
 }
-.song-info.show { opacity: 1; visibility: visible; transition: opacity .5s ease; }
-.song-info.show.under-panel { opacity: 0; }
+.song-info.show { opacity: 1; visibility: visible; }
 .song-info::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 .si-cover { grid-area: cover; width: 116px; height: 116px; object-fit: cover; border-radius: 10px; box-shadow: 0 4px 14px rgba(0, 0, 0, .4); }
 .si-main { grid-area: main; min-width: 0; }
@@ -2228,12 +2140,9 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .si-inst svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
 .si-inst .mini-pips { margin-left: 2px; }
 /* paused: the window is a control surface: the Play button and, below the difficulties, the instrument cards of the song details */
-.si-play { display: none; margin-top: 12px; padding: 8px 18px; }
+.si-play { margin-top: 12px; }
 .song-info.paused { pointer-events: auto; }
-.song-info.paused .si-play { display: inline-flex; }
 .si-picker { grid-area: picker; display: none; width: 100%; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); text-align: left; }
-.song-info.paused .si-picker { display: grid; }
-.si-picker .icard { background: color-mix(in srgb, var(--panel-2) 80%, transparent); }
 /* A wide stage: the cover grows and the instruments sit in a column to the right of the text (the horizontal room is used instead of stacking) */
 @media (min-width: 1100px) {
   .song-info { width: min(1000px, 84%); max-width: none; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "cover main insts" "picker picker picker"; gap: 22px 32px; padding: 22px 32px; }
@@ -2359,25 +2268,21 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 /* The paused window has no static instrument list (the instrument cards below say it all) and is narrower */
 .song-info.paused .si-insts { display: none; }
 @media (min-width: 1100px) {
-  .song-info.paused { width: min(940px, 90%); grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "cover main" "picker picker"; }
 }
 
 /* The Play button of the start screen drains over the start time (--si-ms): a lighter layer shrinks to the right until the song starts */
-.si-play { position: relative; overflow: hidden; }
 .si-play.counting::after { content: ""; position: absolute; inset: 0; background: rgba(255, 255, 255, .3); transform-origin: right center; animation: si-count var(--si-ms, 3s) linear forwards; pointer-events: none; }
 @keyframes si-count { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 .song-info.starting .si-insts { display: none; }
 
 /* The Play button of the start screen while the audio loads: a spinner in front of the progress text, not clickable */
-.si-play.loading { opacity: .85; cursor: progress; }
 .si-play.loading svg { display: none; }
-.si-play.loading::before { content: ""; width: 14px; height: 14px; margin-right: 8px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .35); border-top-color: #fff; animation: si-spin .8s linear infinite; }
+.si-play.loading::before { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .35); border-top-color: #fff; animation: si-spin .8s linear infinite; }
 @keyframes si-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .si-play.loading::before { animation-duration: 2.4s; } }
 
 /* The Play / loading button of the start screen keeps one size (Play, the percentage and the spinner all fit) and its content is centred */
-.si-play { width: 124px; height: 40px; padding: 0; justify-content: center; align-items: center; gap: 8px; text-align: center; }
-.song-info.paused .si-play { display: inline-flex; }
+.si-play { justify-content: center; align-items: center; gap: 8px; text-align: center; }
 .si-play svg, .si-play span { position: relative; z-index: 1; }
 .si-play.loading::before { margin-right: 0; flex: none; }
 .si-play span { min-width: 3ch; text-align: center; font-variant-numeric: tabular-nums; }
@@ -2386,22 +2291,21 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
    A header row (cover, title block, the Play button on the right), a hairline, then one row of instrument tiles: the name with an on/off dot, the song's level
    bar under it, and at the bottom the type and difficulty selectors. The Play button loads like a progress bar and then becomes the Play button. */
 .song-info { --si-fill: color-mix(in srgb, var(--accent) 88%, #000); --si-dim-fill: color-mix(in srgb, var(--accent) 30%, transparent); --si-dim-accent: color-mix(in srgb, var(--accent) 45%, transparent); }
-.song-info.paused { width: min(1100px, 94%); max-width: none; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "cover main play" "picker picker picker"; gap: 24px 32px; padding: 28px 24px 24px; align-items: start; }
+.song-info.paused { width: min(1100px, 94%); max-width: none; gap: 24px 32px; padding: 28px 24px 24px; align-items: start; }
 .song-info.paused .si-cover { width: 184px; height: 184px; border-radius: 20px; box-shadow: none; }
-.song-info.paused .si-main { padding-top: 8px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
-.song-info.paused .si-title { font-size: 38px; line-height: 1.1; margin: 0; }
+.song-info.paused .si-main { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.song-info.paused .si-title { font-size: 38px; margin: 0; }
 .song-info.paused .si-artist { font-size: 22px; margin: 0; }
 .song-info.paused .si-details { font-size: 15px; gap: 0 20px; margin: 0; }
 
 /* the Play button: 176 x 60, on the right of the header */
 .si-play { grid-area: play; align-self: center; margin: 0 8px 0 0; display: none; position: relative; overflow: hidden; width: 176px; height: 60px; padding: 0; border: 0; border-radius: 12px;
-  font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; color: #fff; background: var(--si-fill); transition: background .3s; }
+  font-size: 19px; font-variant-numeric: tabular-nums; background: var(--si-fill); transition: background .3s; }
 .song-info.paused .si-play { display: flex; align-items: center; justify-content: center; }
-.si-play .si-fill { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--p, 1) * 100%); background: var(--si-fill); transition: width .1s linear; min-width: 0; }
-.si-play .si-play-in { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; }
-.si-play .si-play-in svg { width: 16px; height: 16px; }
+.si-play .si-fill { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--p, 1) * 100%); background: var(--si-fill); min-width: 0; }
+.si-play .si-play-in { position: relative; display: flex; align-items: center; gap: 10px; }
 .si-play #siPlayText { min-width: 0; }
-.si-play.loading { background: rgba(255, 255, 255, .09); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); opacity: 1; cursor: default; }
+.si-play.loading { opacity: 1; cursor: default; }
 .si-play.loading .si-play-in svg { display: none; }
 .si-play.loading::before { content: none; }
 .si-play:hover:not(:disabled) { filter: brightness(1.15); }
@@ -2412,8 +2316,8 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .si-play.loading { background: var(--accent-track, #0d2442); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
 
 /* the instrument tiles */
-.song-info.paused .si-picker { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; padding: 24px 0 0; border-top: 1px solid rgba(255, 255, 255, .09); }
-.si-picker .icard { box-sizing: border-box; flex: 1 1 150px; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1.5px solid rgba(255, 255, 255, .09); border-radius: 12px; background: rgba(255, 255, 255, .03); box-shadow: none; }
+.song-info.paused .si-picker { flex-wrap: wrap; align-items: stretch; padding: 24px 0 0; border-top: 1px solid rgba(255, 255, 255, .09); }
+.si-picker .icard { box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1.5px solid rgba(255, 255, 255, .09); border-radius: 12px; background: rgba(255, 255, 255, .03); box-shadow: none; }
 .si-picker .icard[data-key="drums"] { flex-grow: 1.3; }
 .si-picker .icard[data-active="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); box-shadow: none; }
 .si-picker .icard-top { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -2442,7 +2346,6 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .si-picker .icard[data-active="false"]:hover { border-color: rgba(255, 255, 255, .2); }
 
 @media (max-width: 1099px) {
-  .song-info.paused { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "cover main" "play play" "picker picker"; }
   .song-info.paused .si-cover { width: 120px; height: 120px; }
   .song-info.paused .si-title { font-size: 26px; }
   .song-info.paused .si-artist { font-size: 18px; }
@@ -2596,11 +2499,10 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .icards .seg button { padding-inline: 2px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 /* The tool row at the bottom of the instrument tiles (volume, neck speed, chart delay, 2D / 3D, circles / rectangles) and its small slider window */
-.icard-tools { display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: rgba(0, 0, 0, .3); }
 .icard-top + .icard-tools { margin-top: auto; }
-.tile-tool { flex: 1 1 0; min-width: 0; height: 30px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: #9a8d87; cursor: pointer; padding: 0; }
-.tile-tool svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.tile-tool:hover:not(:disabled) { background: rgba(255, 255, 255, .1); color: var(--text); }
+.tile-tool { place-items: center; color: #9a8d87; cursor: pointer; }
+.tile-tool svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tile-tool:hover:not(:disabled) { color: var(--text); }
 .tile-tool[aria-expanded="true"] { background: var(--si-fill, var(--accent)); color: #fff; }
 .tile-tool[data-mod="true"] { color: var(--accent); }
 .tile-tool:disabled { opacity: .35; cursor: default; }
@@ -2611,7 +2513,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .tile-pop .pm-range { display: grid; grid-template-columns: minmax(0, 1fr) 46px 28px; gap: 4px; align-items: center; }
 
 /* tool buttons with a value: the icon above, the value (volume, neck, delay, view) under it */
-.tile-tool { flex-direction: column; gap: 1px; height: 44px; align-content: center; }
+.tile-tool { align-content: center; }
 .tile-tool { display: flex; align-items: center; justify-content: center; }
 .tile-tool svg { width: 16px; height: 16px; }
 .tile-tool .tt-val { font-size: 11px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -2621,19 +2523,17 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .tp-segs .seg svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; }
 .pm-range output { white-space: nowrap; }
 /* tool buttons: the value to the right of the icon; the row wraps when the tile is narrow */
-.icard-tools { flex-wrap: wrap; }
-.tile-tool { flex: 1 1 auto; flex-direction: row; gap: 5px; height: 30px; padding: 0 8px; }
+.tile-tool { flex: 1 1 auto; flex-direction: row; }
 .tile-tool .tt-val:empty { display: none; }
 /* at most two lines: when the four buttons no longer fit side by side, they go two by two */
-.icard-tools { flex-wrap: nowrap; }
-.tile-tool { min-width: 0; padding: 0 4px; }
+.tile-tool { min-width: 0; }
 .tile-tool[aria-expanded="true"], .tile-tool[aria-expanded="true"][data-mod="true"] { background: var(--si-fill, var(--accent)); color: #fff; }
 /* the tile's content stays at the top; only the tool row sits at the bottom */
 .si-picker .icard-top + .seg, :is(.icards, .pc-cards) .icard-top + .seg, .icards .icard-top + .seg { margin-top: 0; }
 .si-picker .icard-tools, :is(.icards, .pc-cards) .icard-tools, .icard-top + .icard-tools { margin-top: auto; }
 /* the tool row as chips: no dark tray like the type / difficulty selectors, each tool a rounded outline pill */
 .icard-tools { background: transparent; padding: 0; gap: 6px; border-radius: 0; }
-.tile-tool { height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .16); background: transparent; }
+.tile-tool { border-radius: 999px; border: 1px solid rgba(255, 255, 255, .16); background: transparent; }
 .tile-tool:hover:not(:disabled) { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .28); }
 .tile-tool[data-mod="true"] { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 .tile-tool[aria-expanded="true"], .tile-tool[aria-expanded="true"][data-mod="true"] { border-color: transparent; }
@@ -2648,7 +2548,7 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .icard-remove svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
 .icard-remove:hover { background: rgba(255, 90, 90, .18); color: #ff8a8a; }
 .icard-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.pane-menu .pm-actions { display: flex; gap: 6px; }
+.pane-menu .pm-actions { gap: 6px; }
 .pane-menu .pm-actions .chip-btn { flex: 1 1 0; }
 .pm-tile .icard-dot { display: none; }
 
@@ -2684,12 +2584,11 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 
 /* the tool row is always one line: the chips shrink (padding, then the value is cut) instead of wrapping */
 .icard-tools { display: flex !important; flex-wrap: nowrap; }
-.tile-tool { overflow: hidden; padding: 0 6px; }
-.tile-tool .tt-val { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tile-tool { overflow: hidden; }
+.tile-tool .tt-val { min-width: 0; overflow: hidden; }
 .tile-tool .tt-val { text-overflow: clip; }
 .icard-tools.units-cut .tile-tool { gap: 1px; }
 .tile-tool { padding: 0 4px; }
-.icard-tools.units-cut .tile-tool { padding-left: 2px; }
 /* the 2 px smaller left padding only for chips that have a value (the ones without a label keep their padding); the value's visible area is 2 px wider at the right */
 .icard-tools.units-cut .tile-tool { padding-left: 4px; }
 .icard-tools.units-cut .tile-tool:has(.tt-val:not(:empty)) { padding-left: 2px; }
