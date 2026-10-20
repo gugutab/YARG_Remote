@@ -515,7 +515,7 @@ const XI = 31.6 + ((46 - YT) * 7.4) / 30; // the cap's inner edge at the new top
 const YN_CAP = sampleDesign([XI, YT], [[XE + 7.4, YT], [XE + 2.9, YT, XE + 1, YT + 2, XE, YT + 5.5], ...OUTER_REST, [35.4, 92], [35, 89], [31.2, 60], [30.6, 55, 30.8, 50, 31.6, 46]]); // the left cap; the right one is mirrored
 const YN_BODY = sampleDesign([XI, YT], [[220 - XI, YT], [191.4, 46], [192.2, 50, 192.4, 55, 191.8, 60], [188, 89], [32, 89], [28.2, 60], [27.6, 55, 27.8, 50, 28.6, 46]]);
 const YN_BASE_TOP = sampleDesign([19, 84], [[201, 84], [203.8, 84, 204.7, 86.5], [205.5, 90.5], [14.5, 90.5], [15.3, 86.5], [16.2, 84, 19, 84]], 4);
-const YN_BASE_FRONT = sampleDesign([14.5, 90.5], [[205.5, 90.5], [205.5, 92], [205.5, 96, 201.5, 96], [18.5, 96], [14.5, 96, 14.5, 92]], 4);
+const YN_BASE_FRONT = sampleDesign([14.5, 90.5], [[205.5, 90.5], [205.5, 93.5, 203, 96, 200, 96], [20, 96], [17, 96, 14.5, 93.5, 14.5, 90.5]], 8); // the lower ends are quarter circles of the face's whole height
 // The band beside a cap (HOPO / accent white strip): from under the cap to the cap's inner edge moved `s` units in; both sides go in one path.
 const strip = (s) => sampleDesign([30, YT], [[XI + s, YT], [31.6 + s, 46], [30.8 + s, 50, 30.6 + s, 55, 31.2 + s, 60], [35 + s, 89], [30, 89]]);
 // The tap / ghost dark centre: between two coloured strips of width `s`.
@@ -583,15 +583,10 @@ const linGrad = (g, x0, y0, x1, y1, stops) => {
 };
 function ynGradients(g, side, gold) {
   if (!ynShared) {
-    const spec = g.createRadialGradient(0, 0, 0, 0, 0, 1);
-    spec.addColorStop(0, '#fff');
-    spec.addColorStop(0.45, 'rgba(255,255,255,0.75)');
-    spec.addColorStop(1, 'rgba(255,255,255,0)');
     ynShared = {
       ends: linGrad(g, -82, 0, 82, 0, [[0, 'rgba(0,0,0,0.4)'], [0.1, 'rgba(0,0,0,0)'], [0.9, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.4)']]),
       capV: linGrad(g, 0, YT - YN_CY, 0, 35, [[0, 'rgba(0,0,0,0.6)'], [0.38, 'rgba(0,0,0,0)'], [0.7, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.35)']]),
       cap: CAP_STOPS.map((stops) => linGrad(g, CAP_FROM, 0, CAP_TO, 0, stops)),
-      spec,
     };
   }
   let pair = ynBase.get(side);
@@ -603,9 +598,9 @@ function ynGradients(g, side, gold) {
     const fr = 3.4 * Math.max(0.5, side); // half height of the floor shadow
     const shadow = linGrad(g, 0, fy - fr, 0, fy + fr, [[0, 'rgba(0,0,0,0)'], [0.5, 'rgba(0,0,0,0.55)'], [1, 'rgba(0,0,0,0)']]);
     // the top face's dark line at row 88 is the design's contact shadow under the body
-    pair = [['#141414', '#0c0c0c', '#4a4a4a', '#3a3a3a', '#1e1e1e', '#0a0a0a'], ['#1c1600', '#120e00', '#5a4a14', '#4a3c10', '#261e00', '#0c0900']].map((c) => ({
+    pair = [['#141414', '#0c0c0c', '#4a4a4a', ['#23272b', '#5e646c', '#8d939b', '#3a3e43', '#121416']], ['#1c1600', '#120e00', '#5a4a14', ['#2a2200', '#6a5415', '#98801f', '#3c3008', '#120d00']]].map((c) => ({
       top: linGrad(g, 0, Math.min(top0, top1 - 0.01), 0, top1, [[0, c[0]], [0.7, c[1]], [1, c[2]]]),
-      front: linGrad(g, 0, top1, 0, Math.max(front1, top1 + 0.01), [[0, c[3]], [0.5, c[4]], [1, c[5]]]),
+      front: linGrad(g, 0, top1, 0, Math.max(front1, top1 + 0.01), c[3].map((col, i) => [[0, 0.3, 0.55, 0.8, 1][i], col])),
       shadow, fy, fr,
     }));
     if (ynBase.size >= 8) ynBase.clear();
@@ -696,17 +691,6 @@ export function drawYNote(g, x, y, hw, hh, n, laneColor, bodyColor, taper = 0, s
     traceYN(g, YN_CAP, -1, k, side);
     g.fillStyle = S.capV;
     g.fill();
-  }
-  if (detail === 2) { // the specular blobs on the ridges
-    g.fillStyle = S.spec;
-    for (let m = -1; m <= 1; m += 2) {
-      const cu = m * 83.6 * (1 - k * 2.5);
-      g.transform(2.6, 0, 0, 4.4, cu, -2.5);
-      g.beginPath();
-      g.arc(0, 0, 1, 0, Math.PI * 2);
-      g.fill();
-      g.transform(1 / 2.6, 0, 0, 1 / 4.4, -cu / 2.6, 2.5 / 4.4);
-    }
   }
   // the base's front face, over the caps' lower ends
   g.beginPath();
