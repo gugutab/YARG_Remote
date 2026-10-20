@@ -110,8 +110,13 @@ export const HELD_FADE_IN = 0.2;
 // when that is positive, else 0; a note is lit only once `t - n.time >= litFrom` (set per frame by Highway.draw).
 export let litFrom = 0;
 export function setLitLag(lag) { litFrom = lag > 0 ? lag : 0; }
+// Disabled notes (the stretch replayed after a rewind, and what follows the end of a loop) are never played, so they never light: no pad flash, no held glow
+// as the hit line crosses them. `fn(note)` is Highway.disabledNote, or null when nothing is disabled (set per frame by Highway.draw).
+let disabledOf = null;
+export function setDisabledNotes(fn) { disabledOf = fn; }
+export const noteDisabled = (n) => disabledOf !== null && disabledOf(n);
 export function heldAmount(n, t) {
-  if (!(n.length > 0) || t - n.time < litFrom) return 0;
+  if (!(n.length > 0) || t - n.time < litFrom || noteDisabled(n)) return 0;
   const end = n.time + n.length;
   const x = Math.min(1, (t - n.time) / HELD_FADE_IN);
   const rampIn = x * x * (3 - 2 * x); // smoothstep

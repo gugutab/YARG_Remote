@@ -36,6 +36,8 @@ import {
   heldAmount,
   litFrom,
   setLitLag,
+  setDisabledNotes,
+  noteDisabled,
   HIT_FLASH_SEC,
   BAR_FLASH_SEC,
   PAD_FILL_ALPHA,
@@ -193,6 +195,7 @@ export class Highway {
     this._sustainWidth = 1; // tail width (highway.sustainWidth)
     this._kickBar = 1; // pedal / open bar thickness (highway.kickBarHeight)
     this.leftHanded = false; // the lanes of the guitar-like and drum windows run right to left (highway.leftHanded)
+    this.disabledFn = (n) => this.disabledNote(n); // (one closure for gfx.js setDisabledNotes: nothing is allocated per frame)
     this.litLag = 0; // drawn time minus the real chart time (> 0 while a seek animation sweeps back), see setLitLag in gfx.js
     this._heldMotion = true; // the held note's swell, tail shimmer and pad flicker (highway.heldPulse)
     this._padLook = 1; // opacity of the resting pads (highway.padLook)
@@ -501,6 +504,7 @@ export class Highway {
   }
 
   draw(t, w, h) {
+    setDisabledNotes(this.loopEnd !== null || this.replayWindow !== null ? this.disabledFn : null);
     setLitLag(this.litLag); // (drawn time - real time, set by app.js each frame: a backward seek animation lights nothing it sweeps over)
     const g = this.g;
     if (this.bgCanvas) g.clearRect(0, 0, w, h); // (transparent: the background canvas and the stage colour show through)
@@ -1449,7 +1453,7 @@ export class Highway {
     for (let vi = from; vi < end; vi++) {
       const n = notes[vi];
       const past = t - n.time;
-      if (past < litFrom) continue; // (not yet reached by the real time: see setLitLag)
+      if (past < litFrom || noteDisabled(n)) continue; // (not yet reached by the real time: see setLitLag; a disabled note is never hit)
       if (n.lane >= 0 && !n.open) {
         if (past < HIT_FLASH_SEC) flash[n.lane] = Math.max(flash[n.lane], 1 - past / HIT_FLASH_SEC);
         flash[n.lane] = Math.max(flash[n.lane], heldAmount(n, t) * (0.75 + flicker));

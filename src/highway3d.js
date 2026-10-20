@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, NOTE_RECT_W, NOTE_RECT_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, litFrom, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
 
@@ -221,7 +221,7 @@ export function renderLanes3D(hw, t, w, h) {
   for (let vi = from; vi < end; vi++) {
     const n = notes[vi];
     const past = t - n.time;
-    if (past < litFrom) continue; // (see setLitLag)
+    if (past < litFrom || noteDisabled(n)) continue; // (see setLitLag; a disabled note, replayed or after the loop end, is never hit)
     if (n.lane >= 0 && !n.open) flash[n.lane] = Math.max(flash[n.lane], heldAmount(n, t) * (0.75 + flicker));
     if (n.lane >= 0 && !n.open) {
       if (past < HIT_FLASH_SEC) flash[n.lane] = Math.max(flash[n.lane], 1 - past / HIT_FLASH_SEC);

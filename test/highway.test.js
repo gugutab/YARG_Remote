@@ -203,3 +203,16 @@ test('motion blur sample count adapts to the frame time (adaptBlurSamples)', asy
   assert.equal(adaptBlurSamples(3, 20), 3);
   assert.equal(adaptBlurSamples(3, 500), 3); // not consecutive blurred frames: kept for the next jump
 });
+
+test('disabled notes never light: heldAmount is 0 for them and back for the others', async () => {
+  const { heldAmount, setDisabledNotes, noteDisabled } = await import('../src/gfx.js');
+  const n = { time: 10, length: 2 };
+  assert.ok(heldAmount(n, 11) > 0);
+  setDisabledNotes((x) => x === n);
+  assert.equal(noteDisabled(n), true);
+  assert.equal(heldAmount(n, 11), 0);
+  assert.ok(heldAmount({ time: 10, length: 2 }, 11) > 0);
+  setDisabledNotes(null);
+  assert.equal(noteDisabled(n), false);
+  assert.ok(heldAmount(n, 11) > 0);
+});
