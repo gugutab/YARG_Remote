@@ -876,6 +876,10 @@ body.settings-open { overflow: hidden; }
   .sp-body { flex-direction: column; }
   .sp-nav { width: auto; flex-direction: row; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; border-right: 0; border-bottom: 1px solid var(--line); padding: 8px; }
   .sp-nav-btn { flex: none; }
+  /* more tabs past an edge: that edge fades out (classes from edgeFade in settings-ui.js, only while the strip overflows) */
+  .sp-nav.fade-end { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); }
+  .sp-nav.fade-start { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 56px), transparent); }
+  .sp-nav.fade-start.fade-end { -webkit-mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent); }
   .sp-content { padding: 4px 14px 80px; }
   .sp-row { flex-wrap: wrap; }
   .sp-head h2 { display: none; }
