@@ -25,7 +25,7 @@ test('WIN_MARGIN is --lib-gap', () => {
 });
 
 test('CONTENT_MAX is the default --content-max', () => {
-  const m = /:root\s*\{\s*--content-max:\s*(\d+)px/.exec(css);
+  const m = /^:root\s*\{[^}]*?--content-max:\s*(\d+)px/m.exec(css);
   assert.ok(m, ':root --content-max not found in styles.css');
   assert.equal(Number(m[1]), constant('CONTENT_MAX'));
 });
