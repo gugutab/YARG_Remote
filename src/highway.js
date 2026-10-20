@@ -108,6 +108,23 @@ const PERC_RINGS = [[0, 1.9, 3.5], [0.18, 1.4, 2]]; // percussion hit: [delay, g
 // Speed of the vocal chart in pixels per second at the default neck speed: a 1000 px wide window shows 2.5 s ahead, a wider one more.
 const VOCAL_PX_PER_SEC = (1000 * 0.85) / BASE_LOOKAHEAD_SEC;
 
+// The pane dots (several fretboards that do not all fit): centred PANE_DOT_Y px above the bottom, PANE_DOT_GAP apart; each has a PANE_DOT_GAP square hit area,
+// which ends above the 16 px the touch seek bar reaches into the stage (styles.css `.seekbox input`).
+export const PANE_DOT_GAP = 24;
+export const PANE_DOT_Y = 28;
+// The dot under (x, y) on a w x h canvas with `total` dots, or -1.
+export function paneDotIndex(total, w, h, x, y) {
+  if (total < 2 || Math.abs(y - (h - PANE_DOT_Y)) > PANE_DOT_GAP / 2) return -1;
+  const x0 = w / 2 - ((total - 1) * PANE_DOT_GAP) / 2;
+  const i = Math.floor((x - x0) / PANE_DOT_GAP + 0.5); // (floor, not round: no -0 left of the first dot)
+  return i >= 0 && i < total && Math.abs(x - (x0 + i * PANE_DOT_GAP)) <= PANE_DOT_GAP / 2 ? i : -1;
+}
+// The first fretboard in view that brings fretboard i into view with the least move (`per` fit on screen).
+export function focusShowing(i, focus, per, total) {
+  const f = i < focus ? i : i >= focus + per ? i - per + 1 : focus;
+  return Math.max(0, Math.min(Math.max(0, total - per), f));
+}
+
 export class Highway {
   constructor(canvas) {
     this.canvas = canvas;
@@ -330,6 +347,26 @@ export class Highway {
     this.focus = next;
     this.invalidate();
     return moved;
+  }
+
+  // The pane dot under a canvas point, while the dots show: { index, label } or null.
+  paneDotAt(x, y) {
+    const lanes = this.panes.filter((p) => p.chart?.mode !== 'vocals');
+    if (lanes.length <= this.perScreen) return null;
+    const i = paneDotIndex(lanes.length, this.canvas.clientWidth, this.canvas.clientHeight, x, y);
+    return i < 0 ? null : { index: i, label: lanes[i].label };
+  }
+  // A tap on a pane dot: brings that fretboard into view. Returns whether it moved.
+  showPane(i) {
+    const next = focusShowing(i, this.focus, this.perScreen, this.laneCount());
+    const moved = next !== this.focus;
+    this.focus = next;
+    this.invalidate();
+    return moved;
+  }
+  // The fretboards in view, by label (the canvas's text alternative).
+  panesInView() {
+    return this.panes.filter((p) => p.chart?.mode !== 'vocals').slice(this.focus, this.focus + this.perScreen).map((p) => p.label);
   }
 
   resize() {
@@ -831,12 +868,12 @@ export class Highway {
   // Small dots at the bottom: how many fretboards there are and which ones are in view (swipe sideways to change).
   drawPaneDots(total, per, w, h) {
     const g = this.g;
-    const gap = 14;
+    const gap = PANE_DOT_GAP; // (24 px apart: each dot is a 24 px tap target, paneDotAt)
     const x0 = w / 2 - ((total - 1) * gap) / 2;
     for (let i = 0; i < total; i++) {
       const on = i >= this.focus && i < this.focus + per;
       g.beginPath();
-      g.arc(x0 + i * gap, h - 10, on ? 4 : 3, 0, Math.PI * 2);
+      g.arc(x0 + i * gap, h - PANE_DOT_Y, on ? 4 : 3, 0, Math.PI * 2);
       g.fillStyle = on ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.35)';
       g.fill();
     }

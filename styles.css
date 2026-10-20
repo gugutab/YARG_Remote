@@ -153,6 +153,8 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 }
 .welcome svg { width: 48px; height: 48px; }
 .welcome button { background: var(--accent); border-color: var(--accent); color: var(--accent-text, #fff); }
+/* read by screen readers only (the stage's live status line, #stageStatus) */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* Fullscreen / idle: the bar hides while playing and returns on mouse move */
 .app.immersive .topbar { position: absolute; left: 0; right: 0; top: 0; opacity: .96; transition: transform .2s ease; }
@@ -876,6 +878,10 @@ body.settings-open { overflow: hidden; }
   .sp-body { flex-direction: column; }
   .sp-nav { width: auto; flex-direction: row; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; border-right: 0; border-bottom: 1px solid var(--line); padding: 8px; }
   .sp-nav-btn { flex: none; }
+  /* more tabs past an edge: that edge fades out (classes from edgeFade in settings-ui.js, only while the strip overflows) */
+  .sp-nav.fade-end { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); }
+  .sp-nav.fade-start { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 56px), transparent); }
+  .sp-nav.fade-start.fade-end { -webkit-mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent); }
   .sp-content { padding: 4px 14px 80px; }
   .sp-row { flex-wrap: wrap; }
   .sp-head h2 { display: none; }
@@ -1473,8 +1479,8 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 
 /* Touch screens: every control gets a 44x44 px hit area. Where the layout has room the control itself grows; in the top bar,
    the pane tags, the edge tabs and the stage buttons (fixed metrics) an invisible ::before reaches out instead, so the look and
-   the bar heights do not change. Fine pointers (mouse) are untouched. */
-@media (pointer: coarse) {
+   the bar heights do not change. Fine pointers (mouse) are untouched, except in a phone-width window (700 px or less), which gets the same hit areas. */
+@media (pointer: coarse), (max-width: 700px) {
   :where(.topbar button, .pane-tag, button.stage-btn, .mix-row button:not(.stem-btn)) { position: relative; } /* zero specificity: absolute/fixed rules keep winning */
   .topbar button::before, .pane-tag::before, button.stage-btn::before, .mix-row button:not(.stem-btn)::before {
     content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%);
@@ -1676,7 +1682,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 @container (max-width: 651px) {
   .info-head { grid-template-columns: 1fr; }
   .info-head-text { grid-column: 1; }
-  .info-head img, #info[data-cover] .info-head img { grid-row: auto; width: 100%; height: auto; aspect-ratio: 1; max-height: 70vh; object-fit: cover; }
+  .info-head img, #info[data-cover] .info-head img { grid-row: auto; width: 100%; height: auto; aspect-ratio: 1; max-height: 40vh; object-fit: cover; } /* (UX review: 40vh, was 70vh: the cards below start higher on a phone) */
   .info-head #infoTitle, .info-head #infoArtist { display: none; }
   .info-head img[hidden] ~ .info-head-text #infoTitle { display: block; }
   .info-head img[hidden] ~ .info-head-text #infoArtist { display: block; }
@@ -1965,6 +1971,8 @@ body.details-open .edge-dock { display: none; } /* the details fill the window a
 .song-packtag.short { flex: none; max-width: none; } /* a short pack code is never cut: the title gives way */
 
 .song-packtag { flex: none; max-width: none; overflow: visible; text-overflow: clip; } /* (virtuallist.js fitPacks decides between the name and its code: no ellipsis) */
+/* UX review: a phone-width list with the letter rail keeps the pack code a little further from the rail */
+@media (max-width: 700px) { .songs-wrap:not(.no-rail) #songs li.row.normal .song-packtag { margin-right: 4px; } }
 
 .song-meta[hidden] { display: none; }
 
@@ -2397,6 +2405,11 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .si-play.loading .si-play-in svg { display: none; }
 .si-play.loading::before { content: none; }
 .si-play:hover:not(:disabled) { filter: brightness(1.15); }
+/* UX review: the loading state reads as loading, not as a disabled button. The label says "Loading 60%" (app.js); the text is --accent-text (white, or dark on a
+   light accent) in 19 px bold (WCAG large text) on the fill, and the unfilled part is --accent-track (themes.js accentTrack: the accent pulled far away from
+   the text colour), so the text passes AA on both parts in every preset theme (test/ux.test.js). */
+.si-play { color: var(--accent-text, #fff); font-weight: 700; }
+.si-play.loading { background: var(--accent-track, #0d2442); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
 
 /* the instrument tiles */
 .song-info.paused .si-picker { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; padding: 24px 0 0; border-top: 1px solid rgba(255, 255, 255, .09); }
@@ -2681,6 +2694,12 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .icard-tools.units-cut .tile-tool { padding-left: 4px; }
 .icard-tools.units-cut .tile-tool:has(.tt-val:not(:empty)) { padding-left: 2px; }
 .tile-tool .tt-val { padding-right: 2px; margin-right: -2px; }
+/* UX review: small targets are at least 32 px. The chips are 32 px tall (still one line, fitTileTools unchanged); the reset icons grow to 32 x 32 with a -2 px
+   margin, so their margin box stays the 28 px grid track of the mixer, speed and pane rows (the extra 2 px per side sits in the grid gaps); the pause panel's
+   speed steps are 32 x 32. */
+.tile-tool { height: 32px; }
+button.icon.small-icon.reset { min-width: 32px; min-height: 32px; margin: -2px; }
+button.icon.small-icon.sp-reset, #ppSlower, #ppFaster { min-width: 32px; min-height: 32px; }
 /* The stage menu of an instrument is only the tile: no window behind it, and the tile is not clickable there */
 #paneMenu.pane-menu { background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 0; gap: 0; overflow: visible; }
 .pm-tile .icard, .pm-tile .icard:hover, .pm-tile .icard[data-active="true"], .pm-tile .icard[data-active="true"]:hover { cursor: default; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); box-shadow: 0 8px 24px rgba(0, 0, 0, .45); }
@@ -2694,6 +2713,10 @@ body.settings-open .edge-dock { z-index: 85; } /* above the settings window and 
 .met-pop .met-volume { display: grid; grid-template-columns: auto minmax(0, 1fr) 40px; align-items: center; gap: 8px; }
 .met-pop .met-volume output { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
 .met-pop .met-volume > span { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+/* Speed trainer row of the speed popover (app.js paintTrainer); the speed button is tinted while the trainer runs */
+.trainer-box { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.trainer-status { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; max-width: 280px; }
+#settingsBtn.trainer-on { color: var(--accent); }
 /* While the bottom bar is held back (loading, the start screen) its slot is dimmed like the rest of the stage, instead of showing the plain page behind it */
 .app.stage-held:has(.pause-dim.show) #topbar { visibility: visible; }
 .app.stage-held:has(.pause-dim.show) #topbar > * { visibility: hidden; }

@@ -36,6 +36,7 @@ import { createThumbs, renderCoverThumb } from './thumbs.js';
 import { chartFacts, factRows } from './songstats.js';
 import { recommend } from './recommend.js';
 import { snapPoints, snapTime, clampLoop, currentSectionRange, sectionRange, loopForSection, shouldWrap, MIN_LOOP } from './looprange.js';
+import { trainerConfig, startTrainer, nextTrainerState, trainerStatus, stepNote } from './trainer.js';
 import { VISUALIZERS, createDriver as createVisualizerDriver } from './visualizers.js';
 
 const $ = (id) => document.getElementById(id);
@@ -196,7 +197,7 @@ function applyThemeSetting() {
   applyUiColors();
   try { // read by the inline script in index.html before the first paint
     const css = {};
-    for (const k of ['--bg', '--panel', '--panel-2', '--line', '--text', '--muted', '--accent', '--accent-text', '--stage', '--stage-rgb', 'color-scheme']) css[k] = document.documentElement.style.getPropertyValue(k);
+    for (const k of ['--bg', '--panel', '--panel-2', '--line', '--text', '--muted', '--accent', '--accent-text', '--accent-track', '--stage', '--stage-rgb', 'color-scheme']) css[k] = document.documentElement.style.getPropertyValue(k);
     localStorage.setItem('yargremote.themeCache', JSON.stringify({ scheme: theme.scheme, css }));
   } catch { /* the cache is optional */ }
 }
@@ -1099,7 +1100,7 @@ function renderLoadState() {
   els.loadScreen.hidden = true; // (the loading window is replaced by the start screen: its Play button is the loader)
   if (screen) {
     if (!startScreenOn && current && !infoOpen) { showSongInfo(null); showStartScreen(null); } // (a load that nobody opened the screen for)
-    if (startScreenOn && els.siPlay.classList.contains('loading')) { els.siPlayText.textContent = `${Math.round(fraction * 100)}%`; els.siPlay.style.setProperty('--p', String(fraction)); }
+    if (startScreenOn && els.siPlay.classList.contains('loading')) { els.siPlayText.textContent = `Loading ${Math.round(fraction * 100)}%`; els.siPlay.style.setProperty('--p', String(fraction)); }
   } else if (state === 'error') endStartScreen();
   else if (state === 'ready' && startScreenOn && !startDone && current && !current.started) endStartScreen(); // loaded with nobody pressing Play (a link without autostart): the pre-start screen takes the window back, its Play button ready
   const overlay = !infoOpen && !screen && state === 'error';
@@ -1634,6 +1635,7 @@ function setActiveSection(index) {
   if (index === activeSection) return;
   activeSection = index;
   els.sectionText.textContent = chart?.sections[index]?.name ?? 'No sections';
+  if (player.playing && chart?.sections[index]) announce(chart.sections[index].name); // (screen readers: the section reached while playing)
   for (const row of els.sectionPop.children) row.dataset.active = String(Number(row.dataset.index) === index);
   if (index >= 0) els.sectionSelect.value = String(index);
 }
@@ -2164,6 +2166,7 @@ els.seekbox.addEventListener('wheel', (e) => {
 // Wrap rule: playback jumps back to the start only when it leaves the END of the region from INSIDE it. A loop is
 // dormant while playback is outside the region (after a seek before or past it) and re-arms once playback enters it.
 let loop = null; // { start, end } or null
+let trainer = null; // the speed trainer while it runs ({ speed, passes, done }, trainer.js): practice.trainer is on and so is a loop
 let loopPrev = null; // the previous frame's time, to tell a wrap from a seek
 let loopDrag = null;
 const LOOP_SNAP_PX = 10;
@@ -2176,9 +2179,11 @@ function setLoop(range) {
   cancelLoopWait();
   loopHeld = false;
   if (range) clearRewind();
+  const had = !!loop;
   loop = range && seekMax() > 0 ? range : null;
   loopPrev = null;
   paintLoop();
+  if (!loop) stopTrainer(); else if (!had) beginTrainer(); // (moving a handle keeps the trainer's progress)
 }
 function paintLoop() {
   const on = !!loop;
@@ -2241,6 +2246,7 @@ async function finishLoopWait() {
 // The restart itself: one second before the loop start (the same rewind as after a pause) with the notes of that second drawn disabled, until the song
 // reaches the start. Returns the new player time.
 function wrapLoop() {
+  trainerPass(); // (before the seek: a speed step starts with the new pass)
   const back = prefs.get('playback.resumeRewind') ? Math.max(0, loop.start - PAUSE_REWIND_SEC) : loop.start;
   internalSeek = true;
   player.seek(back); // the audio restarts at once (no scrub)...
@@ -2265,6 +2271,47 @@ function loopSectionRow(i) {
   if (sec) { setLoop(loopForSection(loop, sec)); rewindIntoLoop(); }
 }
 els.loopBtn.addEventListener('click', toggleLoop);
+
+// Speed trainer (setting practice.trainer; rules in trainer.js): while a loop runs, every completed pass (a wrap, counted in wrapLoop, so
+// the restart delay and a pause during it count once) moves it on; after practice.trainerPasses passes the speed goes up one step through
+// setSetting (the audio stretch follows). Starting it (a new loop, or the setting turned on during one) sets the start speed; ending the
+// loop (R, a seek out of it, another song) or turning it off keeps the speed reached. It only reads the wait/rewind state, never changes it.
+const trainerCfg = () => trainerConfig((id) => prefs.get(id));
+function beginTrainer() {
+  trainer = null;
+  if (loop && prefs.get('practice.trainer')) {
+    trainer = startTrainer(trainerCfg());
+    setSetting('speed', trainer.speed);
+    flashNote(`Speed trainer: ${stepNote(trainer)}`);
+  }
+  paintTrainer();
+}
+function stopTrainer() {
+  trainer = null;
+  paintTrainer();
+}
+function trainerPass() {
+  if (!trainer) return;
+  trainer = nextTrainerState(trainer, { type: 'wrap', speed: settings.speed }, trainerCfg());
+  if (trainer.stepped) { setSetting('speed', trainer.speed); flashNote(stepNote(trainer)); }
+  paintTrainer();
+}
+// The trainer row of the speed popover: an On/Off switch bound to practice.trainer and a status line (pass count, speed, target).
+const trainerBox = document.createElement('div');
+trainerBox.className = 'fp-group trainer-box';
+trainerBox.innerHTML = '<span class="fp-label">Speed trainer</span><div class="seg fret-seg" role="group" aria-label="Speed trainer"><button type="button" data-value="true">On</button><button type="button" data-value="false">Off</button></div><div class="trainer-status" role="status"></div>';
+for (const b of trainerBox.querySelectorAll('button')) b.addEventListener('click', () => prefs.set('practice.trainer', b.dataset.value === 'true'));
+els.settingsPop.append(trainerBox);
+const trainerStatusEl = trainerBox.querySelector('.trainer-status');
+function paintTrainer() {
+  const on = prefs.get('practice.trainer');
+  for (const b of trainerBox.querySelectorAll('button')) b.setAttribute('aria-pressed', String(String(on) === b.dataset.value));
+  if (trainer) trainer = nextTrainerState(trainer, { type: 'paint', speed: settings.speed }, trainerCfg()); // (the speed may have been moved by hand, the target changed)
+  setText(trainerStatusEl, trainerStatus({ on, looping: !!loop, state: trainer, cfg: trainerCfg() }));
+  els.settingsBtn.classList.toggle('trainer-on', !!trainer);
+}
+els.settingsPop.addEventListener('input', paintTrainer); // (the speed slider)
+els.settingsBtn.addEventListener('click', paintTrainer);
 
 // Dragging a handle (mouse and touch): pointer capture keeps the move events on the handle; the seek input is untouched.
 function timeAtClientX(x) {
@@ -2533,7 +2580,7 @@ function showStartScreen(sec) {
   els.siPlay.classList.toggle('loading', loading);
   els.siPlay.disabled = loading;
   els.siPlay.classList.remove('counting');
-  if (loading) { els.siPlayText.textContent = '0%'; els.siPlay.style.setProperty('--p', '0'); }
+  if (loading) { els.siPlayText.textContent = 'Loading 0%'; els.siPlay.style.setProperty('--p', '0'); }
   else if (hold) { els.siPlayText.textContent = 'Play'; els.siPlay.style.setProperty('--p', '1'); }
   else {
     els.siPlay.style.setProperty('--p', '1');
@@ -2653,10 +2700,25 @@ window.addEventListener('blur', onFocusLoss);
 window.addEventListener('focus', onFocusBack);
 document.addEventListener('visibilitychange', () => (document.hidden ? onFocusLoss() : onFocusBack()));
 
+// Screen readers: the canvas has no text, so a visually hidden live line (#stageStatus) says the section reached while playing, play / pause and
+// the fretboards brought into view; it is written only when the text changes.
+const stageStatus = $('stageStatus');
+function announce(text) {
+  if (stageStatus && text && stageStatus.textContent !== text) stageStatus.textContent = text;
+}
+function announceView() {
+  const names = highway.panesInView().filter(Boolean).join(', ');
+  if (!names) return;
+  els.highway.setAttribute('aria-label', `Note highway: ${names}`);
+  announce(`Showing ${names}`);
+}
+let announcedPlaying = null; // (the first sync only records the state)
+
 const PLAY_TITLES = { play: els.play.title, npPlay: els.npPlay.title };
 function syncPlayButton() {
   wakeLoop(); // (playback can start without input: media keys, autoplay, a wait ending)
   const playing = player.playing || !!startDone || !!loopWait; // (the start delay shows the playing state)
+  if (playing !== announcedPlaying) { if (announcedPlaying !== null) announce(playing ? 'Playing' : 'Paused'); announcedPlaying = playing; }
   const restart = ended && !playing; // at the end of the song the play button restarts it
   const icon = playing ? '#i-pause' : restart ? '#i-replay' : '#i-play';
   const detailIcon = playing && !backgroundAudio() ? '#i-pause' : '#i-play'; // (the Listen card: the sound of another song is not its)
@@ -3326,8 +3388,9 @@ els.highway.addEventListener('pointermove', (e) => {
     highway.hover = d;
     const jump = highway.sheetPlayButtonAt(...canvasPoint(e)); // over the "jump to" button of a lyric row
     const toCurrent = highway.sheetButtonAt(...canvasPoint(e)); // over the button that goes back to the line being sung
-    els.highway.style.cursor = jump || toCurrent ? 'pointer' : d ? (d.type === 'row' ? 'row-resize' : 'col-resize') : '';
-    els.highway.title = jump ? `Jump to ${highway.fmtTime(jump.playBtn.time + settings.chartDelay)}` : toCurrent ? 'Jump to the line being sung' : '';
+    const dot = highway.paneDotAt(...canvasPoint(e)); // over a pane dot (tap: that fretboard comes into view)
+    els.highway.style.cursor = jump || toCurrent || dot ? 'pointer' : d ? (d.type === 'row' ? 'row-resize' : 'col-resize') : '';
+    els.highway.title = jump ? `Jump to ${highway.fmtTime(jump.playBtn.time + settings.chartDelay)}` : toCurrent ? 'Jump to the line being sung' : dot ? `Show ${dot.label || 'this track'}` : '';
     return;
   }
   if (!swipe.sheet) return;
@@ -3347,10 +3410,12 @@ els.highway.addEventListener('pointerup', (e) => {
   }
   const { x, y, sheet } = swipe;
   swipe = null;
+  const dot = Math.abs(e.clientX - x) < 10 && Math.abs(e.clientY - y) < 10 ? highway.paneDotAt(...canvasPoint(e)) : null; // a tap on a pane dot
+  if (dot) { if (highway.showPane(dot.index)) announceView(); return; }
   if (sheet) return; // (dragging the lyrics only scrolls them; playing from a line is the button that shows when the pointer rests on it)
   const dx = e.clientX - x;
   const dy = e.clientY - y;
-  if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) highway.shiftFocus(dx < 0 ? 1 : -1);
+  if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5 && highway.shiftFocus(dx < 0 ? 1 : -1)) announceView();
 });
 els.highway.addEventListener('pointercancel', () => { swipe = null; highway.hover = null; });
 els.highway.addEventListener('wheel', (e) => { // the mouse wheel scrolls the lyrics when the pointer is over them
@@ -3575,8 +3640,8 @@ const SHORTCUT_HANDLERS = {
   topBar: () => setBarHidden(!els.app.classList.contains('bar-hidden')),
   fullscreen: () => toggleFullscreen(),
   view3d: () => setView(highway.view === '3d' ? '2d' : '3d'),
-  focusNext: () => highway.shiftFocus(1),
-  focusPrev: () => highway.shiftFocus(-1),
+  focusNext: () => { if (highway.shiftFocus(1)) announceView(); },
+  focusPrev: () => { if (highway.shiftFocus(-1)) announceView(); },
   vocalView: () => { if (highway.panes.some((p) => p.chart.mode === 'vocals')) setVocalView(highway.vocalView === 'karaoke' ? 'track' : 'karaoke'); },
   perf: () => cyclePerfOverlay(),
   loop: () => { if (chart && !liveStage) toggleLoop(); },
@@ -3995,6 +4060,8 @@ const EFFECTS = {
   'audio.metronome': (v) => { metronome.setEnabled(v); paintMetronome(v); syncMetPop(); },
   'audio.metronomeVolume': (v) => { metronome.setVolume(v); syncMetPop(); },
   'audio.metronomeSound': (v) => { metronome.setSound(v); syncMetPop(); },
+  'practice.trainer': (v) => { if (!v) stopTrainer(); else if (!trainer) beginTrainer(); },
+  'practice.trainerStart': () => paintTrainer(), 'practice.trainerTarget': () => paintTrainer(), 'practice.trainerStep': () => paintTrainer(), 'practice.trainerPasses': () => paintTrainer(),
   'highway.lyricsAbove': (v) => { highway.sheetPeek = v / 100; },
   'highway.countdown': (v) => { highway.countdowns = v; },
   'highway.countdownColors': applyUiColors,
