@@ -52,6 +52,8 @@ const els = Object.fromEntries([
 for (const img of [els.cover, els.infoCover, els.infoPopCover, els.endCover]) img.addEventListener('error', () => { img.hidden = true; });
 const player = new MultiTrackPlayer();
 const highway = new Highway(els.highway);
+let frameSleep = 0; // the timer while the frame loop ticks slowly (paused and idle, see `idleDeep`); 0 while it runs on requestAnimationFrame
+{ const invalidate = highway.invalidate; highway.invalidate = function () { invalidate.call(this); wakeLoop(); }; } // (any change to the picture wakes a sleeping loop)
 highway.setBackgroundCanvas(document.getElementById('bgCanvas'));
 const perf = new PerfMeter();
 let perfMode = 'off'; // the perf.overlay setting, kept here so the frame loop does not read the prefs every frame
@@ -2637,6 +2639,7 @@ document.addEventListener('visibilitychange', () => (document.hidden ? onFocusLo
 
 const PLAY_TITLES = { play: els.play.title, npPlay: els.npPlay.title };
 function syncPlayButton() {
+  wakeLoop(); // (playback can start without input: media keys, autoplay, a wait ending)
   const playing = player.playing || !!startDone || !!loopWait; // (the start delay shows the playing state)
   const restart = ended && !playing; // at the end of the song the play button restarts it
   const icon = playing ? '#i-pause' : restart ? '#i-replay' : '#i-play';
@@ -3643,7 +3646,7 @@ function visualChartTime(ct) {
 const IDLE_AFTER_MS = 3000;
 const IDLE_REFRESH_MS = 250;
 let lastInputAt = performance.now();
-const wakeUp = () => { lastInputAt = performance.now(); };
+const wakeUp = () => { lastInputAt = performance.now(); wakeLoop(); };
 for (const type of ['pointermove', 'pointerdown', 'pointerup', 'wheel', 'keydown', 'keyup', 'input', 'change', 'click', 'touchstart', 'dragover', 'drop']) document.addEventListener(type, wakeUp, { capture: true, passive: true });
 for (const type of ['resize', 'hashchange', 'popstate', 'focus', 'visibilitychange']) window.addEventListener(type, wakeUp);
 const lastDraw = { at: -Infinity, t: NaN, w: 0, h: 0, dpr: 0, panes: null, chart: null };
@@ -3652,6 +3655,19 @@ function canSkipDraw(now, t) {
   if (now - Math.max(lastInputAt, highway.dirtyAt) < IDLE_AFTER_MS || now - lastDraw.at >= IDLE_REFRESH_MS) return false;
   const c = els.highway;
   return lastDraw.t === t && lastDraw.w === c.clientWidth && lastDraw.h === c.clientHeight && lastDraw.dpr === window.devicePixelRatio && lastDraw.panes === highway.panes && lastDraw.chart === chart;
+}
+// Deep idle: on top of the idle conditions above, nothing that animates by itself (no visualizer, no loading backdrop, no start/resume/loop wait).
+// The loop then ticks at IDLE_REFRESH_MS on a timer instead of every display frame (the refresh it would draw anyway), and any input,
+// `highway.invalidate()` or play-button change wakes it at once (`wakeLoop`).
+function idleDeep(now) {
+  return !player.playing && !vis.anim && !seeking && perfMode === 'off' && !highway.visualizer && !holdStage && !loadingBackdrop
+    && !startDone && !resumeTimer && !loopWait && now - Math.max(lastInputAt, highway.dirtyAt) >= IDLE_AFTER_MS;
+}
+function wakeLoop() {
+  if (!frameSleep) return;
+  clearTimeout(frameSleep);
+  frameSleep = 0;
+  requestAnimationFrame(frame);
 }
 function noteDraw(now, t) {
   const c = els.highway;
@@ -3687,7 +3703,9 @@ function guarded(part, fn) {
 }
 
 function frame(frameTs) {
-  requestAnimationFrame(frame); // first, so nothing below can end the loop
+  // first, so nothing below can end the loop
+  if (guarded('idle check', () => idleDeep(performance.now()))) frameSleep = setTimeout(() => { frameSleep = 0; requestAnimationFrame(frame); }, IDLE_REFRESH_MS);
+  else requestAnimationFrame(frame);
   guarded('pause panel', syncPausePanel);
   guarded('pause info', syncPauseInfo);
   const frameStart = performance.now();
@@ -3926,7 +3944,7 @@ function syncPausePanel() {
   if (els.ppMetronome.getAttribute('aria-pressed') !== String(met)) { els.ppMetronome.setAttribute('aria-pressed', String(met)); els.ppMetronome.textContent = met ? 'On' : 'Off'; }
   const vol = masterState.muted ? 0 : masterState.value;
   if (Number(els.ppVolume.value) !== vol && document.activeElement !== els.ppVolume) els.ppVolume.value = vol;
-  els.ppVolVal.textContent = masterState.muted ? 'Muted' : `${Math.round(masterState.value * 100)}%`;
+  setText(els.ppVolVal, masterState.muted ? 'Muted' : `${Math.round(masterState.value * 100)}%`); // (runs every frame: an unconditional write dirtied layout)
 }
 els.ppSlower.addEventListener('click', () => stepSpeed(-1));
 els.ppFaster.addEventListener('click', () => stepSpeed(1));
