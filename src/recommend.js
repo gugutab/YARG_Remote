@@ -80,3 +80,62 @@ export function recommend(current, songs, { count = 20, instruments = [] } = {})
   }
   return unique;
 }
+
+// ---------- Categories ----------
+// "Play next" as short rows, each with its own heading: Same artist, Similar level, Same era, Same genre, Not played yet, Something
+// different. A song shows in one row only; a row takes at most one song per artist (the "Same artist" row excepted) and at most two
+// per pack, and an artist fills at most `maxPerArtist` places in the whole list, so one band or pack cannot take over.
+// -> [{ key, title, items: [{ song, reason }] }] (empty rows left out). `history` is the play history map (id -> { last, plays }).
+const LEVEL_KEY = { guitar: 'diff_guitar', bass: 'diff_bass', rhythm: 'diff_rhythm', keys: 'diff_keys', drums: 'diff_drums', vocals: 'diff_vocals' };
+const levelOf = (song, inst) => {
+  const v = Number(song.ini?.[LEVEL_KEY[inst]]);
+  return Number.isFinite(v) && v >= 0 && song.ini?.[LEVEL_KEY[inst]] !== undefined && song.ini?.[LEVEL_KEY[inst]] !== '' ? v : null;
+};
+
+export function recommendGroups(current, songs, { instruments = [], history = null, perRow = 4, maxPerArtist = 2 } = {}) {
+  const ranked = recommend(current, songs, { count: Infinity, instruments }); // best first, deduplicated twins
+  if (!ranked.length) return [];
+  const active = instruments[0];
+  const artistOf = (s) => groupKey(s.artist, 'artist') || `?${s.id}`;
+  const curArtist = groupKey(current.artist, 'artist');
+  const genre = norm(current.ini?.genre);
+  const year = yearOf(current);
+  const level = active ? levelOf(current, active) : null;
+  const used = new Set();
+  const artistCount = new Map();
+  const rows = [];
+  const take = ({ key, title, filter, order, sameArtistRow = false }) => {
+    const pool = ranked.filter((r) => !used.has(r.song.id) && filter(r.song));
+    if (order) pool.sort((a, b) => order(a, b) || b.score - a.score || (a.song.id < b.song.id ? -1 : 1));
+    const items = [];
+    const rowArtists = new Set();
+    const rowPacks = new Map();
+    for (const r of pool) {
+      if (items.length >= perRow) break;
+      const a = artistOf(r.song);
+      const pack = packOf(r.song);
+      if (!sameArtistRow && rowArtists.has(a)) continue;
+      if (!sameArtistRow && pack && (rowPacks.get(pack) || 0) >= 2) continue;
+      if (!sameArtistRow && (artistCount.get(a) || 0) >= maxPerArtist) continue;
+      items.push({ song: r.song, reason: title });
+      rowArtists.add(a);
+      rowPacks.set(pack, (rowPacks.get(pack) || 0) + 1);
+    }
+    for (const it of items) { used.add(it.song.id); const a = artistOf(it.song); artistCount.set(a, (artistCount.get(a) || 0) + 1); }
+    if (items.length) rows.push({ key, title, items });
+  };
+  if (curArtist) take({ key: 'artist', title: 'Same artist', filter: (s) => groupKey(s.artist, 'artist') === curArtist, sameArtistRow: true });
+  if (level !== null) {
+    const gap = (s) => Math.abs(levelOf(s, active) - level);
+    take({ key: 'level', title: 'Similar level', filter: (s) => levelOf(s, active) !== null && gap(s) <= 1, order: (a, b) => gap(a.song) - gap(b.song) });
+  }
+  if (year) take({ key: 'era', title: 'Same era', filter: (s) => yearOf(s) && Math.abs(yearOf(s) - year) <= YEAR_WINDOW });
+  if (genre) take({ key: 'genre', title: 'Same genre', filter: (s) => norm(s.ini?.genre) === genre });
+  if (history && history.size) take({ key: 'new', title: 'Not played yet', filter: (s) => !history.has(s.id) });
+  take({
+    key: 'different', title: 'Something different',
+    filter: (s) => (!genre || norm(s.ini?.genre) !== genre) && (!year || !yearOf(s) || Math.abs(yearOf(s) - year) > YEAR_WINDOW),
+    order: (a, b) => unitHash(`d|${current.id}|${a.song.id}`) - unitHash(`d|${current.id}|${b.song.id}`), // spread over the library, stable per song
+  });
+  return rows;
+}

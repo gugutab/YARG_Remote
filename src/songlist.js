@@ -146,6 +146,21 @@ export function rankByRelevance(songs, query) {
   return scored.map((x) => x.song);
 }
 
+// Best match first, but only inside each run of the same group header, so the headers of the chosen sort stay while searching.
+export function rankWithinGroups(sorted, query, by = 'title') {
+  const out = [];
+  let run = [];
+  let last = null;
+  const flush = () => { if (run.length) out.push(...rankByRelevance(run, query)); run = []; };
+  for (const song of sorted) {
+    const label = groupLabel(song, by);
+    if (label !== last) { flush(); last = label; }
+    run.push(song);
+  }
+  flush();
+  return out;
+}
+
 // Ranges [start, end) of `text` that match the terms (for highlighting). Accent, case and punctuation blind, like the search itself.
 export function highlightRanges(text, terms) {
   const src = String(text ?? '');

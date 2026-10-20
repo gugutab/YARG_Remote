@@ -35,10 +35,12 @@ import { renderThemeStudio, renderDataTools, renderShortcuts, renderLaneColors, 
 import { WIN_MARGIN, WIN_BORDER, SETTINGS_MIN_W, contentMaxFor } from './windowframe.js';
 import { isPhone, createWidthPref, createWindowFrame } from './windowframe-dom.js';
 import { saveLibrary, loadLibrary, loadThumb, saveThumb, clearThumbs } from './store.js';
-import { filterSongs, parseQuery, rankByRelevance, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, anchorLabel, INSTRUMENTS, hasInstrument } from './songlist.js';
+import { filterSongs, parseQuery, rankByRelevance, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, rankWithinGroups, anchorLabel, INSTRUMENTS, hasInstrument } from './songlist.js';
 import { createVirtualList, DEFAULT_CARDS, syncStarButton } from './virtuallist.js';
 import { FAVOURITES_KEY, loadFavourites, saveFavourites, toggleFavourite, onlyFavourites, mergeFavourites } from './favourites.js';
 import { HISTORY_KEY, loadHistory, saveHistory, recordPlay, sortByHistory, playedLine, createPlayTracker, HISTORY_SORTS } from './history.js';
+import { paintLevel } from './levelicon.js';
+import { makeZoomable } from './imageviewer.js';
 import { createThumbs, renderCoverThumb } from './thumbs.js';
 import { snapPoints, snapTime, clampLoop, currentSectionRange, sectionRange, loopForSection, shouldWrap, MIN_LOOP } from './looprange.js';
 import { trainerConfig, startTrainer, nextTrainerState, trainerStatus, stepNote } from './trainer.js';
@@ -47,7 +49,7 @@ import { paintRange, installRangeUi } from './range-ui.js';
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
-  'app', 'library', 'closeLibrary', 'splitter', 'libTab', 'settingsTab', 'edgeDock', 'dockHandle', 'edgeL', 'edgeR', 'npPlay', 'npPreview', 'npPreviewBox', 'npSeek', 'npBand', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
+  'app', 'searchClear', 'library', 'closeLibrary', 'splitter', 'libTab', 'settingsTab', 'edgeDock', 'dockHandle', 'edgeL', 'edgeR', 'npPlay', 'npPreview', 'npPreviewBox', 'npSeek', 'npBand', 'npTime', 'loadScreen', 'lsTitle', 'lsBar', 'lsText', 'lsCover', 'groupLabel', 'rail', 'scrim', 'pick', 'resume', 'rescan', 'folderInput', 'status',
   'search', 'sortBy', 'sortDir', 'filterBtn', 'filterBadge', 'filterPanel', 'instChips', 'levelSeg', 'maxLevelSeg', 'diffChips', 'filterGenre', 'filterDecade', 'filterPack', 'filterClear', 'activeFilters', 'viewSeg', 'count', 'songs', 'empty',
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
@@ -59,6 +61,8 @@ const els = Object.fromEntries([
 ].map((id) => [id, $(id)]));
 
 for (const img of [els.cover, els.infoCover, els.infoPopCover, els.endCover]) img.addEventListener('error', () => { img.hidden = true; });
+makeZoomable(els.infoCover, 'Open the album art full screen');
+makeZoomable(els.siCover, 'Open the album art full screen');
 const player = new MultiTrackPlayer();
 const highway = new Highway(els.highway);
 let frameSleep = 0; // the timer while the frame loop ticks slowly (paused and idle, see `idleDeep`); 0 while it runs on requestAnimationFrame
@@ -654,11 +658,19 @@ els.search.addEventListener('keydown', (e) => {
   } else if (e.key === 'Escape' && els.search.value) { // Esc clears the text first; a second Esc leaves the field
     e.preventDefault();
     e.stopPropagation();
-    els.search.value = '';
-    clearTimeout(searchTimer);
-    renderList();
+    clearSearch(false);
   }
 });
+function clearSearch(refocus = true) {
+  els.search.value = '';
+  clearTimeout(searchTimer);
+  renderList();
+  syncSearchClear();
+  if (refocus) setTimeout(() => els.search.focus(), 0); // (after the click handler that drops focus from clicked buttons)
+}
+function syncSearchClear() { els.searchClear.hidden = !els.search.value; }
+els.search.addEventListener('input', syncSearchClear);
+els.searchClear.addEventListener('click', () => clearSearch());
 for (const el of [els.filterGenre, els.filterDecade, els.filterPack]) el.addEventListener('input', () => { syncFilterUi(); renderList(); });
 els.instChips.addEventListener('click', (e) => {
   const b = e.target.closest('[data-inst]');
@@ -901,6 +913,7 @@ syncViewSeg();
 let shownSongs = []; // the list as it is on screen (Enter in the search opens the first one)
 function renderList({ keepScroll = false } = {}) {
   const query = els.search.value;
+  syncSearchClear();
   const terms = parseQuery(query).terms;
   const ranked = terms.length > 0 && prefs.get('library.searchRelevance'); // free text in the search: best match first
   const bySort = els.sortBy.value;
@@ -909,13 +922,13 @@ function renderList({ keepScroll = false } = {}) {
     query, instruments: [...filters.instruments], minLevel: filters.minLevel, maxLevel: filters.maxLevel, diffs: [...filters.diffs], genre: picked(els.filterGenre), decade: picked(els.filterDecade), pack: picked(els.filterPack),
   });
   shown = byHistory ? sortByHistory(sortSongs(shown, 'title'), playHistory, bySort, sortDesc) : sortSongs(shown, bySort, sortDesc);
-  if (ranked) shown = rankByRelevance(shown, query);
+  const heads = prefs.get('library.dividers') && !byHistory; // (a history order has no letter groups); a search keeps the headers
+  if (ranked) shown = heads ? rankWithinGroups(shown, query, bySort) : rankByRelevance(shown, query);
   shownSongs = shown;
   list.setHighlight(terms);
   els.sortDir.classList.toggle('desc', sortDesc); // the arrow points up when descending
   els.sortDir.title = sortDesc ? 'Descending (click to reverse)' : 'Ascending (click to reverse)';
   list.setActive(infoOpen ? current?.song ?? null : null); // marked while its details are open
-  const heads = prefs.get('library.dividers') && !ranked && !byHistory; // (a relevance or history order has no letter groups)
   list.setItems(heads ? buildItems(shown, els.sortBy.value) : shown.map((song) => ({ type: 'song', song })), { keepScroll, evenGroups: heads && els.sortBy.value === 'pack' }); // pack sort: every pack gets a label on the rail
   els.count.textContent = songs.length ? `${shown.length} of ${songs.length} songs${ranked ? ' · best match first' : ''}` : '';
   els.empty.hidden = songs.length > 0;
@@ -2479,7 +2492,7 @@ async function restartSong() {
 }
 
 initEndUi({ // the end-of-song window (src/end-ui.js); its init binds the suggestions' hover tip here, as before
-  els, list, prefs, highway, ended: () => ended, endDismissed: () => endDismissed, chart: () => chart, current: () => current, infoOpen: () => infoOpen, songs: () => songs,
+  els, list, prefs, highway, ended: () => ended, endDismissed: () => endDismissed, chart: () => chart, current: () => current, infoOpen: () => infoOpen, songs: () => songs, history: () => playHistory,
   wakeUp: () => wakeUp(), closePopovers: () => closePopovers(), playNext: (song) => playNext(song), kv: (rows) => kv(rows),
 });
 // A recommended song: opened with the same instruments and difficulties where it has them, and played.
@@ -3115,7 +3128,7 @@ const SHORTCUT_HANDLERS = {
   loop: () => { if (chart && !liveStage) toggleLoop(); },
   loopStart: () => setLoopHere('start'),
   loopEnd: () => setLoopHere('end'),
-  metronome: () => prefs.set('audio.metronome', !prefs.get('audio.metronome')),
+  metronome: () => toggleMetronome(),
   speedDown: () => stepSpeed(-1),
   speedUp: () => stepSpeed(1),
   speedReset: () => stepSpeed(0),
@@ -3389,41 +3402,67 @@ function paintMetronome(on) {
   els.metronomeBtn.setAttribute('aria-pressed', String(on));
   els.metronomeBtn.title = on ? 'Metronome off (M)' : 'Metronome (M)';
 }
-// The bar's metronome button opens a small window with the metronome options (the M key and the pause panel still toggle it).
+// The bar's metronome button opens a small window: a volume row like the mixer's (the speaker is the mute toggle) and the sound.
+// There is no on/off switch: the click plays while the volume is above 0 and the row is not muted (audio.metronome keeps the mute; the M key and the pause panel flip it).
 const metPop = document.getElementById('metronomePop');
+let metLastLevel = 50; // the level to come back to when unmuting from 0
+const metVolume = () => prefs.get('audio.metronomeVolume');
+const metSounding = () => prefs.get('audio.metronome') && metVolume() > 0;
+function toggleMetronome() { // mute / unmute (a click from 0 restores the last level)
+  if (metSounding()) { prefs.set('audio.metronome', false); return; }
+  if (metVolume() === 0) prefs.set('audio.metronomeVolume', metLastLevel || 50);
+  prefs.set('audio.metronome', true);
+}
+function applyMetronome() { metronome.setEnabled(metSounding()); paintMetronome(metSounding()); syncMetPop(); }
 {
   const title = document.createElement('div');
   title.className = 'pop-title';
   title.textContent = 'Metronome';
-  const seg = (label, items, pref) => {
-    const box = document.createElement('div');
-    box.className = 'fp-group';
-    box.innerHTML = `<span class="fp-label"></span><div class="seg fret-seg" role="group"></div>`;
-    box.querySelector('.fp-label').textContent = label;
-    const group = box.querySelector('.seg');
-    for (const [value, text] of items) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.dataset.value = String(value);
-      b.textContent = text;
-      b.addEventListener('click', () => prefs.set(pref, value));
-      group.append(b);
-    }
-    return box;
-  };
-  const volume = document.createElement('label');
-  volume.className = 'pp-row met-volume';
-  volume.innerHTML = '<span>Volume</span><input type="range" min="0" max="100" step="5" aria-label="Metronome volume"><output></output>';
-  volume.querySelector('input').addEventListener('input', (e) => prefs.set('audio.metronomeVolume', Number(e.target.value)));
-  metPop.replaceChildren(title, seg('Status', [[true, 'On'], [false, 'Off']], 'audio.metronome'), volume, seg('Sound', itemById('audio.metronomeSound').options.map((o) => [o.value, o.label]), 'audio.metronomeSound'));
+  const row = document.createElement('div');
+  row.className = 'mix-row';
+  row.innerHTML = `<button class="stem-btn" type="button" aria-pressed="false"><svg><use href="#i-volume"/></svg></button>
+    <input type="range" min="0" max="100" step="5" value="50" aria-label="Metronome volume">
+    <span class="mix-val">50%</span>
+    <button class="icon small-icon reset" type="button" title="Reset volume" aria-label="Reset metronome volume"><svg><use href="#i-reset"/></svg></button>`;
+  const range = row.querySelector('input');
+  paintRange(range, 50);
+  range.addEventListener('input', () => {
+    const v = Number(range.value);
+    if (v === 0 && metVolume() > 0) metLastLevel = metVolume();
+    prefs.set('audio.metronomeVolume', v);
+    if (v > 0 && !prefs.get('audio.metronome')) prefs.set('audio.metronome', true); // moving the slider unmutes, like the mixer
+  });
+  row.querySelector('.stem-btn').addEventListener('click', toggleMetronome);
+  row.querySelector('.reset').addEventListener('click', () => { prefs.set('audio.metronomeVolume', 50); prefs.set('audio.metronome', true); });
+  const seg = document.createElement('div');
+  seg.className = 'fp-group';
+  seg.innerHTML = '<span class="fp-label">Sound</span><div class="seg fret-seg" role="group"></div>';
+  for (const o of itemById('audio.metronomeSound').options) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.value = o.value;
+    b.textContent = o.label;
+    b.addEventListener('click', () => prefs.set('audio.metronomeSound', o.value));
+    seg.querySelector('.seg').append(b);
+  }
+  metPop.replaceChildren(title, row, seg);
 }
 function syncMetPop() {
-  const state = { 'audio.metronome': prefs.get('audio.metronome'), 'audio.metronomeSound': prefs.get('audio.metronomeSound') };
-  const prefOf = (b) => (b.closest('.fp-group') === metPop.querySelectorAll('.fp-group')[0] ? 'audio.metronome' : 'audio.metronomeSound');
-  for (const b of metPop.querySelectorAll('.seg button')) b.setAttribute('aria-pressed', String(String(state[prefOf(b)]) === b.dataset.value));
-  const vol = prefs.get('audio.metronomeVolume');
-  metPop.querySelector('input').value = vol;
-  metPop.querySelector('output').textContent = `${vol}%`;
+  for (const b of metPop.querySelectorAll('.seg button')) b.setAttribute('aria-pressed', String(prefs.get('audio.metronomeSound') === b.dataset.value));
+  const vol = metVolume();
+  const off = !metSounding();
+  const row = metPop.querySelector('.mix-row');
+  const range = metPop.querySelector('input');
+  range.value = vol;
+  paintRange(range);
+  metPop.querySelector('.mix-val').textContent = `${vol}%`;
+  row.classList.toggle('muted', off);
+  const mute = row.querySelector('.stem-btn');
+  paintLevel(mute, { value: vol / 100, off, swapIcon: true });
+  mute.setAttribute('aria-pressed', String(off));
+  mute.title = off ? 'Unmute the metronome' : 'Mute the metronome';
+  mute.setAttribute('aria-label', mute.title);
+  row.querySelector('.reset').disabled = vol === 50 && !off;
 }
 popovers.push([els.metronomeBtn, metPop]);
 registerPopover(els.metronomeBtn, metPop);
@@ -3484,7 +3523,7 @@ function syncPausePanel() {
   if (!on) return;
   const speed = SETTING_FORMAT.speed(settings.speed);
   if (els.ppSpeed.textContent !== speed) els.ppSpeed.textContent = speed;
-  const met = prefs.get('audio.metronome');
+  const met = metSounding();
   if (els.ppMetronome.getAttribute('aria-pressed') !== String(met)) { els.ppMetronome.setAttribute('aria-pressed', String(met)); els.ppMetronome.textContent = met ? 'On' : 'Off'; }
   const vol = masterState.muted ? 0 : masterState.value;
   if (Number(els.ppVolume.value) !== vol && document.activeElement !== els.ppVolume) els.ppVolume.value = vol;
@@ -3492,7 +3531,7 @@ function syncPausePanel() {
 }
 els.ppSlower.addEventListener('click', () => stepSpeed(-1));
 els.ppFaster.addEventListener('click', () => stepSpeed(1));
-els.ppMetronome.addEventListener('click', () => prefs.set('audio.metronome', !prefs.get('audio.metronome')));
+els.ppMetronome.addEventListener('click', toggleMetronome);
 els.ppVolume.addEventListener('input', () => { masterState.value = Number(els.ppVolume.value); masterState.muted = false; applyStem(masterState); });
 els.ppResume.addEventListener('click', () => togglePlay());
 // A small note over the player for a moment (the speed after a shortcut).
@@ -3520,8 +3559,8 @@ function applyNotePalette() {
   highway.invalidate();
 }
 const EFFECTS = {
-  'audio.metronome': (v) => { metronome.setEnabled(v); paintMetronome(v); syncMetPop(); },
-  'audio.metronomeVolume': (v) => { metronome.setVolume(v); syncMetPop(); },
+  'audio.metronome': applyMetronome,
+  'audio.metronomeVolume': (v) => { metronome.setVolume(v); applyMetronome(); },
   'audio.metronomeSound': (v) => { metronome.setSound(v); syncMetPop(); },
   'practice.trainer': (v) => { if (!v) stopTrainer(); else if (!trainer) beginTrainer(); },
   'practice.trainerStart': () => paintTrainer(), 'practice.trainerTarget': () => paintTrainer(), 'practice.trainerStep': () => paintTrainer(), 'practice.trainerPasses': () => paintTrainer(),

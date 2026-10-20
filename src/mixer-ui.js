@@ -7,6 +7,7 @@ import { stemKind, stemBadge, stemGroup, stemGroupLabel } from './songinfo.js';
 import { parseVolumes, serializeVolumes, remember as rememberLevel, recall as recallLevel } from './volmemory.js';
 import { paintRange } from './range-ui.js';
 import { refreshTileVolumes } from './tiles-ui.js';
+import { paintLevel, isSolo } from './levelicon.js';
 
 const LONG_PRESS_MS = 500;
 // Master volume: one more mixer row (kept across songs) that scales every stem.
@@ -172,11 +173,13 @@ export function applyGroup(g) {
 
 export function renderGroup(g) {
   const muted = groupSilent(g);
+  const solo = isSolo(g.members, stemStates, silent);
   for (const v of g.views) {
     v.range.value = g.value;
     paintRange(v.range);
     v.val.textContent = `${Math.round(g.value * 100)}%`;
     v.row.classList.toggle('muted', muted);
+    paintLevel(v.mute, { value: g.value, off: muted, solo });
     v.mute.setAttribute('aria-pressed', String(muted));
     v.mute.title = `${g.label} (${g.members.length} tracks) — ${muted ? 'unmute' : 'mute'} (hold to solo)`;
     v.mute.setAttribute('aria-label', `${muted ? 'Unmute' : 'Mute'} ${g.label}`);
@@ -222,11 +225,14 @@ export function applyStem(st) {
     ctx.store.set('masterMuted', st.muted ? '1' : '0');
   } else if (st.owner === ctx.audioSong() || !ctx.audioSong()) ctx.player.setVolume(st.stem.id, effectiveVolume(st)); // (the sound of another song is not touched by this song's mixer)
   const off = st.master ? st.muted : silent(st);
+  const solo = !st.master && isSolo([st], stemStates, silent);
+  if (st.master) paintLevel(ctx.els.mixerBtn, { value: st.value, off: st.muted, swapIcon: true });
   for (const v of st.views) {
     v.range.value = st.value;
     paintRange(v.range);
     v.val.textContent = `${Math.round(st.value * 100)}%`;
     v.row.classList.toggle('muted', off);
+    paintLevel(v.mute, { value: st.value, off, solo, swapIcon: st.master });
     v.mute.setAttribute('aria-pressed', String(off));
     v.mute.title = `${st.stem.label} — ${off ? 'unmute' : 'mute'} (hold to solo)`;
     v.reset.disabled = st.value === 1 && !off; // already at the default

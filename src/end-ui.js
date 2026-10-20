@@ -5,9 +5,8 @@
 // Moved out of app.js as is; app.js injects what it needs through `initEndUi(ctx)`, called where `list.bindTip(els.endNext)` used to run.
 import { plainText } from './ini.js';
 import { chartFacts, factRows } from './songstats.js';
-import { recommend } from './recommend.js';
+import { recommendGroups } from './recommend.js';
 
-const NEXT_COUNT = 20;
 let ctx = null;
 let endShown = false;
 export const isEndShown = () => endShown;
@@ -70,7 +69,17 @@ export function buildEndScreen() {
   els.endCards.replaceChildren(...screen.map(endCard));
   els.endCards.hidden = screen.length === 0;
   const parts = [...new Set(screen.map((it) => (it.base === 'harmony' ? 'vocals' : it.base)))];
-  const picks = recommend(song, ctx.songs(), { count: NEXT_COUNT, instruments: parts });
-  els.endNext.replaceChildren(...picks.map((r) => endRow(r.song, r.reason)));
-  els.endNextBox.hidden = picks.length === 0;
+  const groups = recommendGroups(song, ctx.songs(), { instruments: parts, history: ctx.history?.() });
+  els.endNext.replaceChildren(...groups.map((g) => {
+    const box = document.createElement('section');
+    box.className = 'end-group';
+    const h = document.createElement('h4');
+    h.textContent = g.title;
+    const ul = document.createElement('ul');
+    ul.className = 'end-list';
+    ul.append(...g.items.map((it) => endRow(it.song, it.reason)));
+    box.append(h, ul);
+    return box;
+  }));
+  els.endNextBox.hidden = groups.length === 0;
 }

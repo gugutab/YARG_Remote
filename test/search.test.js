@@ -54,3 +54,10 @@ test('highlightRanges marks the matches ignoring accents, case and punctuation',
   assert.deepEqual(highlightRanges('abc', ['b', 'bc']), [[1, 3]]); // overlapping ranges merge
   assert.deepEqual(highlightRanges('abc', ['zzz', '']), []);
 });
+
+test('rankWithinGroups keeps the header runs and ranks inside each', async () => {
+  const { rankWithinGroups } = await import('../src/songlist.js');
+  const mk = (title, artist) => ({ id: title, title, artist, album: '', ini: {} });
+  const sorted = [mk('Big rock', 'Q'), mk('Rock big', 'Q'), mk('Zed rock', 'R')];
+  assert.deepEqual(rankWithinGroups(sorted, 'rock', 'artist').map((s) => s.title), ['Rock big', 'Big rock', 'Zed rock']);
+});

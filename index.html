@@ -30,6 +30,7 @@
       <symbol id="i-library" viewBox="0 0 24 24"><rect x="3.5" y="5" width="4" height="14" rx="1"/><rect x="9.5" y="5" width="4" height="14" rx="1"/><path d="M16.2 6.4l3.6-1 3 12.6-3.6 1z" transform="translate(-1.2 0)"/><path d="M3.5 9h4M9.5 9h4" opacity=".6"/></symbol>
       <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
       <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></symbol>
+      <symbol id="i-volume-low" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM15.5 9a4 4 0 0 1 0 6"/></symbol>
       <symbol id="i-volume-off" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5zM16 9.5l5 5M21 9.5l-5 5"/></symbol>
       <symbol id="i-metronome" viewBox="0 0 24 24"><path d="M9 3h6l3.5 18h-13zM12 16l4-9M10 12.5h4"/></symbol>
       <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 1 2.3 5.7M4 5v6h6"/></symbol>
@@ -167,8 +168,8 @@
           <div class="pop-wrap">
             <button id="settingsBtn" class="icon" type="button" title="Speed" aria-label="Speed" aria-expanded="false"><svg><use href="#i-speed"/></svg><span class="tool-val" id="speedVal"></span></button>
             <div class="popover" id="settingsPop" hidden>
-              <div class="pop-title">Settings</div>
-              <label class="row">Speed <input data-setting="speed" type="range" min="0.2" max="2" step="0.05" value="1"><output data-out="speed">1×</output><button class="icon small-icon reset" type="button" data-reset="speed" title="Reset" aria-label="Reset speed"><svg><use href="#i-reset"/></svg></button></label>
+              <div class="pop-title">Speed</div>
+              <label class="row"><svg class="row-icon" role="img" aria-label="Speed" focusable="false"><title>Speed</title><use href="#i-speed"/></svg><input data-setting="speed" type="range" min="0.2" max="2" step="0.05" value="1"><output data-out="speed">1×</output><button class="icon small-icon reset" type="button" data-reset="speed" title="Reset" aria-label="Reset speed"><svg><use href="#i-reset"/></svg></button></label>
             </div>
           </div>
               
@@ -281,7 +282,7 @@
               <div id="endCards" class="end-cards"></div>
               <div id="endNextBox" class="end-next" hidden>
                 <h3>Play next</h3>
-                <ul id="endNext" class="end-list"></ul>
+                <div id="endNext" class="end-groups"></div>
               </div>
             </div>
           </div>
@@ -304,6 +305,7 @@
             <div class="search">
             <svg><use href="#i-search"/></svg>
             <input id="search" type="search" placeholder="Search songs" aria-label="Search" title="Search title, artist or album. Fields: artist:  album:  genre:  charter:  year:1990-1999  len:&lt;4 (minutes)  inst:drums  no:vocals. A leading - excludes (-artist:queen).">
+            <button id="searchClear" class="icon search-clear" type="button" title="Clear the search" aria-label="Clear the search" hidden><svg><use href="#i-x"/></svg></button>
             <button id="filterBtn" class="icon filter-btn" type="button" title="Filters" aria-label="Filters" aria-expanded="false" aria-controls="filterPanel"><svg><use href="#i-filter"/></svg><span id="filterBadge" class="badge" hidden></span></button>
             </div>
             <div class="lib-right">

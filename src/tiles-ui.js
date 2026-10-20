@@ -2,6 +2,7 @@
 // of a tile (volume, neck speed, chart delay, view) and the small popup those tools open. Moved out of app.js as is: app.js injects its state
 // getters and functions through `initTilesUi(ctx)`, called where the tile popup used to be created (same DOM order, same listener order).
 // The chooser slots (`fillChooser`) and the stage menu (`buildPaneMenu`) stay in app.js and use the builders exported here.
+import { paintLevel, isSolo } from './levelicon.js';
 import { instrumentLevel, stemGroup } from './songinfo.js';
 import { paintRange } from './range-ui.js';
 
@@ -295,6 +296,12 @@ export function buildTileTools(group) {
   volume.refresh = () => { // (the stems may load after the tile was built: a song opened by a link)
     volume.disabled = !membersNow().length;
     text(volume, volText());
+    const owner = ctx.groupList().find((g) => g.members[0] && stemGroup(g.members[0].stem.label) === group.key) ?? membersNow()[0];
+    if (owner) {
+      const members = owner.members ?? [owner];
+      const silent = (st) => st.muted || Boolean(st.group?.muted);
+      paintLevel(volume, { value: owner.value, off: members.every(silent), solo: isSolo(members, ctx.stemStates(), silent), swapIcon: true });
+    }
   };
   volume.refresh();
   tileVolumeRefresh.add(volume);

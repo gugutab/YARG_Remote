@@ -75,3 +75,36 @@ test('the same title and artist is shown once and never as the current song', ()
   const list = recommend(cur, [mk('b', 'Smoke On The Water', 'Deep Purple'), mk('c', 'Child in Time', 'Deep Purple'), mk('d', 'Child in Time', 'Deep Purple')], { count: 5, instruments: ['guitar'] });
   assert.deepEqual(list.map((x) => x.song.title), ['Child in Time']);
 });
+
+import { recommendGroups } from '../src/recommend.js';
+
+test('recommendGroups: rows in order, no song twice, one per artist outside "Same artist", artist cap overall', () => {
+  const me = mk('P/me', 'Queen', { genre: 'Rock', year: 1978, diff_guitar: 3 });
+  const songs = [me];
+  for (let i = 0; i < 6; i++) songs.push(mk(`P/q${i}`, 'Queen', { genre: 'Rock', year: 1978, diff_guitar: 3 }));
+  for (let i = 0; i < 6; i++) songs.push(mk(`Q/b${i}`, 'Beta', { genre: 'Rock', year: 1976, diff_guitar: 3 }));
+  for (let i = 0; i < 4; i++) songs.push(mk(`R/c${i}`, `Art${i}`, { genre: 'Pop', year: 2010, diff_guitar: 1 }));
+  const rows = recommendGroups(me, songs, { instruments: ['guitar'], history: new Map([['P/q0', { last: 1, plays: 1 }]]) });
+  assert.equal(rows[0].title, 'Same artist');
+  assert.equal(rows[0].items.length, 4);
+  const ids = rows.flatMap((r) => r.items.map((i) => i.song.id));
+  assert.equal(new Set(ids).size, ids.length);
+  assert.ok(!ids.includes('P/me'));
+  const perArtist = new Map();
+  for (const id of ids) { const a = songs.find((s) => s.id === id).artist; perArtist.set(a, (perArtist.get(a) || 0) + 1); }
+  assert.ok(perArtist.get('Beta') <= 2);
+  for (const r of rows.slice(1)) {
+    const artists = r.items.map((i) => songs.find((s) => s.id === i.song.id).artist);
+    assert.equal(new Set(artists).size, artists.length, r.title);
+  }
+  assert.ok(rows.some((r) => r.title === 'Not played yet'));
+  assert.ok(rows.some((r) => r.title === 'Something different' && r.items.every((i) => i.song.ini.genre === 'Pop')));
+});
+
+test('recommendGroups: deterministic, empty library gives no rows, no history row without history', () => {
+  const me = mk('P/me', 'Queen', { genre: 'Rock' });
+  const songs = [me, mk('P/a', 'A', { genre: 'Rock' }), mk('P/b', 'B', { genre: 'Jazz' })];
+  assert.deepEqual(recommendGroups(me, songs), recommendGroups(me, songs));
+  assert.deepEqual(recommendGroups(me, [me]), []);
+  assert.ok(!recommendGroups(me, songs).some((r) => r.key === 'new'));
+});
