@@ -85,3 +85,14 @@ test('load / save through a storage; empty set removes the key; failures are sof
   assert.equal(loadFavourites(memory({ [FAVOURITES_KEY]: 'not json' })).size, 0);
   assert.equal(loadFavourites(null).size, 0);
 });
+
+test('star button state: aria-pressed and the label follow the favourite', async () => {
+  const { syncStarButton, FAV_LABELS } = await import('../src/virtuallist.js');
+  const attrs = {};
+  const btn = { setAttribute: (k, v) => { attrs[k] = v; }, title: '' };
+  syncStarButton(btn, true);
+  assert.deepEqual(attrs, { 'aria-pressed': 'true', 'aria-label': 'Remove from favourites' });
+  assert.equal(btn.title, FAV_LABELS.on);
+  syncStarButton(btn, false);
+  assert.deepEqual(attrs, { 'aria-pressed': 'false', 'aria-label': 'Favourite' });
+});

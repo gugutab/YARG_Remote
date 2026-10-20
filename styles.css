@@ -2715,7 +2715,7 @@ button.icon.small-icon.sp-reset, #ppSlower, #ppFaster { min-width: 32px; min-hei
 .fav-btn[aria-pressed="true"] { opacity: 1; color: var(--accent); }
 .fav-btn[aria-pressed="true"] svg { fill: currentColor; }
 .song-top .fav-btn { align-self: flex-start; }
-:is(#songs, #endNext) li.row.compact .fav-btn { margin-left: -2px; }
+:is(#songs, #endNext) li.row.compact .fav-btn { margin-left: auto; } /* at the right end of the one-line card */
 /* the details window header: a normal 32 px icon button before the close button */
 .info-top .info-fav { width: 32px; height: 32px; opacity: 1; color: var(--muted); }
 .info-top .info-fav::before { content: none; }
