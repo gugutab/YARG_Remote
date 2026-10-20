@@ -37,12 +37,22 @@ and the working conventions.
 - **Deep links:** `#/song/<id>` opens a song's details and `#/song/<id>/play` its chart. A `play?i=guitar:expert,bass:expert,drums-pro:expert,vocals`
   suffix (`#/song/<id>/play?i=...`) lists the instruments and difficulties on screen; the first one is the active one.
 - **Settings and themes:** the gear (or `,`) opens Settings: themes (presets and a studio), fonts, the library cards,
-  song details, panels, the highway (background visualizers, fretboard opacity, neck speed, countdowns), a performance overlay
+  song details, panels, the highway (notes, track and bands, countdowns, vocals, motion, background visualizers), a performance overlay
   and a settings backup (export / import / reset).
 - **Shortcuts:** all of them are editable in Settings -> Shortcuts, which also shows the defaults (play / pause, seek,
   sections, loop, fretboard windows, 2D / 3D, karaoke, visualizers, library, details, bar, full screen, settings).
 - **A-B loop:** the loop button (key `R`) starts a loop around the current section; drag its two handles on the seek bar
   (they snap to section starts) to adjust it.
+- **Speed trainer:** with an A-B loop on, Settings -> General -> Practice can raise the speed by itself (start, target, step and
+  passes per step); the speed popover has the switch and shows the progress.
+- **Notes and colours:** the rectangular notes are drawn after the note design (chrome caps, coloured body, base) and many
+  things are settings: note size and base, the note cut, beat lines, lane stripes, pad strength, solo / star power / fill / BRE bands
+  (the BRE pulse can be steady or off), sustain and kick bar sizes, lyric size, plus lane colour palettes (YARG, colour-blind safe,
+  high contrast, custom) and per-instrument defaults for the view, the note shape and the neck speed.
+- **Library:** star a song to filter by Starred, sort by Recently played / Most played (kept locally; Settings -> Library and cards
+  -> Remember what I played), and back up the favourites with the settings.
+- **Accessibility:** a live region announces the section and play state, the pane dots are tappable, settings can be reset per section,
+  and Settings -> Appearance -> Reduce motion (Auto / On / Off) follows the system by default.
 - **Environment variables** (server): `SONGS_DIR`, `PORT`, `HOST`, `CACHE_DIR` (see "Server with the library").
 - **Tests:** `npm test` (unit tests, no browser) and `npm run smoke` (the server end to end).
 
