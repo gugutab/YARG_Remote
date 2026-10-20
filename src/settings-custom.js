@@ -146,23 +146,37 @@ export function renderThemeStudio(host, { settings, prefersDark = () => true, no
   };
 }
 
-export function renderDataTools(host, { settings, extra = [], notify = () => {} }) {
+// `addons`: other local data carried in the same backup file under its own top-level key (older builds ignore unknown keys):
+// [{ key, export() -> JSON value, import(value) -> message }]. `extra` buttons may ask `confirm` first.
+export function renderDataTools(host, { settings, extra = [], addons = [], notify = () => {} }) {
   const status = el('p', { class: 'ts-hint', 'aria-live': 'polite' });
   const say = (m) => { status.textContent = m; notify(m); };
+  const exportText = () => {
+    if (!addons.length) return settings.exportJson();
+    const data = JSON.parse(settings.exportJson());
+    for (const a of addons) data[a.key] = a.export();
+    return JSON.stringify(data, null, 2);
+  };
   const buttons = [
-    el('button', { type: 'button', class: 'chip-btn', text: 'Export settings', onclick: () => { download('yarg-remote-settings.json', settings.exportJson()); say('Settings exported.'); } }),
+    el('button', { type: 'button', class: 'chip-btn', text: 'Export settings', onclick: () => { download('yarg-remote-settings.json', exportText()); say('Settings exported.'); } }),
     el('button', { type: 'button', class: 'chip-btn', text: 'Import settings…', onclick: async () => {
       const text = await pickFile('.json,application/json');
       if (text == null) return;
       try {
-        const { imported, skipped } = settings.importJson(text);
-        say(`Imported ${imported} settings${skipped ? ` (${skipped} skipped)` : ''}.`);
+        const { imported, skipped } = settings.importJson(text); // (throws on a file that is not a settings export)
+        const data = JSON.parse(text);
+        const more = [];
+        for (const a of addons) {
+          if (!Object.hasOwn(data, a.key)) continue;
+          try { more.push(a.import(data[a.key])); } catch (e) { more.push(e.message); }
+        }
+        say([`Imported ${imported} settings${skipped ? ` (${skipped} skipped)` : ''}.`, ...more].join(' '));
       } catch (e) { say(e.message); }
     } }),
     el('button', { type: 'button', class: 'chip-btn danger', text: 'Reset all settings', onclick: () => {
       if (window.confirm('Reset every setting to its default?')) { settings.resetAll(); say('All settings are back to their defaults.'); }
     } }),
-    ...extra.map((x) => el('button', { type: 'button', class: 'chip-btn', text: x.label, title: x.help, onclick: async () => say(await x.run()) })),
+    ...extra.map((x) => el('button', { type: 'button', class: 'chip-btn', text: x.label, title: x.help, onclick: async () => { if (!x.confirm || window.confirm(x.confirm)) say(await x.run()); } })),
   ];
   host.append(el('div', { class: 'ts-actions' }, buttons), status);
   return () => {};

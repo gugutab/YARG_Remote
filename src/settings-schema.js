@@ -44,12 +44,13 @@ export const SECTIONS = [
     description: 'How the song list looks and what each card shows.',
     items: [
       { id: 'library.cardStyle', group: 'List', type: 'choice', label: 'Card style', options: [{ value: 'compact', label: 'Compact' }, { value: 'normal', label: 'Normal' }, { value: 'large', label: 'Large' }], default: 'normal' },
-      { id: 'library.sort', group: 'List', type: 'choice', label: 'Sort by', options: [{ value: 'title', label: 'Title' }, { value: 'artist', label: 'Artist' }, { value: 'album', label: 'Album' }, { value: 'pack', label: 'Pack' }, { value: 'year', label: 'Year' }, { value: 'length', label: 'Length' }], default: 'title', help: 'Also changes when you use the sort menu in the library.' },
+      { id: 'library.sort', group: 'List', type: 'choice', label: 'Sort by', options: [{ value: 'title', label: 'Title' }, { value: 'artist', label: 'Artist' }, { value: 'album', label: 'Album' }, { value: 'pack', label: 'Pack' }, { value: 'year', label: 'Year' }, { value: 'length', label: 'Length' }, { value: 'recent', label: 'Recently played' }, { value: 'plays', label: 'Most played' }], default: 'title', help: 'Also changes when you use the sort menu in the library. Songs never played come last in Recently played and Most played.' },
       { id: 'library.sortDesc', group: 'List', type: 'toggle', label: 'Reverse the order', default: false },
       { id: 'library.columns', group: 'List', type: 'choice', label: 'Columns', help: 'Auto adds columns as soon as two cards fit.', options: [{ value: 'auto', label: 'Auto' }, { value: 1, label: '1' }, { value: 2, label: '2' }, { value: 3, label: '3' }, { value: 4, label: '4' }], default: 'auto' },
       { id: 'library.searchRelevance', group: 'List', type: 'toggle', label: 'Best match first while searching', help: 'With text in the search box, the closest matches (title first, then artist and album) come first instead of the chosen sort.', default: true, keywords: 'search relevance order rank' },
       { id: 'library.dividers', group: 'List', type: 'toggle', label: 'Group headers', help: 'A heading for each letter, artist, pack, decade or length range.', default: true, keywords: 'divider section' },
       { id: 'library.rail', group: 'List', type: 'toggle', label: 'Scroll index', help: 'The strip with letters and ticks next to the scrollbar.', default: true, keywords: 'rail scrollbar' },
+      { id: 'library.history', group: 'List', type: 'toggle', label: 'Remember what I played', help: 'Keeps, in this browser only, when you last played each song and how many times (a play is 10 seconds or more of the chart). Used by the Recently played and Most played sorts and shown in the song details. Clear it in Data and backup.', default: true, keywords: 'history recent played plays count practice log' },
       { id: 'library.thumbs', group: 'Size', type: 'toggle', label: 'Album covers', help: 'Normal and large cards.', default: true, keywords: 'thumbnails images' },
       { id: 'library.cardScale', group: 'Size', type: 'range', label: 'Card size', help: 'Cover size and spacing of the cards.', min: 70, max: 140, step: 5, unit: '%', default: 100 },
       { id: 'library.iconSize', group: 'Size', type: 'range', label: 'Instrument icons', min: 12, max: 24, step: 1, unit: 'px', default: 15 },
@@ -184,7 +185,7 @@ export const SECTIONS = [
     id: 'data', title: 'Data and backup', icon: 'database',
     description: 'Export your settings, move them to another browser, or start over.',
     items: [
-      { id: 'data.tools', type: 'custom', ids: [], label: 'Settings backup', keywords: 'export import reset backup restore default clear cache' },
+      { id: 'data.tools', type: 'custom', ids: [], label: 'Settings backup', keywords: 'export import reset backup restore default clear cache favourites starred history' },
     ],
   },
 ];
