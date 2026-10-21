@@ -3118,6 +3118,16 @@ const toggleBar = () => setBarHeight(currentBarHeight() > BAR_MIN ? BAR_MIN : nu
     if (!barPeek) { if (!open || !peekCan()) return; peekSet(true); }
     peekArm();
   };
+  // The "card" of the bar: its box and the handle strip next to the stage, not the seek bar itself (a click there must seek, not open the bar).
+  const overBarBackground = (x, y) => {
+    const tb = document.getElementById('topbar').getBoundingClientRect();
+    const sk = els.seekbox.getBoundingClientRect();
+    const strip = 20; // (the zone reaches this far over the stage, where the handle is)
+    const top = barBottom() ? tb.top - strip : tb.top;
+    const bottom = barBottom() ? Math.max(tb.bottom, innerHeight) : tb.bottom + strip;
+    if (y < top || y > bottom) return false;
+    return !(y >= sk.top && y <= sk.bottom && x >= sk.left && x <= sk.right);
+  };
   let lastMove = 0;
   let lastRealMove = 0;
   let lastX = -1, lastY = -1;
@@ -3135,6 +3145,7 @@ const toggleBar = () => setBarHeight(currentBarHeight() > BAR_MIN ? BAR_MIN : nu
     lastRealMove = e.timeStamp;
     if (e.timeStamp - lastMove < 80) return;
     if (!barPeek && (moved < 6 || e.timeStamp - peekClosedAt < 500)) return;
+    if (!barPeek && player.playing && !overBarBackground(e.clientX, e.clientY)) return; // while the song plays only the background of the bar opens it; paused or stopped, any movement does
     lastMove = e.timeStamp;
     peekActivity(true);
   }, { passive: true });
