@@ -698,8 +698,7 @@ export function rebuildYNote(cut = YNOTE_CUT) {
   ynShared = null; // (capV starts at the top row)
   bodyGradients.clear(); // (so does every body gloss)
   ynSprites.clear(); // (and every cached note picture)
-  yn3Sprites.clear();
-  yn3Px = 0;
+  for (const p of yn3Pages) yn3Empty(p);
   return c;
 }
 
@@ -802,8 +801,10 @@ function bodyGradient(g, color) {
   return gr;
 }
 const ynSprites = new Map(); // cached flat notes (ynSprite)
-const yn3Sprites = new Map(); // cached 3D notes (ynSprite3D)
-let yn3Px = 0; // (their pixels)
+const yn3Sprites = new Map(); // cached 3D notes (ynSprite3D): key -> { page, sx, sy, X, Y }
+const yn3Pages = []; // (their atlas pages, see sprite3D)
+let yn3Cur = null; // the page being filled
+let yn3Use = 0; // (a counter: the page with the lowest last use is emptied first)
 rebuildYNote(YNOTE_CUT); // (after the gradient caches it resets exist)
 
 // Draws a rectangular note centred at (x, y) with half width hw and half height hh (the box of the 'ynote' outline). `bodyColor` is the body's flat colour (lane
@@ -830,11 +831,12 @@ export function drawYNote(g, x, y, hw, hh, n, laneColor, bodyColor, taper = 0, s
 // (half width in device px rounded to a power of YN3_STEP) at YN3_SS times that size, then drawn scaled to the exact size and sub-pixel place with
 // drawImage (bilinear). Unlike the flat sprites this resamples: edges differ from the direct path by up to ~1/4 of their contrast on a few pixels.
 // The detail level (parts dropped under 24 / 16 / 9 px) follows the note's real size, so it is part of the key. Same canvas-state conditions as ynSprite.
-// When it holds YN3_MAX sprites or YN3_MAX_PX pixels it drops the least recently used ones; cleared when the note's cut changes. Cymbal discs use it too (sprite3D).
+// Kept in atlas pages (see sprite3D) whose least recently used one is emptied when all are full; cleared when the note's cut changes. Cymbal discs use it too (sprite3D).
 const YN3_STEP = 1.05;
 const YN3_SS = 2;
-const YN3_MAX = 2000;
-const YN3_MAX_PX = 12e6; // (~48 MB; Highway Star played through, 3 panes at 1300x760: ~1070 sprites, 4 M px; 2 panes at 1920x1080: ~800, 7.5 M px)
+const YN3_PAGE = 1024; // side of an atlas page (see sprite3D)
+const YN3_PAGES = 12; // (~48 MB; Highway Star played through, 3 panes at 1300x760: ~1070 sprites, 4 M px; 2 panes at 1920x1080: ~800, 7.5 M px)
+const YN3_GAP = 2; // px between pictures in a page (each also has a 3 px transparent margin: no bilinear bleed from a neighbour)
 const LOG_YN3_STEP = Math.log(YN3_STEP);
 function ynSprite3D(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side, maxPx) {
   if (!(hw < maxPx)) return false; // (a cheap first test in note units)
@@ -852,6 +854,10 @@ function ynSprite3D(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side, maxPx
 // A cached picture of a 3D shape that scales uniformly with the road (see above). `r` is its half width in canvas units, `key` names everything but its
 // size, (ex, ey) is its half extent around (x, y) in units of r, and draw(sg) draws it centred on (0, 0) of sg at the caller's size. False (nothing drawn)
 // when its half width is maxPx device px or more, or the transform is not a plain scale + translate.
+// The pictures live in a few shared atlas pages (YN3_PAGE px square, packed in rows) rather than one canvas each: the GPU canvas batches
+// consecutive drawImage calls from the same source into one draw, so a dense frame's ~100 heads cost about half as much (a separate canvas per
+// picture is a texture switch per note). When YN3_PAGES pages are full, the least recently used page is emptied and reused (its pictures are
+// drawn again when next needed). A picture larger than a page (only with highway.fast3dNotes, the nearest notes of a big window) is drawn directly.
 export function sprite3D(g, x, y, r, maxPx, key, ex, ey, draw) {
   if (!(r < maxPx)) return false;
   const m = g.getTransform();
@@ -862,29 +868,56 @@ export function sprite3D(g, x, y, r, maxPx, key, ex, ey, draw) {
   const f = (Math.exp(bi * LOG_YN3_STEP) * YN3_SS) / rd; // sprite px per device px
   const fullKey = `${key}|${desat ? 1 : 0}|${bi}|${Math.round((m.d * 1e4) / m.a)}`;
   let sp = yn3Sprites.get(fullKey);
-  if (sp) { // (most recently used last: the oldest go first when the cache is full)
-    yn3Sprites.delete(fullKey);
-    yn3Sprites.set(fullKey, sp);
-  } else {
+  if (!sp) {
     const X = Math.ceil(ex * rd * f) + 3;
     const Y = Math.ceil(ey * r * m.d * f) + 3;
-    const canvas = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(2 * X, 2 * Y) : Object.assign(document.createElement('canvas'), { width: 2 * X, height: 2 * Y });
-    const sg = canvas.getContext('2d');
-    sg.setTransform(m.a * f, 0, 0, m.d * f, X, Y);
+    const page = yn3Alloc(2 * X, 2 * Y);
+    if (!page) return false;
+    const sx = page.x, sy = page.y;
+    page.x += 2 * X + YN3_GAP;
+    const sg = page.g;
+    sg.save();
+    sg.beginPath();
+    sg.rect(sx, sy, 2 * X, 2 * Y); // (nothing spills into the neighbours)
+    sg.clip();
+    sg.setTransform(m.a * f, 0, 0, m.d * f, sx + X, sy + Y);
     draw(sg);
-    for (const [k, old] of yn3Sprites) { // (a full cache drops its least recently used pictures, not all of them at once)
-      if (yn3Sprites.size < YN3_MAX && yn3Px < YN3_MAX_PX) break;
-      yn3Sprites.delete(k);
-      yn3Px -= old.px;
-    }
-    sp = { canvas, X, Y, px: 4 * X * Y };
+    sg.restore();
+    sp = { page, sx, sy, X, Y };
+    page.keys.push(fullKey);
     yn3Sprites.set(fullKey, sp);
-    yn3Px += sp.px;
   }
+  sp.page.used = ++yn3Use;
   g.setTransform(1, 0, 0, 1, 0, 0);
-  g.drawImage(sp.canvas, m.a * x + m.e - sp.X / f, m.d * y + m.f - sp.Y / f, (2 * sp.X) / f, (2 * sp.Y) / f);
+  g.drawImage(sp.page.canvas, sp.sx, sp.sy, 2 * sp.X, 2 * sp.Y, m.a * x + m.e - sp.X / f, m.d * y + m.f - sp.Y / f, (2 * sp.X) / f, (2 * sp.Y) / f);
   g.setTransform(m);
   return true;
+}
+// Room for a w x h picture: the current page, moved to its next row when the row is full; a new page (or the least recently used one, emptied)
+// when the page is full. Returns the page with x, y at the free spot (the caller advances x), or null when the picture is larger than a page.
+function yn3Alloc(w, h) {
+  if (w > YN3_PAGE || h > YN3_PAGE) return null;
+  let p = yn3Cur;
+  if (p && p.x + w > YN3_PAGE) { p.x = 0; p.y += p.rowH + YN3_GAP; p.rowH = 0; }
+  if (!p || p.y + h > YN3_PAGE) {
+    if (yn3Pages.length < YN3_PAGES) {
+      const canvas = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(YN3_PAGE, YN3_PAGE) : Object.assign(document.createElement('canvas'), { width: YN3_PAGE, height: YN3_PAGE });
+      p = { canvas, g: canvas.getContext('2d'), x: 0, y: 0, rowH: 0, used: 0, keys: [] };
+      yn3Pages.push(p);
+    } else {
+      p = yn3Pages.reduce((a, b) => (b.used < a.used ? b : a));
+      yn3Empty(p);
+    }
+    yn3Cur = p;
+  }
+  p.rowH = Math.max(p.rowH, h);
+  return p;
+}
+function yn3Empty(p) {
+  for (const k of p.keys) yn3Sprites.delete(k);
+  p.keys.length = 0;
+  p.x = p.y = p.rowH = 0;
+  p.g.clearRect(0, 0, YN3_PAGE, YN3_PAGE);
 }
 
 // Sprites of flat notes. A note is ~13 gradient fills and ~10 polygons; in 2D every note of one kind in one lane has the same size, so it is drawn once into a
