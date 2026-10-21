@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, NOTE_RECT_W, NOTE_RECT_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, HIT_LINE_COLOR, HIT_LINE_BORDER, HIT_LINE_BORDER_SOFT, drawHitBurst, BURST_SEC, BURST_LOOP_SEC, BURST_VANISH_SEC, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, setDesaturated, isDesaturated, dcol, desaturate, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, HIT_LINE_COLOR, HIT_LINE_BORDER, HIT_LINE_BORDER_SOFT, drawHitBurst, BURST_SEC, BURST_LOOP_SEC, BURST_VANISH_SEC, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
 
@@ -30,16 +30,16 @@ const ROLL_TYPES = Object.keys(ROLL_COLORS);
 const HOPO_DOT = 'rgba(255,255,255,0.9)'; // the alpha of a HOPO dot while its note has not been hit yet (0.9 * (1 - 0))
 
 // The metal edge under a cymbal disc (rectangular style): one vertical gradient from 0 to 1 per variant (plain, star power), built once.
-const discEdges = [null, null];
+const discEdges = [null, null, null]; // (plain, star power, star power desaturated)
 function discEdgeGradient(g, sp) {
-  const i = sp ? 1 : 0;
+  const i = sp ? (isDesaturated() ? 2 : 1) : 0;
   if (!discEdges[i]) {
     const edge = g.createLinearGradient(0, 0, 0, 1);
-    const m = sp ? ['#f0d060', '#a37c00', '#3d2e00'] : ['#d4dae1', '#7f8893', '#30353b'];
+    const m = sp ? ['#f0d060', '#a37c00', '#3d2e00'].map(i === 2 ? desaturate : (c) => c) : ['#d4dae1', '#7f8893', '#30353b'];
     edge.addColorStop(0, m[0]);
     edge.addColorStop(0.45, m[1]);
     edge.addColorStop(0.75, m[2]);
-    edge.addColorStop(1, sp ? 'rgba(61,46,0,0.35)' : 'rgba(48,53,59,0.35)'); // the metal fades into the road at the bottom: depth
+    edge.addColorStop(1, sp ? (i === 2 ? withAlpha(desaturate('#3d2e00'), 0.35) : 'rgba(61,46,0,0.35)') : 'rgba(48,53,59,0.35)'); // the metal fades into the road at the bottom: depth
     discEdges[i] = edge;
   }
   return discEdges[i];
@@ -351,7 +351,7 @@ export function renderLanes3D(hw, t, w, h) {
   // rails, and a bar that thins out as it fades.
   for (let i = end - 1; i >= from; i--) {
     const n = notes[i];
-    g.filter = hw.disabledNote(n) ? DISABLED_FILTER : 'none'; // disabled notes lose their colour
+    setDesaturated(hw.disabledNote(n)); // disabled notes lose their colour
     if (n.lane >= 0 && !n.open) continue;
     const past = t - exitTime(n);
     if (past > FADE_SEC) continue;
@@ -367,7 +367,7 @@ export function renderLanes3D(hw, t, w, h) {
     if (kx > 0) { // glow: a wider, taller, translucent copy that spreads past the rails
       g.globalAlpha = 0.55 * (1 - kx) * (1 - kx) * far;
       g.globalCompositeOperation = 'lighter'; // additive, so the glow lights the road instead of greying it
-      g.fillStyle = base;
+      g.fillStyle = dcol(base);
       quad(g, d - GLOW_DEPTH * (0.6 + 1.6 * e), d + GLOW_DEPTH * (0.6 + 1.6 * e), -half - 0.12 * e, half + 0.12 * e);
       g.fill();
       g.globalCompositeOperation = 'source-over';
@@ -386,7 +386,7 @@ export function renderLanes3D(hw, t, w, h) {
       const y1 = PVY + (PHIT - PVY) * s1 + (d1 > 0 ? PC * d1 * d1 : 0);
       const y0 = PVY + (PHIT - PVY) * s0 + (d0 > 0 ? PC * d0 * d0 : 0);
       g.lineWidth = Math.max(1, 2 * s1);
-      g.strokeStyle = n.activation && hw.fillActivation ? FILL_ACTIVATION : tintWhite(base, 0.65); // (a fill's activation kick: a bright far edge)
+      g.strokeStyle = n.activation && hw.fillActivation ? dcol(FILL_ACTIVATION) : tintWhite(base, 0.65); // (a fill's activation kick: a bright far edge)
       g.beginPath();
       g.moveTo(PCX + -half * PLANE * s1, y1);
       g.lineTo(PCX + half * PLANE * s1, y1);
@@ -403,7 +403,7 @@ export function renderLanes3D(hw, t, w, h) {
   // sustains
   for (let vi = from; vi < end; vi++) {
     const n = notes[vi];
-    g.filter = hw.disabledNote(n) ? DISABLED_FILTER : 'none'; // disabled notes lose their colour
+    setDesaturated(hw.disabledNote(n)); // disabled notes lose their colour
     if (!n.length || n.lane < 0) continue;
     const dTop = depth(n.time + n.length);
     const dBot = depth(Math.max(n.time, t));
@@ -459,7 +459,7 @@ export function renderLanes3D(hw, t, w, h) {
   // heads, far to near so closer ones cover farther ones
   for (let i = end - 1; i >= from; i--) {
     const n = notes[i];
-    g.filter = hw.disabledNote(n) ? DISABLED_FILTER : 'none'; // disabled notes lose their colour
+    setDesaturated(hw.disabledNote(n)); // disabled notes lose their colour
     if (n.lane < 0 || n.open) continue;
     const past = t - exitTime(n); // long notes: the exit starts when the tail ends
     const fadeSec = hw.hitAnimation === 'burst' ? BURST_VANISH_SEC : FADE_SEC; // (the burst: the note vanishes quickly)
@@ -539,7 +539,7 @@ export function renderLanes3D(hw, t, w, h) {
     if (n.activation && hw.fillActivation) drawActivationMark(g, x, y, rx, ry, p, t);
   }
   g.globalAlpha = 1;
-  g.filter = 'none';
+  setDesaturated(false);
   if (hw.hitLine) { // a fixed bar across the road at the hit line, drawn over the notes and the tails (they pass underneath), as thick as the pedal / open bars, in the colour of each lane (it lights when a note is hit), with a fixed border at each end; the pads are not drawn
     for (let i = 0; i < lanes; i++) {
       g.fillStyle = tintWhite(colors[i], 0.3 + 0.45 * Math.max(flash[i], barFlash)); // the note's colour under a white overlay (whiter while the lane is hit)

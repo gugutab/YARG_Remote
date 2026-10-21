@@ -17,7 +17,7 @@ export const TAP_COLOR = '#b25cff';
 export const ACCENT_OUTLINE_WIDTH = 4;
 export const ACCENT_OUTLINE_DARKEN = 0.55; // multiplier applied to the note colour for the accent outline
 export const GHOST_ALPHA = 0.65;
-export const DISABLED_FILTER = 'saturate(0.06)'; // canvas filter of the disabled notes (a replayed stretch, what follows a loop): almost no colour
+export const DISABLED_SATURATION = 0.06; // the disabled notes (a replayed stretch, what follows a loop) keep this much of their colour (desaturate / setDesaturated; a canvas filter made every draw call an offscreen pass)
 export const ROLL_COLORS = {
   kick: 'rgba(242,134,30,0.14)',
   tremolo: 'rgba(63,191,63,0.14)',
@@ -123,11 +123,36 @@ export function firstIndexAtOrAfter(notes, time) {
 // one of the things behind micro-stutters. The steps are fine enough to be invisible.
 const colorCache = [new Map(), new Map(), new Map()];
 function cachedColor(kind, hex, amount, steps, build) {
+  if (desat) hex = desaturate(hex, DISABLED_SATURATION);
   let row = colorCache[kind].get(hex);
   if (!row) { row = []; colorCache[kind].set(hex, row); }
   const q = Math.round(Math.min(1, Math.max(0, amount)) * steps);
   return row[q] ?? (row[q] = build(hex, q / steps));
 }
+
+// Desaturation without a canvas filter: the same matrix as CSS saturate(s) (Rec.709 luma weights, sRGB values), per colour, cached.
+// While setDesaturated(true) is on, every colour helper below (tintWhite / darken / withAlpha, the halos, the note sprites' gold, cymbal faces) works on the
+// desaturated colour, so a disabled note is drawn the normal way (no per-note filter) and looks like saturate(0.06) did.
+let desat = false;
+export function setDesaturated(on) { desat = !!on; }
+export const isDesaturated = () => desat;
+const desatCache = new Map();
+function buildDesat(hex, s) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255, gg = (n >> 8) & 255, b = n & 255;
+  const L = 0.213 * r + 0.715 * gg + 0.072 * b;
+  const m = (c) => Math.max(0, Math.min(255, Math.round(L + (c - L) * s)));
+  return '#' + [m(r), m(gg), m(b)].map((c) => c.toString(16).padStart(2, '0')).join('');
+}
+export function desaturate(hex, amount = DISABLED_SATURATION) {
+  let row = desatCache.get(hex);
+  if (!row) { row = new Map(); desatCache.set(hex, row); if (desatCache.size > 512) { desatCache.clear(); desatCache.set(hex, row); } }
+  let c = row.get(amount);
+  if (c === undefined) row.set(amount, (c = buildDesat(hex, amount)));
+  return c;
+}
+// The colour to draw with while desaturating (a plain #rrggbb), else as it is.
+export const dcol = (hex) => (desat ? desaturate(hex) : hex);
 // (the builders are module functions: an arrow written inside tintWhite/darken/withAlpha was a new closure on every call)
 const buildTint = (h, a) => {
   const n = parseInt(h.slice(1), 16);
@@ -191,6 +216,7 @@ export function heldAmount(n, t) {
 // Radial halo: fills a circle of radius `outer` around (0, 0) that is strongest near `inner` and fades to nothing at the
 // edge. `color` is a #rrggbb string. The caller positions/scales the context (an ellipse is a scaled circle).
 export function fillHalo(g, color, inner, outer, strength) {
+  if (desat) color = desaturate(color);
   // The gradient does not depend on the strength (that is the global alpha), so it is built once per colour and size, not per note per frame.
   // (Looked up by colour, then by size in a short list: a string key built from the numbers was garbage for every halo on every frame.)
   let entries = haloGradients.get(color);
@@ -242,6 +268,7 @@ function hexRgb(color) {
 // Halo beside a tail (2D): a horizontal gradient, strongest at the strip's edges and fading out over `reach` px.
 // Draws from yTop to yBot, plus a rounded cap above yTop (the same falloff, as a half circle).
 export function fillTailHalo(g, color, cx, half, reach, yTop, yBot, strength, withCap) {
+  if (desat) color = desaturate(color);
   // The gradients are built around x = 0 with the strength left to the global alpha, then cached per colour and size: a tail's halo
   // is the same shape every frame, only its position (a translate) and strength change.
   // (looked up by colour, then by size in a short list: a string key built from the numbers was garbage for every held tail on every frame)
@@ -311,7 +338,7 @@ export function drawActivationMark(g, cx, cy, rx, ry, lw, t) {
   g.beginPath();
   g.ellipse(cx, cy, rx * 1.3, ry * 1.3, 0, 0, Math.PI * 2);
   g.lineWidth = 5 * lw;
-  g.strokeStyle = FILL_ACTIVATION;
+  g.strokeStyle = dcol(FILL_ACTIVATION);
   g.globalAlpha *= 0.55;
   g.stroke();
   g.globalAlpha /= 0.55;
@@ -717,7 +744,9 @@ function capProfile(pal) {
 }
 const CAP_CHROME = { fill: '#2a2a2a', outer: '#0e0e0e', ridge: '#7a7a7a', light: '#bdbdbd', white: '#f4f4f4', inner: '#1a1a1a' };
 const CAP_GOLD = { fill: '#3a2c00', outer: '#140e00', ridge: '#a77d00', light: '#e8b923', white: '#fff3b8', inner: '#241a00' };
-const CAP_STOPS = [capProfile(CAP_CHROME), capProfile(CAP_GOLD)];
+const goldDesat = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, desaturate(v)]));
+const CAP_STOPS = [capProfile(CAP_CHROME), capProfile(CAP_GOLD), capProfile(goldDesat(CAP_GOLD))]; // (the third: star power's gold when desaturated)
+const goldIndex = (sp) => (sp ? (desat ? 2 : 1) : 0);
 
 // Gradients in design units (they scale with the transform): built once; the base ones per `side`, the body ones per colour.
 let ynShared = null;
@@ -745,7 +774,9 @@ function ynGradients(g, side, gold) {
     const fr = 3.4 * Math.max(0.5, side); // half height of the floor shadow
     const shadow = linGrad(g, 0, fy - fr, 0, fy + fr, [[0, 'rgba(0,0,0,0)'], [0.5, 'rgba(0,0,0,0.55)'], [1, 'rgba(0,0,0,0)']]);
     // the top face's dark line at row 88 is the design's contact shadow under the body
-    pair = [['#141414', '#0c0c0c', '#4a4a4a', ['#23272b', '#5e646c', '#8d939b', '#3a3e43', '#121416']], ['#1c1600', '#120e00', '#5a4a14', ['#2a2200', '#6a5415', '#98801f', '#3c3008', '#120d00']]].map((c) => ({
+    const gold = ['#1c1600', '#120e00', '#5a4a14', ['#2a2200', '#6a5415', '#98801f', '#3c3008', '#120d00']];
+    const goldD = [...gold.slice(0, 3).map((c) => desaturate(c)), gold[3].map((c) => desaturate(c))];
+    pair = [['#141414', '#0c0c0c', '#4a4a4a', ['#23272b', '#5e646c', '#8d939b', '#3a3e43', '#121416']], gold, goldD].map((c) => ({
       top: linGrad(g, 0, Math.min(top0, top1 - 0.01), 0, top1, [[0, c[0]], [0.7, c[1]], [1, c[2]]]),
       front: linGrad(g, 0, top1, 0, Math.max(front1, top1 + 0.01), c[3].map((col, i) => [[0, 0.3, 0.55, 0.8, 1][i], col])),
       shadow, fy, fr,
@@ -753,7 +784,7 @@ function ynGradients(g, side, gold) {
     if (ynBase.size >= 8) ynBase.clear();
     ynBase.set(side, pair);
   }
-  return pair[gold ? 1 : 0];
+  return pair[gold];
 }
 // The body's gloss for one flat colour, after the design's green (#79d304 -> #4f8f06 .. #6fb80e .. #9df22c .. #86dc1c .. #6cb80f .. #4c8a06): darker at the
 // top and bottom, a brighter band a little above the middle (added, so the hue stays saturated). `color` is #rrggbb or rgb(r,g,b).
@@ -785,7 +816,7 @@ rebuildYNote(YNOTE_CUT); // (after the gradient caches it resets exist)
 let fast3d = false;
 export function setFast3dNotes(on) { fast3d = !!on; }
 export function drawYNote(g, x, y, hw, hh, n, laneColor, bodyColor, taper = 0, side = 1, cacheable = false) {
-  if (cacheable && g.globalAlpha === 1 && g.filter === 'none' && g.globalCompositeOperation === 'source-over' && typeof g.getTransform === 'function'
+  if (cacheable && !desat && g.globalAlpha === 1 && g.filter === 'none' && g.globalCompositeOperation === 'source-over' && typeof g.getTransform === 'function'
     && (taper === 0 ? ynSprite(g, x, y, hw, hh, n, laneColor, bodyColor, side) : fast3d && ynSprite3D(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side))) return;
   drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side);
 }
@@ -880,7 +911,7 @@ function ynSprite(g, x, y, hw, hh, n, laneColor, bodyColor, side) {
 function drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side) {
   const k = taper * (hh / YN_HH); // taper per design unit of row
   const detail = hw >= 24 ? 2 : hw >= 9 ? 1 : 0; // the small parts only where they have pixels to live in
-  const base = ynGradients(g, side, n.sp);
+  const base = ynGradients(g, side, goldIndex(n.sp));
   const S = ynShared;
   g.save();
   g.translate(x, y - ((YT - YN_CY + YN_BASE_V) / 2) * (hh / YN_HH)); // (the middle of the cut note's face on the note's position)
@@ -906,7 +937,7 @@ function drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side) 
   g.beginPath();
   traceYN(g, YN_BODY, 1, k, side);
   const dark = n.tap || n.ghost;
-  g.fillStyle = bodyGradient(g, dark && n.sp ? laneColor : bodyColor);
+  g.fillStyle = bodyGradient(g, dark && n.sp ? dcol(laneColor) : bodyColor);
   g.fill();
   if (dark || n.hopo || n.accent) {
     g.beginPath();
@@ -920,7 +951,7 @@ function drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side) 
   g.fillStyle = S.ends;
   g.fill();
   // the two chrome (gold for star power) caps: the profile across the cap, sheared along the ridge slab by slab (one piece, along the middle stretch, when small)
-  g.fillStyle = S.cap[n.sp ? 1 : 0];
+  g.fillStyle = S.cap[goldIndex(n.sp)];
   const slabs = detail === 2;
   for (let m = -1; m <= 1; m += 2) {
     const sg = m; // m = 1 is the design's left cap, -1 the mirrored right one (the profile is mirrored with it)
@@ -957,7 +988,7 @@ function drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side) 
 // a coloured ring). Call it with the disc's outline (an ellipse of half sizes rx / ry at x, y) as the current path.
 // Its gradients are built once in unit space (radius 1) and drawn under a scale, with the path added after the scale in unit coordinates (adding it
 // before the scale and filling under it rasterizes the edges a little differently in Chromium; this way the pixels are the same as before).
-let cymbalGrads = null; // { chrome: [plain, gold], cone }
+let cymbalGrads = null; // { chrome: [plain, gold, gold desaturated], cone }
 function cymbalGradients(g) {
   if (!cymbalGrads) {
     const chrome = (c) => {
@@ -968,7 +999,7 @@ function cymbalGradients(g) {
     const cone = g.createRadialGradient(-0.25, -0.3, 0, 0, 0, 1);
     cone.addColorStop(0, 'rgba(255,255,255,0.6)');
     cone.addColorStop(1, 'rgba(0,0,0,0.12)');
-    cymbalGrads = { chrome: [chrome(['#eef2f6', '#9aa3ad', '#e3e9f0', '#2e3237']), chrome(['#fff0a0', '#b88a00', '#ffe27a', '#3d2e00'])], cone };
+    cymbalGrads = { chrome: [chrome(['#eef2f6', '#9aa3ad', '#e3e9f0', '#2e3237']), chrome(['#fff0a0', '#b88a00', '#ffe27a', '#3d2e00']), chrome(['#fff0a0', '#b88a00', '#ffe27a', '#3d2e00'].map((c) => desaturate(c)))], cone };
   }
   return cymbalGrads;
 }
@@ -988,7 +1019,7 @@ export function drawCymbalFace(g, x, y, rx, ry, n, laneColor) {
   g.clip();
   g.translate(x, y);
   g.scale(1, ry / rx); // work in a circle of radius rx, the ellipse comes from this scale
-  fillCircleScaled(g, grads.chrome[n.sp ? 1 : 0], rx + 1, rx);
+  fillCircleScaled(g, grads.chrome[goldIndex(n.sp)], rx + 1, rx);
   if (n.accent) { // the white ring
     g.strokeStyle = '#ffffff';
     g.lineWidth = rx * 0.14;
@@ -1002,11 +1033,11 @@ export function drawCymbalFace(g, x, y, rx, ry, n, laneColor) {
   if (n.ghost) { // dark centre inside a coloured ring
     g.fillStyle = '#1b1c1f';
     g.fill();
-    g.strokeStyle = laneColor;
+    g.strokeStyle = dcol(laneColor);
     g.lineWidth = rx * 0.11;
     g.stroke();
   } else { // the cone: the colour with a light top
-    g.fillStyle = laneColor;
+    g.fillStyle = dcol(laneColor);
     g.fill();
     fillCircleScaled(g, grads.cone, inner, inner);
   }

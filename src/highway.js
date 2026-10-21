@@ -14,7 +14,7 @@ import {
   ACCENT_OUTLINE_WIDTH,
   ACCENT_OUTLINE_DARKEN,
   GHOST_ALPHA,
-  DISABLED_FILTER,
+  setDesaturated,
   ROLL_COLORS,
   FILL_COLORS,
   FILL_STRONG,
@@ -116,7 +116,7 @@ const NO_SHIFTS = [];
 const NO_BEATS = [];
 const VOC_GLOW_HOLD = 0.22; // seconds the vocal hit glow stays after the voice stops (a shorter gap does not dim it at all)
 const VOC_GLOW_FADE = 0.35; // and then fades out over this long
-const REPLAY_ALPHA = 0.5; // (they are also drawn almost without colour: DISABLED_FILTER)
+const REPLAY_ALPHA = 0.5; // (they are also drawn almost without colour: setDesaturated)
 const PERC_HOLD = 0.4; // seconds a percussion hit stays on the hit line (its quick pulse)
 const PERC_RINGS = [[0, 1.9, 3.5], [0.18, 1.4, 2]]; // percussion hit: [delay, growth, width] of the two rings
 
@@ -1517,7 +1517,7 @@ export class Highway {
     // pedal bars go behind the other notes and sustains
     for (let vi = from; vi < end; vi++) {
       const n = notes[vi];
-      g.filter = this.disabledNote(n) ? DISABLED_FILTER : 'none'; // disabled notes lose their colour
+      setDesaturated(this.disabledNote(n)); // disabled notes lose their colour
       if (n.lane >= 0 && !n.open) continue;
       const past = t - exitTime(n); // long notes: the exit starts when the tail ends
       if (past > FADE_SEC) continue;
@@ -1540,7 +1540,7 @@ export class Highway {
 
     for (let vi = from; vi < end; vi++) {
       const n = notes[vi];
-      g.filter = this.disabledNote(n) ? DISABLED_FILTER : 'none'; // disabled notes lose their colour
+      setDesaturated(this.disabledNote(n)); // disabled notes lose their colour
       if (!n.length || n.lane < 0) continue;
       const yTop = laneY(n.time + n.length);
       const yBot = laneY(Math.max(n.time, t));
@@ -1570,7 +1570,7 @@ export class Highway {
     // it grows, fades and turns white over FADE_SEC, for pedals too.
     for (let vi = from; vi < end; vi++) {
       const n = notes[vi];
-      g.filter = this.disabledNote(n) ? DISABLED_FILTER : 'none'; // disabled notes lose their colour
+      setDesaturated(this.disabledNote(n)); // disabled notes lose their colour
       if (n.lane < 0 || n.open) continue; // pedals and open notes are drawn above, behind the other notes
       const past = t - exitTime(n); // long notes: the exit starts when the tail ends
       if (past > FADE_SEC) continue;
@@ -1624,13 +1624,13 @@ export class Highway {
     }
     // fill activation marks on top of every head (the notes behind it, drawn later, would cover its star), dim like their note
     for (let i = 0; i < marks.length; i += 6) {
-      g.filter = this.disabledNote(marks[i]) ? DISABLED_FILTER : 'none';
+      setDesaturated(this.disabledNote(marks[i]));
       g.globalAlpha = marks[i + 5];
       drawActivationMark(g, marks[i + 1], marks[i + 2], marks[i + 3], marks[i + 4], 1, t);
     }
     marks.length = 0;
     g.globalAlpha = 1;
-    g.filter = 'none';
+    setDesaturated(false);
 
     // a very short fade at the bottom: the board dissolves right below the pads
     const bottomFade = Math.min(h - hitY, radius * 1.05 + 80);
