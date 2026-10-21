@@ -335,7 +335,7 @@ export function renderLanes3D(hw, t, w, h) {
   }
   if (hw.hitLine) { // a fixed bar across the road at the hit line, as thick as the pedal / open bars, in the colour of each lane (it lights when a note is hit), with a fixed border at each end; the pads are not drawn
     for (let i = 0; i < lanes; i++) {
-      g.fillStyle = withAlpha(colors[i], Math.min(1, 0.55 + 0.45 * Math.max(flash[i], barFlash)));
+      g.fillStyle = withAlpha(colors[i], Math.min(1, 0.3 + 0.55 * Math.max(flash[i], barFlash)));
       quad(g, -barDepth / 2, barDepth / 2, -half + i, -half + i + 1);
       g.fill();
     }

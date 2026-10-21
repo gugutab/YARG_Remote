@@ -596,3 +596,4 @@ Only checked by synthetic test, headless run or code reading:
 - Hit line bar (setting `highway.hitLine`, Track and bands, default on): a fixed translucent bar across the board at the hit line, as thick as the pedal / open bars (`KICK_BAR_HALF_H * kickBar`, `BAR_DEPTH * kickBar` in 3D), with a fixed border at each end (`HIT_LINE_COLOR`, `HIT_LINE_BORDER` in gfx.js), drawn under the pads and the notes in 2D and 3D.
 - Hit line bar: its end borders are now exactly as tall as the bar (no overhang) and the bar and borders are more opaque (0.24 / 0.95).
 - 3D hit area: with the hit line bar on, the coloured pads are no longer drawn; the bar itself is split into one segment per lane in the lane colour (brighter while that lane is hit, every segment on a pedal / open hit or a fill activation) with the white end borders. The 2D view keeps its pads.
+- 3D hit line segments are more transparent at rest (alpha 0.3, up to 0.85 when the lane is hit).
