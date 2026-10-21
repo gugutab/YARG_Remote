@@ -605,3 +605,4 @@ Only checked by synthetic test, headless run or code reading:
 - Burst: a long (tail) note is not drawn at all once it reaches the hit line; only its tail and the looping burst are visible, also after the tail ends (no head flash).
 - 3D: the hit line bar and the burst are drawn AFTER the notes and tails, so notes and tails pass underneath the hit area; on a held long note the burst is three layers a third of `BURST_LOOP_SEC` (0.36 s) apart, so one is always in flight (a constant variation instead of a spaced repeat).
 - Burst: the core flash now eases in and out (a sine envelope) instead of popping in at full strength; pedal and open bars get their own burst, a ring and sparks at BOTH ENDS of the bar (the walls of the board) in the bar's colour, while the bar keeps its old swell-and-fade exit.
+- Burst: the side bursts of pedal and open bars are half their former size (0.575 of the pad radius).

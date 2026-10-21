@@ -562,7 +562,7 @@ export function renderLanes3D(hw, t, w, h) {
         const pb = t - n.time;
         if (pb < 0 || pb >= BURST_SEC || pb < litFrom || noteDisabled(n)) continue;
         const bcol = n.open ? NOTE_PALETTE.open : chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick;
-        const side = laneW * headR * 1.15;
+        const side = laneW * headR * 0.575; // (half the size it had)
         drawHitBurst(g, PCX - half * PLANE, PHIT, side, side * HEAD_TILT, bcol, pb / BURST_SEC, n.time);
         drawHitBurst(g, PCX + half * PLANE, PHIT, side, side * HEAD_TILT, bcol, pb / BURST_SEC, n.time + 0.5);
         continue;
