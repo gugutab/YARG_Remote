@@ -813,15 +813,12 @@ export function renderLanes3D(hw, t, w, h) {
   if (hw.hitAnimation === 'burst') { // the burst: a shockwave ring and a fan of sparks on the hit line when a note arrives (setting highway.hitAnimation); drawn over the hit line
     for (let i = end - 1; i >= from; i--) {
       const n = notes[i];
-      if (n.lane < 0 || n.open) { // a pedal / open bar: the burst happens at both ends of the bar (the old swelling and fading of the bar stays)
+      if (n.lane < 0 || n.open) { // a pedal / open bar: its own burst along the whole bar
         const pb = t - n.time;
         if (pb < 0 || pb >= BAR_BURST_SEC || pb < litFrom || noteDisabled(n)) continue;
         const bcol = n.open ? NOTE_PALETTE.open : chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick;
         const barPx = PHIT - (PVY + (PHIT - PVY) / (1 + PK * (barDepth / 2))); // the bar's half thickness on screen at the hit line
         drawBarBurst(g, PCX, PHIT, half * PLANE, Math.max(2, barPx), bcol, pb / BAR_BURST_SEC, n.time, laneW * headR * 0.6);
-        const side = laneW * headR * 0.575; // (half the size it had)
-        drawHitBurst(g, PCX - half * PLANE, PHIT, side, side * HEAD_TILT, bcol, pb / BAR_BURST_SEC, n.time);
-        drawHitBurst(g, PCX + half * PLANE, PHIT, side, side * HEAD_TILT, bcol, pb / BAR_BURST_SEC, n.time + 0.5);
         continue;
       }
       const past = t - n.time;
