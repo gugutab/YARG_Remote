@@ -61,7 +61,6 @@ const TAP_NOTE = 104;
 // Fills (YARG.Core MidIOHelper.cs): drums use 120-124 as activation phrases (DRUM_FILL_NOTE_0..4); guitar-like parts use
 // 120 as a Big Rock Ending (BIG_ROCK_ENDING_NOTE_1), which only counts inside a coda.
 const FILL_NOTES = [120, 121, 122, 123, 124];
-const FILL_BAND_TAIL = 0.12; // seconds the fill band runs past the activation chord
 const BRE_NOTE = 120;
 const ENHANCED_OPENS_TEXT = 'ENHANCED_OPENS'; // MidIOHelper.ENHANCED_OPENS_TEXT
 const VELOCITY_ACCENT = 127; // drum pads: accent (bigger) and ghost (dim), as YARG.Core MidIOHelper.cs
@@ -383,7 +382,7 @@ export function markFillNotes(chart) {
     let best = null;
     for (let k = i; k < notes.length && notes[k].time === time; k++) if (best === null || notes[k].lane > best.lane) best = notes[k];
     if (best) best.activation = true;
-    f.bandEnd = Math.max(f.end, time + FILL_BAND_TAIL); // the band is drawn up to the activation chord (it comes after the phrase end), not only to the phrase
+    f.bandEnd = Math.max(f.end, time); // the band is drawn up to the activation chord (it comes after the phrase end), not only to the phrase
     from = i;
   }
   return chart;
