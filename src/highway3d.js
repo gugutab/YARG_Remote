@@ -333,21 +333,6 @@ export function renderLanes3D(hw, t, w, h) {
       barFlash = 1 - past / BAR_FLASH_SEC;
     }
   }
-  if (hw.hitLine) { // a fixed bar across the road at the hit line, as thick as the pedal / open bars, in the colour of each lane (it lights when a note is hit), with a fixed border at each end; the pads are not drawn
-    for (let i = 0; i < lanes; i++) {
-      g.fillStyle = tintWhite(colors[i], 0.3 + 0.45 * Math.max(flash[i], barFlash)); // the note's colour under a white overlay (whiter while the lane is hit)
-      quad(g, -barDepth / 2, barDepth / 2, -half + i, -half + i + 1); // (the first and last segments end exactly on the walls of the board)
-      g.fill();
-    }
-    // the end indicators pass over the coloured bar, a little transparent, in the colour of the open notes or the pedal when the chart has them (white otherwise)
-    const hasOpen = (chart.hasOpen ??= chart.notes.some((n) => n.open));
-    const edge = chart.drumKind ? (chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick) : hasOpen ? NOTE_PALETTE.open : null;
-    g.fillStyle = edge ? withAlpha(edge, 0.8) : HIT_LINE_BORDER_SOFT;
-    quad(g, -barDepth / 2, barDepth / 2, -half - FILL_BORDER_LANES, -half + FILL_BORDER_LANES * 0.4); // (the borders are exactly as deep as the bar)
-    g.fill();
-    quad(g, -barDepth / 2, barDepth / 2, half - FILL_BORDER_LANES * 0.4, half + FILL_BORDER_LANES);
-    g.fill();
-  }
   // (the pads mark the spot; a pedal hit lights every pad)
   const padRx = laneW * headR;
   for (let i = 0; i < lanes && !hw.hitLine; i++) { // (with the hit line bar on, its coloured segments replace the pads)
@@ -470,22 +455,6 @@ export function renderLanes3D(hw, t, w, h) {
     }
   }
 
-  if (hw.hitAnimation === 'burst') { // the burst: a shockwave ring and a fan of sparks on the hit line when a note arrives (setting highway.hitAnimation)
-    for (let i = end - 1; i >= from; i--) {
-      const n = notes[i];
-      if (n.lane < 0 || n.open) continue;
-      const past = t - n.time;
-      if (past < 0 || past < litFrom || noteDisabled(n)) continue;
-      let k, seed, scale = 1;
-      if (n.length > 0 && past < n.length) { // a held long note: the burst runs in a loop, a little smaller, with a new fan each time
-        const ph = past / BURST_LOOP_SEC;
-        k = ph - Math.floor(ph);
-        seed = n.time + Math.floor(ph) * 0.137;
-        scale = 0.75;
-      } else if (past < BURST_SEC) { k = past / BURST_SEC; seed = n.time; } else continue;
-      drawHitBurst(g, PCX + (n.lane + 0.5 - half) * PLANE, PHIT, laneW * headR, laneW * headR * HEAD_TILT, noteColor(n, colors), k, seed, scale);
-    }
-  }
 
   // heads, far to near so closer ones cover farther ones
   for (let i = end - 1; i >= from; i--) {
@@ -571,6 +540,36 @@ export function renderLanes3D(hw, t, w, h) {
   }
   g.globalAlpha = 1;
   g.filter = 'none';
+  if (hw.hitLine) { // a fixed bar across the road at the hit line, drawn over the notes and the tails (they pass underneath), as thick as the pedal / open bars, in the colour of each lane (it lights when a note is hit), with a fixed border at each end; the pads are not drawn
+    for (let i = 0; i < lanes; i++) {
+      g.fillStyle = tintWhite(colors[i], 0.3 + 0.45 * Math.max(flash[i], barFlash)); // the note's colour under a white overlay (whiter while the lane is hit)
+      quad(g, -barDepth / 2, barDepth / 2, -half + i, -half + i + 1); // (the first and last segments end exactly on the walls of the board)
+      g.fill();
+    }
+    // the end indicators pass over the coloured bar, a little transparent, in the colour of the open notes or the pedal when the chart has them (white otherwise)
+    const hasOpen = (chart.hasOpen ??= chart.notes.some((n) => n.open));
+    const edge = chart.drumKind ? (chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick) : hasOpen ? NOTE_PALETTE.open : null;
+    g.fillStyle = edge ? withAlpha(edge, 0.8) : HIT_LINE_BORDER_SOFT;
+    quad(g, -barDepth / 2, barDepth / 2, -half - FILL_BORDER_LANES, -half + FILL_BORDER_LANES * 0.4); // (the borders are exactly as deep as the bar)
+    g.fill();
+    quad(g, -barDepth / 2, barDepth / 2, half - FILL_BORDER_LANES * 0.4, half + FILL_BORDER_LANES);
+    g.fill();
+  }
+  if (hw.hitAnimation === 'burst') { // the burst: a shockwave ring and a fan of sparks on the hit line when a note arrives (setting highway.hitAnimation); drawn over the hit line
+    for (let i = end - 1; i >= from; i--) {
+      const n = notes[i];
+      if (n.lane < 0 || n.open) continue;
+      const past = t - n.time;
+      if (past < 0 || past < litFrom || noteDisabled(n)) continue;
+      const bx = PCX + (n.lane + 0.5 - half) * PLANE, bw = laneW * headR, bh = laneW * headR * HEAD_TILT, bc = noteColor(n, colors);
+      if (n.length > 0 && past < n.length) { // a held long note: three bursts a third of a period apart, so there is always one in flight (a constant variation)
+        for (let j = 0; j < 3; j++) {
+          const ph = past / BURST_LOOP_SEC + j / 3;
+          drawHitBurst(g, bx, PHIT, bw, bh, bc, ph - Math.floor(ph), n.time + Math.floor(ph) * 0.137 + j * 0.31, 0.62);
+        }
+      } else if (past < BURST_SEC) drawHitBurst(g, bx, PHIT, bw, bh, bc, past / BURST_SEC, n.time);
+    }
+  }
 
   // a very short fade at the bottom: the board dissolves right below the pads
   const padBottom = hitY + padRy;

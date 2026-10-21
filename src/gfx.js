@@ -35,7 +35,7 @@ export const BAND_BORDERS = { // the side borders of the other overlay bands (se
 // The "burst" hit animation (setting highway.hitAnimation, 3D): when a note reaches the hit line a shockwave ring spreads over the road and a fan of sparks
 // flies up and out of the lane, in the note's colour. A pure function of k = seconds since the hit / BURST_SEC (0..1): nothing is stored per note.
 export const BURST_SEC = 0.45;
-export const BURST_LOOP_SEC = 0.32; // while a long note is held the burst repeats with this period
+export const BURST_LOOP_SEC = 0.36; // while a long note is held three bursts (a third of this period apart) keep one always in flight
 export const BURST_VANISH_SEC = 0.1; // the note itself vanishes this fast in the burst animation
 const BURST_SIZE = 0.72; // overall size of the burst (a little smaller than the first version)
 const BURST_SPARKS = 8;
