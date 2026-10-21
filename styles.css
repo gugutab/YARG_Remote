@@ -2630,3 +2630,8 @@ button.icon.small-icon.sp-reset, #ppSlower, #ppFaster { min-width: 32px; min-hei
 .stem-btn.lvl-swap::after { display: none; } /* the speaker itself shows the muted state */
 .popover .row-icon { width: 20px; height: 20px; flex: none; color: var(--muted); }
 .popover .row:has(> .row-icon) { grid-template-columns: 24px 1fr 52px 28px; }
+
+/* Play next on the end screen: the cards grow with their content (the instruments wrap onto more lines) instead of a fixed height */
+#endNext li.row { height: auto !important; min-height: var(--row-h, 60px); }
+#endNext .song-insts { grid-template-columns: repeat(auto-fill, minmax(78px, max-content)); max-width: 100%; }
+#endNext .song-text, #endNext .song-bottom { min-width: 0; }
