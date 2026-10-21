@@ -2635,3 +2635,9 @@ button.icon.small-icon.sp-reset, #ppSlower, #ppFaster { min-width: 32px; min-hei
 #endNext li.row { height: auto !important; min-height: var(--row-h, 60px); }
 #endNext .song-insts { grid-template-columns: repeat(auto-fill, minmax(78px, max-content)); max-width: 100%; }
 #endNext .song-text, #endNext .song-bottom { min-width: 0; }
+
+/* The speed button of the bottom bar is highlighted while the playback speed is not 1x */
+#settingsBtn[data-mod="true"], #settingsBtn[data-mod="true"] .tool-val { color: var(--accent); }
+#settingsBtn[data-mod="true"] .tool-val { font-weight: 700; }
+.tile-tool[data-mod="true"] .tt-val { color: var(--accent); font-weight: 700; }
+.tile-tool[aria-expanded="true"][data-mod="true"] .tt-val { color: #fff; }

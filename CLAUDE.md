@@ -609,3 +609,5 @@ Only checked by synthetic test, headless run or code reading:
 - Burst: the lane (button) bursts are half their former size too (scale 0.5, and 0.31 for the three layers of a held note), like the side bursts of the bars.
 - Perf: disabled notes (replay window, after a loop end) no longer use a per-note canvas filter (`DISABLED_FILTER` removed): `setDesaturated(on)` in gfx.js switches the colour helpers to `desaturate(hex)` (cached, bounded), so frames near a loop end are as cheap as normal ones. Any new colour drawn in a note loop must go through those helpers or `dcol(hex)`.
 - 3D road width: 0.9 of a narrow pane (was 0.94: the hit line's end indicators touched the pane edge, e.g. the drums pane on an ultrawide screen), growing by 0.3 of the extra width up to 1.2 of the height (was 0.16 and 1.05), so the roads are wider in wide windows.
+- Speed highlight: the bottom bar's speed button (icon and value) turns to the accent colour (bold value) while the playback speed is not 1x (`#settingsBtn[data-mod]`, set in `setSetting('speed')`).
+- The tile tools' value label (neck speed, chart delay) is also accent and bold while it differs from its default.

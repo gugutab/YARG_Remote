@@ -1771,7 +1771,7 @@ function setSetting(name, value) {
   for (const out of document.querySelectorAll(`[data-out="${name}"]`)) out.textContent = SETTING_FORMAT[name](value);
   for (const btn of document.querySelectorAll(`[data-reset="${name}"]`)) btn.disabled = value === SETTING_DEFAULTS[name];
   if (name === 'chartDelay') { paintSectionTicks(); highway.delay = value; }
-  if (name === 'speed') { player.setRate(value); els.speedVal.textContent = SETTING_FORMAT.speed(value); }
+  if (name === 'speed') { player.setRate(value); els.speedVal.textContent = SETTING_FORMAT.speed(value); els.settingsBtn.dataset.mod = String(Math.abs(value - 1) > 1e-9); } // (the bar's speed button is highlighted while the speed is not 1x)
   if (name === 'neck') highway.setNeckSpeed(value);
 }
 installRangeUi(); // slider paint and wheel (src/range-ui.js), at the same point of the start-up as before
