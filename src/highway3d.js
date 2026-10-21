@@ -2,7 +2,7 @@
 // so it stays light enough for phones. Only the lane instruments (guitar, bass, keys, drums) have a highway;
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
-  NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, sprite3D, noteSpritePx, NOTE_RECT_W, NOTE_RECT_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
+  NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, sprite3D, noteSpritePx, NOTE_RECT_W, NOTE_RECT_H, NOTE_TRI_W, NOTE_TRI_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
   ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, setDesaturated, isDesaturated, dcol, desaturate, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, HIT_LINE_COLOR, HIT_LINE_BORDER, HIT_LINE_BORDER_SOFT, drawHitBurst, BURST_SEC, BURST_LOOP_SEC, BURST_VANISH_SEC, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
@@ -71,7 +71,34 @@ const yAt = (d) => PVY + (PHIT - PVY) * scaleAt(d) + (d > 0 ? PC * d * d : 0);
 const xAt = (lx, d) => PCX + lx * PLANE * scaleAt(d); // lx = lane units from the road's centre
 const depth = (time) => Math.min(1, Math.max(0, (time - PT) / PSEC));
 const CURVE_MAX = 0.9; // curve 100%: the road's slope on screen at the far edge (d = 1) is 10% of the flat one, so the crest stays past the notes
-const CURVE_STEPS = 24; // segments per depth unit of a quad or line on a curved road
+const CURVE_STEPS = 24; // at most this many segments per depth unit of a quad or line on a curved road
+const CURVE_TOL = 0.15; // ...and only as many as keep a road edge within this many px of the true curve
+let PSTEPS = CURVE_STEPS; // the segments per depth unit of the current projection (curveSteps)
+// Segments per depth unit for the current projection: the polylines of a curved road cost GPU time per vertex (with 24 per unit the road, its
+// stripes, lines and bands were about 1.5 ms of a 3-pane frame), and 24 is far finer than needed in most windows. The chord error of the road's
+// outer edge (halfW lane units from the centre: the farthest from the centre, so the largest error) is measured at CURVE_STEPS once per
+// projection; it falls with the square of the step count, which gives the fewest steps within CURVE_TOL (at least 4).
+const curveStepsCache = new Map();
+function curveSteps(halfW) {
+  if (!(PC > 0)) return CURVE_STEPS;
+  const key = `${PK}|${PVY}|${PHIT}|${PC}|${PEND}|${PLANE * halfW}`;
+  let n = curveStepsCache.get(key);
+  if (n === undefined) {
+    const px = (d) => PCX + halfW * PLANE / (1 + PK * d);
+    const py = (d) => PVY + (PHIT - PVY) / (1 + PK * d) + (d > 0 ? PC * d * d : 0);
+    const segs = Math.ceil((PEND - ROAD_NEAR) * CURVE_STEPS);
+    let err = 0;
+    for (let i = 0; i < segs; i++) {
+      const a = ROAD_NEAR + ((PEND - ROAD_NEAR) * i) / segs, b = ROAD_NEAR + ((PEND - ROAD_NEAR) * (i + 1)) / segs;
+      const ax = px(a), ay = py(a), dx = px(b) - ax, dy = py(b) - ay, len = Math.hypot(dx, dy) || 1;
+      for (let k = 1; k < 8; k++) { const d = a + ((b - a) * k) / 8; err = Math.max(err, Math.abs(dx * (py(d) - ay) - dy * (px(d) - ax)) / len); }
+    }
+    n = Math.max(4, Math.min(CURVE_STEPS, Math.ceil(CURVE_STEPS * Math.sqrt(err / CURVE_TOL))));
+    if (curveStepsCache.size >= 16) curveStepsCache.delete(curveStepsCache.keys().next().value);
+    curveStepsCache.set(key, n);
+  }
+  return n;
+}
 
 // The projection for a pane: `h` its height, `hitY` the hit line, `strength` the perspective (setting highway.perspective / 100: 1 = the
 // classic FAR_SCALE) and `curve` the downward bend (highway.curve / 100). The far edge (d = 1) of a flat road stays at FAR_TOP and the hit
@@ -99,7 +126,7 @@ function quad(g, d0, d1, lx0, lx1) {
   const s1 = 1 / (1 + PK * d1);
   const y0 = PVY + (PHIT - PVY) * s0;
   const y1 = PVY + (PHIT - PVY) * s1;
-  g.beginPath();
+  g.beginPath?.(); // (g may be a Path2D: see roadPaths)
   g.moveTo(PCX + lx0 * PLANE * s0, y0);
   g.lineTo(PCX + lx1 * PLANE * s0, y0);
   g.lineTo(PCX + lx1 * PLANE * s1, y1);
@@ -110,8 +137,8 @@ function quad(g, d0, d1, lx0, lx1) {
 function curvedQuad(g, d0, d1, lx0, lx1) {
   d0 = Math.min(d0, PEND);
   d1 = Math.min(d1, PEND);
-  const n = Math.max(1, Math.ceil(Math.abs(d1 - d0) * CURVE_STEPS));
-  g.beginPath();
+  const n = Math.max(1, Math.ceil(Math.abs(d1 - d0) * PSTEPS));
+  g.beginPath?.();
   for (let i = 0; i <= n; i++) {
     const d = d0 + ((d1 - d0) * i) / n;
     const s = 1 / (1 + PK * d);
@@ -129,8 +156,27 @@ function curvedQuad(g, d0, d1, lx0, lx1) {
 // A line along the road at lx lane units from the centre, from ROAD_NEAR to the road's end (added to the current path).
 function roadLine(g, lx) {
   g.moveTo(xAt(lx, ROAD_NEAR), yAt(ROAD_NEAR));
-  if (PC > 0) for (let i = 1, n = Math.ceil((PEND - ROAD_NEAR) * CURVE_STEPS); i <= n; i++) { const d = ROAD_NEAR + ((PEND - ROAD_NEAR) * i) / n; g.lineTo(xAt(lx, d), yAt(d)); }
+  if (PC > 0) for (let i = 1, n = Math.ceil((PEND - ROAD_NEAR) * PSTEPS); i <= n; i++) { const d = ROAD_NEAR + ((PEND - ROAD_NEAR) * i) / n; g.lineTo(xAt(lx, d), yAt(d)); }
   else g.lineTo(xAt(lx, ROAD_END), yAt(ROAD_END));
+}
+// The board's fixed shapes for the current projection, as Path2D objects kept between frames: the road (also the dark base), the lane stripes,
+// the lane dividers and the rails. On a curved road (the default) these are long polylines, and rebuilding them as the context's own path every
+// frame made the GPU canvas tessellate them again each time (about a third of the frame of 3 panes in a dense part); a Path2D that is filled
+// again lets the canvas reuse that work. Same geometry, same pixels. Keyed by everything the geometry depends on (a resize makes a new entry).
+const roadPaths = new Map();
+function roadPathsFor(lanes, half, stripes) {
+  const key = `${lanes}|${stripes ? 1 : 0}|${PK}|${PVY}|${PHIT}|${PCX}|${PLANE}|${PC}|${PEND}`;
+  let p = roadPaths.get(key);
+  if (!p) {
+    p = { road: new Path2D(), stripes: new Path2D(), dividers: new Path2D(), rails: new Path2D() };
+    quad(p.road, ROAD_NEAR, PEND, -half, half);
+    for (let i = 0; i < lanes && stripes; i += 2) quad(p.stripes, ROAD_NEAR, PEND, i - half, i + 1 - half); // (disjoint: one fill draws what one fill each did)
+    for (let i = 1; i < lanes; i++) roadLine(p.dividers, i - half);
+    for (let i = 0; i < 2; i++) roadLine(p.rails, i === 0 ? -half : half);
+    if (roadPaths.size >= 16) roadPaths.delete(roadPaths.keys().next().value); // (panes of several sizes, a window being resized)
+    roadPaths.set(key, p);
+  }
+  return p;
 }
 // A tail strip with the same extra perspective taper the note heads get (see noteShape): relative to the strip's base
 // (dRef, where the head is), its width shrinks with (scale / baseScale) ^ TAIL_TAPER_POWER, never below TAIL_MIN_WIDTH.
@@ -255,6 +301,24 @@ function drawHead3D(g, x, y, rx, ry, vy, n, colors, body, lw, disc, headStyle) {
   g.stroke();
 }
 
+// The HOPO dot on a head (kx: the head's exit, 0..1).
+function hopoDot(g, x, y, rx, ry, style, dist, kx) {
+  g.beginPath();
+  noteShape(g, x, y, rx * 0.35, ry * 0.35, style, dist);
+  g.fillStyle = kx === 0 ? HOPO_DOT : `rgba(255,255,255,${0.9 * (1 - kx)})`;
+  g.fill();
+}
+// The half extent of a drawHead3D picture around its centre, in units of rx (see sprite3D): the shape (a triangle is wider and flatter), its edge
+// underneath (th, at least 0.5 px), the perspective taper of the lowest row and the outline.
+function headExtentX(style, rx, dist, lw) {
+  const w = style === 'tri' ? NOTE_TRI_W : 1;
+  const below = (style === 'tri' ? NOTE_TRI_H : 1) * HEAD_TILT + 0.21 + 0.5 / rx;
+  return w * (1 + (TAPER_GAIN * below * rx) / dist) + lw / rx;
+}
+function headExtentY(style, rx, lw) {
+  return (style === 'tri' ? NOTE_TRI_H : 1) * HEAD_TILT + 0.21 + 0.5 / rx + lw / rx;
+}
+
 export function renderLanes3D(hw, t, w, h) {
   const g = hw.g;
   const chart = hw.chart;
@@ -281,19 +345,16 @@ export function renderLanes3D(hw, t, w, h) {
   PT = t;
   const vy = PVY;
   const half = lanes / 2;
+  PSTEPS = curveSteps(half);
 
   // In a long rest the whole board turns more transparent together (see Highway.restBoard)
   const boardK = hw.restBoard(t, windowSec);
   g.globalAlpha = boardK;
   // road (its dark base is added at the very end, behind everything, so the edge fades do not thin it)
+  const roadP = roadPathsFor(lanes, half, hw.laneStripes); // (setting highway.laneStripes)
   g.fillStyle = 'rgba(255,255,255,0.045)';
-  quad(g, ROAD_NEAR, PEND, -half, half);
-  g.fill();
-  g.fillStyle = 'rgba(255,255,255,0.045)';
-  for (let i = 0; i < lanes && hw.laneStripes; i += 2) { // (setting highway.laneStripes)
-    quad(g, ROAD_NEAR, PEND, i - half, i + 1 - half);
-    g.fill();
-  }
+  g.fill(roadP.road);
+  if (hw.laneStripes) g.fill(roadP.stripes);
   BORDERS3D = hw.bandBorders;
   if (hw.starPowerBand) span(g, chart.starPower, STAR_POWER_BAND_3D, -half, half, BAND_BORDERS.starPower);
   else if (BORDERS3D) sideBorders3D(g, chart.starPower, BAND_BORDERS.starPower, BAND_BORDERS.starPower, -half, half); // (the gold borders mark the phrase even when its tint is off, the default)
@@ -314,14 +375,10 @@ export function renderLanes3D(hw, t, w, h) {
   // lane dividers and rails
   g.lineWidth = 1;
   g.strokeStyle = 'rgba(255,255,255,0.10)';
-  g.beginPath();
-  for (let i = 1; i < lanes; i++) roadLine(g, i - half);
-  g.stroke();
+  g.stroke(roadP.dividers);
   g.lineWidth = 2;
   g.strokeStyle = 'rgba(255,255,255,0.4)';
-  g.beginPath();
-  for (let i = 0; i < 2; i++) roadLine(g, i === 0 ? -half : half);
-  g.stroke();
+  g.stroke(roadP.rails);
 
   // beat and measure lines
   const beatStyle = hw.beatStyles['3d']; // (setting highway.beatLines: null = off)
@@ -542,13 +599,22 @@ export function renderLanes3D(hw, t, w, h) {
           1 + (TAPER_GAIN * 0.9 * rx) / dist + lw / rx, HEAD_TILT + 0.3 + lw / rx, (sg) => drawHead3D(sg, 0, 0, rx, ry, -dist, n, colors, body, lw, true, 'round')))) {
         drawHead3D(g, x, y, rx, ry, vy, n, colors, body, lw, true, 'round');
       }
-    } else drawHead3D(g, x, y, rx, ry, vy, n, colors, body, lw, false, n.cymbal ? 'tri' : hw.noteStyle);
-    if (n.hopo) {
-      g.beginPath();
-      noteShape(g, x, y, rx * 0.35, ry * 0.35, hw.noteStyle, y - vy);
-      g.fillStyle = kx === 0 ? HOPO_DOT : `rgba(255,255,255,${0.9 * (1 - kx)})`;
-      g.fill();
+    } else {
+      // a steady head (circle, triangle, square) also comes from a cached picture: its edge, face and outline were three path fills and strokes
+      // per note per frame, the largest part of a dense frame with circles; the HOPO dot is in the picture too
+      const style = n.cymbal ? 'tri' : hw.noteStyle;
+      const dist = y - vy;
+      const dot = n.hopo && g.globalAlpha === 1; // (while the note fades in, its dot is drawn over the faded picture, as before: in the picture it would fade as one piece with the face and turn grey)
+      if (kx === 0 && amt === 0 && g.filter === 'none' && g.globalCompositeOperation === 'source-over'
+        && sprite3D(g, x, y, rx, noteSpritePx(), `head|${style}|${body}|${colors[n.lane]}|${n.tap && !n.sp ? 1 : 0}${n.accent ? 1 : 0}${dot ? 1 : 0}|${Math.round((lw * 100) / rx)}|${Math.round((dist * 100) / rx)}`,
+          headExtentX(style, rx, dist, lw), headExtentY(style, rx, lw), (sg) => { drawHead3D(sg, 0, 0, rx, ry, -dist, n, colors, body, lw, false, style); if (dot) hopoDot(sg, 0, 0, rx, ry, hw.noteStyle, dist, 0); })) {
+        if (n.hopo && !dot) hopoDot(g, x, y, rx, ry, hw.noteStyle, dist, 0);
+        if (n.activation && hw.fillActivation) drawActivationMark(g, x, y, rx, ry, p, t);
+        continue;
+      }
+      drawHead3D(g, x, y, rx, ry, vy, n, colors, body, lw, false, style);
     }
+    if (n.hopo) hopoDot(g, x, y, rx, ry, hw.noteStyle, y - vy, kx);
     if (n.activation && hw.fillActivation) drawActivationMark(g, x, y, rx, ry, p, t);
   }
   g.globalAlpha = 1;
@@ -605,8 +671,7 @@ export function renderLanes3D(hw, t, w, h) {
   // the board's neutral dark base, as opaque as the setting says: behind the notes and the guides, and not faded at the edges
   g.globalCompositeOperation = 'destination-over';
   g.fillStyle = boardBase(hw.trackOpacity * boardK); // (more transparent in a long rest)
-  quad(g, ROAD_NEAR, PEND, -half, half);
-  g.fill();
+  g.fill(roadP.road);
   g.globalCompositeOperation = 'source-over';
   // far edge fades into the background
   // (an eased fade, so the board dissolves instead of ending in a visible edge)
