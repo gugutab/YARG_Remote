@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, NOTE_RECT_W, NOTE_RECT_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, HIT_LINE_COLOR, HIT_LINE_BORDER, HIT_LINE_BORDER_SOFT, drawHitBurst, BURST_SEC, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, HIT_LINE_COLOR, HIT_LINE_BORDER, HIT_LINE_BORDER_SOFT, drawHitBurst, BURST_SEC, BURST_LOOP_SEC, BURST_VANISH_SEC, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
 
@@ -475,8 +475,15 @@ export function renderLanes3D(hw, t, w, h) {
       const n = notes[i];
       if (n.lane < 0 || n.open) continue;
       const past = t - n.time;
-      if (past < 0 || past >= BURST_SEC || past < litFrom || noteDisabled(n)) continue;
-      drawHitBurst(g, PCX + (n.lane + 0.5 - half) * PLANE, PHIT, laneW * headR, laneW * headR * HEAD_TILT, noteColor(n, colors), past / BURST_SEC, n.time);
+      if (past < 0 || past < litFrom || noteDisabled(n)) continue;
+      let k, seed, scale = 1;
+      if (n.length > 0 && past < n.length) { // a held long note: the burst runs in a loop, a little smaller, with a new fan each time
+        const ph = past / BURST_LOOP_SEC;
+        k = ph - Math.floor(ph);
+        seed = n.time + Math.floor(ph) * 0.137;
+        scale = 0.75;
+      } else if (past < BURST_SEC) { k = past / BURST_SEC; seed = n.time; } else continue;
+      drawHitBurst(g, PCX + (n.lane + 0.5 - half) * PLANE, PHIT, laneW * headR, laneW * headR * HEAD_TILT, noteColor(n, colors), k, seed, scale);
     }
   }
 
@@ -486,8 +493,9 @@ export function renderLanes3D(hw, t, w, h) {
     g.filter = hw.disabledNote(n) ? DISABLED_FILTER : 'none'; // disabled notes lose their colour
     if (n.lane < 0 || n.open) continue;
     const past = t - exitTime(n); // long notes: the exit starts when the tail ends
-    if (past > FADE_SEC) continue;
-    const kx = Math.max(0, past) / FADE_SEC;
+    const fadeSec = hw.hitAnimation === 'burst' ? BURST_VANISH_SEC : FADE_SEC; // (the burst: the note vanishes quickly)
+    if (past > fadeSec) continue;
+    const kx = Math.max(0, past) / fadeSec;
     const d = depth(n.time);
     const p = scaleAt(d);
     const x = PCX + (n.lane + 0.5 - half) * PLANE * p;
@@ -495,7 +503,7 @@ export function renderLanes3D(hw, t, w, h) {
     const y = PVY + (PHIT - PVY) * p + lift;
     const vy = PVY + lift;
     const amt = heldAmount(n, t);
-    const rx = laneW * headR * noteScale(n) * p * (hw.hitAnimation === 'burst' ? 1 - 0.35 * kx : 1 + 0.4 * kx) * (1 + (pulse - 1) * amt); // (the burst makes the note shrink into the hit line instead of swelling)
+    const rx = laneW * headR * noteScale(n) * p * (hw.hitAnimation === 'burst' ? 1 - 0.5 * kx : 1 + 0.4 * kx) * (1 + (pulse - 1) * amt); // (the burst makes the note shrink into the hit line instead of swelling)
     const ry = rx * HEAD_TILT;
     if (amt > 0) { // a soft halo while the note is held
       g.globalCompositeOperation = 'lighter';
