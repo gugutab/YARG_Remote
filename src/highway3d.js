@@ -562,7 +562,6 @@ export function renderLanes3D(hw, t, w, h) {
   }
   for (let i = 0; i < ROLL_TYPES.length; i++) {
     const rs = spansOfKind(chart, chart.rolls, 'type', ROLL_TYPES[i]);
-    span(g, rs, ROLL_COLORS[ROLL_TYPES[i]], -half, half, BAND_BORDERS[ROLL_TYPES[i]]);
     rollColumns3D(g, rs, chart.laneColors || NOTE_PALETTE.lanes, chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick, half, lanes);
   }
 

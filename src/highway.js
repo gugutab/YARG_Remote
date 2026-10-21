@@ -1442,7 +1442,6 @@ export class Highway {
     }
     // drum rolls: one band per roll type (kick roll, tremolo lane, trill lane)
     for (let i = 0; i < ROLL_TYPES.length; i++) {
-      this.fillSpans(spansOfKind(chart, chart.rolls, 'type', ROLL_TYPES[i]), t, ahead, x0, laneW * chart.lanes, h, ROLL_COLORS[ROLL_TYPES[i]], BAND_BORDERS[ROLL_TYPES[i]]);
       this.rollColumns(spansOfKind(chart, chart.rolls, 'type', ROLL_TYPES[i]), t, ahead, x0, laneW * chart.lanes, h, chart);
     }
 
