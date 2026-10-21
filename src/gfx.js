@@ -437,8 +437,8 @@ export const HOPO_SCALE = 0.8;
 export const GHOST_SCALE = 0.8; // YARG's ghost note model is about 80% as wide as a normal one
 export const noteScale = (n) => (n.hopo ? HOPO_SCALE : n.ghost ? GHOST_SCALE : 1);
 
-// Star power notes: a white overlay at 80% over the lane colour (the colour and the centre still show through).
-export const STAR_POWER_OVERLAY = 0.8;
+// Star power notes: a white overlay at 50% over the lane colour (the colour and the centre still show through; it was 80%, too washed out).
+export const STAR_POWER_OVERLAY = 0.5;
 const starPowerColors = new Map(); // hex -> result (a handful of lane colours: the string was rebuilt for every star power note on every frame)
 export function starPowerColor(hex) {
   let out = starPowerColors.get(hex);

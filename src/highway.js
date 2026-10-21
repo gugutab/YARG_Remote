@@ -1412,6 +1412,7 @@ export class Highway {
     g.globalAlpha = boardK;
     // star power / solo bands
     if (this.starPowerBand) this.fillSpans(chart.starPower, t, ahead, x0, laneW * chart.lanes, h, STAR_POWER_BAND, BAND_BORDERS.starPower);
+    else if (this.bandBorders) this.sideBorders(chart.starPower, t, ahead, x0, laneW * chart.lanes, h, BAND_BORDERS.starPower, BAND_BORDERS.starPower); // (the gold borders mark the phrase even when its tint is off, the default)
     if (this.soloBand) this.fillSpans(chart.solos, t, ahead, x0, laneW * chart.lanes, h, SOLO_BAND, BAND_BORDERS.solo);
     // drum fills / big rock endings (YARG activation phrases and BRE), a faint band under the notes
     for (let i = 0; i < FILL_KINDS.length; i++) {

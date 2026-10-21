@@ -262,6 +262,7 @@ export function renderLanes3D(hw, t, w, h) {
   }
   BORDERS3D = hw.bandBorders;
   if (hw.starPowerBand) span(g, chart.starPower, STAR_POWER_BAND_3D, -half, half, BAND_BORDERS.starPower);
+  else if (BORDERS3D) sideBorders3D(g, chart.starPower, BAND_BORDERS.starPower, BAND_BORDERS.starPower, -half, half); // (the gold borders mark the phrase even when its tint is off, the default)
   if (hw.soloBand) span(g, chart.solos, SOLO_BAND_3D, -half, half, BAND_BORDERS.solo);
   for (let i = 0; i < FILL_KINDS.length; i++) {
     if (FILL_KINDS[i] === 'fill' && !hw.fillBand) continue;
