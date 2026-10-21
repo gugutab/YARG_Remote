@@ -124,11 +124,10 @@ function fillBand3D(g, spans, color, xl, xr, roadW) {
       g.fill();
       g.globalAlpha /= k;
     };
-    piece(d0 + f, d1 - f, 1);
+    piece(d0 + f, d1, 1); // (the far end, where the activation note is, stays full: only the start fades in)
     for (let k = 0; k < STEPS; k++) {
       const w = f / STEPS, a = (k + 1) / (STEPS + 1);
       piece(d0 + k * w, d0 + (k + 1) * w, a);
-      piece(d1 - (k + 1) * w, d1 - k * w, a);
     }
     g.fillStyle = FILL_EDGE;
     for (const dd of [d0, d1]) {

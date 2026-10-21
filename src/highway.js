@@ -2047,8 +2047,7 @@ export class Highway {
       const len = bottom - top;
       const fade = Math.min(0.18, 28 / Math.max(1, len));
       const grad = g.createLinearGradient(0, top, 0, bottom);
-      grad.addColorStop(0, 'rgba(40,200,90,0)');
-      grad.addColorStop(fade, color);
+      grad.addColorStop(0, color); // (the far end, where the activation note is, stays full: only the start fades in)
       grad.addColorStop(1 - fade, color);
       grad.addColorStop(1, 'rgba(40,200,90,0)');
       g.fillStyle = grad;
