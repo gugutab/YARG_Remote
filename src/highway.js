@@ -200,6 +200,7 @@ export class Highway {
     this.rectPool = []; // the objects of paneRects
     this.vocalView = 'track'; // 'track' (notes + lyrics) or 'karaoke' (the lyrics alone)
     this._fillBand = true; // the green band during a drum fill (setting highway.fillBand, on by default; the big rock ending band always shows)
+    this.hitAnimation = 'burst'; // 3D: what a note does on reaching the hit line ('burst' or 'classic', highway.hitAnimation)
     this.hitLine = true; // the fixed bar and borders at the hit line (highway.hitLine)
     this.bandBorders = true; // thick side borders along the star power, solo, roll and big rock ending bands (highway.bandBorders)
     this._fillActivation = true; // the glow, ring and star on a fill's activation note and the pad flash when it arrives (setting highway.fillActivation)

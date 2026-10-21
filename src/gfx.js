@@ -32,6 +32,53 @@ export const FILL_STRONG = 'rgba(40,200,90,0.5)'; // the lead-up: a stronger gre
 export const BAND_BORDERS = { // the side borders of the other overlay bands (setting highway.bandBorders), like the fill's: the band's own colour, solid
   starPower: 'rgba(255,190,40,0.95)', solo: 'rgba(40,180,255,0.95)', kick: 'rgba(255,150,50,0.95)', tremolo: 'rgba(80,220,80,0.95)', trill: 'rgba(255,215,60,0.95)',
 };
+// The "burst" hit animation (setting highway.hitAnimation, 3D): when a note reaches the hit line a shockwave ring spreads over the road and a fan of sparks
+// flies up and out of the lane, in the note's colour. A pure function of k = seconds since the hit / BURST_SEC (0..1): nothing is stored per note.
+export const BURST_SEC = 0.45;
+const BURST_SPARKS = 8;
+const burstEase = (k) => 1 - (1 - k) * (1 - k); // fast start, soft end
+// (x, y): the hit line under the lane centre; rx / ry: the pad's half sizes (ry is the road's squashed vertical radius); `seed`: the note's time (so the fan differs per note)
+export function drawHitBurst(g, x, y, rx, ry, color, k, seed) {
+  if (!(k >= 0 && k < 1)) return;
+  const e = burstEase(k);
+  const fade = (1 - k) * (1 - k);
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  // the shockwave: a ring on the road that widens and thins
+  g.beginPath();
+  g.ellipse(x, y, rx * (0.7 + 2.4 * e), ry * (0.7 + 2.4 * e), 0, 0, Math.PI * 2);
+  g.lineWidth = Math.max(0.8, rx * 0.24 * (1 - k));
+  g.strokeStyle = tintWhite(color, 0.45);
+  g.globalAlpha = Math.min(1, 1.15 * fade);
+  g.stroke();
+  // a quick core flash
+  if (k < 0.35) {
+    const f = 1 - k / 0.35;
+    g.beginPath();
+    g.ellipse(x, y, rx * (0.6 + 0.5 * e), ry * (0.6 + 0.5 * e), 0, 0, Math.PI * 2);
+    g.fillStyle = tintWhite(color, 0.7);
+    g.globalAlpha = 0.6 * f * f;
+    g.fill();
+  }
+  // the sparks: a fan going up (away from the player) and sideways, each with its own angle and reach
+  g.strokeStyle = tintWhite(color, 0.25);
+  g.lineCap = 'round';
+  const base = Math.floor((seed * 1000) % 97);
+  for (let i = 0; i < BURST_SPARKS; i++) {
+    const r = ((base * 31 + i * 57) % 100) / 100; // 0..1, fixed per note and spark
+    const a = -Math.PI / 2 + (i / (BURST_SPARKS - 1) - 0.5) * 2.4 + (r - 0.5) * 0.3; // upwards, spread over about 140 degrees
+    const reach = rx * (2 + 2.4 * r) * e;
+    const tail = rx * (0.5 + 0.8 * r) * (1 - e * 0.5);
+    const c = Math.cos(a), s = Math.sin(a);
+    g.beginPath();
+    g.moveTo(x + c * Math.max(0, reach - tail) * 1.0, y + s * Math.max(0, reach - tail) * 0.62);
+    g.lineTo(x + c * reach, y + s * reach * 0.62 - e * rx * 0.5 * (0.4 + r)); // (the sparks drift up the road)
+    g.lineWidth = Math.max(0.8, rx * 0.17 * (1 - k));
+    g.globalAlpha = Math.min(1, 1.1 * fade);
+    g.stroke();
+  }
+  g.restore();
+}
 export const HIT_LINE_COLOR = 'rgba(255,255,255,0.24)'; // the fixed bar at the hit line (setting highway.hitLine), as thick as the pedal / open bars
 export const HIT_LINE_BORDER = 'rgba(255,255,255,0.95)'; // and its fixed borders at both ends
 export const HIT_LINE_BORDER_SOFT = 'rgba(255,255,255,0.8)'; // the 3D ones, over the coloured bar (a little transparent)

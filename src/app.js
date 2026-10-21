@@ -3693,6 +3693,7 @@ const EFFECTS = {
   'highway.starPowerBand': (v) => { highway.starPowerBand = !!v; },
   'highway.fillBand': (v) => { highway.fillBand = !!v; },
   'highway.fillActivation': (v) => { highway.fillActivation = !!v; },
+  'highway.hitAnimation': (v) => { highway.hitAnimation = v; highway.invalidate(); },
   'highway.hitLine': (v) => { highway.hitLine = !!v; highway.invalidate(); },
   'highway.bandBorders': (v) => { highway.bandBorders = !!v; highway.invalidate(); },
   'highway.soloBand': (v) => { highway.soloBand = !!v; },
