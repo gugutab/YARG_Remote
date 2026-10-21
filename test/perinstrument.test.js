@@ -37,7 +37,7 @@ test('cleanPerInstrument: strict shape, bad fields and instruments dropped', () 
 
 test('Highway.paneOpt: window override > instrument default > global; the reset returns to the instrument default', () => {
   const h = Object.create(Highway.prototype); // (no canvas needed for the option logic)
-  Object.assign(h, { paneOpts: {}, instrumentOpts: {}, view: '3d', noteStyle: 'rect', neck: 1.2, invalidate() {} });
+  Object.assign(h, { paneOpts: {}, persistentNeck: {}, instrumentOpts: {}, view: '3d', noteStyle: 'rect', neck: 1.2, invalidate() {} });
   assert.equal(h.paneOpt('guitar', 'view'), '3d', 'no per-instrument setting: as before');
   h.perInstrument = { guitar: { view: '2d', noteStyle: 'round' }, drums: { neck: 2 } };
   assert.equal(h.paneOpt('guitar', 'view'), '2d');

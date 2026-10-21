@@ -165,6 +165,8 @@ export class Highway {
     this.vizFps = () => Infinity; // how many times per second the background may be redrawn (set by the app from the setting)
     this.bgNext = 0; // the time (ms) from which the background may be redrawn
     this.paneOpts = {}; // per window overrides, see setPaneOpt
+    this.persistentNeck = {}; // the neck speed chosen for each window, kept between songs and visits (src/neckmemory.js); onNeckPersist(persistentNeck) saves it
+    this.onNeckPersist = null;
     this.instrumentOpts = {}; // per instrument starting options (setting highway.perInstrument), see the perInstrument setter
     this.neck = 1.2; // neck speed (the app default): scales distance between notes only; timing is unchanged
     this.bg = '#0d1117'; // chart background and the colour its fades dissolve into (the theme's "stage" colour)
@@ -317,17 +319,23 @@ export class Highway {
   // notes arrive later). `paneOpt` answers with the override or the global value; clearPaneOpt(null, name) clears it for every window.
   setPaneOpt(key, name, value) {
     (this.paneOpts[key] ??= {})[name] = value;
+    if (name === 'neck') { this.persistentNeck[key] = value; this.onNeckPersist?.(this.persistentNeck); }
     this.invalidate();
   }
 
   clearPaneOpt(key, name) {
     this.invalidate();
     for (const k of key === null ? Object.keys(this.paneOpts) : [key]) if (this.paneOpts[k]) delete this.paneOpts[k][name];
+    if (name === 'neck') {
+      for (const k of key === null ? Object.keys(this.persistentNeck) : [key]) delete this.persistentNeck[k];
+      this.onNeckPersist?.(this.persistentNeck);
+    }
   }
 
   paneOpt(key, name) {
     const v = this.paneOpts[key]?.[name];
     if (v !== undefined) return v;
+    if (name === 'neck') { const p = this.persistentNeck[key]; if (p !== undefined) return p; } // (what the user last chose for this window)
     return this.paneDefault(key, name);
   }
 

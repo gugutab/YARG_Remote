@@ -59,3 +59,15 @@ test('packCode: a one-word name of up to 4 characters is kept', () => {
   assert.equal(packCode('CDLC'), 'CDLC');
   assert.equal(packCode('Rock Band 3 DLC'), 'RB3+');
 });
+
+test('neck memory: parse, clean and restore only over the same starting speed', async () => {
+  const { parseNeck, serializeNeck, restoredGlobal, cleanNeck } = await import('../src/neckmemory.js');
+  assert.deepEqual(parseNeck('garbage'), { panes: {} });
+  assert.deepEqual(parseNeck(null), { panes: {} });
+  const s = cleanNeck({ global: 1.234, base: 1, panes: { guitar: 2.04, 'bad key!': 2, drums: 9, bass: 'x' } });
+  assert.deepEqual(s, { global: 1.2, base: 1, panes: { guitar: 2 } });
+  assert.deepEqual(parseNeck(serializeNeck(s)), s);
+  assert.equal(restoredGlobal(s, 1), 1.2);
+  assert.equal(restoredGlobal(s, 1.5), undefined);
+  assert.equal(restoredGlobal({ panes: {} }, 1), undefined);
+});

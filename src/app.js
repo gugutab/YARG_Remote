@@ -30,6 +30,7 @@ import { SECTIONS, buildDefaults, buildValidator, FONT_OPTIONS, RENAMES, SETTING
 import { resolvePalette, applyPalette, PALETTES } from './palette.js';
 import { resolveTheme, applyTheme, PRESETS as THEME_PRESETS } from './themes.js';
 import { createWakeLock } from './wakelock.js';
+import { loadNeck, saveNeck, restoredGlobal } from './neckmemory.js';
 import { openOnboarding, shouldShowOnboarding, ONBOARDED_KEY } from './onboarding.js';
 import { mountSettings } from './settings-ui.js';
 import { renderThemeStudio, renderDataTools, renderShortcuts, renderLaneColors, renderPerInstrument } from './settings-custom.js';
@@ -612,6 +613,15 @@ const filters = { instruments: new Set(), minLevel: 0, maxLevel: 0, diffs: new S
 const localStore = (() => { try { return localStorage; } catch { return null; } })();
 let favourites = loadFavourites(localStore);
 let playHistory = loadHistory(localStore);
+// The chart (neck) speed is remembered: each window's own value lives in the highway (persistentNeck), the global slider value here.
+const neckMem = loadNeck(localStore);
+highway.persistentNeck = { ...neckMem.panes };
+highway.onNeckPersist = (panes) => { neckMem.panes = { ...panes }; saveNeck(localStore, neckMem); };
+const rememberNeck = (value) => { // the global neck slider: a value equal to the starting setting needs no memory
+  const base = prefs.get('highway.neck');
+  if (value === undefined || Math.abs(value - base) < 1e-9) { delete neckMem.global; delete neckMem.base; } else { neckMem.global = value; neckMem.base = base; }
+  saveNeck(localStore, neckMem);
+};
 const favChip = $('favChip');
 const infoFav = $('infoFav');
 const infoPlayed = $('infoPlayed');
@@ -1779,11 +1789,11 @@ els.mixerBtn.addEventListener('wheel', (e) => {
 }, { passive: false });
 document.addEventListener('input', (e) => {
   const name = e.target.dataset?.setting;
-  if (name) setSetting(name, Number(e.target.value));
+  if (name) { setSetting(name, Number(e.target.value)); if (name === 'neck') rememberNeck(Number(e.target.value)); }
 });
 for (const name of Object.keys(SETTING_DEFAULTS)) setSetting(name, SETTING_DEFAULTS[name]); // starts the reset buttons disabled
 for (const btn of document.querySelectorAll('[data-reset]')) {
-  btn.addEventListener('click', () => setSetting(btn.dataset.reset, SETTING_DEFAULTS[btn.dataset.reset]));
+  btn.addEventListener('click', () => { setSetting(btn.dataset.reset, SETTING_DEFAULTS[btn.dataset.reset]); if (btn.dataset.reset === 'neck') rememberNeck(undefined); });
 }
 
 const popovers = [[els.infoBtn, els.infoPop], [els.sectionBtn, els.sectionPop], [els.mixerBtn, els.mixerPop], [els.settingsBtn, els.settingsPop]];
@@ -3768,6 +3778,7 @@ const settingsPage = mountSettings({
     }),
   },
 });
+{ const g = restoredGlobal(neckMem, prefs.get('highway.neck')); if (g !== undefined) setSetting('neck', g); } // the neck speed chosen last time (while the starting setting is still the one it was chosen over)
 syncQualityStatus(); // (the status line under the adaptive quality setting)
 attachScrollThumb(document.querySelector('#settingsPage .sp-content')); // the same slim thumb as the details
 
