@@ -199,6 +199,174 @@ function taperedStrip(g, d0, d1, mid, wl, dRef) {
   for (let i = N; i >= 0; i--) g.lineTo(right[2 * i], right[2 * i + 1]);
   g.closePath();
 }
+// The 'flow' tail style (setting highway.tailStyle): a body in the lane colour with a lighter core and spine and a rounded tip, built from a
+// few segments and filled in batches (one fill per body colour, one for every core, one for every spine), plus, on a held tail only, chevrons
+// that run down it towards the hit line, a soft halo and a glow where it meets the hit line. All a pure function of the time.
+export const FLOW_PERIOD = 0.1; // seconds between two chevrons passing the same point
+export const FLOW_SPACING = 0.18; // chart seconds between two chevrons along the tail (they run at SPACING / PERIOD = 1.8x the notes' speed, so they flow down the tail)
+const FLOW_CHEVRONS = 12; // at most this many on one tail
+const FLOW_TIP = 1.1; // the tip's length beyond the tail's end, in half widths
+// The chevrons' phase at time t, 0..1 (periodic, FLOW_PERIOD).
+export const flowPhase = (t) => { const x = t / FLOW_PERIOD; return x - Math.floor(x); };
+// Chevron k's distance ahead of the hit line at time t, in chart seconds: it falls as t grows (towards the hit line), and chevron k + 1
+// takes the place of chevron k after one period.
+export const flowPulseAt = (k, t) => FLOW_SPACING * (k + 1 - flowPhase(t));
+// Segments of one side of a flow tail `lenPx` pixels long on screen: a straight road needs few (the taper is the only bend), a curved one one more.
+export const tailSegments = (lenPx, curved) => Math.max(1, Math.min(6, Math.ceil(lenPx / 90) + (curved ? 1 : 0)));
+// The visible flow tails of the frame (columns, reused): depths, centre and half width in lane units, segments, tip, body fill, amount held
+const FT = { n: 0, d0: [], d1: [], mid: [], wl: [], segs: [], tip: [], body: [], amt: [], col: [] };
+const FT_BODIES = []; // the distinct body fills of the frame
+// One flow tail outline as a subpath of the current path (no beginPath): the tapered sides sampled closer together near the base, where
+// both the width and the screen position change fastest, and a rounded tip when `tip`.
+function flowStrip(g, d0, d1, mid, wl, segs, tip) {
+  const right = TAIL_RIGHT;
+  const sRef = 1 / (1 + PK * d0);
+  let halfPx = 0, xe = 0, ye = 0;
+  for (let i = 0; i <= segs; i++) {
+    const u = i / segs;
+    const d = d0 + (d1 - d0) * u * u;
+    const sc = 1 / (1 + PK * d);
+    const halfW = wl * (TAIL_MIN_WIDTH + (1 - TAIL_MIN_WIDTH) * (sc / sRef) ** TAIL_TAPER_POWER); // (tailFactor)
+    const y = PVY + (PHIT - PVY) * sc + (d > 0 ? PC * d * d : 0);
+    const xm = PCX + mid * PLANE * sc;
+    halfPx = halfW * PLANE * sc;
+    if (i === 0) g.moveTo(xm - halfPx, y);
+    else g.lineTo(xm - halfPx, y);
+    right[2 * i] = xm + halfPx;
+    right[2 * i + 1] = y;
+    xe = xm; ye = y;
+  }
+  if (tip) {
+    const ty = halfPx * FLOW_TIP;
+    g.lineTo(xe - 0.7 * halfPx, ye - 0.7 * ty);
+    g.lineTo(xe, ye - ty);
+    g.lineTo(xe + 0.7 * halfPx, ye - 0.7 * ty);
+  }
+  for (let i = segs; i >= 0; i--) g.lineTo(right[2 * i], right[2 * i + 1]);
+  g.closePath();
+}
+// Draws the sustains of notes[from .. end) in the flow style. Static tails cost (body colours + 2) fills in all; a held one adds a halo,
+// its chevrons and its contact glow.
+function drawFlowTails(g, hw, notes, from, end, t, colors, half, headR, tailW, windowSec, held) {
+  const ft = FT;
+  ft.n = 0;
+  FT_BODIES.length = 0;
+  let anyHeld = false;
+  const curved = PC > 0;
+  for (let vi = from; vi < end; vi++) {
+    const n = notes[vi];
+    if (!n.length || n.lane < 0) continue;
+    const dTop = Math.min(depth(n.time + n.length), PEND);
+    const dBot = depth(Math.max(n.time, t));
+    if (dTop <= dBot) continue;
+    setDesaturated(hw.disabledNote(n)); // disabled notes lose their colour
+    if (n.open) {
+      g.fillStyle = withAlpha(NOTE_PALETTE.open, 0.3);
+      quad(g, dBot, dTop, -half, half);
+      g.fill();
+      continue;
+    }
+    const lenPx = (PVY + (PHIT - PVY) / (1 + PK * dBot) + (dBot > 0 ? PC * dBot * dBot : 0)) - (PVY + (PHIT - PVY) / (1 + PK * dTop) + PC * dTop * dTop);
+    if (lenPx < 1) continue; // (nothing to see)
+    const amt = heldAmount(n, t);
+    const col = noteColor(n, colors);
+    const k = ft.n++;
+    ft.d0[k] = dBot;
+    ft.d1[k] = dTop;
+    ft.mid[k] = n.lane + 0.5 - half;
+    ft.wl[k] = headR * noteScale(n) * 0.38 * tailW * (1 + 0.15 * amt); // (HOPO notes are smaller; a held tail swells a little)
+    ft.segs[k] = tailSegments(lenPx, curved);
+    ft.tip[k] = n.time + n.length <= t + windowSec;
+    const body = withAlpha(col, Math.round((0.6 + 0.3 * amt) * 20) / 20); // (bucketed, so held tails batch too)
+    ft.body[k] = body;
+    ft.amt[k] = amt;
+    ft.col[k] = col;
+    if (amt > 0) anyHeld = true;
+    if (!FT_BODIES.includes(body)) FT_BODIES.push(body);
+  }
+  if (ft.n === 0) return;
+  setDesaturated(false); // (the body fills were made above, per note; only held tails, never disabled, take a colour below)
+  // held: a soft halo under the body
+  if (anyHeld) {
+    for (let k = 0; k < ft.n; k++) {
+      if (!(ft.amt[k] > 0)) continue;
+      g.fillStyle = withAlpha(ft.col[k], Math.round(0.16 * ft.amt[k] * 100) / 100);
+      g.beginPath();
+      flowStrip(g, ft.d0[k], ft.d1[k], ft.mid[k], ft.wl[k] * 1.9, ft.segs[k], ft.tip[k]);
+      g.fill();
+    }
+  }
+  // the bodies, one fill per colour
+  for (let b = 0; b < FT_BODIES.length; b++) {
+    const body = FT_BODIES[b];
+    g.fillStyle = body;
+    g.beginPath();
+    for (let k = 0; k < ft.n; k++) if (ft.body[k] === body) flowStrip(g, ft.d0[k], ft.d1[k], ft.mid[k], ft.wl[k], ft.segs[k], ft.tip[k]);
+    g.fill();
+  }
+  // a lighter core and a bright spine, white over every colour at once
+  g.fillStyle = '#ffffff';
+  g.globalAlpha = 0.16;
+  g.beginPath();
+  for (let k = 0; k < ft.n; k++) flowStrip(g, ft.d0[k], ft.d1[k], ft.mid[k], ft.wl[k] * 0.55, ft.segs[k], ft.tip[k]);
+  g.fill();
+  g.globalAlpha = 0.42;
+  g.beginPath();
+  for (let k = 0; k < ft.n; k++) flowStrip(g, ft.d0[k], ft.d1[k], ft.mid[k], ft.wl[k] * 0.16, ft.segs[k], ft.tip[k]);
+  g.fill();
+  g.globalAlpha = 1;
+  if (!anyHeld) return;
+  // held: chevrons running down the tail (still when the held motion is off), growing in at the far end and shrinking into the hit line.
+  // Each is a V pointing at the hit line, laid out on screen along the tail's direction and sized by the tail's width there.
+  const ph = held ? flowPhase(t) : 0;
+  for (let k = 0; k < ft.n; k++) {
+    const amt = ft.amt[k];
+    if (!(amt > 0)) continue;
+    const mid = ft.mid[k], wl = ft.wl[k] * 1.05, d1 = ft.d1[k];
+    const left = d1 * PSEC; // chart seconds of tail ahead of the hit line
+    const s1 = 1 / (1 + PK * d1);
+    const bx = PCX + mid * PLANE, ex = PCX + mid * PLANE * s1, ey = PVY + (PHIT - PVY) * s1 + PC * d1 * d1;
+    const len = Math.hypot(ex - bx, ey - PHIT) || 1;
+    const ux = (ex - bx) / len, uy = (ey - PHIT) / len; // along the tail, away from the hit line
+    g.globalAlpha = 0.75 * amt;
+    g.fillStyle = tintWhite(ft.col[k], 0.75);
+    g.beginPath();
+    for (let c = 0; c < FLOW_CHEVRONS; c++) {
+      const x = FLOW_SPACING * (c + 1 - ph);
+      if (x >= left) break;
+      const f = Math.min(1, (left - x) / 0.12, x / 0.06); // grows in from the far end, shrinks into the hit line
+      if (!(f > 0)) continue;
+      const d = x / PSEC;
+      const sc = 1 / (1 + PK * d);
+      const hp = wl * (TAIL_MIN_WIDTH + (1 - TAIL_MIN_WIDTH) * sc ** TAIL_TAPER_POWER) * PLANE * sc * f; // half width in px (the held tail's base is the hit line)
+      const px = PCX + mid * PLANE * sc, py = PVY + (PHIT - PVY) * sc + PC * d * d;
+      const vee = 1.1 * hp, th = 0.85 * hp; // the depth of the V and the chevron's thickness, in px along the tail
+      g.moveTo(px, py);
+      g.lineTo(px + hp + ux * vee, py + uy * vee);
+      g.lineTo(px + hp + ux * (vee + th), py + uy * (vee + th));
+      g.lineTo(px + ux * th, py + uy * th);
+      g.lineTo(px - hp + ux * (vee + th), py + uy * (vee + th));
+      g.lineTo(px - hp + ux * vee, py + uy * vee);
+      g.closePath();
+    }
+    g.fill();
+  }
+  // held: the contact glow where the tail meets the hit line (additive, one small ellipse each)
+  g.globalCompositeOperation = 'lighter';
+  const flick = held ? 0.85 + 0.15 * Math.sin(t * 22) : 1;
+  for (let k = 0; k < ft.n; k++) {
+    const amt = ft.amt[k];
+    if (!(amt > 0)) continue;
+    const rx = ft.wl[k] * 2.4 * PLANE;
+    g.globalAlpha = 0.5 * amt * flick;
+    g.fillStyle = ft.col[k];
+    g.beginPath();
+    g.ellipse(PCX + ft.mid[k] * PLANE, PHIT, rx, rx * HEAD_TILT * 0.5, 0, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.globalCompositeOperation = 'source-over';
+  g.globalAlpha = 1;
+}
 // A drum fill band: a full-strength quad from the phrase start to the activation chord (no fades), with a thin bright line
 // across the road at the start and end.
 function fillBand3D(g, spans, color, xl, xr, roadW) {
@@ -492,7 +660,8 @@ export function renderLanes3D(hw, t, w, h) {
   g.globalAlpha = 1;
 
   // sustains
-  for (let vi = from; vi < end; vi++) {
+  if (hw.tailStyle === 'flow') drawFlowTails(g, hw, notes, from, end, t, colors, half, headR, tailW, windowSec, held);
+  else for (let vi = from; vi < end; vi++) {
     const n = notes[vi];
     setDesaturated(hw.disabledNote(n)); // disabled notes lose their colour
     if (!n.length || n.lane < 0) continue;

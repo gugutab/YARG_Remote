@@ -48,3 +48,27 @@ test('curve 0 is the flat road; a curve moves only depths past the hit line, dow
     }
   }
 });
+
+test('flow tails: few segments, more for long or curved tails, at most 6', async () => {
+  const { tailSegments } = await import('../src/highway3d.js');
+  assert.equal(tailSegments(0.5, false), 1);
+  assert.equal(tailSegments(60, false), 1);
+  assert.equal(tailSegments(60, true), 2);
+  assert.equal(tailSegments(250, false), 3);
+  assert.equal(tailSegments(5000, true), 6);
+  for (let px = 1; px < 2000; px += 37) assert.ok(tailSegments(px, false) <= tailSegments(px + 37, false));
+});
+
+test('flow chevrons: periodic, deterministic and running towards the hit line', async () => {
+  const { flowPhase, flowPulseAt, FLOW_PERIOD, FLOW_SPACING } = await import('../src/highway3d.js');
+  for (const t of [0, 0.01, 1.234, 57.9, 356.02]) {
+    assert.ok(flowPhase(t) >= 0 && flowPhase(t) < 1);
+    assert.ok(Math.abs(flowPhase(t + FLOW_PERIOD) - flowPhase(t)) < 1e-9 || Math.abs(Math.abs(flowPhase(t + FLOW_PERIOD) - flowPhase(t)) - 1) < 1e-9);
+    assert.equal(flowPulseAt(2, t), flowPulseAt(2, t)); // a pure function of the time
+    const dt = FLOW_PERIOD / 50;
+    if (flowPhase(t) + dt / FLOW_PERIOD < 1) assert.ok(flowPulseAt(0, t + dt) < flowPulseAt(0, t)); // moves towards the hit line
+    // one period later chevron k + 1 stands where chevron k was
+    assert.ok(Math.abs(flowPulseAt(1, t + FLOW_PERIOD) - flowPulseAt(1, t)) < 1e-9);
+    assert.ok(Math.abs(flowPulseAt(1, t) - flowPulseAt(0, t) - FLOW_SPACING) < 1e-9);
+  }
+});
