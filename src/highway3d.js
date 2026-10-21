@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, NOTE_RECT_W, NOTE_RECT_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, HIT_LINE_COLOR, HIT_LINE_BORDER, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
 
@@ -333,7 +333,17 @@ export function renderLanes3D(hw, t, w, h) {
       barFlash = 1 - past / BAR_FLASH_SEC;
     }
   }
-  // (there is no hit line: the pads mark the spot; a pedal hit lights every pad)
+  if (hw.hitLine) { // a fixed bar across the road at the hit line, as thick as the pedal / open bars, with a fixed border at each end
+    g.fillStyle = HIT_LINE_COLOR;
+    quad(g, -barDepth / 2, barDepth / 2, -half, half);
+    g.fill();
+    g.fillStyle = HIT_LINE_BORDER;
+    quad(g, -barDepth * 0.9, barDepth * 0.9, -half - FILL_BORDER_LANES, -half + FILL_BORDER_LANES * 0.4);
+    g.fill();
+    quad(g, -barDepth * 0.9, barDepth * 0.9, half - FILL_BORDER_LANES * 0.4, half + FILL_BORDER_LANES);
+    g.fill();
+  }
+  // (the pads mark the spot; a pedal hit lights every pad)
   const padRx = laneW * headR;
   for (let i = 0; i < lanes; i++) {
     const x = cx + (i + 0.5 - half) * laneW;

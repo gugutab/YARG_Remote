@@ -32,6 +32,8 @@ export const FILL_STRONG = 'rgba(40,200,90,0.5)'; // the lead-up: a stronger gre
 export const BAND_BORDERS = { // the side borders of the other overlay bands (setting highway.bandBorders), like the fill's: the band's own colour, solid
   starPower: 'rgba(255,190,40,0.95)', solo: 'rgba(40,180,255,0.95)', kick: 'rgba(255,150,50,0.95)', tremolo: 'rgba(80,220,80,0.95)', trill: 'rgba(255,215,60,0.95)',
 };
+export const HIT_LINE_COLOR = 'rgba(255,255,255,0.14)'; // the fixed bar at the hit line (setting highway.hitLine), as thick as the pedal / open bars
+export const HIT_LINE_BORDER = 'rgba(255,255,255,0.6)'; // and its fixed borders at both ends
 export const FILL_BORDER = 'rgba(90,240,130,0.95)'; // the green side borders of the fretboard along a fill (thicker than the normal board edge)
 export const FILL_BORDER_PX = 5; // 2D width
 export const FILL_BORDER_LANES = 0.09; // 3D width, in lane units (scaled by the perspective)

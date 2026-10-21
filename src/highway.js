@@ -20,6 +20,8 @@ import {
   FILL_STRONG,
   FILL_BORDER,
   FILL_BORDER_PX,
+  HIT_LINE_COLOR,
+  HIT_LINE_BORDER,
   BAND_BORDERS,
   FILL_EDGE,
   FILL_ACTIVATION,
@@ -198,6 +200,7 @@ export class Highway {
     this.rectPool = []; // the objects of paneRects
     this.vocalView = 'track'; // 'track' (notes + lyrics) or 'karaoke' (the lyrics alone)
     this._fillBand = true; // the green band during a drum fill (setting highway.fillBand, on by default; the big rock ending band always shows)
+    this.hitLine = true; // the fixed bar and borders at the hit line (highway.hitLine)
     this.bandBorders = true; // thick side borders along the star power, solo, roll and big rock ending bands (highway.bandBorders)
     this._fillActivation = true; // the glow, ring and star on a fill's activation note and the pad flash when it arrives (setting highway.fillActivation)
     this._starPowerBand = false; // the gold band under a star power phrase (setting highway.starPowerBand, off by default)
@@ -1457,7 +1460,14 @@ export class Highway {
       if (i % 2 === 0) g.fillRect(x0 + i * laneW, 0, laneW, h); // down to the bottom edge, where it fades out
     }
     g.globalAlpha = 1;
-    // (there is no hit line: the pads mark the spot)
+    if (this.hitLine) { // a fixed bar across the board at the hit line, as thick as the pedal / open bars, with a fixed border at each end
+      const barH = KICK_BAR_HALF_H * this.kickBar * 2;
+      g.fillStyle = HIT_LINE_COLOR;
+      g.fillRect(x0, hitY - barH / 2, laneW * chart.lanes, barH);
+      g.fillStyle = HIT_LINE_BORDER;
+      g.fillRect(x0, hitY - barH / 2 - 4, FILL_BORDER_PX, barH + 8);
+      g.fillRect(x0 + laneW * chart.lanes - FILL_BORDER_PX, hitY - barH / 2 - 4, FILL_BORDER_PX, barH + 8);
+    }
 
     // sustains first, then heads
     const from = firstVisibleIndex(chart.notes, t, this.maxLength);
