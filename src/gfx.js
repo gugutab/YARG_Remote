@@ -811,13 +811,17 @@ rebuildYNote(YNOTE_CUT); // (after the gradient caches it resets exist)
 // (TAPER_GAIN / dist in 3D, 0 in 2D) and `side` scales the height of the base under the note (how much of the front face the view shows). Uses the caller's
 // globalAlpha and filter.
 // `cacheable`: the caller's colours are steady from frame to frame (not a held or exiting note's changing tint); a flat (2D) note is then drawn from a
-// cached picture of itself (ynSprite) when nothing in the canvas state would make that look different.
-// Setting highway.fast3dNotes: 3D notes come from scaled cached pictures (about a third faster, slightly softer edges); off = every 3D note drawn directly.
+// cached picture of itself (ynSprite) when nothing in the canvas state would make that look different, and a 3D note under NOTE_SPRITE_PX device px of half
+// width from a scaled cached picture (ynSprite3D; at any opacity: the picture fades as one piece). In a GPU canvas a note's ~13 fills cost far more than one
+// drawImage (Highway Star, 3 panes: the rectangular notes cost about as much as the round ones this way); the nearest notes of a big window stay direct.
+// Setting highway.fast3dNotes: every 3D note from the cached pictures, whatever its size.
 let fast3d = false;
+const NOTE_SPRITE_PX = 48;
+export const noteSpritePx = () => (fast3d ? Infinity : NOTE_SPRITE_PX); // (the size limit of 3D pictures, for the cymbal discs too)
 export function setFast3dNotes(on) { fast3d = !!on; }
 export function drawYNote(g, x, y, hw, hh, n, laneColor, bodyColor, taper = 0, side = 1, cacheable = false) {
-  if (cacheable && !desat && g.globalAlpha === 1 && g.filter === 'none' && g.globalCompositeOperation === 'source-over' && typeof g.getTransform === 'function'
-    && (taper === 0 ? ynSprite(g, x, y, hw, hh, n, laneColor, bodyColor, side) : fast3d && ynSprite3D(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side))) return;
+  if (cacheable && g.filter === 'none' && g.globalCompositeOperation === 'source-over' && typeof g.getTransform === 'function'
+    && (taper === 0 ? !desat && g.globalAlpha === 1 && ynSprite(g, x, y, hw, hh, n, laneColor, bodyColor, side) : ynSprite3D(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side, noteSpritePx()))) return;
   drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side);
 }
 
@@ -826,40 +830,56 @@ export function drawYNote(g, x, y, hw, hh, n, laneColor, bodyColor, taper = 0, s
 // (half width in device px rounded to a power of YN3_STEP) at YN3_SS times that size, then drawn scaled to the exact size and sub-pixel place with
 // drawImage (bilinear). Unlike the flat sprites this resamples: edges differ from the direct path by up to ~1/4 of their contrast on a few pixels.
 // The detail level (parts dropped under 24 / 16 / 9 px) follows the note's real size, so it is part of the key. Same canvas-state conditions as ynSprite.
-// Cleared when it holds YN3_MAX sprites or YN3_MAX_PX pixels, or the note's cut changes.
+// When it holds YN3_MAX sprites or YN3_MAX_PX pixels it drops the least recently used ones; cleared when the note's cut changes. Cymbal discs use it too (sprite3D).
 const YN3_STEP = 1.05;
 const YN3_SS = 2;
-const YN3_MAX = 1200;
-const YN3_MAX_PX = 8e6; // (~32 MB; Highway Star with 3 panes at 1300x760 holds ~570 sprites, 1.8 M px)
+const YN3_MAX = 2000;
+const YN3_MAX_PX = 12e6; // (~48 MB; Highway Star played through, 3 panes at 1300x760: ~1070 sprites, 4 M px; 2 panes at 1920x1080: ~800, 7.5 M px)
 const LOG_YN3_STEP = Math.log(YN3_STEP);
-function ynSprite3D(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side) {
+function ynSprite3D(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side, maxPx) {
+  if (!(hw < maxPx)) return false; // (a cheap first test in note units)
+  const kq = Math.round(taper * (hh / YN_HH) * 1e7); // the taper per design unit (equal up to rounding noise at every depth)
+  const dark = n.tap || n.ghost;
+  const key = `${bodyColor}|${dark && n.sp ? laneColor : ''}|${n.sp ? 1 : 0}${n.tap ? 1 : 0}${n.ghost ? 1 : 0}${n.hopo || n.accent ? 1 : 0}|${kq}|${Math.round((hh * 1e4) / hw)}|${side}|${hw >= 24 ? 2 : hw >= 16 ? 1 : 0}${hw >= 9 ? 1 : 0}`;
+  // the note's extent around (x, y) as in ynSprite, widened by the taper at the farthest row, in units of hw
+  const mid = (YT - YN_CY + YN_BASE_V) / 2;
+  const vLo = YT - YN_CY;
+  const vHi = Math.max(baseRow(96.5, side) + 3.4 * Math.max(0.5, side), baseRow(96, side));
+  const ex = (100 * (1 + Math.abs(kq / 1e7) * Math.max(Math.abs(vLo), Math.abs(vHi)))) / YN_HW;
+  const ey = (Math.max(Math.abs(vLo - mid), Math.abs(vHi - mid)) * hh) / YN_HH / hw;
+  return sprite3D(g, x, y, hw, maxPx, key, ex, ey, (sg) => drawYNoteDirect(sg, 0, 0, hw, hh, n, laneColor, bodyColor, taper, side));
+}
+// A cached picture of a 3D shape that scales uniformly with the road (see above). `r` is its half width in canvas units, `key` names everything but its
+// size, (ex, ey) is its half extent around (x, y) in units of r, and draw(sg) draws it centred on (0, 0) of sg at the caller's size. False (nothing drawn)
+// when its half width is maxPx device px or more, or the transform is not a plain scale + translate.
+export function sprite3D(g, x, y, r, maxPx, key, ex, ey, draw) {
+  if (!(r < maxPx)) return false;
   const m = g.getTransform();
   if (m.b !== 0 || m.c !== 0 || !(m.a > 0) || !(m.d > 0)) return false;
-  const hwd = hw * m.a; // half width in device px
-  const bi = Math.round(Math.log(hwd) / LOG_YN3_STEP);
-  const f = (Math.exp(bi * LOG_YN3_STEP) * YN3_SS) / hwd; // sprite px per device px
-  const kq = Math.round(taper * (hh / YN_HH) * 1e7); // the taper per design unit (equal up to rounding noise at every depth)
-  const asp = Math.round((hh * m.d * 1e4) / hwd);
-  const dark = n.tap || n.ghost;
-  const key = `${bodyColor}|${dark && n.sp ? laneColor : ''}|${n.sp ? 1 : 0}${n.tap ? 1 : 0}${n.ghost ? 1 : 0}${n.hopo || n.accent ? 1 : 0}|${bi}|${kq}|${asp}|${side}|${hw >= 24 ? 2 : hw >= 16 ? 1 : 0}${hw >= 9 ? 1 : 0}`;
-  let sp = yn3Sprites.get(key);
-  if (!sp) {
-    // the note's extent around (x, y) as in ynSprite, widened by the taper at the farthest row
-    const sy = hh / YN_HH;
-    const mid = (YT - YN_CY + YN_BASE_V) / 2;
-    const vLo = YT - YN_CY;
-    const vHi = Math.max(baseRow(96.5, side) + 3.4 * Math.max(0.5, side), baseRow(96, side));
-    const vMax = Math.max(Math.abs(vLo - mid), Math.abs(vHi - mid));
-    const X = Math.ceil(((100 * (1 + Math.abs(kq / 1e7) * Math.max(Math.abs(vLo), Math.abs(vHi))) * hw) / YN_HW) * m.a * f) + 3;
-    const Y = Math.ceil(vMax * sy * m.d * f) + 3;
+  const rd = r * m.a; // half width in device px
+  if (!(rd < maxPx)) return false;
+  const bi = Math.round(Math.log(rd) / LOG_YN3_STEP);
+  const f = (Math.exp(bi * LOG_YN3_STEP) * YN3_SS) / rd; // sprite px per device px
+  const fullKey = `${key}|${desat ? 1 : 0}|${bi}|${Math.round((m.d * 1e4) / m.a)}`;
+  let sp = yn3Sprites.get(fullKey);
+  if (sp) { // (most recently used last: the oldest go first when the cache is full)
+    yn3Sprites.delete(fullKey);
+    yn3Sprites.set(fullKey, sp);
+  } else {
+    const X = Math.ceil(ex * rd * f) + 3;
+    const Y = Math.ceil(ey * r * m.d * f) + 3;
     const canvas = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(2 * X, 2 * Y) : Object.assign(document.createElement('canvas'), { width: 2 * X, height: 2 * Y });
     const sg = canvas.getContext('2d');
     sg.setTransform(m.a * f, 0, 0, m.d * f, X, Y);
-    drawYNoteDirect(sg, 0, 0, hw, hh, n, laneColor, bodyColor, taper, side);
-    if (yn3Sprites.size >= YN3_MAX || yn3Px >= YN3_MAX_PX) { yn3Sprites.clear(); yn3Px = 0; }
-    sp = { canvas, X, Y };
-    yn3Sprites.set(key, sp);
-    yn3Px += 4 * X * Y;
+    draw(sg);
+    for (const [k, old] of yn3Sprites) { // (a full cache drops its least recently used pictures, not all of them at once)
+      if (yn3Sprites.size < YN3_MAX && yn3Px < YN3_MAX_PX) break;
+      yn3Sprites.delete(k);
+      yn3Px -= old.px;
+    }
+    sp = { canvas, X, Y, px: 4 * X * Y };
+    yn3Sprites.set(fullKey, sp);
+    yn3Px += sp.px;
   }
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.drawImage(sp.canvas, m.a * x + m.e - sp.X / f, m.d * y + m.f - sp.Y / f, (2 * sp.X) / f, (2 * sp.Y) / f);
