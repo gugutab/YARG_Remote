@@ -61,6 +61,11 @@ test('forced HOPO (offset +5) makes a note a HOPO even after a long gap', () => 
 test('drum rolls: 126 is a tremolo lane and 127 a trill lane, as time spans', () => {
   const midi = trackMidi('PART DRUMS', [
     { tick: 0, pitch: 96, len: 120 },
+    { tick: 0, pitch: 97, len: 60 },     // the hits that make the lanes valid (YARG: a tremolo needs two hits of a pad, a trill three alternating)
+    { tick: 240, pitch: 97, len: 60 },
+    { tick: 960, pitch: 97, len: 60 },
+    { tick: 1080, pitch: 98, len: 60 },
+    { tick: 1200, pitch: 97, len: 60 },
     { tick: 0, pitch: 126, len: 480 },   // tremolo over [0, 0.5) s at 120 bpm
     { tick: 960, pitch: 127, len: 480 }, // trill over [1, 1.5) s
   ]);
@@ -69,4 +74,13 @@ test('drum rolls: 126 is a tremolo lane and 127 a trill lane, as time spans', ()
     ['tremolo', 0, 0.5],
     ['trill', 1, 1.5],
   ]);
+});
+
+test('drum rolls: markers over one or two notes are not lanes (YARG validation)', () => {
+  const midi = trackMidi('PART DRUMS', [
+    { tick: 0, pitch: 97, len: 60 }, { tick: 0, pitch: 126, len: 100 },       // a tremolo over a single hit
+    { tick: 480, pitch: 97, len: 60 }, { tick: 600, pitch: 98, len: 60 }, { tick: 480, pitch: 127, len: 240 }, // a trill over two hits
+    { tick: 960, pitch: 96, len: 60 }, { tick: 960, pitch: 125, len: 100 },   // a kick lane over one kick
+  ]);
+  assert.deepEqual(buildChart(midi, DRUMS, EXPERT).rolls, []);
 });

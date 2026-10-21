@@ -84,7 +84,7 @@ test('hopo threshold scales with the resolution (res * 65 / 192, like .chart in 
 
 test('drums: 4 lanes without cymbal flags, kick, double kick, accent and ghost', () => {
   const midi = parseChart(chartText({
-    extra: section('ExpertDrums', ['  0 = N 0 0', '  0 = N 32 0', '  0 = N 1 0', '  0 = N 34 0', '  192 = N 2 0', '  192 = N 41 0', '  384 = N 3 0', '  384 = N 40 0', '  0 = S 64 192', '  0 = S 65 96']),
+    extra: section('ExpertDrums', ['  0 = N 0 0', '  0 = N 32 0', '  0 = N 1 0', '  0 = N 34 0', '  192 = N 2 0', '  192 = N 41 0', '  384 = N 3 0', '  384 = N 40 0', '  96 = N 1 0', '  0 = S 64 192', '  0 = S 65 100']),
   }));
   const opts = instrumentOptions(midi);
   assert.deepEqual(opts.map((o) => o.id), ['drums-four']);
@@ -189,8 +189,8 @@ test('per difficulty: star power, solo and forced/tap/open flags stay in their o
 
 test('per difficulty: drum fills, rolls and cymbal flags do not leak', () => {
   const midi = parseChart(chartText({
-    extra: section('ExpertDrums', ['  0 = N 2 0', '  0 = N 66 0', '  0 = S 65 96', '  500 = S 64 100'])
-      + section('HardDrums', ['  0 = N 2 0', '  192 = S 66 96']),
+    extra: section('ExpertDrums', ['  0 = N 2 0', '  0 = N 66 0', '  48 = N 2 0', '  0 = S 65 96', '  500 = S 64 100'])
+      + section('HardDrums', ['  0 = N 2 0', '  192 = N 1 0', '  224 = N 2 0', '  256 = N 1 0', '  192 = S 66 96']),
   }));
   const pro = instrumentOptions(midi).find((o) => o.id === 'drums-pro');
   const expert = buildChart(midi, pro, EXPERT);

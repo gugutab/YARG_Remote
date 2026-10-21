@@ -324,6 +324,30 @@ function rollSpans(track, toSec) {
     .map((n) => ({ start: toSec(n.tick), end: toSec(n.endTick), type: ROLL_TYPES[n.pitch] }));
 }
 
+// Which of the roll markers are real lanes, as YARG decides (MoonSongLoader.Drums.cs: GetDrumTremoloPad, GetDrumTrillPads, GetKickLaneNotes). Some charts
+// (e.g. Guitar Hero 5 conversions) carry hundreds of tiny 126/127 markers over one or two notes: YARG ignores them, so none is drawn here either.
+//  - tremolo: at least two hits, and a pad of the first hit (a kick does not count) comes back later;
+//  - trill: at least three hits, the first a single pad, the second a different single pad, the third the first pad again (kicks ignored);
+//  - kick lane: more than one kick.
+// A hit is the notes sharing a time; `notes` are sorted by time (lane -1 = a kick).
+export function validRolls(rolls, notes) {
+  return rolls.filter((r) => {
+    const hits = [];
+    for (const n of notes) {
+      if (n.time < r.start - 1e-6) continue;
+      if (n.time >= r.end - 1e-6) break;
+      const last = hits[hits.length - 1];
+      if (last && Math.abs(last.time - n.time) < 1e-6) last.notes.push(n); else hits.push({ time: n.time, notes: [n] });
+    }
+    const padsOf = (h) => h.notes.filter((n) => n.lane >= 0).map((n) => n.lane);
+    if (r.type === 'kick') return hits.reduce((c, h) => c + h.notes.filter((n) => n.lane < 0).length, 0) > 1;
+    const pads = hits.map(padsOf).filter((p) => p.length > 0); // (kicks alone are not hits of a tremolo or a trill)
+    if (r.type === 'tremolo') return pads.length >= 2 && pads[0].some((p) => pads.slice(1).some((q) => q.includes(p)));
+    if (r.type === 'trill') return pads.length >= 3 && pads[0].length === 1 && pads[1].length === 1 && pads[1][0] !== pads[0][0] && pads[2].length === 1 && pads[2][0] === pads[0][0];
+    return true;
+  });
+}
+
 function buildDrumChart(midi, track, kind, difficulty, timed, toSec, settings) {
   const extended = kind === 'extended';
   const lanes = extended ? EXTENDED_DRUM_LANES.length : kind === 'five' ? 5 : 4;
@@ -356,7 +380,7 @@ function buildDrumChart(midi, track, kind, difficulty, timed, toSec, settings) {
     });
   }
   const notes = [...kicks.values(), ...pads].sort((a, b) => a.time - b.time);
-  const chart = { mode: 'lanes', lanes, laneColors, laneKinds: extended ? EXTENDED_DRUM_LANES.map((l) => (l.cymbal ? 'cymbal' : 'tom')) : null, drumKind: kind, notes, rolls: rollSpans(track, toSec), ...commonParts(midi, track, toSec, settings, 'drums') };
+  const chart = { mode: 'lanes', lanes, laneColors, laneKinds: extended ? EXTENDED_DRUM_LANES.map((l) => (l.cymbal ? 'cymbal' : 'tom')) : null, drumKind: kind, notes, rolls: validRolls(rollSpans(track, toSec), notes), ...commonParts(midi, track, toSec, settings, 'drums') };
   markFillNotes(chart);
   return chart;
 }
