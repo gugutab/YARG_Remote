@@ -604,9 +604,11 @@ export function renderLanes3D(hw, t, w, h) {
       // per note per frame, the largest part of a dense frame with circles; the HOPO dot is in the picture too
       const style = n.cymbal ? 'tri' : hw.noteStyle;
       const dist = y - vy;
+      const dot = n.hopo && g.globalAlpha === 1; // (while the note fades in, its dot is drawn over the faded picture, as before: in the picture it would fade as one piece with the face and turn grey)
       if (kx === 0 && amt === 0 && g.filter === 'none' && g.globalCompositeOperation === 'source-over'
-        && sprite3D(g, x, y, rx, noteSpritePx(), `head|${style}|${body}|${colors[n.lane]}|${n.tap && !n.sp ? 1 : 0}${n.accent ? 1 : 0}${n.hopo ? 1 : 0}|${Math.round((lw * 100) / rx)}|${Math.round((dist * 100) / rx)}`,
-          headExtentX(style, rx, dist, lw), headExtentY(style, rx, lw), (sg) => { drawHead3D(sg, 0, 0, rx, ry, -dist, n, colors, body, lw, false, style); if (n.hopo) hopoDot(sg, 0, 0, rx, ry, hw.noteStyle, dist, 0); })) {
+        && sprite3D(g, x, y, rx, noteSpritePx(), `head|${style}|${body}|${colors[n.lane]}|${n.tap && !n.sp ? 1 : 0}${n.accent ? 1 : 0}${dot ? 1 : 0}|${Math.round((lw * 100) / rx)}|${Math.round((dist * 100) / rx)}`,
+          headExtentX(style, rx, dist, lw), headExtentY(style, rx, lw), (sg) => { drawHead3D(sg, 0, 0, rx, ry, -dist, n, colors, body, lw, false, style); if (dot) hopoDot(sg, 0, 0, rx, ry, hw.noteStyle, dist, 0); })) {
+        if (n.hopo && !dot) hopoDot(g, x, y, rx, ry, hw.noteStyle, dist, 0);
         if (n.activation && hw.fillActivation) drawActivationMark(g, x, y, rx, ry, p, t);
         continue;
       }
