@@ -558,7 +558,15 @@ export function renderLanes3D(hw, t, w, h) {
   if (hw.hitAnimation === 'burst') { // the burst: a shockwave ring and a fan of sparks on the hit line when a note arrives (setting highway.hitAnimation); drawn over the hit line
     for (let i = end - 1; i >= from; i--) {
       const n = notes[i];
-      if (n.lane < 0 || n.open) continue;
+      if (n.lane < 0 || n.open) { // a pedal / open bar: the burst happens at both ends of the bar (the old swelling and fading of the bar stays)
+        const pb = t - n.time;
+        if (pb < 0 || pb >= BURST_SEC || pb < litFrom || noteDisabled(n)) continue;
+        const bcol = n.open ? NOTE_PALETTE.open : chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick;
+        const side = laneW * headR * 1.15;
+        drawHitBurst(g, PCX - half * PLANE, PHIT, side, side * HEAD_TILT, bcol, pb / BURST_SEC, n.time);
+        drawHitBurst(g, PCX + half * PLANE, PHIT, side, side * HEAD_TILT, bcol, pb / BURST_SEC, n.time + 0.5);
+        continue;
+      }
       const past = t - n.time;
       if (past < 0 || past < litFrom || noteDisabled(n)) continue;
       const bx = PCX + (n.lane + 0.5 - half) * PLANE, bw = laneW * headR, bh = laneW * headR * HEAD_TILT, bc = noteColor(n, colors);

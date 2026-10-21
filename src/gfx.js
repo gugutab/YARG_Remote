@@ -57,12 +57,12 @@ export function drawHitBurst(g, x, y, rx, ry, color, k, seed, scale = 1) {
   g.globalAlpha = Math.min(1, 1.15 * fade);
   g.stroke();
   // a quick core flash
-  if (k < 0.35) {
-    const f = 1 - k / 0.35;
+  if (k < 0.4) {
+    const env = Math.sin((Math.PI * k) / 0.4); // eases in and out (0 at the start, so it no longer pops in), peak at k = 0.2
     g.beginPath();
     g.ellipse(x, y, rx * (0.6 + 0.5 * e), ry * (0.6 + 0.5 * e), 0, 0, Math.PI * 2);
     g.fillStyle = tintWhite(color, 0.7);
-    g.globalAlpha = 0.6 * f * f;
+    g.globalAlpha = 0.55 * env * env;
     g.fill();
   }
   // the sparks: a fan going up (away from the player) and sideways, each with its own angle and reach
