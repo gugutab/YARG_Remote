@@ -147,6 +147,7 @@ export function drawBarBurst(g, cx, y, halfW, halfH, color, k, seed, spark) {
 export const HIT_LINE_COLOR = 'rgba(255,255,255,0.24)'; // the fixed bar at the hit line (setting highway.hitLine), as thick as the pedal / open bars
 export const HIT_LINE_BORDER = 'rgba(255,255,255,0.95)'; // and its fixed borders at both ends
 export const HIT_LINE_BORDER_SOFT = 'rgba(255,255,255,0.8)'; // the 3D ones, over the coloured bar (a little transparent)
+export const ROLL_LEAD_SEC = 0.07; // the roll column starts (and ends) this much outside the roll's times, so the notes at its ends sit inside it instead of half out
 export const ROLL_COLUMN_ALPHA = 0.3; // the background of the lane(s) of a tremolo / trill / kick roll: the note's own colour at this opacity, along the roll
 export const FILL_BORDER = 'rgba(90,240,130,0.95)'; // the green side borders of the fretboard along a fill (thicker than the normal board edge)
 export const FILL_BORDER_PX = 5; // 2D width

@@ -21,6 +21,7 @@ import {
   FILL_BORDER,
   FILL_BORDER_PX,
   ROLL_COLUMN_ALPHA,
+  ROLL_LEAD_SEC,
   HIT_LINE_COLOR,
   HIT_LINE_BORDER,
   BAND_BORDERS,
@@ -2116,9 +2117,9 @@ export class Highway {
     const cols = chart.laneColors || NOTE_PALETTE.lanes;
     for (let i = 0; i < spans.length; i++) {
       const s = spans[i];
-      if (!s.lanes || s.start > t + ahead) continue;
-      const top = laneY(s.end);
-      const bottom = laneY(s.start);
+      if (!s.lanes || s.start - ROLL_LEAD_SEC > t + ahead) continue;
+      const top = laneY(s.end + ROLL_LEAD_SEC);
+      const bottom = laneY(s.start - ROLL_LEAD_SEC);
       if (top > h || bottom < 0) continue;
       for (const l of s.lanes) {
         g.fillStyle = withAlpha(l >= 0 && l < lanes ? cols[l] : chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick, ROLL_COLUMN_ALPHA);
