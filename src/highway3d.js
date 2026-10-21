@@ -418,7 +418,7 @@ function span(g, spans, color, xl, xr, border = null) { // xl..xr: the lane rang
     const s = spans[i];
     if ((s.end - PT) / PSEC < ROAD_NEAR || s.start > PT + PSEC) continue;
     const near = Math.max(ROAD_NEAR, Math.min(1, (s.start - PT) / PSEC)); // the band goes on past the hit line, to the end of the board
-    quad(g, near, depth(s.end), xl, xr);
+    quad(g, near, Math.min(1, (s.end - PT) / PSEC), xl, xr); // (the far end is not clamped at the hit line: the band runs on past it, off the board)
     g.fill();
   }
   if (border && BORDERS3D) sideBorders3D(g, spans, border, border, xl, xr);
@@ -430,7 +430,7 @@ function rollColumns3D(g, spans, cols, kickCol, half, lanes) {
     const s = spans[i];
     if (!s.lanes || (s.end + ROLL_LEAD_SEC - PT) / PSEC < ROAD_NEAR || s.start - ROLL_LEAD_SEC > PT + PSEC) continue;
     const near = Math.max(ROAD_NEAR, Math.min(1, (s.start - ROLL_LEAD_SEC - PT) / PSEC));
-    const far = depth(s.end + ROLL_LEAD_SEC);
+    const far = Math.min(1, (s.end + ROLL_LEAD_SEC - PT) / PSEC);
     if (far <= near) continue;
     for (const l of s.lanes) {
       g.fillStyle = withAlpha(l >= 0 && l < lanes ? cols[l] : kickCol, ROLL_COLUMN_ALPHA);
