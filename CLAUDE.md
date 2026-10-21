@@ -597,3 +597,4 @@ Only checked by synthetic test, headless run or code reading:
 - Hit line bar: its end borders are now exactly as tall as the bar (no overhang) and the bar and borders are more opaque (0.24 / 0.95).
 - 3D hit area: with the hit line bar on, the coloured pads are no longer drawn; the bar itself is split into one segment per lane in the lane colour (brighter while that lane is hit, every segment on a pedal / open hit or a fill activation) with the white end borders. The 2D view keeps its pads.
 - 3D hit line segments are more transparent at rest (alpha 0.3, up to 0.85 when the lane is hit).
+- 3D hit line segments: back to solid colours, now the lane (note) colour under a white overlay (30% at rest, up to 75% while the lane is hit) instead of a transparent tint, so they read as the note colours.
