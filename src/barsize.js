@@ -1,7 +1,7 @@
 // Height of the player bar: the user drags a handle on the bar's stage-facing edge. Pure helpers (no DOM) so they can be tested.
 // Heights are the bar's box height in px. The range runs from just the seek bar (BAR_MIN) to the full bar (the maximum is passed in:
 // it follows --bar-h, which depends on the window width and on where the bar sits).
-export const BAR_MIN = 16; // the seek bar and a little air; nothing else is shown
+export const BAR_MIN = 12; // the seek bar (its 4 px border line and the track) and nothing else; the seek box still fits, the handle strip is outside it
 export const BAR_COMPACT_AT = 56; // from here up the one-row (compact) layout fits
 export const BAR_FULL_SLACK = 8; // within this many px of the maximum the two-row (full) layout is used
 export const BAR_STEP = 8; // (the old keyboard step; the keys now jump between the snap positions)

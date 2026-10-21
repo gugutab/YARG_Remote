@@ -38,6 +38,11 @@ test('legacy barHidden: 1 is the minimum, 0 the maximum, the new key wins', () =
   assert.equal(parseStoredHeight('80', '1', 120), 80);
 });
 
+test('an old stored 16 px height stays valid and a tiny one is clamped', () => {
+  assert.equal(parseStoredHeight('16', null, 120), 16);
+  assert.equal(parseStoredHeight('4', null, 120), BAR_MIN);
+});
+
 test('keyHeight: arrows step by 8 px, Home and End jump to the ends', () => {
   assert.equal(keyHeight('ArrowUp', 64, 120), 72);
   assert.equal(keyHeight('ArrowDown', 64, 120), 56);
@@ -50,18 +55,18 @@ test('keyHeight: arrows step by 8 px, Home and End jump to the ends', () => {
 
 
 test('snap: three positions, the nearest on release, a magnet near them, arrows jump to the next', () => {
-  assert.deepEqual(snapPositions(120), [16, 64, 120]);
-  assert.deepEqual(snapPositions(100), [16, 64, 100]);
-  assert.deepEqual(snapPositions(60), [16, 60]); // too low for a middle position
-  assert.equal(snapHeight(30, 120), 16);
+  assert.deepEqual(snapPositions(120), [12, 64, 120]);
+  assert.deepEqual(snapPositions(100), [12, 64, 100]);
+  assert.deepEqual(snapPositions(60), [12, 60]); // too low for a middle position
+  assert.equal(snapHeight(30, 120), 12);
   assert.equal(snapHeight(45, 120), 64);
   assert.equal(snapHeight(100, 120), 120);
   assert.equal(magnetHeight(70, 120), 64);
   assert.equal(magnetHeight(90, 120), 90); // between positions: untouched
-  assert.equal(nextSnap(16, 120, 1), 64);
+  assert.equal(nextSnap(12, 120, 1), 64);
   assert.equal(nextSnap(64, 120, 1), 120);
   assert.equal(nextSnap(120, 120, 1), 120);
-  assert.equal(nextSnap(64, 120, -1), 16);
-  assert.equal(nextSnap(16, 120, -1), 16);
+  assert.equal(nextSnap(64, 120, -1), 12);
+  assert.equal(nextSnap(12, 120, -1), 12);
   assert.equal(nextSnap(90, 120, -1), 64);
 });

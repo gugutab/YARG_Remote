@@ -3023,14 +3023,19 @@ function barMax() {
   const h = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar-h')) || 112;
   return Math.round(h + (barBottom() ? 8 : 0)); // (the bar at the bottom has 8 px more padding)
 }
+let barPeek = false; // the full bar is shown over the stage for a moment (only while the chosen height is the minimum)
 let barHeight = null; // px; null = full height (follows the maximum when the window changes)
 function setBarHeight(h, persist = true) {
   const max = barMax();
   const v = h == null ? max : clampHeight(h, max);
   barHeight = v >= max ? null : v;
-  const level = barLevel(v, max);
+  if (v > BAR_MIN) barPeek = false;
+  const vis = barPeek ? max : v; // what is on screen; the layout (the stage) follows v
+  const level = barLevel(vis, max);
   const before = els.app.classList.contains('bar-hidden') + (els.app.classList.contains('bar-min') ? 2 : 0);
   els.app.style.setProperty('--bar-now', `${v}px`);
+  els.app.style.setProperty('--bar-vis', `${vis}px`);
+  els.app.classList.toggle('bar-peek', barPeek);
   els.app.classList.toggle('bar-hidden', level !== 'full');
   els.app.classList.toggle('bar-min', level === 'min');
   const r = els.barResizer;
@@ -3043,6 +3048,8 @@ function setBarHeight(h, persist = true) {
   if (before !== after) closePopovers(); // (a menu of a button that just disappeared)
   alignStageButtons();
 }
+let peekTimer = 0;
+let peekArm = () => {};
 const currentBarHeight = () => barHeight ?? barMax();
 const toggleBar = () => setBarHeight(currentBarHeight() > BAR_MIN ? BAR_MIN : null); // full <-> only the seek bar
 {
@@ -3054,7 +3061,7 @@ const toggleBar = () => setBarHeight(currentBarHeight() > BAR_MIN ? BAR_MIN : nu
   let drag = null;
   r.addEventListener('pointerdown', (e) => {
     if (e.button > 0) return;
-    drag = { y: e.clientY, h: currentBarHeight(), id: e.pointerId };
+    drag = { y: e.clientY, h: barPeek ? barMax() : currentBarHeight(), id: e.pointerId, moved: false }; // (during a peek the drag starts from the bar as it is seen)
     r.setPointerCapture(e.pointerId);
     r.classList.add('dragging');
     els.app.classList.add('bar-resizing');
@@ -3064,15 +3071,18 @@ const toggleBar = () => setBarHeight(currentBarHeight() > BAR_MIN ? BAR_MIN : nu
   r.addEventListener('pointermove', (e) => {
     if (!drag || e.pointerId !== drag.id) return;
     const dy = e.clientY - drag.y;
+    if (!drag.moved) { drag.moved = true; barPeek = false; }
     setBarHeight(magnetHeight(drag.h + (barBottom() ? -dy : dy), barMax())); // the bar grows away from its edge, and sticks to a position when it comes near one
   });
   const end = (e) => {
     if (!drag || e.pointerId !== drag.id) return;
+    const moved = drag.moved;
     drag = null;
+    if (!moved) { peekArm(); endClasses(); return; }
     setBarHeight(snapHeight(currentBarHeight(), barMax())); // released: snap to the nearest of the three positions
-    r.classList.remove('dragging');
-    els.app.classList.remove('bar-resizing');
+    endClasses();
   };
+  const endClasses = () => { r.classList.remove('dragging'); els.app.classList.remove('bar-resizing'); };
   r.addEventListener('pointerup', end);
   r.addEventListener('pointercancel', end);
   r.addEventListener('lostpointercapture', end);
@@ -3084,6 +3094,41 @@ const toggleBar = () => setBarHeight(currentBarHeight() > BAR_MIN ? BAR_MIN : nu
     setBarHeight(h);
   });
   r.addEventListener('dblclick', toggleBar);
+
+  // Peek: while the chosen height is the minimum, activity shows the full bar over the stage (the layout keeps the minimum), and
+  // inactivity closes it again. Mouse movement or an upward swipe starts it; keys, wheel and touches keep it open.
+  const peekCan = () => currentBarHeight() <= BAR_MIN && prefs.get('ui.barPeek') !== false && !els.app.classList.contains('stage-unborn')
+    && !(els.app.classList.contains('immersive') && els.app.classList.contains('idle')); // (an idle-hidden bar stays hidden)
+  const peekSet = (on) => {
+    if (barPeek === on) return;
+    barPeek = on;
+    els.app.classList.add('bar-ease');
+    setTimeout(() => els.app.classList.remove('bar-ease'), 300);
+    setBarHeight(barHeight, false);
+  };
+  const peekBusy = () => drag || document.getElementById('topbar').matches(':hover') || r.matches(':hover') || document.querySelector('#topbar .popover:not([hidden])')
+    || els.seek.matches(':active') || document.querySelector('.seekbox .loop-handle.dragging');
+  function peekTick() { peekTimer = 0; if (!barPeek) return; if (peekBusy()) peekArm(); else peekSet(false); }
+  peekArm = () => { clearTimeout(peekTimer); peekTimer = setTimeout(peekTick, (Number(prefs.get('ui.barPeekDelay')) || 2.5) * 1000); };
+  const peekActivity = (open) => {
+    if (!barPeek) { if (!open || !peekCan()) return; peekSet(true); }
+    peekArm();
+  };
+  let lastMove = 0;
+  document.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse' || e.timeStamp - lastMove < 80) return;
+    lastMove = e.timeStamp;
+    peekActivity(true);
+  }, { passive: true });
+  for (const ev of ['keydown', 'wheel', 'pointerdown']) document.addEventListener(ev, () => peekActivity(false), { passive: true, capture: true });
+  let swipe = null;
+  document.addEventListener('touchstart', (e) => { swipe = e.touches.length === 1 ? { y: e.touches[0].clientY, done: false } : null; peekActivity(false); }, { passive: true, capture: true });
+  document.addEventListener('touchmove', (e) => {
+    peekActivity(false);
+    if (!swipe || swipe.done || e.touches.length !== 1) return;
+    if (swipe.y - e.touches[0].clientY >= 40) { swipe.done = true; peekActivity(true); }
+  }, { passive: true, capture: true });
+  document.addEventListener('touchend', () => { swipe = null; peekActivity(false); }, { passive: true, capture: true });
 }
 
 // ---------- Background visualizer ----------

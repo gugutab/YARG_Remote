@@ -291,7 +291,7 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
 
 /* ---------- New top bar ---------- */
 .topbar {
-  height: var(--bar-now, var(--bar-h));
+  height: var(--bar-vis, var(--bar-now, var(--bar-h)));
   flex: none;
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr);
@@ -1360,7 +1360,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 }
 
 /* Bar at the bottom: the expand/compact arrow is inverted (down = compact, up = expand) and the controls get more room above the window edge */
-.app.bar-bottom .topbar { padding-bottom: 16px; height: var(--bar-now, calc(var(--bar-h) + 8px)); }
+.app.bar-bottom .topbar { padding-bottom: 16px; height: var(--bar-vis, var(--bar-now, calc(var(--bar-h) + 8px))); }
 
 /* Wide open bar: back to vertically centred (text block and the play/time rows), also with the bar at the bottom */
 @container song (min-width: 800px) {
@@ -2653,3 +2653,14 @@ button.icon.small-icon.sp-reset, #ppSlower, #ppFaster { min-width: 32px; min-hei
 .app.bar-min .topbar > .tb-cover, .app.bar-min .topbar .tb-top, .app.bar-min .topbar .tb-bottom { display: none !important; }
 /* the compact one-row layout in a taller bar stays centred between the edges */
 .app.bar-hidden:not(.bar-min) .topbar { align-content: center; }
+
+/* The peek: the full bar over the stage while the layout keeps the minimum (--bar-now is the layout height, --bar-vis what is shown) */
+.app.bar-peek.bar-bottom .main > .topbar { margin-top: calc(var(--bar-now) - var(--bar-vis)); }
+.app.bar-peek:not(.bar-bottom) .main > .topbar { margin-bottom: calc(var(--bar-now) - var(--bar-vis)); }
+.app.bar-peek.bar-bottom .bar-resizer { transform: translateY(calc(var(--bar-now) - var(--bar-vis))); z-index: 14; }
+.app.bar-peek:not(.bar-bottom) .bar-resizer { transform: translateY(calc(var(--bar-vis) - var(--bar-now))); z-index: 14; }
+.app.bar-ease .topbar { transition: height .18s ease, margin .18s ease; }
+.app.bar-ease .bar-resizer { transition: transform .18s ease; }
+
+/* the minimum is only the seek bar: no padding may keep the box taller than its height */
+.app.bar-min .topbar, .app.bar-min.bar-bottom .topbar, .app.bar-min:not(.bar-bottom) .topbar { padding-top: 0 !important; padding-bottom: 0 !important; min-height: 0; }
