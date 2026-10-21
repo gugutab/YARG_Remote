@@ -18,7 +18,6 @@ import {
   ROLL_COLORS,
   FILL_COLORS,
   FILL_STRONG,
-  FILL_LEAD_SEC,
   FILL_EDGE,
   FILL_ACTIVATION,
   drawActivationMark,
@@ -2049,13 +2048,17 @@ export class Highway {
       const len = bottom - top;
       const fade = Math.min(0.18, 28 / Math.max(1, len));
       const grad = g.createLinearGradient(0, top, 0, bottom);
-      const lead = Math.min(0.5, Math.max(0.02, (laneY((s.bandEnd ?? s.end) - FILL_LEAD_SEC) - top) / Math.max(1, len))); // the finishing stretch before the activation note: a stronger green
-      grad.addColorStop(0, FILL_STRONG);
-      grad.addColorStop(lead, color);
+      grad.addColorStop(0, color); // (the far end, where the activation note is, stays full: only the start fades in)
       grad.addColorStop(1 - fade, color);
       grad.addColorStop(1, 'rgba(40,200,90,0)');
       g.fillStyle = grad;
       g.fillRect(x0, top, width, len);
+      if (s.activationLane !== undefined) { // the lead-up: a stronger green over the column of the final note, along the whole fill (every column for the kick)
+        const lanes = this.chart.lanes, lw = width / lanes;
+        g.fillStyle = FILL_STRONG;
+        if (s.activationLane >= 0 && s.activationLane < lanes) g.fillRect(x0 + s.activationLane * lw, top, lw, len);
+        else g.fillRect(x0, top, width, len);
+      }
       g.fillStyle = FILL_EDGE;
       g.fillRect(x0, top - 1, width, 2);
       g.fillRect(x0, bottom - 1, width, 2);

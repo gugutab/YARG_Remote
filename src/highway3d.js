@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, NOTE_RECT_W, NOTE_RECT_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_LEAD_SEC, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
 
@@ -125,8 +125,13 @@ function fillBand3D(g, spans, color, xl, xr, roadW) {
       g.globalAlpha /= k;
     };
     piece(d0 + f, d1, 1); // (the far end, where the activation note is, stays full: only the start fades in)
-    const leadD = Math.min(FILL_LEAD_SEC / PSEC, (d1 - d0) * 0.5); // the finishing stretch before the activation note: a stronger green, in three growing slices
-    for (let k = 0; k < 3; k++) piece(d1 - leadD * (3 - k) / 3, d1 - leadD * (2 - k) / 3, 0.5 + 0.25 * k, FILL_STRONG);
+    if (s.activationLane !== undefined) { // the lead-up: a stronger green over the column of the final note, along the whole fill (every column for the kick)
+      const lanes = xr - xl;
+      const lx0 = s.activationLane >= 0 && s.activationLane < lanes ? xl + s.activationLane : xl;
+      const lx1 = s.activationLane >= 0 && s.activationLane < lanes ? lx0 + 1 : xr;
+      const lo = Math.max(ROAD_NEAR, d0);
+      if (d1 > lo) { g.fillStyle = FILL_STRONG; quad(g, lo, d1, lx0, lx1); g.fill(); }
+    }
     for (let k = 0; k < STEPS; k++) {
       const w = f / STEPS, a = (k + 1) / (STEPS + 1);
       piece(d0 + k * w, d0 + (k + 1) * w, a);
