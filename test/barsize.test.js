@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BAR_MIN, clampHeight, barLevel, serializeHeight, parseStoredHeight, keyHeight } from '../src/barsize.js';
+import { snapPositions, snapHeight, magnetHeight, nextSnap, BAR_MIN, clampHeight, barLevel, serializeHeight, parseStoredHeight, keyHeight } from '../src/barsize.js';
 
 test('clampHeight keeps the height in the range', () => {
   assert.equal(clampHeight(5, 120), BAR_MIN);
@@ -46,4 +46,22 @@ test('keyHeight: arrows step by 8 px, Home and End jump to the ends', () => {
   assert.equal(keyHeight('Home', 64, 120), BAR_MIN);
   assert.equal(keyHeight('End', 64, 120), 120);
   assert.equal(keyHeight('a', 64, 120), null);
+});
+
+
+test('snap: three positions, the nearest on release, a magnet near them, arrows jump to the next', () => {
+  assert.deepEqual(snapPositions(120), [16, 64, 120]);
+  assert.deepEqual(snapPositions(100), [16, 64, 100]);
+  assert.deepEqual(snapPositions(60), [16, 60]); // too low for a middle position
+  assert.equal(snapHeight(30, 120), 16);
+  assert.equal(snapHeight(45, 120), 64);
+  assert.equal(snapHeight(100, 120), 120);
+  assert.equal(magnetHeight(70, 120), 64);
+  assert.equal(magnetHeight(90, 120), 90); // between positions: untouched
+  assert.equal(nextSnap(16, 120, 1), 64);
+  assert.equal(nextSnap(64, 120, 1), 120);
+  assert.equal(nextSnap(120, 120, 1), 120);
+  assert.equal(nextSnap(64, 120, -1), 16);
+  assert.equal(nextSnap(16, 120, -1), 16);
+  assert.equal(nextSnap(90, 120, -1), 64);
 });

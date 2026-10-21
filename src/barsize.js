@@ -4,7 +4,9 @@
 export const BAR_MIN = 16; // the seek bar and a little air; nothing else is shown
 export const BAR_COMPACT_AT = 56; // from here up the one-row (compact) layout fits
 export const BAR_FULL_SLACK = 8; // within this many px of the maximum the two-row (full) layout is used
-export const BAR_STEP = 8; // keyboard step
+export const BAR_STEP = 8; // (the old keyboard step; the keys now jump between the snap positions)
+export const BAR_COMPACT_SNAP = 64; // the height of the middle position (the one-row layout)
+export const BAR_MAGNET = 10; // while dragging, within this many px of a position the bar sticks to it
 
 export function clampHeight(h, max, min = BAR_MIN) {
   const hi = Math.max(min, Number.isFinite(max) ? max : min);
@@ -39,4 +41,34 @@ export function keyHeight(key, h, max, growKey = 'ArrowUp', min = BAR_MIN) {
   if (key === 'End') return clampHeight(max, max, min);
   if (key === 'ArrowUp' || key === 'ArrowDown') return clampHeight(h + (key === growKey ? BAR_STEP : -BAR_STEP), max, min);
   return null;
+}
+
+// The three positions the bar snaps to: only the seek bar, the one-row layout, the full bar (the middle one is dropped when the maximum is too low for it).
+export function snapPositions(max) {
+  const hi = Math.max(BAR_MIN, Number.isFinite(max) ? max : BAR_MIN);
+  const list = [BAR_MIN];
+  if (hi - BAR_COMPACT_SNAP >= BAR_FULL_SLACK) list.push(BAR_COMPACT_SNAP);
+  if (hi > BAR_MIN) list.push(hi);
+  return list;
+}
+
+// The nearest snap position to a height.
+export function snapHeight(h, max) {
+  const list = snapPositions(max);
+  let best = list[0];
+  for (const p of list) if (Math.abs(p - h) < Math.abs(best - h)) best = p;
+  return best;
+}
+
+// While dragging: the height, pulled onto a snap position when it is within BAR_MAGNET px of it (else untouched).
+export function magnetHeight(h, max) {
+  const p = snapHeight(h, max);
+  return Math.abs(p - h) <= BAR_MAGNET ? p : h;
+}
+
+// The next snap position above (dir > 0) or below (dir < 0) a height (the same position when there is none).
+export function nextSnap(h, max, dir) {
+  const list = snapPositions(max);
+  if (dir > 0) return list.find((p) => p > h + 0.5) ?? list[list.length - 1];
+  return [...list].reverse().find((p) => p < h - 0.5) ?? list[0];
 }

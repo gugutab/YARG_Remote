@@ -36,7 +36,7 @@ import { mountSettings } from './settings-ui.js';
 import { renderThemeStudio, renderDataTools, renderShortcuts, renderLaneColors, renderPerInstrument } from './settings-custom.js';
 import { WIN_MARGIN, WIN_BORDER, SETTINGS_MIN_W, contentMaxFor } from './windowframe.js';
 import { isPhone, createWidthPref, createWindowFrame } from './windowframe-dom.js';
-import { BAR_MIN, clampHeight, barLevel, serializeHeight, parseStoredHeight, keyHeight } from './barsize.js';
+import { BAR_MIN, clampHeight, barLevel, serializeHeight, parseStoredHeight, keyHeight, snapHeight, magnetHeight, nextSnap } from './barsize.js';
 import { saveLibrary, loadLibrary, loadThumb, saveThumb, clearThumbs } from './store.js';
 import { filterSongs, parseQuery, rankByRelevance, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, rankWithinGroups, anchorLabel, INSTRUMENTS, hasInstrument } from './songlist.js';
 import { createVirtualList, DEFAULT_CARDS, syncStarButton } from './virtuallist.js';
@@ -3064,11 +3064,12 @@ const toggleBar = () => setBarHeight(currentBarHeight() > BAR_MIN ? BAR_MIN : nu
   r.addEventListener('pointermove', (e) => {
     if (!drag || e.pointerId !== drag.id) return;
     const dy = e.clientY - drag.y;
-    setBarHeight(drag.h + (barBottom() ? -dy : dy)); // the bar grows away from its edge
+    setBarHeight(magnetHeight(drag.h + (barBottom() ? -dy : dy), barMax())); // the bar grows away from its edge, and sticks to a position when it comes near one
   });
   const end = (e) => {
     if (!drag || e.pointerId !== drag.id) return;
     drag = null;
+    setBarHeight(snapHeight(currentBarHeight(), barMax())); // released: snap to the nearest of the three positions
     r.classList.remove('dragging');
     els.app.classList.remove('bar-resizing');
   };
@@ -3076,7 +3077,8 @@ const toggleBar = () => setBarHeight(currentBarHeight() > BAR_MIN ? BAR_MIN : nu
   r.addEventListener('pointercancel', end);
   r.addEventListener('lostpointercapture', end);
   r.addEventListener('keydown', (e) => {
-    const h = keyHeight(e.key, currentBarHeight(), barMax(), barBottom() ? 'ArrowUp' : 'ArrowDown');
+    const grow = barBottom() ? 'ArrowUp' : 'ArrowDown';
+    const h = e.key === 'ArrowUp' || e.key === 'ArrowDown' ? nextSnap(currentBarHeight(), barMax(), e.key === grow ? 1 : -1) : keyHeight(e.key, currentBarHeight(), barMax(), grow); // (the arrows jump to the next position)
     if (h == null) return;
     e.preventDefault();
     setBarHeight(h);
