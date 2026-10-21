@@ -312,3 +312,16 @@ test('route: only known difficulty ids survive parsing', async () => {
   const r = parseRoute('#/song/x/play?i=guitar:expert,bass:hard,keys:<script>,drums:__proto__,vocals:EXPERT,rhythm:medium,x:easy');
   assert.deepEqual(r.instruments, [{ id: 'guitar', diff: 'expert' }, { id: 'bass', diff: 'hard' }, { id: 'keys' }, { id: 'drums' }, { id: 'vocals' }, { id: 'rhythm', diff: 'medium' }, { id: 'x', diff: 'easy' }]);
 });
+
+test('route: a song position (t) is parsed, bounded and formatted', async () => {
+  const { parseRoute, formatRoute } = await import('../src/route.js');
+  assert.equal(parseRoute('#/song/a/play?i=drums-pro:expert&t=27.94').time, 27.9);
+  assert.equal(parseRoute('#/song/a/play?t=0').time, 0);
+  assert.equal(parseRoute('#/song/a/play?t=-3').time, undefined);
+  assert.equal(parseRoute('#/song/a/play?t=abc').time, undefined);
+  assert.equal(parseRoute('#/song/a/play?t=99999999').time, undefined);
+  assert.equal(parseRoute('#/song/a/play').time, undefined);
+  assert.equal(formatRoute({ view: 'play', id: 'a b', instruments: [{ id: 'drums-pro', diff: 'expert' }], time: 27.94 }), '#/song/a%20b/play?i=drums-pro:expert&t=27.9');
+  assert.equal(formatRoute({ view: 'play', id: 'a', time: 12 }), '#/song/a/play?t=12');
+  assert.equal(formatRoute({ view: 'play', id: 'a', time: 0 }), '#/song/a/play');
+});

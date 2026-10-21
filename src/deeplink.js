@@ -67,11 +67,12 @@ export function openFromHash() {
   const current = ctx.current();
   if (current?.song.id === route.id) { // the same song: a link with other instruments rearranges the screen
     if (route.instruments && applyInstruments(route.instruments)) ctx.updateChart();
+    if (route.time !== undefined) ctx.seekLink(route.time);
     return;
   }
   const song = ctx.songs().find((s) => s.id === route.id);
   if (!song) return;
-  ctx.setPendingOpen(route.view === 'play', route.instruments || null); // (loadAudioWithSong, pendingInstruments)
+  ctx.setPendingOpen(route.view === 'play', route.instruments || null, route.time ?? null); // (loadAudioWithSong, pendingInstruments)
   ctx.selectSong(song);
   if (route.view === 'play') { ctx.markStageLive(); ctx.setInfoOpen(false, { grow: false, release: false }); } // (the stage stays held until the audio of the link has loaded) // a /play link is the player: the bar shows, the library keeps its width
 }

@@ -168,6 +168,7 @@ let pendingSongId = null; // song clicked while detached; opened once the folder
 let previewStop = null; // chart-clock second where the preview ends, or null when none is running
 let previewStart = 0; // ... and where it starts (the band on the Listen slider shows [previewStart, previewStop])
 // song opening (deep links, "play next", the remembered pick)
+let pendingTime = null; // the position of a link (&t=), applied once the audio is ready
 let pendingInstruments = null; // the instruments of a link, applied once the chart is read
 let openingSong = false; // while a song is being opened its first chart is not a choice of the user: it must not overwrite the memory
 let loadAudioWithSong = false; // a #/song/<id>/play link: the audio loads with the song, like a Play press would
@@ -322,7 +323,8 @@ initDeepLinks({
   els, store, current: () => current, songs: () => songs, infoOpen: () => infoOpen,
   instrumentGroups: () => instrumentGroups(), diffFor: (ins) => diffFor(ins), fillDifficultyOptions: () => fillDifficultyOptions(), updateChart: () => updateChart(),
   selectSong: (song) => selectSong(song), markStageLive: () => markStageLive(), setInfoOpen: (open, opts) => setInfoOpen(open, opts),
-  setPendingOpen: (withAudio, instruments) => { loadAudioWithSong = withAudio; pendingInstruments = instruments; },
+  setPendingOpen: (withAudio, instruments, time = null) => { loadAudioWithSong = withAudio; pendingInstruments = instruments; pendingTime = time; },
+  seekLink: (t) => { if (ready) { seekPlain(Math.min(t, Math.max(0, player.duration - 0.5))); } else pendingTime = t; },
 });
 
 // ---------- Library window ----------
@@ -642,7 +644,9 @@ window.addEventListener('storage', (e) => {
 // Share: a link that opens this song's details (with the instruments on screen, when it is the open song). It works for whoever opens the same server.
 $('infoShare').addEventListener('click', async () => {
   if (!infoSong) return;
-  const link = location.origin + location.pathname + location.search + formatRoute({ view: 'song', id: infoSong.id, instruments: current?.song === infoSong ? instrumentsOnScreen() : undefined });
+  const open = current?.song === infoSong;
+  const at = open && ready ? player.currentTime() : 0;
+  const link = location.origin + location.pathname + location.search + formatRoute({ view: at > 1 ? 'play' : 'song', id: infoSong.id, instruments: open ? instrumentsOnScreen() : undefined, time: at > 1 ? at : undefined }); // (the song position goes in the link once the song is past its first second)
   try { await navigator.clipboard.writeText(link); flashNote('Link copied'); } catch { window.prompt('Copy this link', link); }
 });
 infoFav.addEventListener('click', () => { if (infoSong) setFavourite(infoSong, !favourites.has(infoSong.id)); });
@@ -1281,6 +1285,11 @@ function ensureAudio({ listen = false, at = 0 } = {}) {
     stemStates.forEach(applyStem); // volumes chosen while loading
     ready = true;
     audioSong = song;
+    if (pendingTime !== null && !rec.listen) { // a link with &t=: the song waits at that position (paused)
+      const at = Math.min(pendingTime, Math.max(0, player.duration - 0.5));
+      pendingTime = null;
+      if (at > 0) player.seek(at);
+    }
     player.onLate = refreshStemFailures; // (the stems that were left for later join the mix or fail)
     const nFailed = failedIds.size;
     setLoadState('ready', nFailed ? `Ready to play (${nFailed} ${nFailed === 1 ? 'stem' : 'stems'} could not be decoded)` : 'Ready to play', 1);
