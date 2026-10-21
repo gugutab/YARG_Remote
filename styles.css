@@ -109,7 +109,7 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 .popover {
   position: fixed; /* placed by placePopover() in app.js so it never leaves the screen */
   left: 8px;
-  top: var(--bar-h);
+  top: var(--bar-now, var(--bar-h));
   z-index: 20;
   width: min(340px, calc(100vw - 16px));
   max-height: 70vh;
@@ -291,7 +291,7 @@ button.icon:disabled.reset, .reset:disabled { opacity: .3; cursor: default; }
 
 /* ---------- New top bar ---------- */
 .topbar {
-  height: var(--bar-h);
+  height: var(--bar-now, var(--bar-h));
   flex: none;
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr);
@@ -645,9 +645,6 @@ button.icon.small-icon.expand-btn svg { width: 24px; height: 24px; padding: 2px;
 .active-filters .chip svg.x { width: 12px; height: 12px; color: var(--muted); }
 
 /* Round 52: the top bar can be hidden; the stage then takes the whole height and a small tab brings the bar back */
-.bar-hide svg { transform: rotate(180deg); }
-.bar-hide { align-self: center; opacity: .7; }
-.bar-hide:hover { opacity: 1; }
 
 .fret-seg { align-self: stretch; }
 .fret-seg button { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 8px; font-size: 13px; font-weight: 600; color: var(--text); }
@@ -1067,7 +1064,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .pane-tag span { display: none; }
 
 /* The top bar is a glass window over the background of the fretboards (the visualizer shows through) */
-.topbar { border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); transition: height .2s ease; }
+.topbar { border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }
 
 /* In the glass top bar the section selector and the button hovers are see-through too */
 .topbar .chip-btn, .topbar .chip-select { background: transparent; border-color: color-mix(in srgb, var(--line) 60%, transparent); }
@@ -1076,7 +1073,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .topbar button.icon.primary:hover { background: var(--accent); filter: brightness(1.12); }
 
 /* ---------- The "hide the top bar" button now makes the bar compact: half the height, one row ---------- */
-.app.bar-hidden { --bar-h: 56px; }
 .app.bar-hidden .topbar { padding: 4px 10px 4px 6px; }
 .app.bar-hidden .tb-cover { width: 44px; height: 44px; border-radius: 7px; }
 .app.bar-hidden .tb-main { display: flex; align-items: center; gap: 10px; grid-template-rows: none; }
@@ -1088,7 +1084,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .app.bar-hidden .topbar .chip-btn { min-height: 28px; height: 28px; font-size: 12px; }
 .app.bar-hidden .topbar .time { font-size: 12px; margin-left: 4px; }
 .app.bar-hidden .brand { display: none; }
-.app.bar-hidden .bar-hide svg { transform: none; } /* points down: expand */
 @container song (max-width: 600px) { /* compact bar in a narrow window: only what fits */
   .app.bar-hidden #sectionText { display: none; }
   .app.bar-hidden .tools { gap: 0; }
@@ -1165,7 +1160,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 /* ---------- Mobile bar, fourth pass ---------- */
 @media (max-width: 700px) {
   /* extended: the compact button alone on the last row of the right column; prev .. section centred */
-  .app:not(.bar-hidden) .tools #barHide { grid-column: 2; grid-row: 3; }
   .app:not(.bar-hidden) .transport { justify-content: center; }
 }
 @media (min-width: 440px) and (max-width: 700px) {
@@ -1308,9 +1302,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
   .app.bar-hidden .now-artist { font-size: 11px; }
 }
 /* the expand / compact button gets twice the usual air on its left when the row has room; in a tight row it shrinks back */
-.app.bar-hidden .tools #barHide { margin-left: 12px; flex: none; }
-@container song (max-width: 420px) { .app.bar-hidden .tools #barHide { margin-left: 2px; } }
-@container song (min-width: 421px) and (max-width: 520px) { .app.bar-hidden .tools #barHide { margin-left: 6px; } }
 
 /* Compact bar: 3 px more between the title and the artist */
 
@@ -1369,9 +1360,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 }
 
 /* Bar at the bottom: the expand/compact arrow is inverted (down = compact, up = expand) and the controls get more room above the window edge */
-.app.bar-bottom .bar-hide svg { transform: none; }
-.app.bar-bottom.bar-hidden .bar-hide svg { transform: rotate(180deg); }
-.app.bar-bottom .topbar { padding-bottom: 16px; height: calc(var(--bar-h) + 8px); }
+.app.bar-bottom .topbar { padding-bottom: 16px; height: var(--bar-now, calc(var(--bar-h) + 8px)); }
 
 /* Wide open bar: back to vertically centred (text block and the play/time rows), also with the bar at the bottom */
 @container song (min-width: 800px) {
@@ -1512,7 +1501,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .end-screen[hidden] { display: none; }
 @media (min-width: 701px) { .end-screen { transition: padding-left .22s ease; } }
 .app.song-ended #highway, .app.song-ended #paneTags { visibility: hidden; }
-.app.immersive .end-screen { padding-block: calc(var(--bar-h, 64px) + var(--lib-gap, 12px)); }
+.app.immersive .end-screen { padding-block: calc(var(--bar-now, var(--bar-h, 64px)) + var(--lib-gap, 12px)); }
 .end-card {
   position: relative; width: min(1100px, 100%); max-height: 100%; min-height: 0; display: flex; flex-direction: column; pointer-events: auto;
   background: color-mix(in srgb, var(--panel) 78%, transparent); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
@@ -2641,3 +2630,26 @@ button.icon.small-icon.sp-reset, #ppSlower, #ppFaster { min-width: 32px; min-hei
 #settingsBtn[data-mod="true"] .tool-val { font-weight: 700; }
 .tile-tool[data-mod="true"] .tt-val { color: var(--accent); font-weight: 700; }
 .tile-tool[aria-expanded="true"][data-mod="true"] .tt-val { color: #fff; }
+
+/* ---------- The bar's height handle ----------
+   A strip of its own on the bar's stage-facing edge (above the bar at the bottom, below it at the top), clear of the seek bar: the seek bar
+   reaches 6 px past the bar's edge, so the strip's box runs 6 px under it (the bar is stacked above the handle and keeps those pixels). */
+.bar-resizer { flex: none; position: relative; z-index: 12; height: 14px; margin-bottom: -6px; cursor: ns-resize; touch-action: none; outline: none; }
+.app.bar-bottom .bar-resizer { order: 2; }
+.app:not(.bar-bottom) .bar-resizer { margin: -6px 0 0; }
+.bar-resizer::before { content: ""; position: absolute; left: 0; right: 0; top: -8px; bottom: 6px; } /* hit area: 8 px more over the stage (16 px in all, 24 on touch), never over the seek bar */
+@media (pointer: coarse) { .bar-resizer::before { top: -16px; } }
+.app:not(.bar-bottom) .bar-resizer::before { top: 6px; bottom: -8px; }
+@media (pointer: coarse) { .app:not(.bar-bottom) .bar-resizer::before { bottom: -16px; } }
+.bar-resizer i { position: absolute; left: 50%; top: 2px; width: 56px; height: 4px; margin-left: -28px; border-radius: 2px; background: transparent; transition: background .15s; pointer-events: none; }
+.app:not(.bar-bottom) .bar-resizer i { top: auto; bottom: 2px; }
+.bar-resizer:hover i, .bar-resizer.dragging i, .bar-resizer:focus-visible i { background: var(--accent); }
+.bar-resizer:focus-visible i { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
+@media (pointer: coarse) { .bar-resizer i { background: color-mix(in srgb, var(--muted) 60%, transparent); } }
+.app.immersive .bar-resizer, .app.stage-unborn .bar-resizer { display: none; }
+.app.stage-held .bar-resizer { visibility: hidden; }
+.app.bar-resizing, .app.bar-resizing * { cursor: ns-resize !important; user-select: none; }
+/* only the seek bar: everything else is gone (not focusable either) */
+.app.bar-min .topbar > .tb-cover, .app.bar-min .topbar .tb-top, .app.bar-min .topbar .tb-bottom { display: none !important; }
+/* the compact one-row layout in a taller bar stays centred between the edges */
+.app.bar-hidden:not(.bar-min) .topbar { align-content: center; }

@@ -26,7 +26,7 @@ export const ACTIONS = [
   { id: 'search', group: 'Panels', label: 'Search the library', key: 'Slash' },
   { id: 'library', group: 'Panels', label: 'Show / hide the library', key: 'KeyL' },
   { id: 'details', group: 'Panels', label: 'Song details / chart', key: 'KeyI' },
-  { id: 'topBar', group: 'Panels', label: 'Expand / compact the player bar', key: 'KeyB' },
+  { id: 'topBar', group: 'Panels', label: 'Full bar / seek bar only', key: 'KeyB' },
   { id: 'fullscreen', group: 'Panels', label: 'Full screen', key: 'KeyF' },
   { id: 'settings', group: 'Panels', label: 'Open / close the settings', key: 'Comma' },
   { id: 'perf', group: 'Panels', label: 'Performance overlay', key: 'KeyP' },

@@ -36,6 +36,7 @@ import { mountSettings } from './settings-ui.js';
 import { renderThemeStudio, renderDataTools, renderShortcuts, renderLaneColors, renderPerInstrument } from './settings-custom.js';
 import { WIN_MARGIN, WIN_BORDER, SETTINGS_MIN_W, contentMaxFor } from './windowframe.js';
 import { isPhone, createWidthPref, createWindowFrame } from './windowframe-dom.js';
+import { BAR_MIN, clampHeight, barLevel, serializeHeight, parseStoredHeight, keyHeight } from './barsize.js';
 import { saveLibrary, loadLibrary, loadThumb, saveThumb, clearThumbs } from './store.js';
 import { filterSongs, parseQuery, rankByRelevance, sortSongs, genresOf, decadesOf, packsOf, evenPerRow, songSummary, buildItems, rankWithinGroups, anchorLabel, INSTRUMENTS, hasInstrument } from './songlist.js';
 import { createVirtualList, DEFAULT_CARDS, syncStarButton } from './virtuallist.js';
@@ -56,7 +57,7 @@ const els = Object.fromEntries([
   'now', 'brand', 'cover', 'title', 'artist', 'tertiary', 'chips', 'instrument', 'difficulty',
   'transport', 'play', 'back', 'forward', 'seekbox', 'seek', 'loopBtn', 'loopBand', 'loopStart', 'loopEnd', 'seekTip', 'timeNow', 'timeTotal',
   'tools', 'sectionSelect', 'mixerBtn', 'mixerPop', 'sectionBtn', 'sectionPop', 'sectionText', 'infoPop', 'infoPopCover', 'infoPopTitle', 'infoPopArtist', 'infoPopMeta', 'infoPopMore', 'mixer', 'settingsBtn', 'settingsPop',
-  'barHide', 'metronomeBtn', 'mixerVal', 'speedVal', 'stagePlay', 'songInfo', 'siCover', 'siCredits', 'siInsts', 'siPicker', 'siPlay', 'siPlayText', 'pauseDim', 'pausePanel', 'ppSlower', 'ppFaster', 'ppSpeed', 'ppMetronome', 'ppVolume', 'ppVolVal', 'ppResume', 'siTitle', 'siArtist', 'siDetails', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
+  'barResizer', 'metronomeBtn', 'mixerVal', 'speedVal', 'stagePlay', 'songInfo', 'siCover', 'siCredits', 'siInsts', 'siPicker', 'siPlay', 'siPlayText', 'pauseDim', 'pausePanel', 'ppSlower', 'ppFaster', 'ppSpeed', 'ppMetronome', 'ppVolume', 'ppVolVal', 'ppResume', 'siTitle', 'siArtist', 'siDetails', 'paneTags', 'paneMenu', 'paneMenuDyn', 'paneMenuActions', 'viewChoice', 'noteChoice', 'vocalChoice', 'infoBtn', 'libList', 'info', 'infoWindow', 'infoClose', 'infoWinTitle', 'infoWinArtist', 'infoCover', 'infoTitle', 'infoArtist', 'infoQuote', 'infoMeta', 'instrumentCards',
   'mixerInfo', 'infoExtra', 'infoProgress', 'infoBar', 'infoState', 'infoPlay',
   'stage', 'highway', 'loading', 'welcome', 'welcomeOpen',
   'endScreen', 'endCover', 'endTitle', 'endArtist', 'endAgain', 'endSearch', 'endCards', 'endNextBox', 'endNext',
@@ -3014,16 +3015,74 @@ if (typeof ResizeObserver !== 'undefined') {
   ro.observe(document.querySelector('.tb-main'));
 }
 window.addEventListener('resize', alignStageButtons);
-function setBarHidden(hidden, persist = true) {
-  els.app.classList.toggle('bar-hidden', hidden);
-  els.barHide.title = hidden ? 'Expand the top bar (B)' : 'Make the top bar compact (B)';
-  els.barHide.setAttribute('aria-label', hidden ? 'Expand the top bar' : 'Make the top bar compact');
-  if (persist) store.set('barHidden', hidden ? '1' : '0');
-  closePopovers();
+// The bar's height is set by dragging the handle on its stage-facing edge (src/barsize.js): from just the seek bar up to the full bar
+// (--bar-h). --bar-now is the live height (the layout follows it); the level class says what fits: no class = full, .bar-hidden = the
+// compact one-row layout, plus .bar-min = only the seek bar.
+const barBottom = () => els.app.classList.contains('bar-bottom');
+function barMax() {
+  const h = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar-h')) || 112;
+  return Math.round(h + (barBottom() ? 8 : 0)); // (the bar at the bottom has 8 px more padding)
+}
+let barHeight = null; // px; null = full height (follows the maximum when the window changes)
+function setBarHeight(h, persist = true) {
+  const max = barMax();
+  const v = h == null ? max : clampHeight(h, max);
+  barHeight = v >= max ? null : v;
+  const level = barLevel(v, max);
+  const before = els.app.classList.contains('bar-hidden') + (els.app.classList.contains('bar-min') ? 2 : 0);
+  els.app.style.setProperty('--bar-now', `${v}px`);
+  els.app.classList.toggle('bar-hidden', level !== 'full');
+  els.app.classList.toggle('bar-min', level === 'min');
+  const r = els.barResizer;
+  r.setAttribute('aria-valuemin', String(BAR_MIN));
+  r.setAttribute('aria-valuemax', String(max));
+  r.setAttribute('aria-valuenow', String(v));
+  r.setAttribute('aria-valuetext', `Bar height ${v} px`);
+  if (persist) store.set('barHeight', serializeHeight(v, max));
+  const after = els.app.classList.contains('bar-hidden') + (els.app.classList.contains('bar-min') ? 2 : 0);
+  if (before !== after) closePopovers(); // (a menu of a button that just disappeared)
   alignStageButtons();
 }
-setBarHidden(prefs.get('highway.barHidden') === 'hidden' || (prefs.get('highway.barHidden') === 'last' && store.get('barHidden') === '1'));
-els.barHide.addEventListener('click', () => setBarHidden(!els.app.classList.contains('bar-hidden'))); // compact <-> full
+const currentBarHeight = () => barHeight ?? barMax();
+const toggleBar = () => setBarHeight(currentBarHeight() > BAR_MIN ? BAR_MIN : null); // full <-> only the seek bar
+{
+  const mode = prefs.get('highway.barHidden');
+  const stored = parseStoredHeight(store.get('barHeight'), store.get('barHidden'), barMax());
+  setBarHeight(mode === 'hidden' ? BAR_MIN : mode === 'last' ? stored : null, false);
+  window.addEventListener('resize', () => setBarHeight(barHeight, false));
+  const r = els.barResizer;
+  let drag = null;
+  r.addEventListener('pointerdown', (e) => {
+    if (e.button > 0) return;
+    drag = { y: e.clientY, h: currentBarHeight(), id: e.pointerId };
+    r.setPointerCapture(e.pointerId);
+    r.classList.add('dragging');
+    els.app.classList.add('bar-resizing');
+    closePopovers();
+    e.preventDefault();
+  });
+  r.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dy = e.clientY - drag.y;
+    setBarHeight(drag.h + (barBottom() ? -dy : dy)); // the bar grows away from its edge
+  });
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag = null;
+    r.classList.remove('dragging');
+    els.app.classList.remove('bar-resizing');
+  };
+  r.addEventListener('pointerup', end);
+  r.addEventListener('pointercancel', end);
+  r.addEventListener('lostpointercapture', end);
+  r.addEventListener('keydown', (e) => {
+    const h = keyHeight(e.key, currentBarHeight(), barMax(), barBottom() ? 'ArrowUp' : 'ArrowDown');
+    if (h == null) return;
+    e.preventDefault();
+    setBarHeight(h);
+  });
+  r.addEventListener('dblclick', toggleBar);
+}
 
 // ---------- Background visualizer ----------
 // One animated background behind every fretboard (src/visualizers.js, Highway.setVisualizer). The picker is a popover from the
@@ -3190,7 +3249,7 @@ const SHORTCUT_HANDLERS = {
   details: () => { if (current || loadInfo.state !== 'idle') setInfoOpen(!infoOpen); },
   search: () => focusSearch(),
   library: () => (libraryOpen() ? minimizeLibrary() : setLibraryOpen(true)),
-  topBar: () => setBarHidden(!els.app.classList.contains('bar-hidden')),
+  topBar: () => toggleBar(),
   fullscreen: () => toggleFullscreen(),
   view3d: () => setView(highway.view === '3d' ? '2d' : '3d'),
   focusNext: () => { if (highway.shiftFocus(1)) announceView(); },
@@ -3717,7 +3776,7 @@ const EFFECTS = {
   'highway.countdownMin': (v) => { highway.countdownMin = Number(v) || 9; },
   'highway.stageColorOn': () => { applyStage(); syncVizPop(); },
   'highway.stageColor': () => { applyStage(); syncVizPop(); },
-  'ui.barPosition': (v) => { els.app.classList.toggle('bar-bottom', v !== 'top'); closePopovers(); },
+  'ui.barPosition': (v) => { els.app.classList.toggle('bar-bottom', v !== 'top'); closePopovers(); setBarHeight(barHeight, false); },
   'general.endScreen': () => syncEndScreen(),
   'playback.songInfoOverlay': (v) => { if (!v) hideSongInfo(); },
   'playback.keepSongInfo': (v) => { if (!v && els.songInfo.classList.contains('show') && !startDone) scheduleInfoHide(INFO_FIRST_PLAY_MS); },

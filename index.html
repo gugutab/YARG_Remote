@@ -183,11 +183,12 @@
             <button id="visualizerBtn" class="icon" type="button" title="Background visualizer (G)" aria-label="Background visualizer" aria-expanded="false"><svg><use href="#i-visualizer"/></svg></button>
             <div class="popover viz-pop" id="visualizerPop" hidden></div>
           </div>
-          <button id="barHide" class="icon small-icon bar-hide" type="button" title="Make the top bar compact (B)" aria-label="Make the top bar compact"><svg><use href="#i-chevron"/></svg></button>
             </div>
           </div>
         </div>
       </header>
+      <!-- Drag to resize the bar: from just the seek bar up to the full bar (the strip sits on the bar's stage-facing edge, clear of the seek bar) -->
+      <div class="bar-resizer" id="barResizer" role="separator" aria-orientation="horizontal" aria-label="Bar height" tabindex="0" title="Drag to resize the bar (double-click: full / seek bar only)"><i></i></div>
 
       <!-- Chart takes the whole remaining screen -->
       <main class="stage" id="stage">
