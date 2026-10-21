@@ -2629,15 +2629,15 @@ button.icon.small-icon.sp-reset, #ppSlower, #ppFaster { min-width: 32px; min-hei
 /* ---------- The bar's height handle ----------
    A strip of its own on the bar's stage-facing edge (above the bar at the bottom, below it at the top), clear of the seek bar: the seek bar
    reaches 6 px past the bar's edge, so the strip's box runs 6 px under it (the bar is stacked above the handle and keeps those pixels). */
-.bar-resizer { flex: none; position: relative; z-index: 12; height: 14px; margin-bottom: -6px; cursor: ns-resize; touch-action: none; outline: none; }
+.bar-resizer { flex: none; position: relative; z-index: 12; height: 0; margin: 0; cursor: ns-resize; touch-action: none; outline: none; } /* no room of its own: the handle sits over the first pixels of the stage, so the fretboards touch the bar */
 .app.bar-bottom .bar-resizer { order: 2; }
-.app:not(.bar-bottom) .bar-resizer { margin: -6px 0 0; }
-.bar-resizer::before { content: ""; position: absolute; left: 0; right: 0; top: -8px; bottom: 6px; } /* hit area: 8 px more over the stage (16 px in all, 24 on touch), never over the seek bar */
-@media (pointer: coarse) { .bar-resizer::before { top: -16px; } }
-.app:not(.bar-bottom) .bar-resizer::before { top: 6px; bottom: -8px; }
-@media (pointer: coarse) { .app:not(.bar-bottom) .bar-resizer::before { bottom: -16px; } }
-.bar-resizer i { position: absolute; left: 50%; top: 2px; width: 56px; height: 4px; margin-left: -28px; border-radius: 2px; background: transparent; transition: background .15s; pointer-events: none; }
-.app:not(.bar-bottom) .bar-resizer i { top: auto; bottom: 2px; }
+
+.bar-resizer::before { content: ""; position: absolute; left: 0; right: 0; top: -14px; bottom: 0; } /* hit area: the 14 px over the stage next to the bar (22 on touch), never over the seek bar */
+@media (pointer: coarse) { .bar-resizer::before { top: -22px; } }
+.app:not(.bar-bottom) .bar-resizer::before { top: 0; bottom: -14px; }
+@media (pointer: coarse) { .app:not(.bar-bottom) .bar-resizer::before { bottom: -22px; } }
+.bar-resizer i { position: absolute; left: 50%; top: -9px; width: 56px; height: 4px; margin-left: -28px; border-radius: 2px; background: transparent; transition: background .15s; pointer-events: none; }
+.app:not(.bar-bottom) .bar-resizer i { top: 5px; bottom: auto; }
 .bar-resizer:hover i, .bar-resizer.dragging i, .bar-resizer:focus-visible i { background: var(--accent); }
 .bar-resizer:focus-visible i { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
 @media (pointer: coarse) { .bar-resizer i { background: color-mix(in srgb, var(--muted) 60%, transparent); } }

@@ -11,7 +11,7 @@ export const SOLO_BAND = 'rgba(0,150,220,0.12)'; // ...and a solo (YARG: cyan-bl
 export const OPEN_COLOR = '#c800ff'; // YARG's open-note purple
 export const STAR_POWER_NOTE = '#ffffff'; // YARG draws notes inside a star power phrase in the star power colour
 export const HARMONY_COLORS = { 1: '#00ccff', 2: '#ff8500', 3: '#ffdb00' }; // YARG's harmony parts: cyan, orange, yellow // harmony parts 1..3, behind the lead
-export const KICK_BAR_HALF_H = 6; // pedal bar is 12 px tall at rest
+export const KICK_BAR_HALF_H = 4; // pedal / open bar is 8 px tall at rest (a third thinner than the first 12)
 export const DOUBLE_KICK_GAP = 4; // px between the two bars of a double kick
 export const TAP_COLOR = '#b25cff';
 export const ACCENT_OUTLINE_WIDTH = 4;
@@ -41,7 +41,7 @@ const BURST_SIZE = 0.72; // overall size of the burst (a little smaller than the
 const BURST_SPARKS = 8;
 const burstEase = (k) => 1 - (1 - k) * (1 - k); // fast start, soft end
 // (x, y): the hit line under the lane centre; rx / ry: the pad's half sizes (ry is the road's squashed vertical radius); `seed`: the note's time (so the fan differs per note)
-export function drawHitBurst(g, x, y, rx, ry, color, k, seed, scale = 1) {
+export function drawHitBurst(g, x, y, rx, ry, color, k, seed, scale = 1, rect = false) {
   if (!(k >= 0 && k < 1)) return;
   rx *= BURST_SIZE * scale;
   ry *= BURST_SIZE * scale;
@@ -51,7 +51,10 @@ export function drawHitBurst(g, x, y, rx, ry, color, k, seed, scale = 1) {
   g.globalCompositeOperation = 'lighter';
   // the shockwave: a ring on the road that widens and thins
   g.beginPath();
-  g.ellipse(x, y, rx * (0.7 + 2.4 * e), ry * (0.7 + 2.4 * e), 0, 0, Math.PI * 2);
+  if (rect) { // a rectangular note: the ripple is a rounded rectangle spreading from the note's own proportions
+    const rw = rx * NOTE_RECT_W * (0.7 + 2.4 * e), rh = ry * NOTE_RECT_H * (0.7 + 2.4 * e);
+    g.roundRect(x - rw, y - rh, 2 * rw, 2 * rh, Math.min(rw, rh) * 0.45);
+  } else g.ellipse(x, y, rx * (0.7 + 2.4 * e), ry * (0.7 + 2.4 * e), 0, 0, Math.PI * 2);
   g.lineWidth = Math.max(0.8, rx * 0.24 * (1 - k));
   g.strokeStyle = tintWhite(color, 0.45);
   g.globalAlpha = Math.min(1, 1.15 * fade);
@@ -60,7 +63,10 @@ export function drawHitBurst(g, x, y, rx, ry, color, k, seed, scale = 1) {
   if (k < 0.4) {
     const env = Math.sin((Math.PI * k) / 0.4); // eases in and out (0 at the start, so it no longer pops in), peak at k = 0.2
     g.beginPath();
-    g.ellipse(x, y, rx * (0.6 + 0.5 * e), ry * (0.6 + 0.5 * e), 0, 0, Math.PI * 2);
+    if (rect) {
+      const rw = rx * NOTE_RECT_W * (0.6 + 0.5 * e), rh = ry * NOTE_RECT_H * (0.6 + 0.5 * e);
+      g.roundRect(x - rw, y - rh, 2 * rw, 2 * rh, Math.min(rw, rh) * 0.45);
+    } else g.ellipse(x, y, rx * (0.6 + 0.5 * e), ry * (0.6 + 0.5 * e), 0, 0, Math.PI * 2);
     g.fillStyle = tintWhite(color, 0.7);
     g.globalAlpha = 0.55 * env * env;
     g.fill();

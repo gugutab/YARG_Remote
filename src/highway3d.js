@@ -17,7 +17,7 @@ const TAIL_TAPER_POWER = 3; // like the heads' TAPER_GAIN: about 3x the natural 
 const TAIL_MIN_WIDTH = 0.3; // a tail never gets thinner than this fraction of its base width
 const ROAD_NEAR = -0.14; // the road starts below the canvas (past the pads), so it can fade out at the bottom
 const ROAD_END = 1.8; // the road runs well past the last visible note, so it has no visible far edge: the fade hides the rest
-const BAR_DEPTH = 0.0087; // one third of the earlier 0.026 // pedal/open bar thickness along the road, in depth units (it lies flat on the fretboard)
+const BAR_DEPTH = 0.0058; // a third thinner again (0.0087, itself a third of the earliest 0.026) // pedal/open bar thickness along the road, in depth units (it lies flat on the fretboard)
 const GLOW_DEPTH = 0.009; // half-height of the hit glow (it was 0.026 and looked too tall)
 const easeOut = (x) => 1 - (1 - x) ** 3;
 const TAIL_RIGHT = new Float64Array(2 * 21); // scratch for taperedStrip
@@ -649,12 +649,13 @@ export function renderLanes3D(hw, t, w, h) {
       const past = t - n.time;
       if (past < 0 || past < litFrom || noteDisabled(n)) continue;
       const bx = PCX + (n.lane + 0.5 - half) * PLANE, bw = laneW * headR, bh = laneW * headR * HEAD_TILT, bc = noteColor(n, colors);
+      const rippleRect = hw.noteStyle === 'rect' && !n.cymbal; // (the rectangular ripple is only for the rectangular notes)
       if (n.length > 0 && past < n.length) { // a held long note: three bursts a third of a period apart, so there is always one in flight (a constant variation)
         for (let j = 0; j < 3; j++) {
           const ph = past / BURST_LOOP_SEC + j / 3;
-          drawHitBurst(g, bx, PHIT, bw, bh, bc, ph - Math.floor(ph), n.time + Math.floor(ph) * 0.137 + j * 0.31, 0.31); // (half the size they had)
+          drawHitBurst(g, bx, PHIT, bw, bh, bc, ph - Math.floor(ph), n.time + Math.floor(ph) * 0.137 + j * 0.31, 0.31, rippleRect); // (half the size they had)
         }
-      } else if (past < BURST_SEC) drawHitBurst(g, bx, PHIT, bw, bh, bc, past / BURST_SEC, n.time, 0.5); // (half the size it had)
+      } else if (past < BURST_SEC) drawHitBurst(g, bx, PHIT, bw, bh, bc, past / BURST_SEC, n.time, 0.5, rippleRect); // (half the size it had)
     }
   }
 
