@@ -29,6 +29,9 @@ export const FILL_COLORS = {
   bre: 'rgba(255,80,80,0.15)',
 };
 export const FILL_STRONG = 'rgba(40,200,90,0.5)'; // the lead-up: a stronger green over the column (lane) of the activation note, along the whole fill
+export const FILL_BORDER = 'rgba(90,240,130,0.95)'; // the green side borders of the fretboard along a fill (thicker than the normal board edge)
+export const FILL_BORDER_PX = 5; // 2D width
+export const FILL_BORDER_LANES = 0.09; // 3D width, in lane units (scaled by the perspective)
 export const FILL_EDGE = 'rgba(140,255,170,0.9)'; // the thin bright line at the start and end of a fill phrase
 export const FILL_ACTIVATION = '#8cffaa'; // the drum fill activation note's halo and ring (white core): not one of the lane colours
 export const FADE_SEC = 0.25; // how long a note takes to fade out after the hit line

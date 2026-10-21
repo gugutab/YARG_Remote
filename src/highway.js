@@ -18,6 +18,8 @@ import {
   ROLL_COLORS,
   FILL_COLORS,
   FILL_STRONG,
+  FILL_BORDER,
+  FILL_BORDER_PX,
   FILL_EDGE,
   FILL_ACTIVATION,
   drawActivationMark,
@@ -2054,6 +2056,9 @@ export class Highway {
         g.fillStyle = FILL_STRONG;
         g.fillRect(inside ? x0 + s.activationLane * lw : x0, top, inside ? lw : width, len);
       }
+      g.fillStyle = FILL_BORDER; // green borders on both sides of the board along the fill
+      g.fillRect(x0, top, FILL_BORDER_PX, len);
+      g.fillRect(x0 + width - FILL_BORDER_PX, top, FILL_BORDER_PX, len);
       g.fillStyle = FILL_EDGE;
       g.fillRect(x0, top - 1, width, 2);
       g.fillRect(x0, bottom - 1, width, 2);
