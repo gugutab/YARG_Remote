@@ -573,9 +573,9 @@ export function renderLanes3D(hw, t, w, h) {
       if (n.length > 0 && past < n.length) { // a held long note: three bursts a third of a period apart, so there is always one in flight (a constant variation)
         for (let j = 0; j < 3; j++) {
           const ph = past / BURST_LOOP_SEC + j / 3;
-          drawHitBurst(g, bx, PHIT, bw, bh, bc, ph - Math.floor(ph), n.time + Math.floor(ph) * 0.137 + j * 0.31, 0.62);
+          drawHitBurst(g, bx, PHIT, bw, bh, bc, ph - Math.floor(ph), n.time + Math.floor(ph) * 0.137 + j * 0.31, 0.31); // (half the size they had)
         }
-      } else if (past < BURST_SEC) drawHitBurst(g, bx, PHIT, bw, bh, bc, past / BURST_SEC, n.time);
+      } else if (past < BURST_SEC) drawHitBurst(g, bx, PHIT, bw, bh, bc, past / BURST_SEC, n.time, 0.5); // (half the size it had)
     }
   }
 
