@@ -3,7 +3,8 @@
 import { ACTIONS, SHORTCUT_GROUPS, comboOf, effectiveBindings, assign, formatCombo } from './shortcuts.js';
 import { PRESETS, THEME_KEYS, THEME_LABELS, resolveTheme, deriveTheme, contrast, isHex } from './themes.js';
 import { resolvePalette, cleanLaneColors, DEFAULT_LANE_COLORS } from './palette.js';
-import { PER_INSTRUMENT_BASES, NECK_MIN, NECK_MAX, instrumentDefaults } from './perinstrument.js';
+import { PER_INSTRUMENT_BASES, instrumentDefaults } from './perinstrument.js';
+import { NECK_VALUES, neckIndex, neckAt } from './neckscale.js';
 
 const el = (tag, props = {}, ...kids) => {
   const e = document.createElement(tag);
@@ -292,14 +293,14 @@ export function renderPerInstrument(host, { settings }) {
       refreshers.push(() => { const v = instrumentDefaults(all(), base)[name]; sel.value = v === undefined ? '' : toOption(v); });
       return el('span', { role: 'cell' }, sel);
     };
-    const range = el('input', { type: 'range', min: NECK_MIN, max: NECK_MAX, step: 0.1, 'aria-label': `${label} neck speed` });
+    const range = el('input', { type: 'range', min: 0, max: NECK_VALUES.length - 1, step: 1, 'aria-label': `${label} neck speed` }); // (the position in NECK_VALUES)
     const out = el('output', { class: 'sp-out' });
     const def = el('button', { type: 'button', class: 'chip-btn pi-def', text: 'Default', title: `${label}: use the global neck speed`, onclick: () => update(base, 'neck', undefined) });
-    range.addEventListener('input', () => update(base, 'neck', Number(range.value)));
+    range.addEventListener('input', () => update(base, 'neck', neckAt(range.value)));
     refreshers.push(() => {
       const v = instrumentDefaults(all(), base).neck;
       const shown = v ?? settings.get('highway.neck'); // (unset: the global neck speed, dimmed)
-      range.value = shown;
+      range.value = neckIndex(shown);
       out.textContent = `${shown.toFixed(1)}×`;
       range.classList.toggle('pi-unset', v === undefined);
       out.classList.toggle('pi-unset', v === undefined);

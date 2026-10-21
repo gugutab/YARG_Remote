@@ -71,3 +71,19 @@ test('neck memory: parse, clean and restore only over the same starting speed', 
   assert.equal(restoredGlobal(s, 1.5), undefined);
   assert.equal(restoredGlobal({ panes: {} }, 1), undefined);
 });
+
+test('neck scale: steps of 0.2 up to 2, then 0.5 up to 5, nearest snapping', async () => {
+  const { NECK_VALUES, neckIndex, neckAt, snapNeck, NECK_MIN, NECK_MAX } = await import('../src/neckscale.js');
+  assert.deepEqual(NECK_VALUES.slice(0, 9), [0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2]);
+  assert.deepEqual(NECK_VALUES.slice(9), [2.5, 3, 3.5, 4, 4.5, 5]);
+  assert.equal(NECK_MIN, 0.4);
+  assert.equal(NECK_MAX, 5);
+  assert.equal(snapNeck(1.35), 1.4);
+  assert.equal(snapNeck(0.5), 0.4);
+  assert.equal(snapNeck(2.2), 2);
+  assert.equal(snapNeck(2.3), 2.5);
+  assert.equal(snapNeck(99), 5);
+  assert.equal(neckAt(neckIndex(1.2)), 1.2);
+  assert.equal(neckAt(-4), 0.4);
+  assert.equal(neckAt(999), 5);
+});

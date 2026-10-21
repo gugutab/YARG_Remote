@@ -1,6 +1,7 @@
 // The settings page: a full-screen dialog with a section list on the left and the settings of every section stacked on the
 // right (scrolling), a search box that filters them, and a "reset" button on every setting that differs from its default.
 // It only knows the schema and the settings store; what a setting does is up to app.js (it subscribes to the store).
+import { neckIndex } from './neckscale.js';
 
 const el = (tag, props = {}, ...kids) => {
   const e = document.createElement(tag);
@@ -88,10 +89,12 @@ export function mountSettings({ root, frame, settings, sections, renderers = {},
     }
     if (item.type === 'range') {
       const out = el('output', { class: 'sp-out' });
-      const input = el('input', { type: 'range', min: item.min, max: item.max, step: item.step ?? 1, 'aria-label': item.label });
-      const show = () => { out.textContent = `${item.format ? item.format(Number(input.value)) : input.value}${item.unit ?? ''}`; };
-      input.addEventListener('input', () => { show(); settings.set(id, Number(input.value)); });
-      refreshers.push(() => { input.value = settings.get(id); show(); });
+      const list = Array.isArray(item.values) ? item.values : null; // (a list of allowed values: the slider moves over their positions)
+      const input = el('input', list ? { type: 'range', min: 0, max: list.length - 1, step: 1, 'aria-label': item.label } : { type: 'range', min: item.min, max: item.max, step: item.step ?? 1, 'aria-label': item.label });
+      const valueOf = () => (list ? list[Number(input.value)] : Number(input.value));
+      const show = () => { out.textContent = `${item.format ? item.format(valueOf()) : valueOf()}${item.unit ?? ''}`; };
+      input.addEventListener('input', () => { show(); settings.set(id, valueOf()); });
+      refreshers.push(() => { input.value = list ? neckIndex(settings.get(id)) : settings.get(id); show(); });
       return el('div', { class: 'sp-range' }, input, out);
     }
     if (item.type === 'color') {

@@ -16,6 +16,7 @@
 import { PRESETS, THEME_KEYS, isHex } from './themes.js';
 import { ACTIONS } from './shortcuts.js';
 import { VISUALIZERS, showsStage } from './visualizers.js';
+import { NECK_VALUES, NECK_MIN, NECK_MAX, neckIndex } from './neckscale.js';
 import { DETAIL_CHIPS } from './songinfo.js';
 import { PALETTES, DEFAULT_LANE_COLORS, cleanLaneColors } from './palette.js';
 import { cleanPerInstrument } from './perinstrument.js';
@@ -152,7 +153,7 @@ export const SECTIONS = [
       { id: 'highway.lyricOutline', group: 'Vocals', type: 'toggle', label: 'Lyrics outline', help: 'A dark edge around the letters of the lyrics, so they read over any background.', default: true, keywords: 'lyrics outline stroke shadow contrast' },
       { id: 'highway.seekAnimation', group: 'Motion', type: 'toggle', label: 'Animate jumps in the song', help: 'When you seek or jump to a section, the notes scroll to the new place instead of snapping.', default: true, when: (get) => !motionOff(get) },
       { id: 'highway.motionBlur', group: 'Motion', type: 'toggle', label: 'Motion blur on jumps', help: 'While the notes rush to the new place after a seek, draw a trail behind them.', default: true, when: (get) => !motionOff(get) && get('highway.seekAnimation') && !get('perf.economy') },
-      { id: 'highway.neck', group: 'Motion', type: 'range', label: 'Note spacing (neck speed)', help: 'Only the spacing of the notes, not the music speed. Each track\'s own neck speed control resets to this value.', min: 0.5, max: 3, step: 0.1, unit: '×', default: 1.2, keywords: 'scroll speed spacing approach' },
+      { id: 'highway.neck', group: 'Motion', type: 'range', label: 'Note spacing (neck speed)', help: 'Only the spacing of the notes, not the music speed. Each track\'s own neck speed control resets to this value.', values: NECK_VALUES, min: NECK_MIN, max: NECK_MAX, unit: '×', default: 1.2, keywords: 'scroll speed spacing approach' },
       { id: 'highway.visualizer', group: 'Visualizer', type: 'choice', label: 'Background visualizer', help: 'An animation behind all the tracks, driven by the album art, the beats and the notes. Key: G.', options: VISUALIZERS.map((v) => ({ value: v.id, label: v.label })), default: 'none', keywords: 'background animation aurora synthwave warp rings equalizer embers cover radial spotlights tunnel', when: (get) => !get('perf.economy') },
       { id: 'highway.visualizerQuality', group: 'Visualizer', type: 'choice', label: 'Visualizer quality', help: 'The background is drawn at a lower resolution and stretched: lower is much lighter on the graphics card (the album art always stays sharp).', options: [{ value: 'high', label: 'High (full resolution)' }, { value: 'medium', label: 'Medium' }, { value: 'low', label: 'Low (lightest)' }], default: 'medium', when: (get) => get('highway.visualizer') !== 'none' },
       { id: 'highway.visualizerFps', group: 'Visualizer', type: 'choice', label: 'Visualizer frame rate', help: 'How often the background is redrawn. Lower is lighter on the graphics card (the tracks are not affected). Unlimited redraws it on every frame of your screen, even above 60.', options: [{ value: '20', label: '20 frames per second' }, { value: '30', label: '30 frames per second' }, { value: '60', label: '60 frames per second' }, { value: 'unlimited', label: 'Unlimited (every screen frame)' }], default: '60', when: (get) => get('highway.visualizer') !== 'none' },
@@ -271,6 +272,7 @@ function checkItem(it, value) {
       const min = it.min ?? -Infinity;
       const max = it.max ?? Infinity;
       let v = Math.min(max, Math.max(min, value));
+      if (Array.isArray(it.values)) return { ok: true, value: it.values[neckIndex(v)] }; // (a list of allowed values: the nearest one)
       if (it.step > 0 && Number.isFinite(min)) {
         v = min + Math.round((v - min) / it.step) * it.step;
         v = Number(v.toFixed(Math.max(decimals(it.step), decimals(min))));

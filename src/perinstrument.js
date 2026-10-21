@@ -3,8 +3,8 @@
 // window's own chart-menu choice still wins over it during the session; the menu's reset returns to it).
 
 export const PER_INSTRUMENT_BASES = ['guitar', 'bass', 'rhythm', 'keys', 'drums', 'vocals'];
-export const NECK_MIN = 0.5;
-export const NECK_MAX = 3;
+import { NECK_MIN, NECK_MAX } from './neckscale.js';
+export { NECK_MIN, NECK_MAX };
 const VIEWS = ['2d', '3d'];
 const STYLES = ['round', 'rect'];
 const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v) && [Object.prototype, null].includes(Object.getPrototypeOf(v));

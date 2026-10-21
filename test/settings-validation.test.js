@@ -33,7 +33,9 @@ test('validator: range needs a finite number, clamps and snaps to the step', () 
   assert.equal(validate('library.cardScale', 102).value, 100, 'step 5 from 70');
   assert.equal(validate('library.cardScale', 103).value, 105);
   assert.equal(validate('highway.neck', 1.234).value, 1.2, 'no float noise');
-  assert.equal(validate('highway.neck', 99).value, 3);
+  assert.equal(validate('highway.neck', 99).value, 5);
+  assert.equal(validate('highway.neck', 2.2).value, 2, 'a list of allowed values: the nearest one');
+  assert.equal(validate('highway.neck', 2.3).value, 2.5);
   for (const bad of [NaN, Infinity, -Infinity, '5', null, true, [], {}]) assert.equal(validate('ui.radius', bad).ok, false, String(bad));
 });
 

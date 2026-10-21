@@ -2,8 +2,8 @@
 // { global?: number, base?: number, panes: { [instrument]: number } }. `base` is the highway.neck setting the global value was chosen over: when
 // that setting changes later, the new starting value wins and the old choice is dropped.
 export const NECK_KEY = 'yargremote.neck';
-export const NECK_MIN = 0.5;
-export const NECK_MAX = 3;
+import { NECK_MIN, NECK_MAX } from './neckscale.js';
+export { NECK_MIN, NECK_MAX };
 const PANE_KEY = /^[a-z0-9_-]{1,24}$/i;
 
 const valid = (v) => typeof v === 'number' && Number.isFinite(v) && v >= NECK_MIN && v <= NECK_MAX;

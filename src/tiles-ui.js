@@ -2,6 +2,7 @@
 // of a tile (volume, neck speed, chart delay, view) and the small popup those tools open. Moved out of app.js as is: app.js injects its state
 // getters and functions through `initTilesUi(ctx)`, called where the tile popup used to be created (same DOM order, same listener order).
 // The chooser slots (`fillChooser`) and the stage menu (`buildPaneMenu`) stay in app.js and use the builders exported here.
+import { NECK_VALUES, neckIndex, neckAt } from './neckscale.js';
 import { paintLevel, isSolo } from './levelicon.js';
 import { instrumentLevel, stemGroup } from './songinfo.js';
 import { paintRange } from './range-ui.js';
@@ -193,17 +194,18 @@ function paneRange(group, name, min, max, step, def, fmtValue, onChange) {
   const input = box.querySelector('input');
   const out = box.querySelector('output');
   const reset = box.querySelector('button');
-  Object.assign(input, { min, max, step });
-  input.setAttribute('aria-label', name === 'neck' ? 'Neck speed' : 'Chart delay');
+  const neck = name === 'neck'; // (the neck speed slider moves over the positions of NECK_VALUES)
+  Object.assign(input, neck ? { min: 0, max: NECK_VALUES.length - 1, step: 1 } : { min, max, step });
+  input.setAttribute('aria-label', neck ? 'Neck speed' : 'Chart delay');
   const paint = () => {
     const v = ctx.highway.paneOpt(group.key, name);
-    input.value = v;
+    input.value = neck ? neckIndex(v) : v;
     out.textContent = fmtValue(v);
     reset.disabled = Math.abs(v - def()) < 1e-9;
-    paintRange(input, def());
+    paintRange(input, neck ? neckIndex(def()) : def());
     onChange?.();
   };
-  input.addEventListener('input', () => { ctx.highway.setPaneOpt(group.key, name, Number(input.value)); paint(); });
+  input.addEventListener('input', () => { ctx.highway.setPaneOpt(group.key, name, neck ? neckAt(input.value) : Number(input.value)); paint(); });
   reset.addEventListener('click', () => { ctx.highway.clearPaneOpt(group.key, name); paint(); });
   paint();
   return box;

@@ -80,6 +80,7 @@ test('schema: choice and multi options are unique and the default is one of them
 test('schema: ranges have min <= default <= max, the default on a step, and a valid step', () => {
   for (const it of plain.filter((x) => x.type === 'range')) {
     assert.ok(it.min <= it.default && it.default <= it.max, `${it.id}: ${it.min} <= ${it.default} <= ${it.max}`);
+    if (Array.isArray(it.values)) { assert.ok(it.values.includes(it.default), `${it.id}: default ${it.default} is one of the allowed values`); continue; } // (a list of allowed values instead of a step)
     assert.ok(it.step > 0, `${it.id}: step`);
     const n = (it.default - it.min) / it.step;
     assert.ok(Math.abs(n - Math.round(n)) < 1e-9, `${it.id}: default ${it.default} is not on a step of ${it.step} from ${it.min}`);
