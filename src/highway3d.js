@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, sprite3D, noteSpritePx, NOTE_RECT_W, NOTE_RECT_H, NOTE_TRI_W, NOTE_TRI_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, setDesaturated, isDesaturated, dcol, desaturate, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, HIT_LINE_COLOR, HIT_LINE_BORDER, HIT_LINE_BORDER_SOFT, drawHitBurst, drawBarBurst, BURST_SEC, BURST_LOOP_SEC, BURST_VANISH_SEC, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, setDesaturated, isDesaturated, dcol, desaturate, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, HIT_LINE_COLOR, HIT_LINE_BORDER, HIT_LINE_BORDER_SOFT, drawHitBurst, drawBarBurst, BURST_SEC, BAR_BURST_SEC, BURST_LOOP_SEC, BURST_VANISH_SEC, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
 
@@ -619,7 +619,7 @@ export function renderLanes3D(hw, t, w, h) {
     setDesaturated(hw.disabledNote(n)); // disabled notes lose their colour
     if (n.lane >= 0 && !n.open) continue;
     const past = t - exitTime(n);
-    const barFade = hw.hitAnimation === 'burst' ? BURST_VANISH_SEC * 1.3 : FADE_SEC; // (the burst: the bar vanishes quickly, the burst does the rest)
+    const barFade = hw.hitAnimation === 'burst' ? BURST_VANISH_SEC : FADE_SEC; // (the burst: the bar vanishes quickly, the burst does the rest)
     if (past > barFade) continue;
     const kx = Math.max(0, past) / barFade;
     const e = easeOut(kx);
@@ -815,13 +815,13 @@ export function renderLanes3D(hw, t, w, h) {
       const n = notes[i];
       if (n.lane < 0 || n.open) { // a pedal / open bar: the burst happens at both ends of the bar (the old swelling and fading of the bar stays)
         const pb = t - n.time;
-        if (pb < 0 || pb >= BURST_SEC || pb < litFrom || noteDisabled(n)) continue;
+        if (pb < 0 || pb >= BAR_BURST_SEC || pb < litFrom || noteDisabled(n)) continue;
         const bcol = n.open ? NOTE_PALETTE.open : chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick;
         const barPx = PHIT - (PVY + (PHIT - PVY) / (1 + PK * (barDepth / 2))); // the bar's half thickness on screen at the hit line
-        drawBarBurst(g, PCX, PHIT, half * PLANE, Math.max(2, barPx), bcol, pb / BURST_SEC, n.time, laneW * headR * 0.6);
+        drawBarBurst(g, PCX, PHIT, half * PLANE, Math.max(2, barPx), bcol, pb / BAR_BURST_SEC, n.time, laneW * headR * 0.6);
         const side = laneW * headR * 0.575; // (half the size it had)
-        drawHitBurst(g, PCX - half * PLANE, PHIT, side, side * HEAD_TILT, bcol, pb / BURST_SEC, n.time);
-        drawHitBurst(g, PCX + half * PLANE, PHIT, side, side * HEAD_TILT, bcol, pb / BURST_SEC, n.time + 0.5);
+        drawHitBurst(g, PCX - half * PLANE, PHIT, side, side * HEAD_TILT, bcol, pb / BAR_BURST_SEC, n.time);
+        drawHitBurst(g, PCX + half * PLANE, PHIT, side, side * HEAD_TILT, bcol, pb / BAR_BURST_SEC, n.time + 0.5);
         continue;
       }
       const past = t - n.time;
