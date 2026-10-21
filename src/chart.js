@@ -356,7 +356,35 @@ function buildDrumChart(midi, track, kind, difficulty, timed, toSec, settings) {
     });
   }
   const notes = [...kicks.values(), ...pads].sort((a, b) => a.time - b.time);
-  return { mode: 'lanes', lanes, laneColors, laneKinds: extended ? EXTENDED_DRUM_LANES.map((l) => (l.cymbal ? 'cymbal' : 'tom')) : null, drumKind: kind, notes, rolls: rollSpans(track, toSec), ...commonParts(midi, track, toSec, settings, 'drums') };
+  const chart = { mode: 'lanes', lanes, laneColors, laneKinds: extended ? EXTENDED_DRUM_LANES.map((l) => (l.cymbal ? 'cymbal' : 'tom')) : null, drumKind: kind, notes, rolls: rollSpans(track, toSec), ...commonParts(midi, track, toSec, settings, 'drums') };
+  markFillNotes(chart);
+  return chart;
+}
+
+// Drum fills: every note inside a 'fill' span gets n.fill, and the star power activation note(s) get n.activation.
+// YARG.Core SetDrumActivationFlags (InstrumentDifficultyExtensions.cs): for each DrumFill phrase it takes the FIRST note
+// whose time is >= the phrase end (the note the fill leads into; the last note of the chart if none follows), and with the
+// default StarPowerActivationType.RightmostNote flags the rightmost pad of the chord on that tick (highest lane; the kick only
+// if it is alone). BRE spans (kind 'bre') mark nothing. Notes are sorted by time, so one forward pass is enough.
+export function markFillNotes(chart) {
+  const notes = chart.notes;
+  for (const n of notes) { n.fill = false; n.activation = false; }
+  let from = 0;
+  for (const f of chart.fills || []) {
+    if (f.kind !== 'fill') continue;
+    for (let i = from; i < notes.length && notes[i].time < f.end; i++) {
+      if (notes[i].time >= f.start) notes[i].fill = true;
+    }
+    let i = from;
+    while (i < notes.length - 1 && notes[i].time < f.end) i++;
+    if (i >= notes.length) continue;
+    const time = notes[i].time;
+    let best = null;
+    for (let k = i; k < notes.length && notes[k].time === time; k++) if (best === null || notes[k].lane > best.lane) best = notes[k];
+    if (best) best.activation = true;
+    from = i;
+  }
+  return chart;
 }
 
 // Tick ranges during which each cymbal flag (110/111/112) is on.

@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, NOTE_RECT_W, NOTE_RECT_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
 
@@ -104,6 +104,39 @@ function taperedStrip(g, d0, d1, mid, wl, dRef) {
   for (let i = N; i >= 0; i--) g.lineTo(right[2 * i], right[2 * i + 1]);
   g.closePath();
 }
+// A drum fill band: fades in and out over the first and last part of the phrase (stepped slices of the quad), with a thin bright line
+// across the road at the start and end.
+function fillBand3D(g, spans, color, xl, xr, roadW) {
+  if (!spans) return;
+  const STEPS = 4;
+  for (let i = 0; i < spans.length; i++) {
+    const s = spans[i];
+    if ((s.end - PT) / PSEC < ROAD_NEAR || s.start > PT + PSEC) continue;
+    const fadeSec = Math.min(0.25, (s.end - s.start) * 0.2);
+    const d0 = (s.start - PT) / PSEC, d1 = (s.end - PT) / PSEC, f = fadeSec / PSEC;
+    const piece = (a, b, k) => { // [a, b] in depth, clamped to the road, at k of the band's alpha
+      const lo = Math.max(ROAD_NEAR, a);
+      if (b <= lo) return;
+      g.globalAlpha *= k;
+      g.fillStyle = color;
+      quad(g, lo, b, xl, xr);
+      g.fill();
+      g.globalAlpha /= k;
+    };
+    piece(d0 + f, d1 - f, 1);
+    for (let k = 0; k < STEPS; k++) {
+      const w = f / STEPS, a = (k + 1) / (STEPS + 1);
+      piece(d0 + k * w, d0 + (k + 1) * w, a);
+      piece(d1 - (k + 1) * w, d1 - k * w, a);
+    }
+    g.fillStyle = FILL_EDGE;
+    for (const dd of [d0, d1]) {
+      if (dd < ROAD_NEAR || dd > 1) continue;
+      const p = scaleAt(dd);
+      g.fillRect(PCX + xl * PLANE * p, PVY + (PHIT - PVY) * p - 1.5 * p, roadW * p, 3 * p);
+    }
+  }
+}
 // Bands (star power, solo, fills, rolls) that run along the road, to the end of the board.
 function span(g, spans, color, xl, xr) { // xl..xr: the lane range in lane units (-half..half is the whole road)
   g.fillStyle = color;
@@ -163,7 +196,7 @@ export function renderLanes3D(hw, t, w, h) {
       const cols = chart.laneColors || NOTE_PALETTE.lanes;
       const pulseBre = hw.breBand === 'pulse';
       for (let l = 0; l < lanes; l++) span(g, spans, withAlpha(cols[l] || cols[0], breAlpha(t, l, lanes, pulseBre)), -half + l, -half + l + 1);
-    } else span(g, spans, FILL_COLORS[FILL_KINDS[i]], -half, half);
+    } else fillBand3D(g, spans, FILL_COLORS[FILL_KINDS[i]], -half, half, roadW);
   }
   for (let i = 0; i < ROLL_TYPES.length; i++) span(g, spansOfKind(chart, chart.rolls, 'type', ROLL_TYPES[i]), ROLL_COLORS[ROLL_TYPES[i]], -half, half);
 
@@ -222,6 +255,7 @@ export function renderLanes3D(hw, t, w, h) {
     const n = notes[vi];
     const past = t - n.time;
     if (past < litFrom || noteDisabled(n)) continue; // (see setLitLag; a disabled note, replayed or after the loop end, is never hit)
+    if (n.activation && hw.fillActivation && past < BAR_FLASH_SEC && 1 - past / BAR_FLASH_SEC > barFlash) barFlash = 1 - past / BAR_FLASH_SEC; // a fill's activation note lights the whole kit
     if (n.lane >= 0 && !n.open) flash[n.lane] = Math.max(flash[n.lane], heldAmount(n, t) * (0.75 + flicker));
     if (n.lane >= 0 && !n.open) {
       if (past < HIT_FLASH_SEC) flash[n.lane] = Math.max(flash[n.lane], 1 - past / HIT_FLASH_SEC);
@@ -282,7 +316,7 @@ export function renderLanes3D(hw, t, w, h) {
       const y1 = PVY + (PHIT - PVY) * s1;
       const y0 = PVY + (PHIT - PVY) * s0;
       g.lineWidth = Math.max(1, 2 * s1);
-      g.strokeStyle = tintWhite(base, 0.65);
+      g.strokeStyle = n.activation && hw.fillActivation ? FILL_ACTIVATION : tintWhite(base, 0.65); // (a fill's activation kick: a bright far edge)
       g.beginPath();
       g.moveTo(PCX + -half * PLANE * s1, y1);
       g.lineTo(PCX + half * PLANE * s1, y1);
@@ -388,6 +422,7 @@ export function renderLanes3D(hw, t, w, h) {
         g.strokeStyle = darken(colors[n.lane], ACCENT_OUTLINE_DARKEN);
         g.stroke();
       }
+      if (n.activation && hw.fillActivation) drawActivationMark(g, x, y, rx * NOTE_RECT_W, ry * NOTE_RECT_H, p, t);
       continue;
     }
     // thickness: a thin darker edge underneath the top face (no cast shadow; all of it moves, grows and fades with the note)
@@ -426,6 +461,7 @@ export function renderLanes3D(hw, t, w, h) {
       g.fillStyle = kx === 0 ? HOPO_DOT : `rgba(255,255,255,${0.9 * (1 - kx)})`;
       g.fill();
     }
+    if (n.activation && hw.fillActivation) drawActivationMark(g, x, y, rx, ry, p, t);
   }
   g.globalAlpha = 1;
   g.filter = 'none';

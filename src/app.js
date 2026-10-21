@@ -3673,6 +3673,7 @@ const EFFECTS = {
   'highway.trackOpacity': (v) => { highway.trackOpacity = v / 100; },
   'highway.starPowerBand': (v) => { highway.starPowerBand = !!v; },
   'highway.fillBand': (v) => { highway.fillBand = !!v; },
+  'highway.fillActivation': (v) => { highway.fillActivation = !!v; },
   'highway.soloBand': (v) => { highway.soloBand = !!v; },
   'highway.breBand': (v) => { highway.breBand = v === 'pulse' && motionReduced() ? 'steady' : v; }, // (the pulse is flashing: reduced motion draws it steady)
   'highway.beatLines': (v) => { highway.beatLines = v; },

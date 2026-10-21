@@ -17,6 +17,9 @@ import {
   DISABLED_FILTER,
   ROLL_COLORS,
   FILL_COLORS,
+  FILL_EDGE,
+  FILL_ACTIVATION,
+  drawActivationMark,
   FADE_SEC,
   BASE_LOOKAHEAD_SEC,
   laneLookFactor,
@@ -76,6 +79,7 @@ const REST_BOARD_MIN = 0.2; // a fretboard's dark base keeps this fraction of it
 const FILL_KINDS = Object.keys(FILL_COLORS);
 const ROLL_TYPES = Object.keys(ROLL_COLORS);
 const HOPO_DOT = 'rgba(255,255,255,0.9)'; // the alpha of a HOPO dot while its note has not been hit yet (0.9 * (1 - 0))
+const ACT_MARKS = []; // reused every frame (see the heads loop)
 let FLASH_2D = new Float64Array(16); // scratch of renderLanes: the light of each pad
 // The time-to-pixel mapping of the current renderLanes call (it was a closure made on every frame and every pane).
 let LY_HIT = 0;
@@ -187,7 +191,8 @@ export class Highway {
     this.weightScratch = [];
     this.rectPool = []; // the objects of paneRects
     this.vocalView = 'track'; // 'track' (notes + lyrics) or 'karaoke' (the lyrics alone)
-    this._fillBand = false; // the green band during a drum fill (setting highway.fillBand, off by default; the big rock ending band always shows)
+    this._fillBand = true; // the green band during a drum fill (setting highway.fillBand, on by default; the big rock ending band always shows)
+    this._fillActivation = true; // the glow, ring and star on a fill's activation note and the pad flash when it arrives (setting highway.fillActivation)
     this._starPowerBand = false; // the gold band under a star power phrase (setting highway.starPowerBand, off by default)
     this._trackOpacity = 0.75; // how opaque the board of a fretboard is (setting highway.trackOpacity)
     // The look of the notes and the board (settings of the Highway "Notes" and "Track and bands" groups; 1 / true = the original look)
@@ -223,6 +228,8 @@ export class Highway {
   set delay(v) { this._delay = v; this.invalidate(); }
   get fillBand() { return this._fillBand; }
   set fillBand(v) { this._fillBand = v; this.invalidate(); }
+  get fillActivation() { return this._fillActivation; }
+  set fillActivation(v) { this._fillActivation = v; this.invalidate(); }
   get starPowerBand() { return this._starPowerBand; }
   set starPowerBand(v) { this._starPowerBand = v; this.invalidate(); }
   get trackOpacity() { return this._trackOpacity; }
@@ -1404,7 +1411,7 @@ export class Highway {
         const cols = chart.laneColors || NOTE_PALETTE.lanes;
         const pulseBre = this.breBand === 'pulse';
         for (let l = 0; l < chart.lanes; l++) this.fillSpans(spans, t, ahead, x0 + l * laneW, laneW, h, withAlpha(cols[l] || cols[0], breAlpha(t, l, chart.lanes, pulseBre)));
-      } else this.fillSpans(spans, t, ahead, x0, laneW * chart.lanes, h, FILL_COLORS[FILL_KINDS[i]]);
+      } else this.fillBandSpans(spans, t, ahead, x0, laneW * chart.lanes, h, FILL_COLORS[FILL_KINDS[i]]);
     }
     // drum rolls: one band per roll type (kick roll, tremolo lane, trill lane)
     for (let i = 0; i < ROLL_TYPES.length; i++) {
@@ -1455,6 +1462,7 @@ export class Highway {
       const n = notes[vi];
       const past = t - n.time;
       if (past < litFrom || noteDisabled(n)) continue; // (not yet reached by the real time: see setLitLag; a disabled note is never hit)
+      if (n.activation && this.fillActivation && past < BAR_FLASH_SEC) barFlash = Math.max(barFlash, 1 - past / BAR_FLASH_SEC); // a fill's activation note lights the whole kit
       if (n.lane >= 0 && !n.open) {
         if (past < HIT_FLASH_SEC) flash[n.lane] = Math.max(flash[n.lane], 1 - past / HIT_FLASH_SEC);
         flash[n.lane] = Math.max(flash[n.lane], heldAmount(n, t) * (0.75 + flicker));
@@ -1490,6 +1498,11 @@ export class Highway {
       // double kick: a second bar stacked above the first
       g.fillRect(x0, cy + 0 - height / 2, full, height);
       if (n.doubleKick) g.fillRect(x0, cy + -(height + DOUBLE_KICK_GAP) - height / 2, full, height);
+      if (n.activation && this.fillActivation) { // a fill's activation note on the kick: a bright edge around the bar
+        g.lineWidth = 2;
+        g.strokeStyle = FILL_ACTIVATION;
+        g.strokeRect(x0, cy - height / 2, full, height);
+      }
     }
     g.globalAlpha = 1;
 
@@ -1520,6 +1533,7 @@ export class Highway {
       }
     }
 
+    const marks = ACT_MARKS; // [note, cx, cy, rx, ry, alpha] of the fill activation notes (drawn after the heads)
     // Heads. Once a note reaches the hit line it stops moving and plays its exit animation:
     // it grows, fades and turns white over FADE_SEC, for pedals too.
     for (let vi = from; vi < end; vi++) {
@@ -1554,6 +1568,7 @@ export class Highway {
           g.strokeStyle = darken(colors[n.lane], ACCENT_OUTLINE_DARKEN);
           g.stroke();
         }
+        if (n.activation && this.fillActivation) marks.push(n, cx, cy, r * wide * NOTE_RECT_W, r * NOTE_RECT_H, g.globalAlpha);
         continue;
       }
       g.beginPath();
@@ -1573,7 +1588,15 @@ export class Highway {
         g.fillStyle = k === 0 ? HOPO_DOT : `rgba(255,255,255,${0.9 * (1 - k)})`;
         g.fill();
       }
+      if (n.activation && this.fillActivation) marks.push(n, cx, cy, n.cymbal ? r : r * wide, r, g.globalAlpha);
     }
+    // fill activation marks on top of every head (the notes behind it, drawn later, would cover its star), dim like their note
+    for (let i = 0; i < marks.length; i += 6) {
+      g.filter = this.disabledNote(marks[i]) ? DISABLED_FILTER : 'none';
+      g.globalAlpha = marks[i + 5];
+      drawActivationMark(g, marks[i + 1], marks[i + 2], marks[i + 3], marks[i + 4], 1, t);
+    }
+    marks.length = 0;
     g.globalAlpha = 1;
     g.filter = 'none';
 
@@ -2010,6 +2033,30 @@ export class Highway {
     vr[0] = vr[0] + (targetLo - vr[0]) * k;
     vr[1] = vr[1] + (targetHi - vr[1]) * k;
     return vr;
+  }
+
+  // A drum fill: the band fades in and out over the first and last part of the phrase, with a thin bright line on the start and end.
+  fillBandSpans(spans, t, ahead, x0, width, h, color) {
+    const g = this.g;
+    for (let i = 0; i < spans.length; i++) {
+      const s = spans[i];
+      if (s.start > t + ahead) continue;
+      const top = laneY(s.end);
+      const bottom = laneY(s.start);
+      if (top > h || bottom < 0) continue;
+      const len = bottom - top;
+      const fade = Math.min(0.18, 28 / Math.max(1, len));
+      const grad = g.createLinearGradient(0, top, 0, bottom);
+      grad.addColorStop(0, 'rgba(40,200,90,0)');
+      grad.addColorStop(fade, color);
+      grad.addColorStop(1 - fade, color);
+      grad.addColorStop(1, 'rgba(40,200,90,0)');
+      g.fillStyle = grad;
+      g.fillRect(x0, top, width, len);
+      g.fillStyle = FILL_EDGE;
+      g.fillRect(x0, top - 1, width, 2);
+      g.fillRect(x0, bottom - 1, width, 2);
+    }
   }
 
   fillSpans(spans, t, ahead, x0, width, h, color) {

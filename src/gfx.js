@@ -25,9 +25,11 @@ export const ROLL_COLORS = {
 };
 // Drum fill (activation phrase) and big rock ending bands, one colour per chart.fills kind; kept faint under the notes.
 export const FILL_COLORS = {
-  fill: 'rgba(40,200,90,0.13)', // YARG draws the drum fill overlay in green
+  fill: 'rgba(40,200,90,0.24)', // YARG draws the drum fill overlay in green (the 2D/3D band fades at both ends and has edge lines, see FILL_EDGE)
   bre: 'rgba(255,80,80,0.15)',
 };
+export const FILL_EDGE = 'rgba(140,255,170,0.9)'; // the thin bright line at the start and end of a fill phrase
+export const FILL_ACTIVATION = '#8cffaa'; // the drum fill activation note's halo and ring (white core): not one of the lane colours
 export const FADE_SEC = 0.25; // how long a note takes to fade out after the hit line
 export const BASE_LOOKAHEAD_SEC = 2.5; // time from the top edge to the hit line at neck speed 1
 // The fretboards scroll at a fixed speed in pixels, like the vocal view: a taller window shows more lookahead instead of stretching the same
@@ -231,6 +233,42 @@ export function adaptBlurSamples(n, gapMs) {
   if (!(gapMs < 100)) return n;
   if (gapMs > BLUR_SLOW_MS) return Math.max(2, n >> 1);
   return gapMs < BLUR_FAST_MS ? Math.min(BLUR_MAX_SAMPLES, n + 1) : n;
+}
+// The star power activation note of a drum fill (chart n.activation, setting highway.fillActivation): a glowing halo, a ring (white inside a
+// light-green glow) and a small four-point star above it. Drawn by the caller on top of the finished head (the note keeps its lane colour
+// and the sprite caches are untouched). rx / ry: the head's half sizes on screen; lw: line width scale (perspective); t: the pulse.
+export function drawActivationMark(g, cx, cy, rx, ry, lw, t) {
+  const pulse = 0.5 + 0.5 * Math.sin(t * 7);
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  g.translate(cx, cy);
+  g.scale(1, ry / rx);
+  fillHalo(g, FILL_ACTIVATION, rx * 0.8, rx * 2.1, 0.55 + 0.25 * pulse);
+  g.restore();
+  g.globalCompositeOperation = 'source-over';
+  g.beginPath();
+  g.ellipse(cx, cy, rx * 1.3, ry * 1.3, 0, 0, Math.PI * 2);
+  g.lineWidth = 5 * lw;
+  g.strokeStyle = FILL_ACTIVATION;
+  g.globalAlpha *= 0.55;
+  g.stroke();
+  g.globalAlpha /= 0.55;
+  g.lineWidth = 2 * lw;
+  g.strokeStyle = '#ffffff';
+  g.stroke();
+  // star: four points, centred above the ring
+  const sr = Math.max(rx * 0.3, 3), sy = cy - ry * 1.3 - sr * 0.8;
+  g.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = (i * Math.PI) / 4 - Math.PI / 2, r = i % 2 === 0 ? sr : sr * 0.38;
+    g.lineTo(cx + Math.cos(a) * r, sy + Math.sin(a) * r);
+  }
+  g.closePath();
+  g.fillStyle = '#ffffff';
+  g.fill();
+  g.lineWidth = 1.5 * lw;
+  g.strokeStyle = FILL_ACTIVATION;
+  g.stroke();
 }
 export const HIT_FLASH_SEC = 0.14; // how long a hit pad stays lit after a note hit
 export const BAR_FLASH_SEC = 0.24; // ... after a pedal or open hit (it lights every pad)
