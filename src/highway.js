@@ -203,6 +203,8 @@ export class Highway {
     this._noteBase = 1; // height of the rectangular note's base (highway.noteBase)
     this._sustainWidth = 1; // tail width (highway.sustainWidth)
     this._kickBar = 1; // pedal / open bar thickness (highway.kickBarHeight)
+    this._perspective = 1.2; // strength of the 3D perspective, 1 = the classic look (highway.perspective / 100)
+    this._curve = 0.25; // downward bend of the 3D road, 0 = flat (highway.curve / 100)
     this.leftHanded = false; // the lanes of the guitar-like and drum windows run right to left (highway.leftHanded)
     this.disabledFn = (n) => this.disabledNote(n); // (one closure for gfx.js setDisabledNotes: nothing is allocated per frame)
     this.litLag = 0; // drawn time minus the real chart time (> 0 while a seek animation sweeps back), see setLitLag in gfx.js
@@ -245,6 +247,10 @@ export class Highway {
   set sustainWidth(v) { this._sustainWidth = v; this.invalidate(); }
   get kickBar() { return this._kickBar; }
   set kickBar(v) { this._kickBar = v; this.invalidate(); }
+  get perspective() { return this._perspective; }
+  set perspective(v) { this._perspective = v; this.invalidate(); }
+  get curve() { return this._curve; }
+  set curve(v) { this._curve = v; this.invalidate(); }
   get heldMotion() { return this._heldMotion; }
   set heldMotion(v) { this._heldMotion = v; this.invalidate(); }
   get padLook() { return this._padLook; }

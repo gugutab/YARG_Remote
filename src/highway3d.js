@@ -64,14 +64,37 @@ let PCX = 0; // centre of the road
 let PLANE = 0; // lane width at the hit line
 let PSEC = 1; // seconds between the hit line and the far edge
 let PT = 0; // song time
+let PC = 0; // downward curve of the road: an extra PC * d^2 px (down) at depth d > 0 (0 = a flat road; setting highway.curve)
+let PEND = ROAD_END; // where the road stops: ROAD_END, or the crest of a curved road (past it the road would fold back down)
 const scaleAt = (d) => 1 / (1 + PK * d); // perspective scale at depth d (0 = hit line, 1 = far edge)
-const yAt = (d) => PVY + (PHIT - PVY) * scaleAt(d);
+const yAt = (d) => PVY + (PHIT - PVY) * scaleAt(d) + (d > 0 ? PC * d * d : 0);
 const xAt = (lx, d) => PCX + lx * PLANE * scaleAt(d); // lx = lane units from the road's centre
 const depth = (time) => Math.min(1, Math.max(0, (time - PT) / PSEC));
+const CURVE_MAX = 0.9; // curve 100%: the road's slope on screen at the far edge (d = 1) is 10% of the flat one, so the crest stays past the notes
+const CURVE_STEPS = 24; // segments per depth unit of a quad or line on a curved road
+
+// The projection for a pane: `h` its height, `hitY` the hit line, `strength` the perspective (setting highway.perspective / 100: 1 = the
+// classic FAR_SCALE) and `curve` the downward bend (highway.curve / 100). The far edge (d = 1) of a flat road stays at FAR_TOP and the hit
+// line at hitY for every strength; only how fast things shrink with depth changes. Returns { k, vy, c, end }: the scale at depth d is
+// 1 / (1 + k d), y = vy + (hitY - vy) * scale + (d > 0 ? c d^2 : 0), and `end` is the depth where the road stops (the crest of a curved one).
+export function projection3D(h, hitY, strength = 1, curve = 0) {
+  const far = Math.min(0.6, Math.max(0.12, FAR_SCALE / strength));
+  const k = 1 / far - 1;
+  const vy = (h * FAR_TOP - far * hitY) / (1 - far); // vanishing point, above the canvas
+  if (!(curve > 0)) return { k, vy, c: 0, end: ROAD_END };
+  const a = (hitY - vy) * k; // -dy/dd of the flat road is a / (1 + k d)^2
+  const c = (Math.min(1, curve) * CURVE_MAX * a) / (2 * (1 + k) ** 2); // the curve's slope 2 c d cancels CURVE_MAX of it at d = 1
+  // the crest: where 2 c d (1 + k d)^2 = a (past it y would grow again); it is past d = 1, found by bisection
+  let lo = 1, hi = ROAD_END;
+  if (2 * c * hi * (1 + k * hi) ** 2 < a) return { k, vy, c, end: ROAD_END };
+  for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; if (2 * c * m * (1 + k * m) ** 2 < a) lo = m; else hi = m; }
+  return { k, vy, c, end: lo };
+}
 
 // (The projection is written out in the loops below, with the scale kept in a local: as calls, the engine ran out of inlining room in these
 // big functions and every x, y and scale came back boxed as a new number, thousands of them per held note per frame. Same operations, same results.)
 function quad(g, d0, d1, lx0, lx1) {
+  if (PC > 0) { curvedQuad(g, d0, d1, lx0, lx1); return; }
   const s0 = 1 / (1 + PK * d0);
   const s1 = 1 / (1 + PK * d1);
   const y0 = PVY + (PHIT - PVY) * s0;
@@ -82,6 +105,32 @@ function quad(g, d0, d1, lx0, lx1) {
   g.lineTo(PCX + lx1 * PLANE * s1, y1);
   g.lineTo(PCX + lx0 * PLANE * s1, y1);
   g.closePath();
+}
+// The same quad on a curved road: both sides are polylines that follow the curve (cut at the crest).
+function curvedQuad(g, d0, d1, lx0, lx1) {
+  d0 = Math.min(d0, PEND);
+  d1 = Math.min(d1, PEND);
+  const n = Math.max(1, Math.ceil(Math.abs(d1 - d0) * CURVE_STEPS));
+  g.beginPath();
+  for (let i = 0; i <= n; i++) {
+    const d = d0 + ((d1 - d0) * i) / n;
+    const s = 1 / (1 + PK * d);
+    const y = PVY + (PHIT - PVY) * s + (d > 0 ? PC * d * d : 0);
+    if (i === 0) g.moveTo(PCX + lx0 * PLANE * s, y);
+    else g.lineTo(PCX + lx0 * PLANE * s, y);
+  }
+  for (let i = n; i >= 0; i--) {
+    const d = d0 + ((d1 - d0) * i) / n;
+    const s = 1 / (1 + PK * d);
+    g.lineTo(PCX + lx1 * PLANE * s, PVY + (PHIT - PVY) * s + (d > 0 ? PC * d * d : 0));
+  }
+  g.closePath();
+}
+// A line along the road at lx lane units from the centre, from ROAD_NEAR to the road's end (added to the current path).
+function roadLine(g, lx) {
+  g.moveTo(xAt(lx, ROAD_NEAR), yAt(ROAD_NEAR));
+  if (PC > 0) for (let i = 1, n = Math.ceil((PEND - ROAD_NEAR) * CURVE_STEPS); i <= n; i++) { const d = ROAD_NEAR + ((PEND - ROAD_NEAR) * i) / n; g.lineTo(xAt(lx, d), yAt(d)); }
+  else g.lineTo(xAt(lx, ROAD_END), yAt(ROAD_END));
 }
 // A tail strip with the same extra perspective taper the note heads get (see noteShape): relative to the strip's base
 // (dRef, where the head is), its width shrinks with (scale / baseScale) ^ TAIL_TAPER_POWER, never below TAIL_MIN_WIDTH.
@@ -95,7 +144,7 @@ function taperedStrip(g, d0, d1, mid, wl, dRef) {
     const d = d0 + ((d1 - d0) * i) / N;
     const sc = 1 / (1 + PK * d);
     const halfW = wl * (TAIL_MIN_WIDTH + (1 - TAIL_MIN_WIDTH) * (sc / sRef) ** TAIL_TAPER_POWER); // (tailFactor)
-    const y = PVY + (PHIT - PVY) * sc;
+    const y = PVY + (PHIT - PVY) * sc + (d > 0 ? PC * d * d : 0);
     if (i === 0) g.moveTo(PCX + (mid - halfW) * PLANE * sc, y);
     else g.lineTo(PCX + (mid - halfW) * PLANE * sc, y);
     right[2 * i] = PCX + (mid + halfW) * PLANE * sc;
@@ -137,7 +186,7 @@ function fillBand3D(g, spans, color, xl, xr, roadW) {
     for (const dd of [d0, d1]) {
       if (dd < ROAD_NEAR || dd > 1) continue;
       const p = scaleAt(dd);
-      g.fillRect(PCX + xl * PLANE * p, PVY + (PHIT - PVY) * p - 1.5 * p, roadW * p, 3 * p);
+      g.fillRect(PCX + xl * PLANE * p, PVY + (PHIT - PVY) * p + (dd > 0 ? PC * dd * dd : 0) - 1.5 * p, roadW * p, 3 * p);
     }
   }
 }
@@ -167,9 +216,11 @@ export function renderLanes3D(hw, t, w, h) {
   const hitY = h - (padRy + 26); // hit line (the pads): the 26 px below them hold the bottom fade
   const cx = w / 2;
   const windowSec = (DEPTH_SEC / hw.neck) * laneLookFactor(h); // neck speed shortens or stretches the visible time; a taller window shows more of it (fixed pixel speed)
-  const k = 1 / FAR_SCALE - 1;
-  PK = k;
-  PVY = (h * FAR_TOP - FAR_SCALE * hitY) / (1 - FAR_SCALE); // vanishing point, above the canvas
+  const proj = projection3D(h, hitY, hw.perspective, hw.curve); // (settings highway.perspective and highway.curve)
+  PK = proj.k;
+  PVY = proj.vy; // vanishing point, above the canvas
+  PC = proj.c;
+  PEND = proj.end;
   PHIT = hitY;
   PCX = cx;
   PLANE = laneW;
@@ -183,11 +234,11 @@ export function renderLanes3D(hw, t, w, h) {
   g.globalAlpha = boardK;
   // road (its dark base is added at the very end, behind everything, so the edge fades do not thin it)
   g.fillStyle = 'rgba(255,255,255,0.045)';
-  quad(g, ROAD_NEAR, ROAD_END, -half, half);
+  quad(g, ROAD_NEAR, PEND, -half, half);
   g.fill();
   g.fillStyle = 'rgba(255,255,255,0.045)';
   for (let i = 0; i < lanes && hw.laneStripes; i += 2) { // (setting highway.laneStripes)
-    quad(g, ROAD_NEAR, ROAD_END, i - half, i + 1 - half);
+    quad(g, ROAD_NEAR, PEND, i - half, i + 1 - half);
     g.fill();
   }
   if (hw.starPowerBand) span(g, chart.starPower, STAR_POWER_BAND_3D, -half, half);
@@ -208,19 +259,12 @@ export function renderLanes3D(hw, t, w, h) {
   g.lineWidth = 1;
   g.strokeStyle = 'rgba(255,255,255,0.10)';
   g.beginPath();
-  for (let i = 1; i < lanes; i++) {
-    g.moveTo(xAt(i - half, ROAD_NEAR), yAt(ROAD_NEAR));
-    g.lineTo(xAt(i - half, ROAD_END), yAt(ROAD_END));
-  }
+  for (let i = 1; i < lanes; i++) roadLine(g, i - half);
   g.stroke();
   g.lineWidth = 2;
   g.strokeStyle = 'rgba(255,255,255,0.4)';
   g.beginPath();
-  for (let i = 0; i < 2; i++) {
-    const side = i === 0 ? -half : half;
-    g.moveTo(xAt(side, ROAD_NEAR), yAt(ROAD_NEAR));
-    g.lineTo(xAt(side, ROAD_END), yAt(ROAD_END));
-  }
+  for (let i = 0; i < 2; i++) roadLine(g, i === 0 ? -half : half);
   g.stroke();
 
   // beat and measure lines
@@ -233,7 +277,7 @@ export function renderLanes3D(hw, t, w, h) {
     const p = scaleAt(d);
     g.fillStyle = b.measure ? beatStyle[0] : b.strong ? beatStyle[1] : beatStyle[2];
     const bh = b.measure ? 3 : b.strong ? 2 : 1;
-    g.fillRect(PCX + -half * PLANE * p, PVY + (PHIT - PVY) * p - (bh / 2) * p, roadW * p, bh * p);
+    g.fillRect(PCX + -half * PLANE * p, PVY + (PHIT - PVY) * p + (d > 0 ? PC * d * d : 0) - (bh / 2) * p, roadW * p, bh * p);
   }
 
   g.globalAlpha = 1;
@@ -317,8 +361,8 @@ export function renderLanes3D(hw, t, w, h) {
       // lit far edge and darker near edge give the bar some body
       const s1 = scaleAt(d1);
       const s0 = scaleAt(d0);
-      const y1 = PVY + (PHIT - PVY) * s1;
-      const y0 = PVY + (PHIT - PVY) * s0;
+      const y1 = PVY + (PHIT - PVY) * s1 + (d1 > 0 ? PC * d1 * d1 : 0);
+      const y0 = PVY + (PHIT - PVY) * s0 + (d0 > 0 ? PC * d0 * d0 : 0);
       g.lineWidth = Math.max(1, 2 * s1);
       g.strokeStyle = n.activation && hw.fillActivation ? FILL_ACTIVATION : tintWhite(base, 0.65); // (a fill's activation kick: a bright far edge)
       g.beginPath();
@@ -400,7 +444,9 @@ export function renderLanes3D(hw, t, w, h) {
     const d = depth(n.time);
     const p = scaleAt(d);
     const x = PCX + (n.lane + 0.5 - half) * PLANE * p;
-    const y = PVY + (PHIT - PVY) * p;
+    const lift = d > 0 ? PC * d * d : 0; // (the curve moves the note down the road; its shape keeps the flat road's taper: vy moves with it)
+    const y = PVY + (PHIT - PVY) * p + lift;
+    const vy = PVY + lift;
     const amt = heldAmount(n, t);
     const rx = laneW * headR * noteScale(n) * p * (1 + 0.4 * kx) * (1 + (pulse - 1) * amt);
     const ry = rx * HEAD_TILT;
@@ -483,14 +529,15 @@ export function renderLanes3D(hw, t, w, h) {
   // the board's neutral dark base, as opaque as the setting says: behind the notes and the guides, and not faded at the edges
   g.globalCompositeOperation = 'destination-over';
   g.fillStyle = boardBase(hw.trackOpacity * boardK); // (more transparent in a long rest)
-  quad(g, ROAD_NEAR, ROAD_END, -half, half);
+  quad(g, ROAD_NEAR, PEND, -half, half);
   g.fill();
   g.globalCompositeOperation = 'source-over';
   // far edge fades into the background
   // (an eased fade, so the board dissolves instead of ending in a visible edge)
+  // (on a curved road it moves down with the far edge, PC px at d = 1; above it the background is solid)
   const fadeH = h * 0.26;
-  const grad = fadeGradient(g, 0, fadeH, EDGE_FADE_STOPS); // smootherstep: eases at both ends
+  const grad = fadeGradient(g, PC, PC + fadeH, EDGE_FADE_STOPS); // smootherstep: eases at both ends
   g.globalCompositeOperation = hw.layered ? 'destination-out' : 'source-over';
   g.fillStyle = grad;
-  g.fillRect(0, 0, w, fadeH);  g.globalCompositeOperation = 'source-over';
+  g.fillRect(0, 0, w, PC + fadeH);  g.globalCompositeOperation = 'source-over';
 }

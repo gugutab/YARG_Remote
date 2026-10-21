@@ -3688,6 +3688,8 @@ const EFFECTS = {
   'highway.beatLines': (v) => { highway.beatLines = v; },
   'highway.laneStripes': (v) => { highway.laneStripes = !!v; },
   'highway.noteScale': (v) => { highway.noteSize = v / 100; },
+  'highway.perspective': (v) => { highway.perspective = v / 100; },
+  'highway.curve': (v) => { highway.curve = v / 100; },
   'highway.noteBase': (v) => { highway.noteBase = v / 100; },
   'highway.noteCut': (v) => { rebuildYNote(noteCutFraction(v)); highway.invalidate(); },
   'highway.sustainWidth': (v) => { highway.sustainWidth = v / 100; },
