@@ -66,7 +66,7 @@ test('flow chevrons: periodic, deterministic and running towards the hit line', 
     assert.ok(Math.abs(flowPhase(t + FLOW_PERIOD) - flowPhase(t)) < 1e-9 || Math.abs(Math.abs(flowPhase(t + FLOW_PERIOD) - flowPhase(t)) - 1) < 1e-9);
     assert.equal(flowPulseAt(2, t), flowPulseAt(2, t)); // a pure function of the time
     const dt = FLOW_PERIOD / 50;
-    if (flowPhase(t) + dt / FLOW_PERIOD < 1) assert.ok(flowPulseAt(0, t + dt) < flowPulseAt(0, t)); // moves towards the hit line
+    if (flowPhase(t) + dt / FLOW_PERIOD < 1) assert.ok(flowPulseAt(0, t + dt) > flowPulseAt(0, t)); // runs up the tail, away from the hit line
     // one period later chevron k + 1 stands where chevron k was
     assert.ok(Math.abs(flowPulseAt(1, t + FLOW_PERIOD) - flowPulseAt(1, t)) < 1e-9);
     assert.ok(Math.abs(flowPulseAt(1, t) - flowPulseAt(0, t) - FLOW_SPACING) < 1e-9);

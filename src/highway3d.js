@@ -208,25 +208,30 @@ const FLOW_CHEVRONS = 12; // at most this many on one tail
 const FLOW_TIP = 1.1; // the tip's length beyond the tail's end, in half widths
 // The chevrons' phase at time t, 0..1 (periodic, FLOW_PERIOD).
 export const flowPhase = (t) => { const x = t / FLOW_PERIOD; return x - Math.floor(x); };
-// Chevron k's distance ahead of the hit line at time t, in chart seconds: it falls as t grows (towards the hit line), and chevron k + 1
-// takes the place of chevron k after one period.
-export const flowPulseAt = (k, t) => FLOW_SPACING * (k + 1 - flowPhase(t));
+// Chevron k's distance ahead of the hit line at time t, in chart seconds: it grows as t grows (the chevrons run UP the tail, away from the hit line),
+// and chevron k takes the place of chevron k + 1 after one period.
+export const flowPulseAt = (k, t) => FLOW_SPACING * (k + flowPhase(t));
+// The swelling of a held tail: waves that inflate and deflate its width, travelling up the tail. `ahead` = chart seconds ahead of the hit line.
+export const WAVE_LEN = 0.45; // chart seconds from one swelling to the next
+export const WAVE_PERIOD = 0.6; // seconds of song time for a wave to travel one length
+export const WAVE_AMP = 0.26; // at full held amount the width swings by +- this (a fraction of the width)
+export const waveFactor = (ahead, t, amp = WAVE_AMP) => 1 + amp * Math.sin(2 * Math.PI * (ahead / WAVE_LEN - t / WAVE_PERIOD));
 // Segments of one side of a flow tail `lenPx` pixels long on screen: a straight road needs few (the taper is the only bend), a curved one one more.
 export const tailSegments = (lenPx, curved) => Math.max(1, Math.min(6, Math.ceil(lenPx / 90) + (curved ? 1 : 0)));
 // The visible flow tails of the frame (columns, reused): depths, centre and half width in lane units, segments, tip, body fill, amount held
-const FT = { n: 0, d0: [], d1: [], mid: [], wl: [], segs: [], tip: [], body: [], amt: [], col: [] };
+const FT = { n: 0, d0: [], d1: [], mid: [], wl: [], segs: [], tip: [], body: [], amt: [], col: [], wave: [] };
 const FT_BODIES = []; // the distinct body fills of the frame
 // One flow tail outline as a subpath of the current path (no beginPath): the tapered sides sampled closer together near the base, where
 // both the width and the screen position change fastest, and a rounded tip when `tip`.
-function flowStrip(g, d0, d1, mid, wl, segs, tip) {
+function flowStrip(g, d0, d1, mid, wl, segs, tip, wave = 0, wt = 0) {
   const right = TAIL_RIGHT;
   const sRef = 1 / (1 + PK * d0);
   let halfPx = 0, xe = 0, ye = 0;
   for (let i = 0; i <= segs; i++) {
     const u = i / segs;
-    const d = d0 + (d1 - d0) * u * u;
+    const d = d0 + (d1 - d0) * (wave > 0 ? u : u * u); // (a swelling tail is sampled evenly: the waves need the points)
     const sc = 1 / (1 + PK * d);
-    const halfW = wl * (TAIL_MIN_WIDTH + (1 - TAIL_MIN_WIDTH) * (sc / sRef) ** TAIL_TAPER_POWER); // (tailFactor)
+    const halfW = wl * (TAIL_MIN_WIDTH + (1 - TAIL_MIN_WIDTH) * (sc / sRef) ** TAIL_TAPER_POWER) * (wave > 0 ? waveFactor((d - d0) * PSEC, wt, wave) : 1); // (tailFactor, and the wave of a held tail)
     const y = PVY + (PHIT - PVY) * sc + (d > 0 ? PC * d * d : 0);
     const xm = PCX + mid * PLANE * sc;
     halfPx = halfW * PLANE * sc;
@@ -274,8 +279,9 @@ function drawFlowTails(g, hw, notes, from, end, t, colors, half, headR, tailW, w
     ft.d0[k] = dBot;
     ft.d1[k] = dTop;
     ft.mid[k] = n.lane + 0.5 - half;
-    ft.wl[k] = headR * noteScale(n) * 0.38 * tailW * (1 + 0.15 * amt); // (HOPO notes are smaller; a held tail swells a little)
-    ft.segs[k] = tailSegments(lenPx, curved);
+    ft.wl[k] = headR * noteScale(n) * 0.38 * tailW * (1 + 0.04 * amt); // (HOPO notes are smaller; a held tail is a touch wider, and swells in waves)
+    ft.wave[k] = held ? WAVE_AMP * amt : 0; // (the waves stand still-free: they only run while the held motion is on)
+    ft.segs[k] = ft.wave[k] > 0 ? Math.min(30, Math.max(tailSegments(lenPx, curved), Math.ceil(((dTop - dBot) * PSEC / WAVE_LEN) * 5))) : tailSegments(lenPx, curved); // (about 5 points per wave)
     ft.tip[k] = n.time + n.length <= t + windowSec;
     const body = withAlpha(col, Math.round((0.6 + 0.3 * amt) * 20) / 20); // (bucketed, so held tails batch too)
     ft.body[k] = body;
@@ -292,7 +298,7 @@ function drawFlowTails(g, hw, notes, from, end, t, colors, half, headR, tailW, w
       if (!(ft.amt[k] > 0)) continue;
       g.fillStyle = withAlpha(ft.col[k], Math.round(0.16 * ft.amt[k] * 100) / 100);
       g.beginPath();
-      flowStrip(g, ft.d0[k], ft.d1[k], ft.mid[k], ft.wl[k] * 1.9, ft.segs[k], ft.tip[k]);
+      flowStrip(g, ft.d0[k], ft.d1[k], ft.mid[k], ft.wl[k] * 1.9, ft.segs[k], ft.tip[k], ft.wave[k], t);
       g.fill();
     }
   }
@@ -301,23 +307,23 @@ function drawFlowTails(g, hw, notes, from, end, t, colors, half, headR, tailW, w
     const body = FT_BODIES[b];
     g.fillStyle = body;
     g.beginPath();
-    for (let k = 0; k < ft.n; k++) if (ft.body[k] === body) flowStrip(g, ft.d0[k], ft.d1[k], ft.mid[k], ft.wl[k], ft.segs[k], ft.tip[k]);
+    for (let k = 0; k < ft.n; k++) if (ft.body[k] === body) flowStrip(g, ft.d0[k], ft.d1[k], ft.mid[k], ft.wl[k], ft.segs[k], ft.tip[k], ft.wave[k], t);
     g.fill();
   }
   // a lighter core and a bright spine, white over every colour at once
   g.fillStyle = '#ffffff';
   g.globalAlpha = 0.16;
   g.beginPath();
-  for (let k = 0; k < ft.n; k++) flowStrip(g, ft.d0[k], ft.d1[k], ft.mid[k], ft.wl[k] * 0.55, ft.segs[k], ft.tip[k]);
+  for (let k = 0; k < ft.n; k++) flowStrip(g, ft.d0[k], ft.d1[k], ft.mid[k], ft.wl[k] * 0.55, ft.segs[k], ft.tip[k], ft.wave[k], t);
   g.fill();
   g.globalAlpha = 0.42;
   g.beginPath();
-  for (let k = 0; k < ft.n; k++) flowStrip(g, ft.d0[k], ft.d1[k], ft.mid[k], ft.wl[k] * 0.16, ft.segs[k], ft.tip[k]);
+  for (let k = 0; k < ft.n; k++) flowStrip(g, ft.d0[k], ft.d1[k], ft.mid[k], ft.wl[k] * 0.16, ft.segs[k], ft.tip[k], ft.wave[k] * 0.5, t);
   g.fill();
   g.globalAlpha = 1;
   if (!anyHeld) return;
-  // held: chevrons running down the tail (still when the held motion is off), growing in at the far end and shrinking into the hit line.
-  // Each is a V pointing at the hit line, laid out on screen along the tail's direction and sized by the tail's width there.
+  // held: chevrons running UP the tail (still when the held motion is off), growing in at the hit line and shrinking at the far end.
+  // Each is a V pointing away from the hit line, laid out on screen along the tail's direction and sized by the tail's width there.
   const ph = held ? flowPhase(t) : 0;
   for (let k = 0; k < ft.n; k++) {
     const amt = ft.amt[k];
@@ -332,9 +338,9 @@ function drawFlowTails(g, hw, notes, from, end, t, colors, half, headR, tailW, w
     g.fillStyle = tintWhite(ft.col[k], 0.75);
     g.beginPath();
     for (let c = 0; c < FLOW_CHEVRONS; c++) {
-      const x = FLOW_SPACING * (c + 1 - ph);
+      const x = FLOW_SPACING * (c + ph);
       if (x >= left) break;
-      const f = Math.min(1, (left - x) / 0.12, x / 0.06); // grows in from the far end, shrinks into the hit line
+      const f = Math.min(1, (left - x) / 0.12, x / 0.06); // grows in at the hit line, shrinks towards the far end
       if (!(f > 0)) continue;
       const d = x / PSEC;
       const sc = 1 / (1 + PK * d);
@@ -342,11 +348,11 @@ function drawFlowTails(g, hw, notes, from, end, t, colors, half, headR, tailW, w
       const px = PCX + mid * PLANE * sc, py = PVY + (PHIT - PVY) * sc + PC * d * d;
       const vee = 1.1 * hp, th = 0.85 * hp; // the depth of the V and the chevron's thickness, in px along the tail
       g.moveTo(px, py);
-      g.lineTo(px + hp + ux * vee, py + uy * vee);
-      g.lineTo(px + hp + ux * (vee + th), py + uy * (vee + th));
-      g.lineTo(px + ux * th, py + uy * th);
-      g.lineTo(px - hp + ux * (vee + th), py + uy * (vee + th));
-      g.lineTo(px - hp + ux * vee, py + uy * vee);
+      g.lineTo(px + hp - ux * vee, py - uy * vee);
+      g.lineTo(px + hp - ux * (vee + th), py - uy * (vee + th));
+      g.lineTo(px - ux * th, py - uy * th);
+      g.lineTo(px - hp - ux * (vee + th), py - uy * (vee + th));
+      g.lineTo(px - hp - ux * vee, py - uy * vee);
       g.closePath();
     }
     g.fill();
