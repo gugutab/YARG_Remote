@@ -226,9 +226,9 @@ export function renderLanes3D(hw, t, w, h) {
   const chart = hw.chart;
   const lanes = chart.lanes;
   const portrait = h > w;
-  // Road width at the hit line. It grows with the window (0.94 of a narrow one), then slowly, and stops at 1.05 of the height: no jump when
-  // the window passes from taller than wide to wider than tall, and past the cap only the side gaps grow.
-  const roadW = portrait ? w * 0.94 : Math.min(h * 1.05, h * 0.94 + (w - h) * 0.16);
+  // Road width at the hit line. It grows with the window (0.9 of a narrow one, leaving a margin for the hit line's end indicators), then more slowly, and stops at 1.2 of the height:
+  // no jump when the window passes from taller than wide to wider than tall, and past the cap only the side gaps grow.
+  const roadW = portrait ? w * 0.9 : Math.min(h * 1.2, h * 0.9 + (w - h) * 0.3);
   const laneW = roadW / lanes;
   const headR = HEAD_R * hw.noteSize; // (setting highway.noteScale: heads and pads)
   const padRy = laneW * headR * 1.05 * HEAD_TILT; // vertical radius of the hit pads
