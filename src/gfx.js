@@ -90,6 +90,59 @@ export function drawHitBurst(g, x, y, rx, ry, color, k, seed, scale = 1, rect = 
   }
   g.restore();
 }
+// The burst of a horizontal note (pedal / open bar, setting highway.hitAnimation 'burst'): based on the burst of the other notes, spread over the whole bar:
+// a core flash along the bar, two rectangular ripples growing forward and back from it, and a row of sparks flying up from along its width.
+// (cx, y): the hit line at the road's centre; halfW: the road's half width there; halfH: the bar's half thickness (px); k = seconds since the hit / BURST_SEC.
+const BAR_SPARKS = 14;
+export function drawBarBurst(g, cx, y, halfW, halfH, color, k, seed, spark) {
+  if (!(k >= 0 && k < 1)) return;
+  const e = burstEase(k);
+  const fade = (1 - k) * (1 - k);
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  g.lineJoin = 'round';
+  // the core: a flash along the whole bar, easing in and out
+  if (k < 0.4) {
+    const env = Math.sin((Math.PI * k) / 0.4);
+    g.fillStyle = tintWhite(color, 0.5);
+    g.globalAlpha = 0.36 * env * env;
+    g.beginPath();
+    g.roundRect(cx - halfW, y - halfH * 1.3, 2 * halfW, 2 * halfH * 1.3, halfH);
+    g.fill();
+  }
+  // two rectangular ripples (the second one a little later): the bar's own outline growing in depth, thinning and fading
+  g.strokeStyle = tintWhite(color, 0.45);
+  for (let r = 0; r < 2; r++) {
+    const kr = k - r * 0.14;
+    if (kr <= 0) continue;
+    const er = burstEase(Math.min(1, kr / (1 - r * 0.14)));
+    const rh = halfH * (1 + 7 * er), rw = halfW * (1 + 0.05 * er);
+    g.beginPath();
+    g.roundRect(cx - rw, y - rh, 2 * rw, 2 * rh, Math.min(rh, 18));
+    g.lineWidth = Math.max(0.8, halfH * 0.5 * (1 - kr));
+    g.globalAlpha = Math.min(1, (r ? 0.7 : 1.05) * (1 - kr) * (1 - kr));
+    g.stroke();
+  }
+  // the sparks: along the bar's width, flying up the road with a slight outward lean
+  g.strokeStyle = tintWhite(color, 0.4);
+  g.lineCap = 'round';
+  const base = Math.floor((seed * 1000) % 89);
+  for (let i = 0; i < BAR_SPARKS; i++) {
+    const r = ((base * 29 + i * 53) % 100) / 100;
+    const sx = cx + (((i + 0.5 + (r - 0.5) * 0.6) / BAR_SPARKS) * 2 - 1) * halfW * 0.95;
+    const lean = ((sx - cx) / halfW) * 0.35 + (r - 0.5) * 0.25; // outward lean (radians from straight up)
+    const reach = spark * (1.2 + 1.6 * r) * e;
+    const tail = spark * (0.4 + 0.7 * r) * (1 - e * 0.5);
+    const c = Math.sin(lean), s = -Math.cos(lean);
+    g.beginPath();
+    g.moveTo(sx + c * Math.max(0, reach - tail), y + s * Math.max(0, reach - tail) * 0.62);
+    g.lineTo(sx + c * reach, y + s * reach * 0.62);
+    g.lineWidth = Math.max(0.8, spark * 0.12 * (1 - k));
+    g.globalAlpha = Math.min(1, 1.1 * fade);
+    g.stroke();
+  }
+  g.restore();
+}
 export const HIT_LINE_COLOR = 'rgba(255,255,255,0.24)'; // the fixed bar at the hit line (setting highway.hitLine), as thick as the pedal / open bars
 export const HIT_LINE_BORDER = 'rgba(255,255,255,0.95)'; // and its fixed borders at both ends
 export const HIT_LINE_BORDER_SOFT = 'rgba(255,255,255,0.8)'; // the 3D ones, over the coloured bar (a little transparent)
