@@ -333,10 +333,12 @@ export function renderLanes3D(hw, t, w, h) {
       barFlash = 1 - past / BAR_FLASH_SEC;
     }
   }
-  if (hw.hitLine) { // a fixed bar across the road at the hit line, as thick as the pedal / open bars, with a fixed border at each end
-    g.fillStyle = HIT_LINE_COLOR;
-    quad(g, -barDepth / 2, barDepth / 2, -half, half);
-    g.fill();
+  if (hw.hitLine) { // a fixed bar across the road at the hit line, as thick as the pedal / open bars, in the colour of each lane (it lights when a note is hit), with a fixed border at each end; the pads are not drawn
+    for (let i = 0; i < lanes; i++) {
+      g.fillStyle = withAlpha(colors[i], Math.min(1, 0.55 + 0.45 * Math.max(flash[i], barFlash)));
+      quad(g, -barDepth / 2, barDepth / 2, -half + i, -half + i + 1);
+      g.fill();
+    }
     g.fillStyle = HIT_LINE_BORDER;
     quad(g, -barDepth / 2, barDepth / 2, -half - FILL_BORDER_LANES, -half + FILL_BORDER_LANES * 0.4); // (the borders are exactly as deep as the bar)
     g.fill();
@@ -345,7 +347,7 @@ export function renderLanes3D(hw, t, w, h) {
   }
   // (the pads mark the spot; a pedal hit lights every pad)
   const padRx = laneW * headR;
-  for (let i = 0; i < lanes; i++) {
+  for (let i = 0; i < lanes && !hw.hitLine; i++) { // (with the hit line bar on, its coloured segments replace the pads)
     const x = cx + (i + 0.5 - half) * laneW;
     g.beginPath();
     noteShape(g, x, hitY, padRx * 1.05, padRx * 1.05 * HEAD_TILT, chart.laneKinds?.[i] === 'cymbal' ? 'tri' : hw.noteStyle, hitY - vy);
