@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, sprite3D, noteSpritePx, NOTE_RECT_W, NOTE_RECT_H, NOTE_TRI_W, NOTE_TRI_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, setDesaturated, isDesaturated, dcol, desaturate, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_COLUMN_ALPHA, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, HIT_LINE_COLOR, HIT_LINE_BORDER, HIT_LINE_BORDER_SOFT, drawHitBurst, drawBarBurst, BURST_SEC, BAR_BURST_SEC, BURST_LOOP_SEC, BURST_VANISH_SEC, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, setDesaturated, isDesaturated, dcol, desaturate, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, ROLL_COLUMN_ALPHA, HIT_LINE_COLOR, HIT_LINE_BORDER, HIT_LINE_BORDER_SOFT, drawHitBurst, drawBarBurst, BURST_SEC, BAR_BURST_SEC, BURST_LOOP_SEC, BURST_VANISH_SEC, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
 
@@ -375,7 +375,7 @@ function drawFlowTails(g, hw, notes, from, end, t, colors, half, headR, tailW, w
 }
 // A drum fill band: a full-strength quad from the phrase start to the activation chord (no fades), with a thin bright line
 // across the road at the start and end.
-function fillBand3D(g, spans, color, xl, xr, roadW, laneCols, kickCol) {
+function fillBand3D(g, spans, color, xl, xr, roadW) {
   if (!spans) return;
   for (let i = 0; i < spans.length; i++) {
     const s = spans[i];
@@ -400,7 +400,7 @@ function fillBand3D(g, spans, color, xl, xr, roadW, laneCols, kickCol) {
     if (s.activationLane !== undefined) { // the lead-up: a stronger green over the column of the final note, along the whole fill (every column for the kick)
       const lanes = xr - xl;
       const inside = s.activationLane >= 0 && s.activationLane < lanes;
-      band(withAlpha(inside ? laneCols[s.activationLane] : kickCol, FILL_COLUMN_ALPHA), inside ? xl + s.activationLane : xl, inside ? xl + s.activationLane + 1 : xr); // (the column's background is the colour of the final note)
+      band(FILL_STRONG, inside ? xl + s.activationLane : xl, inside ? xl + s.activationLane + 1 : xr);
     }
     g.fillStyle = FILL_EDGE;
     for (const dd of [d0, d1]) {
@@ -422,6 +422,22 @@ function span(g, spans, color, xl, xr, border = null) { // xl..xr: the lane rang
     g.fill();
   }
   if (border && BORDERS3D) sideBorders3D(g, spans, border, border, xl, xr);
+}
+// The background of the lane(s) a roll is played on, in the colour of that lane's notes (every lane in the kick colour for a kick roll).
+function rollColumns3D(g, spans, cols, kickCol, half, lanes) {
+  if (!spans) return;
+  for (let i = 0; i < spans.length; i++) {
+    const s = spans[i];
+    if (!s.lanes || (s.end - PT) / PSEC < ROAD_NEAR || s.start > PT + PSEC) continue;
+    const near = Math.max(ROAD_NEAR, Math.min(1, (s.start - PT) / PSEC));
+    const far = depth(s.end);
+    if (far <= near) continue;
+    for (const l of s.lanes) {
+      g.fillStyle = withAlpha(l >= 0 && l < lanes ? cols[l] : kickCol, ROLL_COLUMN_ALPHA);
+      if (l >= 0 && l < lanes) quad(g, near, far, -half + l, -half + l + 1); else quad(g, near, far, -half, half);
+      g.fill();
+    }
+  }
 }
 let BORDERS3D = true; // setting highway.bandBorders, set per frame
 // Thick borders on both sides of the road along each span (left / right colour), like the drum fill's green ones.
@@ -542,9 +558,13 @@ export function renderLanes3D(hw, t, w, h) {
       const pulseBre = hw.breBand === 'pulse';
       for (let l = 0; l < lanes; l++) span(g, spans, withAlpha(cols[l] || cols[0], breAlpha(t, l, lanes, pulseBre)), -half + l, -half + l + 1);
       if (BORDERS3D) sideBorders3D(g, spans, cols[0], cols[lanes - 1] || cols[0], -half, half); // (the outer edges take the first and last lane colours)
-    } else fillBand3D(g, spans, FILL_COLORS[FILL_KINDS[i]], -half, half, roadW, chart.laneColors || NOTE_PALETTE.lanes, chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick);
+    } else fillBand3D(g, spans, FILL_COLORS[FILL_KINDS[i]], -half, half, roadW);
   }
-  for (let i = 0; i < ROLL_TYPES.length; i++) span(g, spansOfKind(chart, chart.rolls, 'type', ROLL_TYPES[i]), ROLL_COLORS[ROLL_TYPES[i]], -half, half, BAND_BORDERS[ROLL_TYPES[i]]);
+  for (let i = 0; i < ROLL_TYPES.length; i++) {
+    const rs = spansOfKind(chart, chart.rolls, 'type', ROLL_TYPES[i]);
+    span(g, rs, ROLL_COLORS[ROLL_TYPES[i]], -half, half, BAND_BORDERS[ROLL_TYPES[i]]);
+    rollColumns3D(g, rs, chart.laneColors || NOTE_PALETTE.lanes, chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick, half, lanes);
+  }
 
   // lane dividers and rails
   g.lineWidth = 1;

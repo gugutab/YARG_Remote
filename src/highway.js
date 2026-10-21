@@ -17,9 +17,10 @@ import {
   setDesaturated,
   ROLL_COLORS,
   FILL_COLORS,
-  FILL_COLUMN_ALPHA,
+  FILL_STRONG,
   FILL_BORDER,
   FILL_BORDER_PX,
+  ROLL_COLUMN_ALPHA,
   HIT_LINE_COLOR,
   HIT_LINE_BORDER,
   BAND_BORDERS,
@@ -1442,6 +1443,7 @@ export class Highway {
     // drum rolls: one band per roll type (kick roll, tremolo lane, trill lane)
     for (let i = 0; i < ROLL_TYPES.length; i++) {
       this.fillSpans(spansOfKind(chart, chart.rolls, 'type', ROLL_TYPES[i]), t, ahead, x0, laneW * chart.lanes, h, ROLL_COLORS[ROLL_TYPES[i]], BAND_BORDERS[ROLL_TYPES[i]]);
+      this.rollColumns(spansOfKind(chart, chart.rolls, 'type', ROLL_TYPES[i]), t, ahead, x0, laneW * chart.lanes, h, chart);
     }
 
     // beat lines
@@ -2083,9 +2085,7 @@ export class Highway {
       if (s.activationLane !== undefined) { // the lead-up: a stronger green over the column of the final note, along the whole fill (every column for the kick)
         const lanes = this.chart.lanes, lw = width / lanes;
         const inside = s.activationLane >= 0 && s.activationLane < lanes;
-        const cols = this.chart.laneColors || NOTE_PALETTE.lanes;
-        const note = inside ? cols[s.activationLane] : this.chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick; // (the column's background is the colour of the final note)
-        g.fillStyle = withAlpha(note, FILL_COLUMN_ALPHA);
+        g.fillStyle = FILL_STRONG;
         g.fillRect(inside ? x0 + s.activationLane * lw : x0, top, inside ? lw : width, len);
       }
       g.fillStyle = FILL_BORDER; // green borders on both sides of the board along the fill
@@ -2108,6 +2108,25 @@ export class Highway {
       this.g.fillRect(x0, top, width, bottom - top);
     }
     if (border && this.bandBorders) this.sideBorders(spans, t, ahead, x0, width, h, border, border);
+  }
+
+  // The background of the lane(s) a roll is played on, in the colour of that lane's notes (every lane in the kick colour for a kick roll).
+  rollColumns(spans, t, ahead, x0, width, h, chart) {
+    const g = this.g;
+    const lanes = chart.lanes, lw = width / lanes;
+    const cols = chart.laneColors || NOTE_PALETTE.lanes;
+    for (let i = 0; i < spans.length; i++) {
+      const s = spans[i];
+      if (!s.lanes || s.start > t + ahead) continue;
+      const top = laneY(s.end);
+      const bottom = laneY(s.start);
+      if (top > h || bottom < 0) continue;
+      for (const l of s.lanes) {
+        g.fillStyle = withAlpha(l >= 0 && l < lanes ? cols[l] : chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick, ROLL_COLUMN_ALPHA);
+        if (l >= 0 && l < lanes) g.fillRect(x0 + l * lw, top, lw, bottom - top);
+        else g.fillRect(x0, top, width, bottom - top);
+      }
+    }
   }
 
   // Thick borders on both sides of the board along each span (left / right colour), like the drum fill's green ones.

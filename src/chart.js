@@ -340,10 +340,18 @@ export function validRolls(rolls, notes) {
       if (last && Math.abs(last.time - n.time) < 1e-6) last.notes.push(n); else hits.push({ time: n.time, notes: [n] });
     }
     const padsOf = (h) => h.notes.filter((n) => n.lane >= 0).map((n) => n.lane);
-    if (r.type === 'kick') return hits.reduce((c, h) => c + h.notes.filter((n) => n.lane < 0).length, 0) > 1;
+    if (r.type === 'kick') { r.lanes = [-1]; return hits.reduce((c, h) => c + h.notes.filter((n) => n.lane < 0).length, 0) > 1; }
     const pads = hits.map(padsOf).filter((p) => p.length > 0); // (kicks alone are not hits of a tremolo or a trill)
-    if (r.type === 'tremolo') return pads.length >= 2 && pads[0].some((p) => pads.slice(1).some((q) => q.includes(p)));
-    if (r.type === 'trill') return pads.length >= 3 && pads[0].length === 1 && pads[1].length === 1 && pads[1][0] !== pads[0][0] && pads[2].length === 1 && pads[2][0] === pads[0][0];
+    if (r.type === 'tremolo') { // the lane is the pad of the first hit that comes back
+      const lane = pads.length >= 2 ? pads[0].find((p) => pads.slice(1).some((q) => q.includes(p))) : undefined;
+      if (lane !== undefined) r.lanes = [lane];
+      return lane !== undefined;
+    }
+    if (r.type === 'trill') {
+      const ok = pads.length >= 3 && pads[0].length === 1 && pads[1].length === 1 && pads[1][0] !== pads[0][0] && pads[2].length === 1 && pads[2][0] === pads[0][0];
+      if (ok) r.lanes = [pads[0][0], pads[1][0]]; // both lanes of the trill
+      return ok;
+    }
     return true;
   });
 }
