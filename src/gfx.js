@@ -29,6 +29,8 @@ export const FILL_COLORS = {
   bre: 'rgba(255,80,80,0.15)',
 };
 export const FILL_STRONG = 'rgba(40,200,90,0.5)'; // the lead-up: a stronger green over the column (lane) of the activation note, along the whole fill
+export const FILL_LEAD = 'rgba(40,200,90,0.3)'; // the lane of the final note shown BEFORE the fill starts (flat, no gradient)
+export const FILL_LEAD_SEC = 1.2; // how long before the fill start that column begins
 export const FILL_EDGE = 'rgba(140,255,170,0.9)'; // the thin bright line at the start and end of a fill phrase
 export const FILL_ACTIVATION = '#8cffaa'; // the drum fill activation note's halo and ring (white core): not one of the lane colours
 export const FADE_SEC = 0.25; // how long a note takes to fade out after the hit line

@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, NOTE_RECT_W, NOTE_RECT_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_LEAD, FILL_LEAD_SEC, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
 
@@ -112,7 +112,7 @@ function fillBand3D(g, spans, color, xl, xr, roadW) {
   for (let i = 0; i < spans.length; i++) {
     const s = spans[i];
     const end = s.bandEnd ?? s.end; // (to the activation note when there is one)
-    if ((end - PT) / PSEC < ROAD_NEAR || s.start > PT + PSEC) continue;
+    if ((end - PT) / PSEC < ROAD_NEAR || s.start - FILL_LEAD_SEC > PT + PSEC) continue;
     const fadeSec = Math.min(0.25, (end - s.start) * 0.2);
     const d0 = (s.start - PT) / PSEC, d1 = (end - PT) / PSEC, f = fadeSec / PSEC;
     const piece = (a, b, k, col, bx0, bx1) => { // [a, b] in depth, clamped to the road, at k of the band's alpha, over the lane range bx0..bx1
@@ -131,6 +131,12 @@ function fillBand3D(g, spans, color, xl, xr, roadW) {
         piece(d0 + k * w, d0 + (k + 1) * w, a, col, bx0, bx1);
       }
     };
+    if (s.activationLane !== undefined) { // the lead-up before the fill: the lane of the final note (every lane for the kick) is already marked, flat, from FILL_LEAD_SEC before the start
+      const lanes = xr - xl;
+      const inside = s.activationLane >= 0 && s.activationLane < lanes;
+      const a = Math.max(ROAD_NEAR, d0 - FILL_LEAD_SEC / PSEC);
+      if (d0 > a) { g.fillStyle = FILL_LEAD; quad(g, a, d0, inside ? xl + s.activationLane : xl, inside ? xl + s.activationLane + 1 : xr); g.fill(); }
+    }
     band(color, xl, xr);
     if (s.activationLane !== undefined) { // the lead-up: a stronger green over the column of the final note, along the whole fill (every column for the kick)
       const lanes = xr - xl;

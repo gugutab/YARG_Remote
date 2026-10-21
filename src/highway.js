@@ -18,6 +18,8 @@ import {
   ROLL_COLORS,
   FILL_COLORS,
   FILL_STRONG,
+  FILL_LEAD,
+  FILL_LEAD_SEC,
   FILL_EDGE,
   FILL_ACTIVATION,
   drawActivationMark,
@@ -2041,9 +2043,16 @@ export class Highway {
     const g = this.g;
     for (let i = 0; i < spans.length; i++) {
       const s = spans[i];
-      if (s.start > t + ahead) continue;
+      if (s.start - FILL_LEAD_SEC > t + ahead) continue;
       const top = laneY(s.bandEnd ?? s.end); // (to the activation note when there is one)
       const bottom = laneY(s.start);
+      if (s.activationLane !== undefined) { // the lead-up before the fill: the lane of the final note (every lane for the kick) is already marked, flat, from FILL_LEAD_SEC before the start
+        const lanes = this.chart.lanes, lw = width / lanes;
+        const inside = s.activationLane >= 0 && s.activationLane < lanes;
+        const yl = laneY(s.start - FILL_LEAD_SEC);
+        g.fillStyle = FILL_LEAD;
+        g.fillRect(inside ? x0 + s.activationLane * lw : x0, bottom, inside ? lw : width, Math.max(0, yl - bottom));
+      }
       if (top > h || bottom < 0) continue;
       const len = bottom - top;
       const fade = Math.min(0.18, 28 / Math.max(1, len));
