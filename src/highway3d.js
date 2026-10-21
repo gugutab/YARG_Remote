@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, NOTE_RECT_W, NOTE_RECT_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
 
@@ -191,7 +191,7 @@ function fillBand3D(g, spans, color, xl, xr, roadW) {
   }
 }
 // Bands (star power, solo, fills, rolls) that run along the road, to the end of the board.
-function span(g, spans, color, xl, xr) { // xl..xr: the lane range in lane units (-half..half is the whole road)
+function span(g, spans, color, xl, xr, border = null) { // xl..xr: the lane range in lane units (-half..half is the whole road)
   g.fillStyle = color;
   if (!spans) return;
   for (let i = 0; i < spans.length; i++) {
@@ -199,6 +199,25 @@ function span(g, spans, color, xl, xr) { // xl..xr: the lane range in lane units
     if ((s.end - PT) / PSEC < ROAD_NEAR || s.start > PT + PSEC) continue;
     const near = Math.max(ROAD_NEAR, Math.min(1, (s.start - PT) / PSEC)); // the band goes on past the hit line, to the end of the board
     quad(g, near, depth(s.end), xl, xr);
+    g.fill();
+  }
+  if (border && BORDERS3D) sideBorders3D(g, spans, border, border, xl, xr);
+}
+let BORDERS3D = true; // setting highway.bandBorders, set per frame
+// Thick borders on both sides of the road along each span (left / right colour), like the drum fill's green ones.
+function sideBorders3D(g, spans, left, right, xl, xr) {
+  if (!spans) return;
+  for (let i = 0; i < spans.length; i++) {
+    const s = spans[i];
+    if ((s.end - PT) / PSEC < ROAD_NEAR || s.start > PT + PSEC) continue;
+    const near = Math.max(ROAD_NEAR, Math.min(1, (s.start - PT) / PSEC));
+    const far = depth(s.end);
+    if (far <= near) continue;
+    g.fillStyle = left;
+    quad(g, near, far, xl - FILL_BORDER_LANES, xl + FILL_BORDER_LANES * 0.4);
+    g.fill();
+    g.fillStyle = right;
+    quad(g, near, far, xr - FILL_BORDER_LANES * 0.4, xr + FILL_BORDER_LANES);
     g.fill();
   }
 }
@@ -241,8 +260,9 @@ export function renderLanes3D(hw, t, w, h) {
     quad(g, ROAD_NEAR, PEND, i - half, i + 1 - half);
     g.fill();
   }
-  if (hw.starPowerBand) span(g, chart.starPower, STAR_POWER_BAND_3D, -half, half);
-  if (hw.soloBand) span(g, chart.solos, SOLO_BAND_3D, -half, half);
+  BORDERS3D = hw.bandBorders;
+  if (hw.starPowerBand) span(g, chart.starPower, STAR_POWER_BAND_3D, -half, half, BAND_BORDERS.starPower);
+  if (hw.soloBand) span(g, chart.solos, SOLO_BAND_3D, -half, half, BAND_BORDERS.solo);
   for (let i = 0; i < FILL_KINDS.length; i++) {
     if (FILL_KINDS[i] === 'fill' && !hw.fillBand) continue;
     if (FILL_KINDS[i] === 'bre' && hw.breBand === 'off') continue;
@@ -251,9 +271,10 @@ export function renderLanes3D(hw, t, w, h) {
       const cols = chart.laneColors || NOTE_PALETTE.lanes;
       const pulseBre = hw.breBand === 'pulse';
       for (let l = 0; l < lanes; l++) span(g, spans, withAlpha(cols[l] || cols[0], breAlpha(t, l, lanes, pulseBre)), -half + l, -half + l + 1);
+      if (BORDERS3D) sideBorders3D(g, spans, cols[0], cols[lanes - 1] || cols[0], -half, half); // (the outer edges take the first and last lane colours)
     } else fillBand3D(g, spans, FILL_COLORS[FILL_KINDS[i]], -half, half, roadW);
   }
-  for (let i = 0; i < ROLL_TYPES.length; i++) span(g, spansOfKind(chart, chart.rolls, 'type', ROLL_TYPES[i]), ROLL_COLORS[ROLL_TYPES[i]], -half, half);
+  for (let i = 0; i < ROLL_TYPES.length; i++) span(g, spansOfKind(chart, chart.rolls, 'type', ROLL_TYPES[i]), ROLL_COLORS[ROLL_TYPES[i]], -half, half, BAND_BORDERS[ROLL_TYPES[i]]);
 
   // lane dividers and rails
   g.lineWidth = 1;

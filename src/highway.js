@@ -20,6 +20,7 @@ import {
   FILL_STRONG,
   FILL_BORDER,
   FILL_BORDER_PX,
+  BAND_BORDERS,
   FILL_EDGE,
   FILL_ACTIVATION,
   drawActivationMark,
@@ -195,6 +196,7 @@ export class Highway {
     this.rectPool = []; // the objects of paneRects
     this.vocalView = 'track'; // 'track' (notes + lyrics) or 'karaoke' (the lyrics alone)
     this._fillBand = true; // the green band during a drum fill (setting highway.fillBand, on by default; the big rock ending band always shows)
+    this.bandBorders = true; // thick side borders along the star power, solo, roll and big rock ending bands (highway.bandBorders)
     this._fillActivation = true; // the glow, ring and star on a fill's activation note and the pad flash when it arrives (setting highway.fillActivation)
     this._starPowerBand = false; // the gold band under a star power phrase (setting highway.starPowerBand, off by default)
     this._trackOpacity = 0.75; // how opaque the board of a fretboard is (setting highway.trackOpacity)
@@ -1409,8 +1411,8 @@ export class Highway {
     const boardK = this.restBoard(t, ahead - ENTRY_MARGIN_SEC);
     g.globalAlpha = boardK;
     // star power / solo bands
-    if (this.starPowerBand) this.fillSpans(chart.starPower, t, ahead, x0, laneW * chart.lanes, h, STAR_POWER_BAND);
-    if (this.soloBand) this.fillSpans(chart.solos, t, ahead, x0, laneW * chart.lanes, h, SOLO_BAND);
+    if (this.starPowerBand) this.fillSpans(chart.starPower, t, ahead, x0, laneW * chart.lanes, h, STAR_POWER_BAND, BAND_BORDERS.starPower);
+    if (this.soloBand) this.fillSpans(chart.solos, t, ahead, x0, laneW * chart.lanes, h, SOLO_BAND, BAND_BORDERS.solo);
     // drum fills / big rock endings (YARG activation phrases and BRE), a faint band under the notes
     for (let i = 0; i < FILL_KINDS.length; i++) {
       if (FILL_KINDS[i] === 'fill' && !this.fillBand) continue;
@@ -1420,11 +1422,12 @@ export class Highway {
         const cols = chart.laneColors || NOTE_PALETTE.lanes;
         const pulseBre = this.breBand === 'pulse';
         for (let l = 0; l < chart.lanes; l++) this.fillSpans(spans, t, ahead, x0 + l * laneW, laneW, h, withAlpha(cols[l] || cols[0], breAlpha(t, l, chart.lanes, pulseBre)));
+        if (this.bandBorders) this.sideBorders(spans, t, ahead, x0, laneW * chart.lanes, h, cols[0], cols[chart.lanes - 1] || cols[0]); // (the outer edges take the first and last lane colours)
       } else this.fillBandSpans(spans, t, ahead, x0, laneW * chart.lanes, h, FILL_COLORS[FILL_KINDS[i]]);
     }
     // drum rolls: one band per roll type (kick roll, tremolo lane, trill lane)
     for (let i = 0; i < ROLL_TYPES.length; i++) {
-      this.fillSpans(spansOfKind(chart, chart.rolls, 'type', ROLL_TYPES[i]), t, ahead, x0, laneW * chart.lanes, h, ROLL_COLORS[ROLL_TYPES[i]]);
+      this.fillSpans(spansOfKind(chart, chart.rolls, 'type', ROLL_TYPES[i]), t, ahead, x0, laneW * chart.lanes, h, ROLL_COLORS[ROLL_TYPES[i]], BAND_BORDERS[ROLL_TYPES[i]]);
     }
 
     // beat lines
@@ -2071,7 +2074,7 @@ export class Highway {
     }
   }
 
-  fillSpans(spans, t, ahead, x0, width, h, color) {
+  fillSpans(spans, t, ahead, x0, width, h, color, border = null) {
     this.g.fillStyle = color;
     for (let i = 0; i < spans.length; i++) {
       const s = spans[i];
@@ -2080,6 +2083,23 @@ export class Highway {
       const bottom = laneY(s.start);
       if (top > h || bottom < 0) continue;
       this.g.fillRect(x0, top, width, bottom - top);
+    }
+    if (border && this.bandBorders) this.sideBorders(spans, t, ahead, x0, width, h, border, border);
+  }
+
+  // Thick borders on both sides of the board along each span (left / right colour), like the drum fill's green ones.
+  sideBorders(spans, t, ahead, x0, width, h, left, right) {
+    const g = this.g;
+    for (let i = 0; i < spans.length; i++) {
+      const s = spans[i];
+      if (s.start > t + ahead) continue;
+      const top = laneY(s.end);
+      const bottom = laneY(s.start);
+      if (top > h || bottom < 0) continue;
+      g.fillStyle = left;
+      g.fillRect(x0, top, FILL_BORDER_PX, bottom - top);
+      g.fillStyle = right;
+      g.fillRect(x0 + width - FILL_BORDER_PX, top, FILL_BORDER_PX, bottom - top);
     }
   }
 }

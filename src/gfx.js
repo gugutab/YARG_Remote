@@ -29,6 +29,9 @@ export const FILL_COLORS = {
   bre: 'rgba(255,80,80,0.15)',
 };
 export const FILL_STRONG = 'rgba(40,200,90,0.5)'; // the lead-up: a stronger green over the column (lane) of the activation note, along the whole fill
+export const BAND_BORDERS = { // the side borders of the other overlay bands (setting highway.bandBorders), like the fill's: the band's own colour, solid
+  starPower: 'rgba(255,190,40,0.95)', solo: 'rgba(40,180,255,0.95)', kick: 'rgba(255,150,50,0.95)', tremolo: 'rgba(80,220,80,0.95)', trill: 'rgba(255,215,60,0.95)',
+};
 export const FILL_BORDER = 'rgba(90,240,130,0.95)'; // the green side borders of the fretboard along a fill (thicker than the normal board edge)
 export const FILL_BORDER_PX = 5; // 2D width
 export const FILL_BORDER_LANES = 0.09; // 3D width, in lane units (scaled by the perspective)
