@@ -15,6 +15,7 @@ const HEAD_TILT = 0.55; // vertical squash of the heads (they lie on the road)
 const FADE_IN = 0.14; // fraction of the depth over which notes fade in at the far edge
 const TAIL_TAPER_POWER = 3; // like the heads' TAPER_GAIN: about 3x the natural perspective change
 const TAIL_MIN_WIDTH = 0.3; // a tail never gets thinner than this fraction of its base width
+const BAND_NEAR = 0; // bands (star power, solo, fills, rolls and their borders) stop at the hit line
 const ROAD_NEAR = -0.14; // the road starts below the canvas (past the pads), so it can fade out at the bottom
 const ROAD_END = 1.8; // the road runs well past the last visible note, so it has no visible far edge: the fade hides the rest
 const BAR_DEPTH = 0.0058; // a third thinner again (0.0087, itself a third of the earliest 0.026) // pedal/open bar thickness along the road, in depth units (it lies flat on the fretboard)
@@ -380,10 +381,10 @@ function fillBand3D(g, spans, color, xl, xr, roadW) {
   for (let i = 0; i < spans.length; i++) {
     const s = spans[i];
     const end = s.bandEnd ?? s.end; // (to the activation note when there is one)
-    if ((end - PT) / PSEC < ROAD_NEAR || s.start > PT + PSEC) continue;
+    if ((end - PT) / PSEC < BAND_NEAR || s.start > PT + PSEC) continue;
     const d0 = (s.start - PT) / PSEC, d1 = (end - PT) / PSEC;
     const piece = (a, b, k, col, bx0, bx1) => { // [a, b] in depth, clamped to the road, at k of the band's alpha, over the lane range bx0..bx1
-      const lo = Math.max(ROAD_NEAR, a);
+      const lo = Math.max(BAND_NEAR, a);
       if (b <= lo) return;
       g.globalAlpha *= k;
       g.fillStyle = col;
@@ -394,7 +395,7 @@ function fillBand3D(g, spans, color, xl, xr, roadW) {
     const band = (col, bx0, bx1) => piece(d0, d1, 1, col, bx0, bx1); // hard edges at both ends: visible in full as soon as it comes in, no fade
     band(color, xl, xr);
     { // green borders on both sides of the road along the fill
-      const lo = Math.max(ROAD_NEAR, d0);
+      const lo = Math.max(BAND_NEAR, d0);
       if (d1 > lo) { g.fillStyle = FILL_BORDER; quad(g, lo, d1, xl - FILL_BORDER_LANES, xl + FILL_BORDER_LANES * 0.4); g.fill(); quad(g, lo, d1, xr - FILL_BORDER_LANES * 0.4, xr + FILL_BORDER_LANES); g.fill(); }
     }
     if (s.activationLane !== undefined) { // the lead-up: a stronger green over the column of the final note, along the whole fill (every column for the kick)
@@ -404,20 +405,20 @@ function fillBand3D(g, spans, color, xl, xr, roadW) {
     }
     g.fillStyle = FILL_EDGE;
     for (const dd of [d0, d1]) {
-      if (dd < ROAD_NEAR || dd > 1) continue;
+      if (dd < BAND_NEAR || dd > 1) continue;
       const p = scaleAt(dd);
       g.fillRect(PCX + xl * PLANE * p, PVY + (PHIT - PVY) * p + (dd > 0 ? PC * dd * dd : 0) - 1.5 * p, roadW * p, 3 * p);
     }
   }
 }
-// Bands (star power, solo, fills, rolls) that run along the road, to the end of the board.
+// Bands (star power, solo, fills, rolls) that run along the road, up to the hit line.
 function span(g, spans, color, xl, xr, border = null) { // xl..xr: the lane range in lane units (-half..half is the whole road)
   g.fillStyle = color;
   if (!spans) return;
   for (let i = 0; i < spans.length; i++) {
     const s = spans[i];
-    if ((s.end - PT) / PSEC < ROAD_NEAR || s.start > PT + PSEC) continue;
-    const near = Math.max(ROAD_NEAR, Math.min(1, (s.start - PT) / PSEC)); // the band goes on past the hit line, to the end of the board
+    if ((s.end - PT) / PSEC < BAND_NEAR || s.start > PT + PSEC) continue;
+    const near = Math.max(BAND_NEAR, Math.min(1, (s.start - PT) / PSEC)); // the band stops at the hit line
     quad(g, near, depth(s.end), xl, xr);
     g.fill();
   }
@@ -428,8 +429,8 @@ function rollColumns3D(g, spans, cols, kickCol, half, lanes) {
   if (!spans) return;
   for (let i = 0; i < spans.length; i++) {
     const s = spans[i];
-    if (!s.lanes || (s.end + ROLL_LEAD_SEC - PT) / PSEC < ROAD_NEAR || s.start - ROLL_LEAD_SEC > PT + PSEC) continue;
-    const near = Math.max(ROAD_NEAR, Math.min(1, (s.start - ROLL_LEAD_SEC - PT) / PSEC));
+    if (!s.lanes || (s.end + ROLL_LEAD_SEC - PT) / PSEC < BAND_NEAR || s.start - ROLL_LEAD_SEC > PT + PSEC) continue;
+    const near = Math.max(BAND_NEAR, Math.min(1, (s.start - ROLL_LEAD_SEC - PT) / PSEC));
     const far = depth(s.end + ROLL_LEAD_SEC);
     if (far <= near) continue;
     for (const l of s.lanes) {
@@ -445,8 +446,8 @@ function sideBorders3D(g, spans, left, right, xl, xr) {
   if (!spans) return;
   for (let i = 0; i < spans.length; i++) {
     const s = spans[i];
-    if ((s.end - PT) / PSEC < ROAD_NEAR || s.start > PT + PSEC) continue;
-    const near = Math.max(ROAD_NEAR, Math.min(1, (s.start - PT) / PSEC));
+    if ((s.end - PT) / PSEC < BAND_NEAR || s.start > PT + PSEC) continue;
+    const near = Math.max(BAND_NEAR, Math.min(1, (s.start - PT) / PSEC));
     const far = depth(s.end);
     if (far <= near) continue;
     g.fillStyle = left;
