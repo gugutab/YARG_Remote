@@ -2077,8 +2077,8 @@ export class Highway {
       const s = spans[i];
       if (s.start > t + ahead) continue;
       const top = laneY(s.bandEnd ?? s.end); // (to the activation note when there is one)
-      const bottom = Math.min(laneY(s.start), LY_HIT); // (bands stop at the hit line)
-      if (top > h || bottom < 0 || top >= bottom) continue;
+      const bottom = laneY(s.start);
+      if (top > h || bottom < 0) continue;
       const len = bottom - top;
       g.fillStyle = color; // (hard edges at both ends: the band is visible in full as soon as it comes in, no fade)
       g.fillRect(x0, top, width, len);
@@ -2103,8 +2103,8 @@ export class Highway {
       const s = spans[i];
       if (s.start > t + ahead) continue;
       const top = laneY(s.end);
-      const bottom = Math.min(laneY(s.start), LY_HIT); // (bands stop at the hit line)
-      if (top > h || bottom < 0 || top >= bottom) continue;
+      const bottom = laneY(s.start);
+      if (top > h || bottom < 0) continue;
       this.g.fillRect(x0, top, width, bottom - top);
     }
     if (border && this.bandBorders) this.sideBorders(spans, t, ahead, x0, width, h, border, border);
@@ -2119,8 +2119,8 @@ export class Highway {
       const s = spans[i];
       if (!s.lanes || s.start - ROLL_LEAD_SEC > t + ahead) continue;
       const top = laneY(s.end + ROLL_LEAD_SEC);
-      const bottom = Math.min(laneY(s.start - ROLL_LEAD_SEC), LY_HIT); // (bands stop at the hit line)
-      if (top > h || bottom < 0 || top >= bottom) continue;
+      const bottom = laneY(s.start - ROLL_LEAD_SEC);
+      if (top > h || bottom < 0) continue;
       for (const l of s.lanes) {
         g.fillStyle = withAlpha(l >= 0 && l < lanes ? cols[l] : chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick, ROLL_COLUMN_ALPHA);
         if (l >= 0 && l < lanes) g.fillRect(x0 + l * lw, top, lw, bottom - top);
@@ -2136,8 +2136,8 @@ export class Highway {
       const s = spans[i];
       if (s.start > t + ahead) continue;
       const top = laneY(s.end);
-      const bottom = Math.min(laneY(s.start), LY_HIT); // (bands stop at the hit line)
-      if (top > h || bottom < 0 || top >= bottom) continue;
+      const bottom = laneY(s.start);
+      if (top > h || bottom < 0) continue;
       g.fillStyle = left;
       g.fillRect(x0, top, FILL_BORDER_PX, bottom - top);
       g.fillStyle = right;
