@@ -2,7 +2,7 @@
 // so it stays light enough for phones. Only the lane instruments (guitar, bass, keys, drums) have a highway;
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
-  NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, NOTE_RECT_W, NOTE_RECT_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
+  NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, sprite3D, noteSpritePx, NOTE_RECT_W, NOTE_RECT_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
   ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, setDesaturated, isDesaturated, dcol, desaturate, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, HIT_LINE_COLOR, HIT_LINE_BORDER, HIT_LINE_BORDER_SOFT, drawHitBurst, BURST_SEC, BURST_LOOP_SEC, BURST_VANISH_SEC, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
@@ -221,6 +221,40 @@ function sideBorders3D(g, spans, left, right, xl, xr) {
     g.fill();
   }
 }
+// A head of the 3D view (not the rectangular note): its edge underneath, the top face and the outline. `disc`: a cymbal of the rectangular style (a chrome
+// disc with a metal edge); headStyle: the outline (cymbals of the other styles: a rounded triangle).
+function drawHead3D(g, x, y, rx, ry, vy, n, colors, body, lw, disc, headStyle) {
+  // thickness: a thin darker edge underneath the top face (no cast shadow; all of it moves, grows and fades with the note)
+  const th = Math.max(0.5, rx * (disc ? 0.27 : 0.21)); // (a little thicker in the rectangular style)
+  if (disc) { // the rectangular style: the edge under the disc is metal like the caps (not a dark shade of the colour)
+    const y0 = y + ry * 0.4; // the gradient runs from y0 down to y + th + ry: a unit gradient (0..1) under that translate and scale
+    const span = y + th + ry - y0;
+    g.save();
+    g.translate(0, y0);
+    g.scale(1, span);
+    g.beginPath();
+    unitY.g = g; unitY.y0 = y0; unitY.k = 1 / span;
+    noteShape(unitY, x, y + th, rx, ry, headStyle, y + th - vy);
+    unitY.g = null;
+    g.fillStyle = discEdgeGradient(g, n.sp);
+    g.fill();
+    g.restore();
+  } else {
+    g.beginPath();
+    noteShape(g, x, y + th, rx, ry, headStyle, y + th - vy);
+    g.fillStyle = darken(n.tap && !n.sp ? NOTE_PALETTE.tap : colors[n.lane], 0.45); // the edge keeps the plain lane colour (no star power overlay)
+    g.fill();
+  }
+  g.beginPath();
+  noteShape(g, x, y, rx, ry, headStyle, y - vy);
+  g.fillStyle = body;
+  g.fill();
+  if (disc) drawCymbalFace(g, x, y, rx, ry, n, colors[n.lane]);
+  g.lineWidth = lw;
+  g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : 'rgba(0,0,0,0.5)';
+  g.stroke();
+}
+
 export function renderLanes3D(hw, t, w, h) {
   const g = hw.g;
   const chart = hw.chart;
@@ -500,36 +534,15 @@ export function renderLanes3D(hw, t, w, h) {
       if (n.activation && hw.fillActivation) drawActivationMark(g, x, y, rx * NOTE_RECT_W, ry * NOTE_RECT_H, p, t);
       continue;
     }
-    // thickness: a thin darker edge underneath the top face (no cast shadow; all of it moves, grows and fades with the note)
-    const th = Math.max(0.5, rx * (disc ? 0.27 : 0.21)); // (a little thicker in the rectangular style)
-    const headStyle = disc ? 'round' : n.cymbal ? 'tri' : hw.noteStyle; // cymbals: a disc in the rectangular style, else a rounded triangle
-    if (disc) { // the rectangular style: the edge under the disc is metal like the caps (not a dark shade of the colour)
-      const y0 = y + ry * 0.4; // the gradient runs from y0 down to y + th + ry: a unit gradient (0..1) under that translate and scale
-      const span = y + th + ry - y0;
-      g.save();
-      g.translate(0, y0);
-      g.scale(1, span);
-      g.beginPath();
-      unitY.g = g; unitY.y0 = y0; unitY.k = 1 / span;
-      noteShape(unitY, x, y + th, rx, ry, headStyle, y + th - vy);
-      unitY.g = null;
-      g.fillStyle = discEdgeGradient(g, n.sp);
-      g.fill();
-      g.restore();
-    } else {
-      g.beginPath();
-      noteShape(g, x, y + th, rx, ry, headStyle, y + th - vy);
-      g.fillStyle = darken(n.tap && !n.sp ? NOTE_PALETTE.tap : colors[n.lane], 0.45); // the edge keeps the plain lane colour (no star power overlay)
-      g.fill();
-    }
-    g.beginPath();
-    noteShape(g, x, y, rx, ry, headStyle, y - vy);
-    g.fillStyle = body;
-    g.fill();
-    if (disc) drawCymbalFace(g, x, y, rx, ry, n, colors[n.lane]);
-    g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH * p : Math.max(1, 1.5 * p);
-    g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : 'rgba(0,0,0,0.5)';
-    g.stroke();
+    const lw = n.accent ? ACCENT_OUTLINE_WIDTH * p : Math.max(1, 1.5 * p);
+    if (disc) { // a steady cymbal disc comes from a cached picture, scaled (see sprite3D); a held or exiting one changes every frame: drawn directly
+      const dist = y - vy;
+      if (!(kx === 0 && amt === 0 && g.filter === 'none' && g.globalCompositeOperation === 'source-over'
+        && sprite3D(g, x, y, rx, noteSpritePx(), `disc|${body}|${colors[n.lane]}|${n.sp ? 1 : 0}${n.accent ? 1 : 0}${n.ghost ? 1 : 0}|${Math.round((lw * 100) / rx)}|${Math.round((dist * 100) / rx)}`,
+          1 + (TAPER_GAIN * 0.9 * rx) / dist + lw / rx, HEAD_TILT + 0.3 + lw / rx, (sg) => drawHead3D(sg, 0, 0, rx, ry, -dist, n, colors, body, lw, true, 'round')))) {
+        drawHead3D(g, x, y, rx, ry, vy, n, colors, body, lw, true, 'round');
+      }
+    } else drawHead3D(g, x, y, rx, ry, vy, n, colors, body, lw, false, n.cymbal ? 'tri' : hw.noteStyle);
     if (n.hopo) {
       g.beginPath();
       noteShape(g, x, y, rx * 0.35, ry * 0.35, hw.noteStyle, y - vy);
