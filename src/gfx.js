@@ -28,7 +28,7 @@ export const FILL_COLORS = {
   fill: 'rgba(40,200,90,0.24)', // YARG draws the drum fill overlay in green (the 2D/3D band fades at both ends and has edge lines, see FILL_EDGE)
   bre: 'rgba(255,80,80,0.15)',
 };
-export const FILL_STRONG = 'rgba(40,200,90,0.5)'; // the lead-up: a stronger green over the column (lane) of the activation note, along the whole fill
+export const FILL_COLUMN_ALPHA = 0.42; // the background of the column (lane) of a fill's activation note: the note's own colour at this opacity, along the whole fill
 export const BAND_BORDERS = { // the side borders of the other overlay bands (setting highway.bandBorders), like the fill's: the band's own colour, solid
   starPower: 'rgba(255,190,40,0.95)', solo: 'rgba(40,180,255,0.95)', kick: 'rgba(255,150,50,0.95)', tremolo: 'rgba(80,220,80,0.95)', trill: 'rgba(255,215,60,0.95)',
 };

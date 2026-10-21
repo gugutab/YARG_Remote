@@ -17,7 +17,7 @@ import {
   setDesaturated,
   ROLL_COLORS,
   FILL_COLORS,
-  FILL_STRONG,
+  FILL_COLUMN_ALPHA,
   FILL_BORDER,
   FILL_BORDER_PX,
   HIT_LINE_COLOR,
@@ -2083,7 +2083,9 @@ export class Highway {
       if (s.activationLane !== undefined) { // the lead-up: a stronger green over the column of the final note, along the whole fill (every column for the kick)
         const lanes = this.chart.lanes, lw = width / lanes;
         const inside = s.activationLane >= 0 && s.activationLane < lanes;
-        g.fillStyle = FILL_STRONG;
+        const cols = this.chart.laneColors || NOTE_PALETTE.lanes;
+        const note = inside ? cols[s.activationLane] : this.chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick; // (the column's background is the colour of the final note)
+        g.fillStyle = withAlpha(note, FILL_COLUMN_ALPHA);
         g.fillRect(inside ? x0 + s.activationLane * lw : x0, top, inside ? lw : width, len);
       }
       g.fillStyle = FILL_BORDER; // green borders on both sides of the board along the fill
