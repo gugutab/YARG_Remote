@@ -3032,10 +3032,11 @@ function setBarHeight(h, persist = true) {
   if (persist && v <= BAR_MIN) peekMuted = true;
   barHeight = v >= max ? null : v;
   if (v > BAR_MIN) barPeek = false;
-  const vis = barPeek ? max : v; // what is on screen; the layout (the stage) follows v
+  const idleMin = els.app.classList.contains('immersive') && els.app.classList.contains('idle'); // fullscreen and idle: only the seek bar, never over the fretboards
+  const vis = barPeek ? max : idleMin ? BAR_MIN : v; // what is on screen
   const level = barLevel(vis, max);
   const before = els.app.classList.contains('bar-hidden') + (els.app.classList.contains('bar-min') ? 2 : 0);
-  els.app.style.setProperty('--bar-now', `${v}px`);
+  els.app.style.setProperty('--bar-now', `${vis}px`); // the layout (the stage) follows what is shown: the bar never covers the fretboards
   els.app.style.setProperty('--bar-vis', `${vis}px`);
   els.app.classList.toggle('bar-peek', barPeek);
   els.app.classList.toggle('bar-hidden', level !== 'full');
@@ -3298,11 +3299,13 @@ function setImmersive() {
   wake();
 }
 function wake() {
+  const wasIdle = els.app.classList.contains('idle');
   els.app.classList.remove('idle');
+  if (wasIdle) setBarHeight(barHeight, false);
   clearTimeout(idleTimer);
   if (document.fullscreenElement && player.playing) {
     idleTimer = setTimeout(() => {
-      if (popovers.every(([, pop]) => pop.hidden)) els.app.classList.add('idle');
+      if (popovers.every(([, pop]) => pop.hidden)) { els.app.classList.add('idle'); setBarHeight(barHeight, false); }
     }, 2500);
   }
 }

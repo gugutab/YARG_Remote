@@ -162,9 +162,7 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 /* read by screen readers only (the stage's live status line, #stageStatus) */
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-/* Fullscreen / idle: the bar hides while playing and returns on mouse move */
-.app.immersive .topbar { position: absolute; left: 0; right: 0; top: 0; opacity: .96; transition: transform .2s ease; z-index: 14; }
-.app.immersive.idle .topbar { transform: translateY(-100%); }
+/* Fullscreen / idle: the bar never floats over the fretboards: while playing and idle it shrinks to the seek bar (the stage grows to fill the room) and returns on mouse move */
 
 button.icon.small-icon { width: 28px; height: 28px; }
 button.icon.small-icon svg { width: 16px; height: 16px; }
@@ -1351,8 +1349,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .app.bar-bottom .seekbox { top: -6px; bottom: auto; }
 .app.bar-bottom .seekbox .tick { bottom: auto; top: 6px; }
 .app.bar-bottom .seekbox:hover .tick { bottom: auto; top: 5px; }
-.app.immersive.bar-bottom .topbar { top: auto; bottom: 0; }
-.app.immersive.idle.bar-bottom .topbar { transform: translateY(100%); }
 /* the compact bar's padding is mirrored (the seek line is above the content now) */
 .app.bar-bottom.bar-hidden .topbar { padding-top: 10px; padding-bottom: 12px; }
 /* wide open bar: the time row stays next to the seek bar, which is above the buttons now */
@@ -1501,7 +1497,6 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .end-screen[hidden] { display: none; }
 @media (min-width: 701px) { .end-screen { transition: padding-left .22s ease; } }
 .app.song-ended #highway, .app.song-ended #paneTags { visibility: hidden; }
-.app.immersive .end-screen { padding-block: calc(var(--bar-now, var(--bar-h, 64px)) + var(--lib-gap, 12px)); }
 .end-card {
   position: relative; width: min(1100px, 100%); max-height: 100%; min-height: 0; display: flex; flex-direction: column; pointer-events: auto;
   background: color-mix(in srgb, var(--panel) 78%, transparent); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
@@ -2654,7 +2649,7 @@ button.icon.small-icon.sp-reset, #ppSlower, #ppFaster { min-width: 32px; min-hei
 /* the compact one-row layout in a taller bar stays centred between the edges */
 .app.bar-hidden:not(.bar-min) .topbar { align-content: center; }
 
-/* The peek: the full bar over the stage while the layout keeps the minimum (--bar-now is the layout height, --bar-vis what is shown) */
+/* The peek: the full bar pushes the stage up while it is shown (--bar-now is the layout height and follows --bar-vis, what is shown; the margins below are 0 then) */
 .app.bar-peek.bar-bottom .main > .topbar { margin-top: calc(var(--bar-now) - var(--bar-vis)); }
 .app.bar-peek:not(.bar-bottom) .main > .topbar { margin-bottom: calc(var(--bar-now) - var(--bar-vis)); }
 .app.bar-peek.bar-bottom .bar-resizer { transform: translateY(calc(var(--bar-now) - var(--bar-vis))); z-index: 14; }
