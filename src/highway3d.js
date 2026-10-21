@@ -71,7 +71,34 @@ const yAt = (d) => PVY + (PHIT - PVY) * scaleAt(d) + (d > 0 ? PC * d * d : 0);
 const xAt = (lx, d) => PCX + lx * PLANE * scaleAt(d); // lx = lane units from the road's centre
 const depth = (time) => Math.min(1, Math.max(0, (time - PT) / PSEC));
 const CURVE_MAX = 0.9; // curve 100%: the road's slope on screen at the far edge (d = 1) is 10% of the flat one, so the crest stays past the notes
-const CURVE_STEPS = 24; // segments per depth unit of a quad or line on a curved road
+const CURVE_STEPS = 24; // at most this many segments per depth unit of a quad or line on a curved road
+const CURVE_TOL = 0.15; // ...and only as many as keep a road edge within this many px of the true curve
+let PSTEPS = CURVE_STEPS; // the segments per depth unit of the current projection (curveSteps)
+// Segments per depth unit for the current projection: the polylines of a curved road cost GPU time per vertex (with 24 per unit the road, its
+// stripes, lines and bands were about 1.5 ms of a 3-pane frame), and 24 is far finer than needed in most windows. The chord error of the road's
+// outer edge (halfW lane units from the centre: the farthest from the centre, so the largest error) is measured at CURVE_STEPS once per
+// projection; it falls with the square of the step count, which gives the fewest steps within CURVE_TOL (at least 4).
+const curveStepsCache = new Map();
+function curveSteps(halfW) {
+  if (!(PC > 0)) return CURVE_STEPS;
+  const key = `${PK}|${PVY}|${PHIT}|${PC}|${PEND}|${PLANE * halfW}`;
+  let n = curveStepsCache.get(key);
+  if (n === undefined) {
+    const px = (d) => PCX + halfW * PLANE / (1 + PK * d);
+    const py = (d) => PVY + (PHIT - PVY) / (1 + PK * d) + (d > 0 ? PC * d * d : 0);
+    const segs = Math.ceil((PEND - ROAD_NEAR) * CURVE_STEPS);
+    let err = 0;
+    for (let i = 0; i < segs; i++) {
+      const a = ROAD_NEAR + ((PEND - ROAD_NEAR) * i) / segs, b = ROAD_NEAR + ((PEND - ROAD_NEAR) * (i + 1)) / segs;
+      const ax = px(a), ay = py(a), dx = px(b) - ax, dy = py(b) - ay, len = Math.hypot(dx, dy) || 1;
+      for (let k = 1; k < 8; k++) { const d = a + ((b - a) * k) / 8; err = Math.max(err, Math.abs(dx * (py(d) - ay) - dy * (px(d) - ax)) / len); }
+    }
+    n = Math.max(4, Math.min(CURVE_STEPS, Math.ceil(CURVE_STEPS * Math.sqrt(err / CURVE_TOL))));
+    if (curveStepsCache.size >= 16) curveStepsCache.delete(curveStepsCache.keys().next().value);
+    curveStepsCache.set(key, n);
+  }
+  return n;
+}
 
 // The projection for a pane: `h` its height, `hitY` the hit line, `strength` the perspective (setting highway.perspective / 100: 1 = the
 // classic FAR_SCALE) and `curve` the downward bend (highway.curve / 100). The far edge (d = 1) of a flat road stays at FAR_TOP and the hit
@@ -110,7 +137,7 @@ function quad(g, d0, d1, lx0, lx1) {
 function curvedQuad(g, d0, d1, lx0, lx1) {
   d0 = Math.min(d0, PEND);
   d1 = Math.min(d1, PEND);
-  const n = Math.max(1, Math.ceil(Math.abs(d1 - d0) * CURVE_STEPS));
+  const n = Math.max(1, Math.ceil(Math.abs(d1 - d0) * PSTEPS));
   g.beginPath?.();
   for (let i = 0; i <= n; i++) {
     const d = d0 + ((d1 - d0) * i) / n;
@@ -129,7 +156,7 @@ function curvedQuad(g, d0, d1, lx0, lx1) {
 // A line along the road at lx lane units from the centre, from ROAD_NEAR to the road's end (added to the current path).
 function roadLine(g, lx) {
   g.moveTo(xAt(lx, ROAD_NEAR), yAt(ROAD_NEAR));
-  if (PC > 0) for (let i = 1, n = Math.ceil((PEND - ROAD_NEAR) * CURVE_STEPS); i <= n; i++) { const d = ROAD_NEAR + ((PEND - ROAD_NEAR) * i) / n; g.lineTo(xAt(lx, d), yAt(d)); }
+  if (PC > 0) for (let i = 1, n = Math.ceil((PEND - ROAD_NEAR) * PSTEPS); i <= n; i++) { const d = ROAD_NEAR + ((PEND - ROAD_NEAR) * i) / n; g.lineTo(xAt(lx, d), yAt(d)); }
   else g.lineTo(xAt(lx, ROAD_END), yAt(ROAD_END));
 }
 // The board's fixed shapes for the current projection, as Path2D objects kept between frames: the road (also the dark base), the lane stripes,
@@ -318,6 +345,7 @@ export function renderLanes3D(hw, t, w, h) {
   PT = t;
   const vy = PVY;
   const half = lanes / 2;
+  PSTEPS = curveSteps(half);
 
   // In a long rest the whole board turns more transparent together (see Highway.restBoard)
   const boardK = hw.restBoard(t, windowSec);
