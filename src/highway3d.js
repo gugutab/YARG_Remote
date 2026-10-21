@@ -495,6 +495,7 @@ export function renderLanes3D(hw, t, w, h) {
     const past = t - exitTime(n); // long notes: the exit starts when the tail ends
     const fadeSec = hw.hitAnimation === 'burst' ? BURST_VANISH_SEC : FADE_SEC; // (the burst: the note vanishes quickly)
     if (past > fadeSec) continue;
+    if (hw.hitAnimation === 'burst' && n.length > 0 && t >= n.time) continue; // (a long note that has arrived is not drawn at all: only its tail and the looping burst)
     const kx = Math.max(0, past) / fadeSec;
     const d = depth(n.time);
     const p = scaleAt(d);
