@@ -51,6 +51,17 @@ and the working conventions.
   high contrast, custom) and per-instrument defaults for the view, the note shape and the neck speed.
 - **Library:** star a song to filter by Starred, sort by Recently played / Most played (kept locally; Settings -> Library and cards
   -> Remember what I played), and back up the favourites with the settings.
+- **Welcome and sync check:** a first visit opens a short setup (songs folder, look, and an audio/visual sync check that sets
+  Settings -> Audio -> Audio latency); Settings -> Data and backup -> Run setup again opens it later.
+- **Library filters:** instrument chips, charted difficulty (Easy to Expert, needs the server index), minimum and maximum
+  level, genre, decade, pack and Starred; the search keeps the group headers and has a clear button. The song details have a
+  link button that copies a link to the song, plain info chips, a fullscreen cover and a Listen player that folds.
+- **Left-handed lanes:** a global setting plus a per-instrument choice (Normal / Mirrored) in each instrument's View window.
+- **Performance:** Settings -> Performance has a frame-rate limit, an economy mode, a render quality (resolution) choice and
+  adaptive quality that lowers the load only when frames run late; "Faster 3D notes" (experimental) caches 3D note pictures.
+  The Highway Visualizer menu has Aurora, Synthwave, Warp, Beat rings, Spotlights, Tunnel and more.
+- **Install and screen:** the app has a web manifest (installable on https or localhost) and keeps the screen awake while a song
+  plays (Settings -> General -> Playback).
 - **Accessibility:** a live region announces the section and play state, the pane dots are tappable, settings can be reset per section,
   and Settings -> Appearance -> Reduce motion (Auto / On / Off) follows the system by default.
 - **Environment variables** (server): `SONGS_DIR`, `PORT`, `HOST`, `CACHE_DIR` (see "Server with the library").
