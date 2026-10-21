@@ -28,6 +28,8 @@ export const FILL_COLORS = {
   fill: 'rgba(40,200,90,0.24)', // YARG draws the drum fill overlay in green (the 2D/3D band fades at both ends and has edge lines, see FILL_EDGE)
   bre: 'rgba(255,80,80,0.15)',
 };
+export const FILL_STRONG = 'rgba(40,200,90,0.55)'; // the finishing stretch of a fill band (the lead-up to the activation note)
+export const FILL_LEAD_SEC = 0.4; // how long that stretch is
 export const FILL_EDGE = 'rgba(140,255,170,0.9)'; // the thin bright line at the start and end of a fill phrase
 export const FILL_ACTIVATION = '#8cffaa'; // the drum fill activation note's halo and ring (white core): not one of the lane colours
 export const FADE_SEC = 0.25; // how long a note takes to fade out after the hit line

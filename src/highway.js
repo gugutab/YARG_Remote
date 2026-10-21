@@ -17,6 +17,8 @@ import {
   DISABLED_FILTER,
   ROLL_COLORS,
   FILL_COLORS,
+  FILL_STRONG,
+  FILL_LEAD_SEC,
   FILL_EDGE,
   FILL_ACTIVATION,
   drawActivationMark,
@@ -1406,7 +1408,7 @@ export class Highway {
     for (let i = 0; i < FILL_KINDS.length; i++) {
       if (FILL_KINDS[i] === 'fill' && !this.fillBand) continue;
       if (FILL_KINDS[i] === 'bre' && this.breBand === 'off') continue;
-      const spans = spansOfKind(chart, chart.fills, 'kind', FILL_KINDS[i]);
+      const spans = spansOfKind(chart, FILL_KINDS[i] === 'fill' ? chart.fillBands ?? chart.fills : chart.fills, 'kind', FILL_KINDS[i]); // (fills without their own activation chord are not shown, like YARG)
       if (FILL_KINDS[i] === 'bre') { // the big rock ending: every lane in its own colour, pulsing (see breAlpha)
         const cols = chart.laneColors || NOTE_PALETTE.lanes;
         const pulseBre = this.breBand === 'pulse';
@@ -2047,7 +2049,9 @@ export class Highway {
       const len = bottom - top;
       const fade = Math.min(0.18, 28 / Math.max(1, len));
       const grad = g.createLinearGradient(0, top, 0, bottom);
-      grad.addColorStop(0, color); // (the far end, where the activation note is, stays full: only the start fades in)
+      const lead = Math.min(0.5, Math.max(0.02, (laneY((s.bandEnd ?? s.end) - FILL_LEAD_SEC) - top) / Math.max(1, len))); // the finishing stretch before the activation note: a stronger green
+      grad.addColorStop(0, FILL_STRONG);
+      grad.addColorStop(lead, color);
       grad.addColorStop(1 - fade, color);
       grad.addColorStop(1, 'rgba(40,200,90,0)');
       g.fillStyle = grad;

@@ -91,3 +91,22 @@ test('markFillNotes is repeatable on a built chart', () => {
   markFillNotes(chart);
   assert.equal(chart.notes.filter((n) => n.activation).length, 1);
 });
+
+test('fill: only the last fill before an activation chord is shown (fillBands), the stats keep every phrase', () => {
+  const notes = [
+    { tick: 0, pitch: 96, len: 60 },
+    { tick: 480, pitch: 97, len: 60 },
+    { tick: 960, pitch: 97, len: 60 },
+    { tick: 1920, pitch: 98, len: 60 },
+    { tick: 500, pitch: 120, len: 100 }, // an earlier fill (ends at 600)
+    { tick: 660, pitch: 120, len: 120 }, // the later one (ends at 780): both lead into the note at 960
+  ];
+  const chart = buildChart(drumsMidi(notes), DRUMS, EXPERT);
+  const fills = chart.fills.filter((f) => f.kind === 'fill');
+  assert.equal(fills.length, 2);
+  assert.equal(chart.fillBands.length, 1);
+  assert.equal(chart.fillBands[0], fills[1]);
+  assert.equal(fills[0].unpaired, true);
+  assert.equal(fills[1].unpaired, false);
+  assert.ok(chart.fillBands[0].bandEnd >= chart.fillBands[0].end);
+});

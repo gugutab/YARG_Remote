@@ -369,6 +369,7 @@ function buildDrumChart(midi, track, kind, difficulty, timed, toSec, settings) {
 export function markFillNotes(chart) {
   const notes = chart.notes;
   for (const n of notes) { n.fill = false; n.activation = false; }
+  for (const f of chart.fills || []) { delete f.activationTime; f.unpaired = false; }
   let from = 0;
   for (const f of chart.fills || []) {
     if (f.kind !== 'fill') continue;
@@ -382,9 +383,16 @@ export function markFillNotes(chart) {
     let best = null;
     for (let k = i; k < notes.length && notes[k].time === time; k++) if (best === null || notes[k].lane > best.lane) best = notes[k];
     if (best) best.activation = true;
-    f.bandEnd = Math.max(f.end, time); // the band is drawn up to the activation chord (it comes after the phrase end), not only to the phrase
+    f.bandEnd = Math.max(f.end, time);
+    f.activationTime = time; // the band is drawn up to the activation chord (it comes after the phrase end), not only to the phrase
     from = i;
   }
+  // YARG pairs ONE fill with each activation chord: the last fill that ends before it (DrumsPlayer.SetDrumFillEffects); the other fills of that chord, and
+  // fills with no chord after them, are not shown. The band list the highway draws is chart.fillBands; chart.fills (and the stats) keep every phrase.
+  const lastByChord = new Map();
+  for (const f of chart.fills || []) if (f.kind === 'fill' && f.activationTime !== undefined) lastByChord.set(f.activationTime, f);
+  for (const f of chart.fills || []) if (f.kind === 'fill') f.unpaired = lastByChord.get(f.activationTime) !== f;
+  chart.fillBands = (chart.fills || []).filter((f) => f.kind === 'fill' && !f.unpaired);
   return chart;
 }
 
