@@ -599,3 +599,4 @@ Only checked by synthetic test, headless run or code reading:
 - 3D hit line segments are more transparent at rest (alpha 0.3, up to 0.85 when the lane is hit).
 - 3D hit line segments: back to solid colours, now the lane (note) colour under a white overlay (30% at rest, up to 75% while the lane is hit) instead of a transparent tint, so they read as the note colours.
 - 3D hit line: the coloured segments reach the walls of the board (the first and last extend under the end indicators); the end indicators pass over them at 80% opacity, in the pedal colour on drums, the open-note colour on a chart that has open notes, white otherwise.
+- 3D hit line: the coloured segments end exactly on the walls of the board (rails), not past them; the end indicators stay over the walls.
