@@ -1,6 +1,7 @@
 // Canvas renderer for a chart. Drawing is a pure function of the playback time,
 // so seek/pause just means re-rendering at a different `t`.
 
+import { renderDpr } from './quality.js';
 import { sanitizeSizes, fitWidths } from './panesizes.js';
 import { PER_INSTRUMENT_BASES, instrumentDefaults } from './perinstrument.js';
 import {
@@ -391,7 +392,7 @@ export class Highway {
   }
 
   resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2); // phones report 3+; 2 is plenty and keeps the fill rate low
+    const dpr = renderDpr(); // (quality.js: min(devicePixelRatio, 2) by default; Settings, Performance can lower it)
     const w = this.canvas.clientWidth;
     const h = this.canvas.clientHeight;
     if (this.canvas.width !== Math.round(w * dpr) || this.canvas.height !== Math.round(h * dpr)) {
@@ -435,7 +436,7 @@ export class Highway {
     const c = this.bgCanvas;
     if (!c) return;
     const sc = this.visualizer ? this.vizScale() : 1; // the background is drawn at a fraction of the resolution and stretched by the compositor: far fewer pixels to fill
-    const dpr = Math.min(window.devicePixelRatio || 1, 2) * sc;
+    const dpr = renderDpr() * sc;
     const w = c.clientWidth;
     const h = c.clientHeight;
     const resized = c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr);

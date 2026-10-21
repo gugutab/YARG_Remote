@@ -9,6 +9,7 @@ import { countdownColors, vocalColors } from './uicolors.js';
 import { createErrorGate } from './errorgate.js';
 import { PerfMeter } from './perf.js';
 import { createPerfOverlay, PERF_MODES } from './perf-overlay.js';
+import { createFrameCap, createAdaptive, adaptiveEffects, adaptiveBudget, ADAPTIVE_STEPS, ADAPTIVE_MAX, renderDpr, setQualityInputs } from './quality.js';
 import { walkHandle, entriesFromFileList, scanSongs, audioStemsOf, findCover, readBytes, serializeSongs, restoreSongs, restoreRemoteSongs } from './library.js';
 import { songDelaySeconds, plainText, packOf } from './ini.js';
 import { actionFor, comboOf } from './shortcuts.js';
@@ -72,12 +73,14 @@ const perf = new PerfMeter();
 let perfMode = 'off'; // the perf.overlay setting, kept here so the frame loop does not read the prefs every frame
 const perfOverlay = createPerfOverlay({
   stage: document.getElementById('stage'), meter: perf, onCycle: () => cyclePerfOverlay(),
+  quality: () => (adaptive.level ? `Q-${adaptive.level}` : ''), // (compact: shown only while the adaptive quality is lowered)
   probes: () => {
     const c = els.highway, mem = performance.memory, ctx = player.ctx;
     const mb = (n) => Math.round(n / 1048576);
     const lat = ctx ? Math.round(((ctx.outputLatency || 0) || (ctx.baseLatency || 0)) * 1000) : null;
     return {
-      canvas: `${c.width}x${c.height}`, dpr: window.devicePixelRatio, panes: highway.panes.length,
+      canvas: `${c.width}x${c.height}`, dpr: `${window.devicePixelRatio} -> ${+renderDpr().toFixed(3)}`, panes: highway.panes.length,
+      quality: `level ${adaptive.level}/${ADAPTIVE_MAX} ${ADAPTIVE_STEPS[adaptive.level]}${adaptiveOn ? '' : ' (adaptive off)'}  cap ${frameCap.fps || 'auto'}${economyOn ? '  economy' : ''}`,
       heap: mem ? `${mb(mem.usedJSHeapSize)} / ${mb(mem.jsHeapSizeLimit)} MB` : null,
       latency: lat == null ? null : `${lat} ms`,
     };
@@ -219,6 +222,56 @@ const motionReduced = () => { const m = prefs.get('ui.reduceMotion'); return m =
 function motionPref(id) {
   return prefs.get(id) && !motionReduced();
 }
+// Performance modes (Settings, Performance; src/quality.js): the frame-rate cap, economy mode, the render quality and the adaptive
+// quality controller. Economy and the adaptive level are runtime state layered over the saved settings (`effective`): they never
+// write the prefs, so turning them off brings back exactly what the user chose.
+const frameCap = createFrameCap();
+const adaptive = createAdaptive();
+let economyOn = false;
+let adaptiveOn = true;
+let qfx = adaptiveEffects(0); // what the adaptive level cuts now
+let lastDrawnAt = null; // the timestamp of the last frame that drew (the adaptive controller's frame interval)
+let shownViz = null; // the visualizer on screen (effective.visualizer)
+const effective = {
+  get motionBlur() { return motionPref('highway.motionBlur') && !economyOn; },
+  get heldPulse() { return !!prefs.get('highway.heldPulse') && !economyOn; },
+  get visualizer() { return economyOn || qfx.vizOff ? 'none' : prefs.get('highway.visualizer'); },
+};
+function applyQuality() {
+  qfx = adaptiveEffects(adaptive.level);
+  setQualityInputs({ scale: prefs.get('perf.renderScale'), economy: economyOn, adaptiveCap: qfx.dprCap });
+  highway.heldMotion = effective.heldPulse;
+  applyVisualizer();
+  syncQualityStatus();
+  highway.invalidate(); // (the canvases take the new resolution on the next draw)
+}
+function applyVisualizer() {
+  const id = effective.visualizer;
+  if (id !== shownViz) { shownViz = id; vizDriver.select(id); highway.setVisualizer(vizDriver.fn); }
+  applyVizGlass();
+  syncVizPop();
+}
+// Fed by every frame that drew. Frames count only while a song plays in a visible tab, with no seek animation or drag (the
+// controller ignores them for a second after any of these, and after a resize, a seek or a level change).
+function adaptTick(now, work) {
+  const prev = lastDrawnAt;
+  lastDrawnAt = now;
+  if (!adaptiveOn) return;
+  if (prev === null || !player.playing || document.hidden || vis.anim || seeking || holdStage) { adaptive.quiet(now); return; }
+  const before = adaptive.level;
+  if (adaptive.feed(now, now - prev, work, adaptiveBudget(frameCap.fps)) !== before) applyQuality();
+}
+// The status line under "Adapt quality to the frame rate" in Settings.
+function syncQualityStatus() {
+  const row = document.querySelector('#settingsPage .sp-row[data-id="perf.adaptive"] .sp-text');
+  if (!row) return;
+  let line = row.querySelector('.perf-status');
+  if (!line) { line = document.createElement('small'); line.className = 'perf-status'; row.append(line); }
+  const lvl = adaptive.level;
+  line.hidden = !adaptiveOn;
+  line.textContent = lvl ? `Now: lowered ${lvl} step${lvl > 1 ? 's' : ''} (${ADAPTIVE_STEPS[lvl]}).` : 'Now: full quality.';
+}
+window.addEventListener('resize', () => adaptive.quiet(performance.now()));
 // Migration of the old hidden key (before ui.reduceMotion): it listed the motion switches the user had set by hand, which the OS
 // preference then no longer overrode. Those values now rule (Reduce motion: Off), and the switches the OS was turning off stay off.
 try {
@@ -2462,7 +2515,7 @@ function syncPlayButton() {
 // songs to play next (recommend.js). Any seek (the player's onSeek hook), a restart, Play or a song change clears the state; Esc only
 // hides the window (the buttons stay Restart). The canvas is hidden by CSS (.song-ended), so the background visualizer keeps running.
 // (The window itself is src/end-ui.js.)
-player.onSeek = () => { cancelLoopWait(); loopHeld = false; metronome.reset(); setEnded(false); cancelStartWait(); if (!internalSeek) clearRewind(); }; // (a seek of the user ends a rewind; the rewind's own seek does not)
+player.onSeek = () => { adaptive.quiet(performance.now()); cancelLoopWait(); loopHeld = false; metronome.reset(); setEnded(false); cancelStartWait(); if (!internalSeek) clearRewind(); }; // (a seek of the user ends a rewind; the rewind's own seek does not)
 
 function setEnded(on) {
   if (ended === on) return;
@@ -3004,7 +3057,7 @@ const vizDriver = createVisualizerDriver({
     return vizSrc;
   },
 });
-highway.vizScale = () => vizDriver.scale; // the background canvas resolution follows the visualizer quality
+highway.vizScale = () => vizDriver.scale * (shownViz === 'cover' ? 1 : qfx.vizFactor); // the background canvas resolution follows the visualizer quality (and the adaptive quality)
 let vizFps = 60; // how often the background is redrawn (the setting; Infinity = every screen frame)
 highway.vizFps = () => vizFps;
 const vizBtn = document.getElementById('visualizerBtn');
@@ -3050,7 +3103,7 @@ vizPop.replaceChildren(vizList, vizFoot);
 // a blur drawn into the canvas every frame; the chart canvas is above it, so the notes stay sharp.
 function applyVizGlass() {
   const px = prefs.get('highway.visualizerBlur');
-  const on = px > 0 && prefs.get('highway.visualizer') !== 'none';
+  const on = px > 0 && effective.visualizer !== 'none';
   document.documentElement.style.setProperty('--viz-blur', `${px}px`);
   els.app.classList.toggle('viz-glass', on);
   highway.invalidate?.();
@@ -3184,7 +3237,7 @@ let lastBlurAt = -Infinity;
 function blurSampleCount(now) {
   blurSamples = adaptBlurSamples(blurSamples, now - lastBlurAt);
   lastBlurAt = now;
-  return blurSamples;
+  return Math.min(blurSamples, qfx.blurMax); // (the adaptive quality may allow fewer)
 }
 const seekAnimMs = (dist) => Math.min(700, 280 + dist * 25); // longer for longer jumps, 0.7 s at most
 function visualChartTime(ct) {
@@ -3223,7 +3276,7 @@ function canSkipDraw(now, t) {
   if (player.playing || vis.anim || seeking || perfMode !== 'off') return false;
   if (now - Math.max(lastInputAt, highway.dirtyAt) < IDLE_AFTER_MS || now - lastDraw.at >= IDLE_REFRESH_MS) return false;
   const c = els.highway;
-  return lastDraw.t === t && lastDraw.w === c.clientWidth && lastDraw.h === c.clientHeight && lastDraw.dpr === window.devicePixelRatio && lastDraw.panes === highway.panes && lastDraw.chart === chart;
+  return lastDraw.t === t && lastDraw.w === c.clientWidth && lastDraw.h === c.clientHeight && lastDraw.dpr === renderDpr() && lastDraw.panes === highway.panes && lastDraw.chart === chart;
 }
 // Deep idle: on top of the idle conditions above, nothing that animates by itself (no visualizer, no loading backdrop, no start/resume/loop wait).
 // The loop then ticks at IDLE_REFRESH_MS on a timer instead of every display frame (the refresh it would draw anyway), and any input,
@@ -3241,7 +3294,7 @@ function wakeLoop() {
 function noteDraw(now, t) {
   const c = els.highway;
   const d = lastDraw; // (one object, updated in place)
-  d.at = now; d.t = t; d.w = c.clientWidth; d.h = c.clientHeight; d.dpr = window.devicePixelRatio; d.panes = highway.panes; d.chart = chart;
+  d.at = now; d.t = t; d.w = c.clientWidth; d.h = c.clientHeight; d.dpr = renderDpr(); d.panes = highway.panes; d.chart = chart;
 }
 
 let lastClock = null; // the previous frame's music time and timestamp, for the clock jitter meter
@@ -3279,8 +3332,9 @@ function frame(frameTs) {
   guarded('pause info', syncPauseInfo);
   const frameStart = performance.now();
   if (frameTs) player.frameNow = frameTs; // the clock of this animation frame (vsync aligned)
+  const drawNow = frameCap.ready(frameTs || frameStart); // the frame-rate cap: a skipped frame keeps the last picture (clock, audio and seek bar still update)
   let drawMs = 0;
-  const draw = (fn) => { if (holdStage) { if (loadingBackdrop) guarded('loading background', () => highway.drawBackground((performance.now() - loadingBackdrop) / 1000)); return; } const d0 = performance.now(); guarded('draw', fn); drawMs = performance.now() - d0; }; // (held: the fretboards keep the last picture)
+  const draw = (fn) => { if (!drawNow) return; if (holdStage) { if (loadingBackdrop) guarded('loading background', () => highway.drawBackground((performance.now() - loadingBackdrop) / 1000)); return; } const d0 = performance.now(); guarded('draw', fn); drawMs = performance.now() - d0; }; // (held: the fretboards keep the last picture)
   if (current && chart && !liveStage) {
     let t = guarded('clock', () => {
       let t = player.currentTime();
@@ -3316,7 +3370,8 @@ function frame(frameTs) {
       const chartTime = listenMode ? 0 : t - settings.chartDelay; // (listening only: the chart stays at its start)
       const shownTime = guarded('visual time', () => visualChartTime(chartTime)) ?? chartTime;
       highway.litLag = shownTime - chartTime; // (a backward seek animation lights none of the notes it sweeps over)
-      if (vis.anim && Math.abs(vis.step) > MOTION_BLUR_MIN_STEP && motionPref('highway.motionBlur')) { // a fast jump: blur the motion
+      if (!drawNow) { /* frame-rate cap: nothing to draw on this display frame */ }
+      else if (vis.anim && Math.abs(vis.step) > MOTION_BLUR_MIN_STEP && effective.motionBlur) { // a fast jump: blur the motion
         const span = Math.max(-0.6, Math.min(0.6, vis.step * 0.85)); // the exposure: most of the frame, within limits
         const n = blurSampleCount(frameTs || frameStart);
         draw(() => highway.renderBlur(Array.from({ length: n }, (_, k) => shownTime - span * (1 - k / (n - 1)))));
@@ -3357,7 +3412,8 @@ function frame(frameTs) {
     });
   } else {
     if (player.playing && current && player.currentTime() >= player.duration) { player.pause(); syncPlayButton(); } // (a song that plays on in the background reached its end: nothing to show, the sound just stops)
-    if (canSkipDraw(frameStart, 0)) {
+    if (!drawNow) { /* frame-rate cap */ }
+    else if (canSkipDraw(frameStart, 0)) {
       if (highway.visualizer) draw(() => highway.drawBackground(0));
     } else {
       draw(() => highway.render(0));
@@ -3365,7 +3421,8 @@ function frame(frameTs) {
     }
     guarded('pane tags', syncPaneTags);
   }
-  if (perfMode !== 'off') guarded('perf', () => { perf.frame(frameStart, drawMs); perfOverlay.tick(frameStart); }); // (no meters while the overlay is off)
+  if (drawNow) guarded('quality', () => adaptTick(frameTs || frameStart, drawMs));
+  if (perfMode !== 'off') guarded('perf', () => { if (drawNow) perf.frame(frameStart, drawMs); perfOverlay.tick(frameStart); }); // (no meters while the overlay is off; FPS counts the frames drawn)
 }
 requestAnimationFrame(frame);
 
@@ -3588,6 +3645,10 @@ const EFFECTS = {
   'highway.noteStyle': (v) => setNoteStyle(v),
   'perf.overlay': (v) => { perfMode = v === 'compact' || v === 'detailed' ? v : 'off'; perf.reset(); lastClock = null; perfOverlay.setMode(v); },
   'perf.position': (v) => perfOverlay.setPosition(v),
+  'perf.fpsCap': (v) => { frameCap.set(v === 'auto' ? 0 : Number(v)); adaptive.quiet(performance.now()); },
+  'perf.economy': (v) => { economyOn = !!v; applyQuality(); },
+  'perf.renderScale': () => applyQuality(),
+  'perf.adaptive': (v) => { adaptiveOn = !!v; adaptive.reset(); applyQuality(); },
   'details.chips': applyDetails, 'details.cover': applyDetails, 'details.quote': applyDetails, 'details.sections': applyDetails,
   'details.layout': applyDetails, 'details.stemNames': applyDetails, 'details.maxWidth': applyDetails, 'details.compact': applyDetails,
   'library.cardStyle': (v) => { list.setMode(v); syncViewSeg(); },
@@ -3604,7 +3665,7 @@ const EFFECTS = {
   'theme.saved': applyThemeSetting,
   'ui.radius': (v) => document.documentElement.style.setProperty('--radius', `${v}px`),
   'ui.font': (v) => document.documentElement.style.setProperty('--font', fontCss(v)),
-  'highway.visualizer': (v) => { vizDriver.select(v); highway.setVisualizer(vizDriver.fn); applyVizGlass(); syncVizPop(); },
+  'highway.visualizer': () => applyVisualizer(), // (economy mode and the adaptive quality may hide it: effective.visualizer)
   'highway.visualizerQuality': (v) => { vizDriver.quality = { high: 1, medium: 0.6, low: 0.4 }[v] ?? 0.6; },
   'highway.visualizerFps': (v) => { vizFps = v === 'unlimited' ? Infinity : Math.max(1, Number(v) || 60); highway.invalidate(); },
   'highway.visualizerOpacity': () => { applyVizOpacity(); syncVizPop(); },
@@ -3622,7 +3683,7 @@ const EFFECTS = {
   'highway.sustainWidth': (v) => { highway.sustainWidth = v / 100; },
   'highway.kickBarHeight': (v) => { highway.kickBar = v / 100; },
   'highway.padLook': (v) => { highway.padLook = v / 100; },
-  'highway.heldPulse': (v) => { highway.heldMotion = !!v; },
+  'highway.heldPulse': () => { highway.heldMotion = effective.heldPulse; },
   'playback.keepAwake': () => syncPlayButton(),
   'highway.leftHanded': (v) => { highway.leftHanded = !!v; },
   'highway.fast3dNotes': (v) => { setFast3dNotes(v); highway.invalidate(); },
@@ -3694,6 +3755,7 @@ const settingsPage = mountSettings({
     }),
   },
 });
+syncQualityStatus(); // (the status line under the adaptive quality setting)
 attachScrollThumb(document.querySelector('#settingsPage .sp-content')); // the same slim thumb as the details
 
 // ---------- Deep links (src/deeplink.js; initDeepLinks is called near the top) ----------

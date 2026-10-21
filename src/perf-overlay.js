@@ -4,7 +4,7 @@ export const PERF_MODES = ['off', 'compact', 'detailed'];
 export const PERF_POSITIONS = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
 const UPDATE_MS = 250;
 
-export function createPerfOverlay({ stage, meter, probes, onCycle }) {
+export function createPerfOverlay({ stage, meter, probes, onCycle, quality }) {
   const el = document.createElement('div');
   el.className = 'perf-overlay';
   el.hidden = true;
@@ -48,7 +48,8 @@ export function createPerfOverlay({ stage, meter, probes, onCycle }) {
 
   function paint(now) {
     const s = meter.stats();
-    fpsEl.textContent = `${Math.round(s.fps)} FPS`;
+    const q = quality?.(); // (the adaptive quality level while it is lowered, e.g. Q-2)
+    fpsEl.textContent = `${Math.round(s.fps)} FPS${q ? ` ${q}` : ''}`;
     fpsEl.style.color = color(s.fps);
     if (mode !== 'detailed') return;
     paintGraph(meter.series());
@@ -59,6 +60,7 @@ export function createPerfOverlay({ stage, meter, probes, onCycle }) {
       `dropped ${s.dropped} / ${s.samples} frames   long tasks ${longTasks}`,
       `music clock jitter  max ${s.clockMax.toFixed(1)} ms  rms ${s.clockRms.toFixed(1)} ms`,
       `canvas ${p.canvas}  dpr ${p.dpr}`,
+      `quality ${p.quality}`,
       `panes ${p.panes}${p.notes != null ? `  notes ${p.notes}` : ''}`,
     ];
     if (p.heap) lines.push(`heap   ${p.heap}`);

@@ -119,6 +119,7 @@ export function mountSettings({ root, frame, settings, sections, renderers = {},
         : el('div', { class: 'sp-row' }, text, el('span', { class: 'sp-ctl' }, control(item), resetButton(item)));
     }
     row.dataset.search = `${item.label} ${item.help ?? ''} ${item.keywords ?? ''} ${item.group ?? ''} ${section.title}`.toLowerCase(); // (the group and section titles match too)
+    row.dataset.id = item.id; // (app.js adds live status lines to a few rows)
     if (item.when) visibility.push({ row, item });
     return row;
   }

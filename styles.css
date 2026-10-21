@@ -814,6 +814,8 @@ body.settings-open { overflow: hidden; }
 .sp-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .sp-text b { font-weight: 600; font-size: 14px; }
 .sp-text small { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.sp-text small.perf-status { color: var(--text); font-weight: 600; }
+.sp-text small.perf-status[hidden] { display: none; }
 .sp-ctl { display: flex; align-items: center; gap: 8px; flex: none; }
 .sp-row.sp-off { opacity: .45; }
 .sp-reset:disabled { opacity: .3; cursor: default; }
