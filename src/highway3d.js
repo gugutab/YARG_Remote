@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, NOTE_RECT_W, NOTE_RECT_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, HIT_LINE_COLOR, HIT_LINE_BORDER, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, DISABLED_FILTER, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, HIT_LINE_COLOR, HIT_LINE_BORDER, HIT_LINE_BORDER_SOFT, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor
 } from './gfx.js';
 
@@ -336,10 +336,13 @@ export function renderLanes3D(hw, t, w, h) {
   if (hw.hitLine) { // a fixed bar across the road at the hit line, as thick as the pedal / open bars, in the colour of each lane (it lights when a note is hit), with a fixed border at each end; the pads are not drawn
     for (let i = 0; i < lanes; i++) {
       g.fillStyle = tintWhite(colors[i], 0.3 + 0.45 * Math.max(flash[i], barFlash)); // the note's colour under a white overlay (whiter while the lane is hit)
-      quad(g, -barDepth / 2, barDepth / 2, -half + i, -half + i + 1);
+      quad(g, -barDepth / 2, barDepth / 2, -half + i - (i === 0 ? FILL_BORDER_LANES : 0), -half + i + 1 + (i === lanes - 1 ? FILL_BORDER_LANES : 0)); // (the first and last segments reach the walls of the board)
       g.fill();
     }
-    g.fillStyle = HIT_LINE_BORDER;
+    // the end indicators pass over the coloured bar, a little transparent, in the colour of the open notes or the pedal when the chart has them (white otherwise)
+    const hasOpen = (chart.hasOpen ??= chart.notes.some((n) => n.open));
+    const edge = chart.drumKind ? (chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick) : hasOpen ? NOTE_PALETTE.open : null;
+    g.fillStyle = edge ? withAlpha(edge, 0.8) : HIT_LINE_BORDER_SOFT;
     quad(g, -barDepth / 2, barDepth / 2, -half - FILL_BORDER_LANES, -half + FILL_BORDER_LANES * 0.4); // (the borders are exactly as deep as the bar)
     g.fill();
     quad(g, -barDepth / 2, barDepth / 2, half - FILL_BORDER_LANES * 0.4, half + FILL_BORDER_LANES);

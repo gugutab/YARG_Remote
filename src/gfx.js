@@ -34,6 +34,7 @@ export const BAND_BORDERS = { // the side borders of the other overlay bands (se
 };
 export const HIT_LINE_COLOR = 'rgba(255,255,255,0.24)'; // the fixed bar at the hit line (setting highway.hitLine), as thick as the pedal / open bars
 export const HIT_LINE_BORDER = 'rgba(255,255,255,0.95)'; // and its fixed borders at both ends
+export const HIT_LINE_BORDER_SOFT = 'rgba(255,255,255,0.8)'; // the 3D ones, over the coloured bar (a little transparent)
 export const FILL_BORDER = 'rgba(90,240,130,0.95)'; // the green side borders of the fretboard along a fill (thicker than the normal board edge)
 export const FILL_BORDER_PX = 5; // 2D width
 export const FILL_BORDER_LANES = 0.09; // 3D width, in lane units (scaled by the perspective)
