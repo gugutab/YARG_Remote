@@ -107,7 +107,7 @@ export function drawBarBurst(g, cx, y, halfW, halfH, color, k, seed, spark) {
     g.fillStyle = tintWhite(color, 0.5);
     g.globalAlpha = 0.36 * env * env;
     g.beginPath();
-    g.roundRect(cx - halfW, y - halfH * 1.3, 2 * halfW, 2 * halfH * 1.3, halfH);
+    g.roundRect(cx - halfW, y - halfH * 1.1, 2 * halfW, 2 * halfH * 1.1, halfH);
     g.fill();
   }
   // two rectangular ripples (the second one a little later): the bar's own outline growing in depth, thinning and fading
@@ -116,9 +116,9 @@ export function drawBarBurst(g, cx, y, halfW, halfH, color, k, seed, spark) {
     const kr = k - r * 0.14;
     if (kr <= 0) continue;
     const er = burstEase(Math.min(1, kr / (1 - r * 0.14)));
-    const rh = halfH * (1 + 7 * er), rw = halfW * (1 + 0.05 * er);
+    const rh = halfH * (1 + 2 * er), rw = halfW * (1 + 0.04 * er); // (tight on the hit area: the ripples hug the bar)
     g.beginPath();
-    g.roundRect(cx - rw, y - rh, 2 * rw, 2 * rh, Math.min(rh, 18));
+    g.roundRect(cx - rw, y - rh, 2 * rw, 2 * rh, Math.min(rh, 10));
     g.lineWidth = Math.max(0.8, halfH * 0.5 * (1 - kr));
     g.globalAlpha = Math.min(1, (r ? 0.7 : 1.05) * (1 - kr) * (1 - kr));
     g.stroke();
@@ -131,12 +131,12 @@ export function drawBarBurst(g, cx, y, halfW, halfH, color, k, seed, spark) {
     const r = ((base * 29 + i * 53) % 100) / 100;
     const sx = cx + (((i + 0.5 + (r - 0.5) * 0.6) / BAR_SPARKS) * 2 - 1) * halfW * 0.95;
     const lean = ((sx - cx) / halfW) * 0.35 + (r - 0.5) * 0.25; // outward lean (radians from straight up)
-    const reach = spark * (1.2 + 1.6 * r) * e;
-    const tail = spark * (0.4 + 0.7 * r) * (1 - e * 0.5);
+    const reach = spark * (0.9 + 1.0 * r) * e; // (short sparks: they stay close above the bar)
+    const tail = spark * (0.3 + 0.4 * r) * (1 - e * 0.5);
     const c = Math.sin(lean), s = -Math.cos(lean);
     g.beginPath();
-    g.moveTo(sx + c * Math.max(0, reach - tail), y + s * Math.max(0, reach - tail) * 0.62);
-    g.lineTo(sx + c * reach, y + s * reach * 0.62);
+    g.moveTo(sx + c * Math.max(0, reach - tail), y + s * Math.max(0, reach - tail) * 0.4);
+    g.lineTo(sx + c * reach, y + s * reach * 0.4);
     g.lineWidth = Math.max(0.8, spark * 0.12 * (1 - k));
     g.globalAlpha = Math.min(1, 1.1 * fade);
     g.stroke();
