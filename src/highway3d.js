@@ -115,26 +115,27 @@ function fillBand3D(g, spans, color, xl, xr, roadW) {
     if ((end - PT) / PSEC < ROAD_NEAR || s.start > PT + PSEC) continue;
     const fadeSec = Math.min(0.25, (end - s.start) * 0.2);
     const d0 = (s.start - PT) / PSEC, d1 = (end - PT) / PSEC, f = fadeSec / PSEC;
-    const piece = (a, b, k, col = color) => { // [a, b] in depth, clamped to the road, at k of the band's alpha
+    const piece = (a, b, k, col, bx0, bx1) => { // [a, b] in depth, clamped to the road, at k of the band's alpha, over the lane range bx0..bx1
       const lo = Math.max(ROAD_NEAR, a);
       if (b <= lo) return;
       g.globalAlpha *= k;
       g.fillStyle = col;
-      quad(g, lo, b, xl, xr);
+      quad(g, lo, b, bx0, bx1);
       g.fill();
       g.globalAlpha /= k;
     };
-    piece(d0 + f, d1, 1); // (the far end, where the activation note is, stays full: only the start fades in)
+    const band = (col, bx0, bx1) => { // the far end, where the activation note is, stays full: only the start fades in (the same fade for the base and for the lead-up column)
+      piece(d0 + f, d1, 1, col, bx0, bx1);
+      for (let k = 0; k < STEPS; k++) {
+        const w = f / STEPS, a = (k + 1) / (STEPS + 1);
+        piece(d0 + k * w, d0 + (k + 1) * w, a, col, bx0, bx1);
+      }
+    };
+    band(color, xl, xr);
     if (s.activationLane !== undefined) { // the lead-up: a stronger green over the column of the final note, along the whole fill (every column for the kick)
       const lanes = xr - xl;
-      const lx0 = s.activationLane >= 0 && s.activationLane < lanes ? xl + s.activationLane : xl;
-      const lx1 = s.activationLane >= 0 && s.activationLane < lanes ? lx0 + 1 : xr;
-      const lo = Math.max(ROAD_NEAR, d0);
-      if (d1 > lo) { g.fillStyle = FILL_STRONG; quad(g, lo, d1, lx0, lx1); g.fill(); }
-    }
-    for (let k = 0; k < STEPS; k++) {
-      const w = f / STEPS, a = (k + 1) / (STEPS + 1);
-      piece(d0 + k * w, d0 + (k + 1) * w, a);
+      const inside = s.activationLane >= 0 && s.activationLane < lanes;
+      band(FILL_STRONG, inside ? xl + s.activationLane : xl, inside ? xl + s.activationLane + 1 : xr);
     }
     g.fillStyle = FILL_EDGE;
     for (const dd of [d0, d1]) {

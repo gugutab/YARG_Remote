@@ -2055,9 +2055,13 @@ export class Highway {
       g.fillRect(x0, top, width, len);
       if (s.activationLane !== undefined) { // the lead-up: a stronger green over the column of the final note, along the whole fill (every column for the kick)
         const lanes = this.chart.lanes, lw = width / lanes;
-        g.fillStyle = FILL_STRONG;
-        if (s.activationLane >= 0 && s.activationLane < lanes) g.fillRect(x0 + s.activationLane * lw, top, lw, len);
-        else g.fillRect(x0, top, width, len);
+        const inside = s.activationLane >= 0 && s.activationLane < lanes;
+        const sg = g.createLinearGradient(0, top, 0, bottom); // (the same fade-in at the start as the base band: both begin together)
+        sg.addColorStop(0, FILL_STRONG);
+        sg.addColorStop(1 - fade, FILL_STRONG);
+        sg.addColorStop(1, 'rgba(40,200,90,0)');
+        g.fillStyle = sg;
+        g.fillRect(inside ? x0 + s.activationLane * lw : x0, top, inside ? lw : width, len);
       }
       g.fillStyle = FILL_EDGE;
       g.fillRect(x0, top - 1, width, 2);
