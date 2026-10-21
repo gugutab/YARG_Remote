@@ -3025,9 +3025,11 @@ function barMax() {
 }
 let barPeek = false; // the full bar is shown over the stage for a moment (only while the chosen height is the minimum)
 let barHeight = null; // px; null = full height (follows the maximum when the window changes)
+let peekMuted = false; // the user just closed the bar by hand: the peek waits until the mouse has been still for a moment
 function setBarHeight(h, persist = true) {
   const max = barMax();
   const v = h == null ? max : clampHeight(h, max);
+  if (persist && v <= BAR_MIN) peekMuted = true;
   barHeight = v >= max ? null : v;
   if (v > BAR_MIN) barPeek = false;
   const vis = barPeek ? max : v; // what is on screen; the layout (the stage) follows v
@@ -3099,9 +3101,11 @@ const toggleBar = () => setBarHeight(currentBarHeight() > BAR_MIN ? BAR_MIN : nu
   // inactivity closes it again. Mouse movement or an upward swipe starts it; keys, wheel and touches keep it open.
   const peekCan = () => currentBarHeight() <= BAR_MIN && prefs.get('ui.barPeek') !== false && !els.app.classList.contains('stage-unborn')
     && !(els.app.classList.contains('immersive') && els.app.classList.contains('idle')); // (an idle-hidden bar stays hidden)
+  let peekClosedAt = 0; // (when the peek last closed)
   const peekSet = (on) => {
     if (barPeek === on) return;
     barPeek = on;
+    if (!on) peekClosedAt = performance.now();
     els.app.classList.add('bar-ease');
     setTimeout(() => els.app.classList.remove('bar-ease'), 300);
     setBarHeight(barHeight, false);
@@ -3115,8 +3119,22 @@ const toggleBar = () => setBarHeight(currentBarHeight() > BAR_MIN ? BAR_MIN : nu
     peekArm();
   };
   let lastMove = 0;
+  let lastRealMove = 0;
+  let lastX = -1, lastY = -1;
   document.addEventListener('pointermove', (e) => {
-    if (e.pointerType !== 'mouse' || e.timeStamp - lastMove < 80) return;
+    if (e.pointerType !== 'mouse') return;
+    // the browser repeats a mouse move at the same spot when the layout changes under a still pointer (e.g. the bar closing): only a real movement
+    // (a few px) opens the peek, and never in the instant after it closed
+    const moved = Math.hypot(e.clientX - lastX, e.clientY - lastY);
+    lastX = e.clientX;
+    lastY = e.clientY;
+    if (peekMuted) { // closed by hand (a drag, a key, a double click): the mouse is still moving; wait for a pause of 600 ms before a move opens it again
+      if (e.timeStamp - lastRealMove < 600) { lastRealMove = e.timeStamp; return; }
+      peekMuted = false;
+    }
+    lastRealMove = e.timeStamp;
+    if (e.timeStamp - lastMove < 80) return;
+    if (!barPeek && (moved < 6 || e.timeStamp - peekClosedAt < 500)) return;
     lastMove = e.timeStamp;
     peekActivity(true);
   }, { passive: true });
