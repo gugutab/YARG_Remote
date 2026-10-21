@@ -256,19 +256,6 @@ export function drawActivationMark(g, cx, cy, rx, ry, lw, t) {
   g.lineWidth = 2 * lw;
   g.strokeStyle = '#ffffff';
   g.stroke();
-  // star: four points, centred above the ring
-  const sr = Math.max(rx * 0.3, 3), sy = cy - ry * 1.3 - sr * 0.8;
-  g.beginPath();
-  for (let i = 0; i < 8; i++) {
-    const a = (i * Math.PI) / 4 - Math.PI / 2, r = i % 2 === 0 ? sr : sr * 0.38;
-    g.lineTo(cx + Math.cos(a) * r, sy + Math.sin(a) * r);
-  }
-  g.closePath();
-  g.fillStyle = '#ffffff';
-  g.fill();
-  g.lineWidth = 1.5 * lw;
-  g.strokeStyle = FILL_ACTIVATION;
-  g.stroke();
 }
 export const HIT_FLASH_SEC = 0.14; // how long a hit pad stays lit after a note hit
 export const BAR_FLASH_SEC = 0.24; // ... after a pedal or open hit (it lights every pad)

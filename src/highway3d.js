@@ -111,9 +111,10 @@ function fillBand3D(g, spans, color, xl, xr, roadW) {
   const STEPS = 4;
   for (let i = 0; i < spans.length; i++) {
     const s = spans[i];
-    if ((s.end - PT) / PSEC < ROAD_NEAR || s.start > PT + PSEC) continue;
-    const fadeSec = Math.min(0.25, (s.end - s.start) * 0.2);
-    const d0 = (s.start - PT) / PSEC, d1 = (s.end - PT) / PSEC, f = fadeSec / PSEC;
+    const end = s.bandEnd ?? s.end; // (to the activation note when there is one)
+    if ((end - PT) / PSEC < ROAD_NEAR || s.start > PT + PSEC) continue;
+    const fadeSec = Math.min(0.25, (end - s.start) * 0.2);
+    const d0 = (s.start - PT) / PSEC, d1 = (end - PT) / PSEC, f = fadeSec / PSEC;
     const piece = (a, b, k) => { // [a, b] in depth, clamped to the road, at k of the band's alpha
       const lo = Math.max(ROAD_NEAR, a);
       if (b <= lo) return;

@@ -2041,7 +2041,7 @@ export class Highway {
     for (let i = 0; i < spans.length; i++) {
       const s = spans[i];
       if (s.start > t + ahead) continue;
-      const top = laneY(s.end);
+      const top = laneY(s.bandEnd ?? s.end); // (to the activation note when there is one)
       const bottom = laneY(s.start);
       if (top > h || bottom < 0) continue;
       const len = bottom - top;
