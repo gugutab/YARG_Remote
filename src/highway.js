@@ -18,8 +18,6 @@ import {
   ROLL_COLORS,
   FILL_COLORS,
   FILL_STRONG,
-  FILL_LEAD,
-  FILL_LEAD_SEC,
   FILL_EDGE,
   FILL_ACTIVATION,
   drawActivationMark,
@@ -2043,33 +2041,17 @@ export class Highway {
     const g = this.g;
     for (let i = 0; i < spans.length; i++) {
       const s = spans[i];
-      if (s.start - FILL_LEAD_SEC > t + ahead) continue;
+      if (s.start > t + ahead) continue;
       const top = laneY(s.bandEnd ?? s.end); // (to the activation note when there is one)
       const bottom = laneY(s.start);
-      if (s.activationLane !== undefined) { // the lead-up before the fill: the lane of the final note (every lane for the kick) is already marked, flat, from FILL_LEAD_SEC before the start
-        const lanes = this.chart.lanes, lw = width / lanes;
-        const inside = s.activationLane >= 0 && s.activationLane < lanes;
-        const yl = laneY(s.start - FILL_LEAD_SEC);
-        g.fillStyle = FILL_LEAD;
-        g.fillRect(inside ? x0 + s.activationLane * lw : x0, bottom, inside ? lw : width, Math.max(0, yl - bottom));
-      }
       if (top > h || bottom < 0) continue;
       const len = bottom - top;
-      const fade = Math.min(0.18, 28 / Math.max(1, len));
-      const grad = g.createLinearGradient(0, top, 0, bottom);
-      grad.addColorStop(0, color); // (the far end, where the activation note is, stays full: only the start fades in)
-      grad.addColorStop(1 - fade, color);
-      grad.addColorStop(1, 'rgba(40,200,90,0)');
-      g.fillStyle = grad;
+      g.fillStyle = color; // (hard edges at both ends: the band is visible in full as soon as it comes in, no fade)
       g.fillRect(x0, top, width, len);
       if (s.activationLane !== undefined) { // the lead-up: a stronger green over the column of the final note, along the whole fill (every column for the kick)
         const lanes = this.chart.lanes, lw = width / lanes;
         const inside = s.activationLane >= 0 && s.activationLane < lanes;
-        const sg = g.createLinearGradient(0, top, 0, bottom); // (the same fade-in at the start as the base band: both begin together)
-        sg.addColorStop(0, FILL_STRONG);
-        sg.addColorStop(1 - fade, FILL_STRONG);
-        sg.addColorStop(1, 'rgba(40,200,90,0)');
-        g.fillStyle = sg;
+        g.fillStyle = FILL_STRONG;
         g.fillRect(inside ? x0 + s.activationLane * lw : x0, top, inside ? lw : width, len);
       }
       g.fillStyle = FILL_EDGE;
