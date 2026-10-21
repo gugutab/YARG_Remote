@@ -338,9 +338,9 @@ export function renderLanes3D(hw, t, w, h) {
     quad(g, -barDepth / 2, barDepth / 2, -half, half);
     g.fill();
     g.fillStyle = HIT_LINE_BORDER;
-    quad(g, -barDepth * 0.9, barDepth * 0.9, -half - FILL_BORDER_LANES, -half + FILL_BORDER_LANES * 0.4);
+    quad(g, -barDepth / 2, barDepth / 2, -half - FILL_BORDER_LANES, -half + FILL_BORDER_LANES * 0.4); // (the borders are exactly as deep as the bar)
     g.fill();
-    quad(g, -barDepth * 0.9, barDepth * 0.9, half - FILL_BORDER_LANES * 0.4, half + FILL_BORDER_LANES);
+    quad(g, -barDepth / 2, barDepth / 2, half - FILL_BORDER_LANES * 0.4, half + FILL_BORDER_LANES);
     g.fill();
   }
   // (the pads mark the spot; a pedal hit lights every pad)

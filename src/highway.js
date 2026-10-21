@@ -1465,8 +1465,8 @@ export class Highway {
       g.fillStyle = HIT_LINE_COLOR;
       g.fillRect(x0, hitY - barH / 2, laneW * chart.lanes, barH);
       g.fillStyle = HIT_LINE_BORDER;
-      g.fillRect(x0, hitY - barH / 2 - 4, FILL_BORDER_PX, barH + 8);
-      g.fillRect(x0 + laneW * chart.lanes - FILL_BORDER_PX, hitY - barH / 2 - 4, FILL_BORDER_PX, barH + 8);
+      g.fillRect(x0, hitY - barH / 2, FILL_BORDER_PX, barH); // (the borders are exactly as tall as the bar)
+      g.fillRect(x0 + laneW * chart.lanes - FILL_BORDER_PX, hitY - barH / 2, FILL_BORDER_PX, barH);
     }
 
     // sustains first, then heads
