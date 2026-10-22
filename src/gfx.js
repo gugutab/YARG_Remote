@@ -756,7 +756,7 @@ export function rebuildYNote(cut = YNOTE_CUT) {
   { // a bar along the top of the coloured part, between the caps (the accent's stronger, the ghost's weaker tone) with a feathered edge: concentric copies, each larger and fainter
     const bh0 = Math.max(9, (89 - YT) * 0.38);
     YN_TOP_BAR = YN_BAR_FEATHER.map(([grow, alpha]) => {
-      const bx0 = XI + 3.5 - grow, bx1 = 220 - XI - 3.5 + grow, by0 = YT + 7 - grow, bh = bh0 + 2 * grow, r = Math.min(2.2, bh0 * 0.22) + grow * 0.9, kc = 0.5523 * r; // (small corners, a little rounder as the copy grows; kc: the cubic's handle for a quarter circle)
+      const bx0 = XI + 3.5 - grow, bx1 = 220 - XI - 3.5 + grow, by0 = YT - grow, bh = bh0 + 2 * grow, r = Math.min(2.2, bh0 * 0.22) + grow * 0.9, kc = 0.5523 * r; // (small corners, a little rounder as the copy grows; kc: the cubic's handle for a quarter circle)
       return { alpha, poly: sampleDesign([bx0 + r, by0], [[bx1 - r, by0], [bx1 - r + kc, by0, bx1, by0 + r - kc, bx1, by0 + r], [bx1, by0 + bh - r], [bx1, by0 + bh - r + kc, bx1 - r + kc, by0 + bh, bx1 - r, by0 + bh], [bx0 + r, by0 + bh], [bx0 + r - kc, by0 + bh, bx0, by0 + bh - r + kc, bx0, by0 + bh - r], [bx0, by0 + r], [bx0, by0 + r - kc, bx0 + r - kc, by0, bx0 + r, by0]]) };
     });
   }
@@ -1111,6 +1111,10 @@ function drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side) 
     // (on a star power note the bar is the plain lane colour's tone and the star power tint of the body is drawn over it afterwards, as an overlay: ONE pass over the
     // largest copy at a fixed opacity, so the wash is the same everywhere on the bar; stacking the copies would cover its centre and leave only its edge showing)
     const a0 = g.globalAlpha;
+    g.save(); // (the bar sits on the note's top edge: what the feather would spill outside the note is clipped)
+    g.beginPath();
+    traceYN(g, YN_BODY, 1, k, side);
+    g.clip();
     g.fillStyle = bodyGradient(g, toneColor(n.sp ? laneColor : bodyColor, !n.ghost));
     for (const { alpha, poly } of YN_TOP_BAR) {
       g.beginPath();
@@ -1125,6 +1129,7 @@ function drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side) 
       g.globalAlpha = a0 * SP_BAR_OVERLAY;
       g.fill();
     }
+    g.restore();
     g.globalAlpha = a0;
   }
   g.beginPath();
