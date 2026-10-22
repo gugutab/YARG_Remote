@@ -61,6 +61,7 @@ export function adaptiveEffects(level) {
     vizFactor: level >= 2 ? 0.5 : 1, // the visualizer's own resolution (its quality setting), halved
     dprCap: level >= 4 ? 1 : level >= 3 ? 1.5 : Infinity,
     vizOff: level >= 5,
+    wavePoints: level >= 1 ? 3 : 5, // sample points per wave of a swelling held tail (3D flow tails)
   };
 }
 

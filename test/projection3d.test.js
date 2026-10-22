@@ -72,3 +72,12 @@ test('flow chevrons: periodic, deterministic and running towards the hit line', 
     assert.ok(Math.abs(flowPulseAt(1, t) - flowPulseAt(0, t) - FLOW_SPACING) < 1e-9);
   }
 });
+
+test('waveSegments: about 5 points per wave, fewer on a short or economical tail, never fewer than the plain taper', async () => {
+  const { waveSegments, tailSegments, WAVE_LEN } = await import('../src/highway3d.js');
+  assert.equal(waveSegments(600, false, WAVE_LEN * 2), 10); // two waves, 5 points each
+  assert.equal(waveSegments(600, false, WAVE_LEN * 2, 3), 6);
+  assert.equal(waveSegments(6000, false, WAVE_LEN * 20), 30); // capped
+  assert.equal(waveSegments(30, false, WAVE_LEN * 4), 10); // 30 px on screen: one point per 3 px
+  for (let px = 1; px < 600; px += 17) assert.ok(waveSegments(px, true, 2) >= tailSegments(px, true));
+});

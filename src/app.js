@@ -244,6 +244,7 @@ function applyQuality() {
   qfx = adaptiveEffects(adaptive.level);
   setQualityInputs({ scale: prefs.get('perf.renderScale'), economy: economyOn, adaptiveCap: qfx.dprCap });
   highway.heldMotion = effective.heldPulse;
+  highway.tailWavePoints = qfx.wavePoints;
   applyVisualizer();
   syncQualityStatus();
   highway.invalidate(); // (the canvases take the new resolution on the next draw)

@@ -57,12 +57,13 @@ test('resolveDpr: Auto keeps the old min(dpr, 2); fixed choices cap it; economy 
 });
 
 test('adaptiveEffects: each level keeps the cuts of the ones before', () => {
-  assert.deepEqual(adaptiveEffects(0), { blurMax: Infinity, vizFactor: 1, dprCap: Infinity, vizOff: false });
+  assert.deepEqual(adaptiveEffects(0), { blurMax: Infinity, vizFactor: 1, dprCap: Infinity, vizOff: false, wavePoints: 5 });
   assert.equal(adaptiveEffects(1).blurMax, 3);
+  assert.equal(adaptiveEffects(1).wavePoints, 3);
   assert.equal(adaptiveEffects(2).vizFactor, 0.5);
   assert.equal(adaptiveEffects(3).dprCap, 1.5);
   assert.equal(adaptiveEffects(4).dprCap, 1);
-  assert.deepEqual(adaptiveEffects(ADAPTIVE_MAX), { blurMax: 3, vizFactor: 0.5, dprCap: 1, vizOff: true });
+  assert.deepEqual(adaptiveEffects(ADAPTIVE_MAX), { blurMax: 3, vizFactor: 0.5, dprCap: 1, vizOff: true, wavePoints: 3 });
   assert.equal(adaptiveBudget(0), 1000 / 60);
   assert.equal(adaptiveBudget(30), 1000 / 30);
   assert.equal(adaptiveBudget(90), 1000 / 60); // never chases more than 60 fps

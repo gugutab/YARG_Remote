@@ -218,30 +218,27 @@ export const WAVE_AMP = 0.26; // at full held amount the width swings by +- this
 export const waveFactor = (ahead, t, amp = WAVE_AMP) => 1 + amp * Math.sin(2 * Math.PI * (ahead / WAVE_LEN - t / WAVE_PERIOD));
 // Segments of one side of a flow tail `lenPx` pixels long on screen: a straight road needs few (the taper is the only bend), a curved one one more.
 export const tailSegments = (lenPx, curved) => Math.max(1, Math.min(6, Math.ceil(lenPx / 90) + (curved ? 1 : 0)));
+// Segments of a swelling (held) tail: about `points` per wave (5 at full quality), capped at 30, and never denser than one per 3 px of the
+// tail on screen (a short tail's waves are too small to see; the cap only bites below 90 px).
+export const waveSegments = (lenPx, curved, spanSec, points = 5) => Math.min(30, Math.max(tailSegments(lenPx, curved), Math.min(Math.ceil((spanSec / WAVE_LEN) * points), Math.ceil(lenPx / 3))));
 // The visible flow tails of the frame (columns, reused): depths, centre and half width in lane units, segments, tip, body fill, amount held
-const FT = { n: 0, d0: [], d1: [], mid: [], wl: [], segs: [], tip: [], body: [], amt: [], col: [], wave: [] };
+const FT = { n: 0, d0: [], d1: [], mid: [], wl: [], segs: [], tip: [], body: [], amt: [], col: [], wave: [], off: [] };
 const FT_BODIES = []; // the distinct body fills of the frame
 // One flow tail outline as a subpath of the current path (no beginPath): the tapered sides sampled closer together near the base, where
 // both the width and the screen position change fastest, and a rounded tip when `tip`.
-function flowStrip(g, d0, d1, mid, wl, segs, tip, wave = 0, wt = 0) {
-  const right = TAIL_RIGHT;
-  const sRef = 1 / (1 + PK * d0);
+function flowStrip(g, k, mult, waveMul = 1) {
+  const ft = FT, right = FLOW_RIGHT, o = ft.off[k], segs = ft.segs[k], wl = ft.wl[k] * mult, wave = ft.wave[k] * waveMul;
   let halfPx = 0, xe = 0, ye = 0;
   for (let i = 0; i <= segs; i++) {
-    const u = i / segs;
-    const d = d0 + (d1 - d0) * (wave > 0 ? u : u * u); // (a swelling tail is sampled evenly: the waves need the points)
-    const sc = 1 / (1 + PK * d);
-    const halfW = wl * (TAIL_MIN_WIDTH + (1 - TAIL_MIN_WIDTH) * (sc / sRef) ** TAIL_TAPER_POWER) * (wave > 0 ? waveFactor((d - d0) * PSEC, wt, wave) : 1); // (tailFactor, and the wave of a held tail)
-    const y = PVY + (PHIT - PVY) * sc + (d > 0 ? PC * d * d : 0);
-    const xm = PCX + mid * PLANE * sc;
-    halfPx = halfW * PLANE * sc;
+    halfPx = wl * SMP_W[o + i] * (wave > 0 ? 1 + wave * SMP_S[o + i] : 1); // (tailFactor, and the wave of a held tail)
+    const xm = SMP_X[o + i], y = SMP_Y[o + i];
     if (i === 0) g.moveTo(xm - halfPx, y);
     else g.lineTo(xm - halfPx, y);
     right[2 * i] = xm + halfPx;
     right[2 * i + 1] = y;
     xe = xm; ye = y;
   }
-  if (tip) {
+  if (ft.tip[k]) {
     const ty = halfPx * FLOW_TIP;
     g.lineTo(xe - 0.7 * halfPx, ye - 0.7 * ty);
     g.lineTo(xe, ye - ty);
@@ -249,6 +246,30 @@ function flowStrip(g, d0, d1, mid, wl, segs, tip, wave = 0, wt = 0) {
   }
   for (let i = segs; i >= 0; i--) g.lineTo(right[2 * i], right[2 * i + 1]);
   g.closePath();
+}
+// The sample points of tail k, computed once per frame and shared by the halo, body, core and spine strips (they differ only in width and
+// wave amplitude): centre x, y, the unit half width in pixels (taper and perspective) and the wave's sine.
+const FLOW_RIGHT = new Float64Array(2 * 32); // scratch for the right side (segs <= 30)
+let SMP_X = new Float64Array(256), SMP_Y = new Float64Array(256), SMP_W = new Float64Array(256), SMP_S = new Float64Array(256);
+function sampleFlowTail(k, off, t) {
+  const ft = FT, segs = ft.segs[k], d0 = ft.d0[k], d1 = ft.d1[k], mid = ft.mid[k], wave = ft.wave[k];
+  if (off + segs + 1 > SMP_X.length) { // (grow: rare)
+    const n = Math.max(SMP_X.length * 2, off + segs + 1);
+    const grow = (a) => { const b = new Float64Array(n); b.set(a); return b; };
+    SMP_X = grow(SMP_X); SMP_Y = grow(SMP_Y); SMP_W = grow(SMP_W); SMP_S = grow(SMP_S);
+  }
+  ft.off[k] = off;
+  const sRef = 1 / (1 + PK * d0);
+  for (let i = 0; i <= segs; i++) {
+    const u = i / segs;
+    const d = d0 + (d1 - d0) * (wave > 0 ? u : u * u); // (a swelling tail is sampled evenly: the waves need the points)
+    const sc = 1 / (1 + PK * d);
+    SMP_W[off + i] = (TAIL_MIN_WIDTH + (1 - TAIL_MIN_WIDTH) * (sc / sRef) ** TAIL_TAPER_POWER) * PLANE * sc;
+    SMP_S[off + i] = wave > 0 ? Math.sin(2 * Math.PI * ((d - d0) * PSEC / WAVE_LEN - t / WAVE_PERIOD)) : 0;
+    SMP_Y[off + i] = PVY + (PHIT - PVY) * sc + (d > 0 ? PC * d * d : 0);
+    SMP_X[off + i] = PCX + mid * PLANE * sc;
+  }
+  return off + segs + 1;
 }
 // Draws the sustains of notes[from .. end) in the flow style. Static tails cost (body colours + 2) fills in all; a held one adds a halo,
 // its chevrons and its contact glow.
@@ -281,7 +302,7 @@ function drawFlowTails(g, hw, notes, from, end, t, colors, half, headR, tailW, w
     ft.mid[k] = n.lane + 0.5 - half;
     ft.wl[k] = headR * noteScale(n) * 0.38 * tailW * (1 + 0.04 * amt); // (HOPO notes are smaller; a held tail is a touch wider, and swells in waves)
     ft.wave[k] = held ? WAVE_AMP * amt : 0; // (the waves stand still-free: they only run while the held motion is on)
-    ft.segs[k] = ft.wave[k] > 0 ? Math.min(30, Math.max(tailSegments(lenPx, curved), Math.ceil(((dTop - dBot) * PSEC / WAVE_LEN) * 5))) : tailSegments(lenPx, curved); // (about 5 points per wave)
+    ft.segs[k] = ft.wave[k] > 0 ? waveSegments(lenPx, curved, (dTop - dBot) * PSEC, hw.tailWavePoints) : tailSegments(lenPx, curved);
     ft.tip[k] = n.time + n.length <= t + windowSec;
     const body = withAlpha(col, Math.round((0.6 + 0.3 * amt) * 20) / 20); // (bucketed, so held tails batch too)
     ft.body[k] = body;
@@ -291,6 +312,7 @@ function drawFlowTails(g, hw, notes, from, end, t, colors, half, headR, tailW, w
     if (!FT_BODIES.includes(body)) FT_BODIES.push(body);
   }
   if (ft.n === 0) return;
+  for (let k = 0, off = 0; k < ft.n; k++) off = sampleFlowTail(k, off, t);
   setDesaturated(false); // (the body fills were made above, per note; only held tails, never disabled, take a colour below)
   // held: a soft halo under the body
   if (anyHeld) {
@@ -298,7 +320,7 @@ function drawFlowTails(g, hw, notes, from, end, t, colors, half, headR, tailW, w
       if (!(ft.amt[k] > 0)) continue;
       g.fillStyle = withAlpha(ft.col[k], Math.round(0.16 * ft.amt[k] * 100) / 100);
       g.beginPath();
-      flowStrip(g, ft.d0[k], ft.d1[k], ft.mid[k], ft.wl[k] * 1.9, ft.segs[k], ft.tip[k], ft.wave[k], t);
+      flowStrip(g, k, 1.9);
       g.fill();
     }
   }
@@ -307,18 +329,18 @@ function drawFlowTails(g, hw, notes, from, end, t, colors, half, headR, tailW, w
     const body = FT_BODIES[b];
     g.fillStyle = body;
     g.beginPath();
-    for (let k = 0; k < ft.n; k++) if (ft.body[k] === body) flowStrip(g, ft.d0[k], ft.d1[k], ft.mid[k], ft.wl[k], ft.segs[k], ft.tip[k], ft.wave[k], t);
+    for (let k = 0; k < ft.n; k++) if (ft.body[k] === body) flowStrip(g, k, 1);
     g.fill();
   }
   // a lighter core and a bright spine, white over every colour at once
   g.fillStyle = '#ffffff';
   g.globalAlpha = 0.16;
   g.beginPath();
-  for (let k = 0; k < ft.n; k++) flowStrip(g, ft.d0[k], ft.d1[k], ft.mid[k], ft.wl[k] * 0.55, ft.segs[k], ft.tip[k], ft.wave[k], t);
+  for (let k = 0; k < ft.n; k++) flowStrip(g, k, 0.55);
   g.fill();
   g.globalAlpha = 0.42;
   g.beginPath();
-  for (let k = 0; k < ft.n; k++) flowStrip(g, ft.d0[k], ft.d1[k], ft.mid[k], ft.wl[k] * 0.16, ft.segs[k], ft.tip[k], ft.wave[k] * 0.5, t);
+  for (let k = 0; k < ft.n; k++) flowStrip(g, k, 0.16, 0.5);
   g.fill();
   g.globalAlpha = 1;
   if (!anyHeld) return;
