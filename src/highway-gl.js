@@ -55,7 +55,7 @@ export function glUnsupported(hw, chart) {
 
 // ---- shaders ------------------------------------------------------------------------------------------------------------------------------------------------------
 
-const UNIFORMS = `uniform vec2 u_res; uniform float u_hit, u_vy, u_k, u_c, u_cx, u_laneW, u_half, u_t, u_win, u_flip, u_headR, u_end, u_fh, u_padB, u_board;`;
+const UNIFORMS = `uniform vec2 u_res; uniform float u_hit, u_vy, u_k, u_c, u_cx, u_laneW, u_half, u_t, u_win, u_flip, u_headR, u_end, u_fh, u_padB, u_board, u_taper, u_fog, u_relief, u_flow;`;
 const COMMON = `#version 300 es
 precision highp float;
 ${UNIFORMS}
@@ -80,10 +80,25 @@ float edgeFade(float y) {
 const FS_COLOR = `${FS_HEAD}in vec4 v_col; in float v_y; uniform float u_noFade; out vec4 o;
 void main() { float a = v_col.a * (u_noFade > 1.5 ? topFade(v_y) : mix(edgeFade(v_y), 1.0, u_noFade)); o = vec4(v_col.rgb * a, a); } // (u_noFade: 0 the whole fade, 1 none, 2 the far edge only: the dark base reaches the bottom of the pane)`;
 
+// The road in relief (the effect "relief"): the road and lane stripes (the faint white quads) get fine grooves along the lanes, a bevelled plate every half second of the
+// song that scrolls with the notes, and a sheen that slides up the board; all of it only changes how much light the faint quads add.
+const FS_FLAT = `${FS_HEAD}in vec4 v_col; in float v_y; in vec2 v_g; uniform float u_noFade; out vec4 o;
+void main() {
+  float a = v_col.a * (u_noFade > 1.5 ? topFade(v_y) : mix(edgeFade(v_y), 1.0, u_noFade));
+  if (u_relief > 0.0 && u_noFade < 1.5 && v_col.a < 0.06) {
+    float groove = 0.5 + 0.5 * sin(v_g.x * 18.8496);
+    float f = fract((u_t + v_g.y * u_win) / 0.5);
+    float seam = 1.0 - smoothstep(0.0, 0.06, f) * (1.0 - smoothstep(0.94, 1.0, f));
+    float sheen = pow(0.5 + 0.5 * sin(6.2831853 * (v_g.y * 1.5 - u_t * 0.25)), 10.0);
+    a *= 1.0 + u_relief * (0.55 * groove + 0.7 * seam + 1.0 * sheen);
+  }
+  o = vec4(v_col.rgb * a, a);
+}`;
+
 const PROGRAMS = {
   // the road, lane lines and rails (triangles in (lane x, fraction of the depth range) space) and the dark base
-  flat: [`${COMMON}in vec2 a_pos; in vec4 a_col; uniform float u_amul; out vec4 v_col; out float v_y;
-void main() { vec2 px = project(a_pos.x, ${ROAD_NEAR.toFixed(2)} + a_pos.y * (u_end - ${ROAD_NEAR.toFixed(2)})); gl_Position = clipPos(px); v_y = px.y; v_col = vec4(a_col.rgb, a_col.a * u_amul); }`, FS_COLOR],
+  flat: [`${COMMON}in vec2 a_pos; in vec4 a_col; uniform float u_amul; out vec4 v_col; out float v_y; out vec2 v_g;
+void main() { float d = ${ROAD_NEAR.toFixed(2)} + a_pos.y * (u_end - ${ROAD_NEAR.toFixed(2)}); vec2 px = project(a_pos.x, d); gl_Position = clipPos(px); v_y = px.y; v_g = vec2(a_pos.x, d); v_col = vec4(a_col.rgb, a_col.a * u_amul); }`, FS_FLAT],
   // beat and measure lines: one instance each (time, kind)
   beats: [`${COMMON}in vec2 a_b; uniform vec4 u_bc[3]; out vec4 v_col; out float v_y;
 void main() {
@@ -110,7 +125,7 @@ void main() {
   // chevrons: u_mult is the half width factor, u_pass = alpha (-1: the body's 0.6 + 0.3 held), white mix, held only, chevron pass)
   tails: [`${COMMON}in vec4 a_t; in vec4 a_col; uniform float u_mult, u_waveMul, u_tailW; uniform vec4 u_pass;
 const float SEGS = 20.0;
-out vec4 v_col; out float v_ahead, v_l, v_hp, v_pxs, v_left, v_y;
+out vec4 v_col; out float v_ahead, v_l, v_hp, v_pxs, v_left, v_y, v_d;
 void main() {
   int id = gl_VertexID; int nb = 2 * (int(SEGS) + 1);
   float side = ((id & 1) == 0) ? -1.0 : 1.0;
@@ -126,7 +141,9 @@ void main() {
   float sc = scaleAt(d), sRef = scaleAt(dBot);
   float S = sin(6.2831853 * ((d - dBot) * u_win / 0.45 - u_t / 0.6));
   float hp = u_headR * 0.38 * u_tailW * (1.0 + 0.04 * amt) * u_mult * (0.3 + 0.7 * pow(sc / sRef, 3.0)) * u_laneW * sc * (1.0 + 0.26 * amt * u_waveMul * S);
-  vec2 c = project(a_t.z + 0.5 - u_half, d); vec2 pos = vec2(c.x + side * hp, c.y); float lat = side;
+  vec2 c = project(a_t.z + 0.5 - u_half, d); // (the effect "fluid": the tail snakes sideways like a current, more while it is held)
+  c.x += u_flow * (0.15 + 0.85 * amt) * hp * 0.55 * sin(d * u_win * 17.0 - u_t * 6.5 + a_t.z * 2.0) * sin(d * u_win * 6.0 + u_t * 2.3);
+  vec2 pos = vec2(c.x + side * hp, c.y); float lat = side;
   if (isTip) {
     float ty = hp * 1.1; float hh = hp; float dy = 0.0;
     if (tip) { bool r0 = ((id - nb) >> 1) == 0; hh = r0 ? 0.7 * hp : 0.0; dy = r0 ? -0.7 * ty : -ty; }
@@ -134,11 +151,13 @@ void main() {
   }
   gl_Position = dead ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(pos); v_y = pos.y;
   float alpha = u_pass.x < 0.0 ? 0.6 + 0.3 * amt : u_pass.x;
-  v_col = vec4(mix(a_col.rgb, vec3(1.0), u_pass.y), alpha * (u_pass.z > 0.5 ? amt : 1.0));
+  vec3 tcol = mix(a_col.rgb, vec3(1.0), u_pass.y); tcol = mix(tcol, vec3(0.10, 0.14, 0.24), u_fog * 0.55 * d * d);
+  v_col = vec4(tcol, alpha * (u_pass.z > 0.5 ? amt : 1.0)); v_d = d;
   v_ahead = d * u_win; v_l = lat; v_hp = hp; v_pxs = (u_hit - u_vy) * u_k * sc * sc / u_win; v_left = t1 - u_t;
-}`, `${FS_HEAD}in vec4 v_col; in float v_ahead, v_l, v_hp, v_pxs, v_left, v_y; uniform vec4 u_pass; out vec4 o;
+}`, `${FS_HEAD}in vec4 v_col; in float v_ahead, v_l, v_hp, v_pxs, v_left, v_y, v_d; uniform vec4 u_pass; out vec4 o;
 void main() {
   float a = v_col.a * edgeFade(v_y);
+  if (u_pass.w < 0.5) a *= 1.0 + u_flow * 0.5 * sin(v_ahead * 21.0 - u_t * 9.0 + v_l * 1.5); // (energy running up the tail)
   if (u_pass.w > 0.5) { // the chevrons: Vs pointing away from the hit line, one every FLOW_SPACING seconds, running up the tail (FLOW_PERIOD)
     float ph = fract(u_t / 0.1);
     float cn = ceil(v_ahead / 0.18 - ph);
@@ -153,7 +172,7 @@ void main() {
 }`],
   // notes, bars (kick, open) and pads: sprites from the atlas, one instance each (time, lane, uv rect, size factors, length, bar, bar width in lanes, depth offset of a double kick);
   // a pad is lit by its lane's flash. The burst animation: a head shrinks into the line and is gone after 0.1 s (a long note that has arrived is not drawn); a bar thins out and fades.
-  notes: [`${COMMON}in vec4 a0; in vec4 a1; in vec4 a2; uniform float u_pad, u_atlas, u_bar; uniform float u_flash[8]; out vec2 v_uv; out float v_a, v_boost, v_white, v_y;
+  notes: [`${COMMON}in vec4 a0; in vec4 a1; in vec4 a2; uniform float u_pad, u_atlas, u_bar; uniform float u_flash[8]; out vec2 v_uv; out float v_a, v_boost, v_white, v_y, v_d;
 float easeOut(float k) { return 1.0 - (1.0 - k) * (1.0 - k); }
 void main() {
   vec2 c = vec2(float(gl_VertexID & 1), float((gl_VertexID >> 1) & 1));
@@ -165,15 +184,23 @@ void main() {
   float sc = scaleAt(d); vec2 size;
   if (bar) size = vec2(a2.z * u_laneW * sc / 0.955, max(2.0, (u_hit - u_vy) * u_k * sc * sc * u_bar * (1.0 - 0.55 * e)) * ${(CELL_H / 28).toFixed(3)});
   else size = (a1.xy - a0.zw) * u_atlas * (u_laneW * u_headR * sc / ${REF_RX.toFixed(1)}) * a1.zw * (u_pad > 0.5 ? 1.0 : 1.0 - 0.5 * kx);
-  vec2 px = centre + (c - 0.5) * size; gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(px); v_y = px.y;
+  vec2 off = (c - 0.5) * size;
+  if (u_taper > 0.0 && !bar && u_pad < 0.5) { // (the effect "taper": the far edge of a note is narrower than its near edge, as the road is)
+    float dd = 0.5 * size.y / max(1.0, (u_hit - u_vy) * u_k * sc * sc);
+    float ratio = scaleAt(d + (c.y < 0.5 ? dd : -dd)) / sc;
+    off.x *= 1.0 + u_taper * (ratio - 1.0);
+  }
+  vec2 px = centre + off; gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(px); v_y = px.y; v_d = d;
   v_uv = mix(a0.zw, a1.xy, c);
   float far = clamp((1.0 - d) / 0.14, 0.0, 1.0);
   v_a = u_pad > 0.5 ? 1.0 : bar ? far * (1.0 - e * e) : far;
   v_white = bar && past > 0.0 ? 0.85 * (1.0 - min(1.0, kx * 3.0)) : 0.0;
   v_boost = u_pad > 0.5 ? u_flash[int(clamp(a0.y, 0.0, 7.0))] : 0.0;
-}`, `${FS_HEAD}uniform sampler2D u_tex; in vec2 v_uv; in float v_a, v_boost, v_white, v_y; out vec4 o;
+}`, `${FS_HEAD}uniform sampler2D u_tex; in vec2 v_uv; in float v_a, v_boost, v_white, v_y, v_d; out vec4 o;
 void main() {
-  vec4 c = texture(u_tex, v_uv) * v_a * edgeFade(v_y);
+  // the effect "fog": far notes lose focus (a lower mip of the sprite: a cheap depth of field) and take the colour of the air
+  vec4 c = texture(u_tex, v_uv, u_fog * 3.2 * v_d * v_d) * v_a * edgeFade(v_y);
+  c.rgb = mix(c.rgb, vec3(0.10, 0.14, 0.24) * c.a, u_fog * 0.5 * smoothstep(0.1, 1.0, v_d));
   c.rgb = min(c.rgb * (1.0 + v_boost * 1.4) + c.a * v_boost * 0.35, vec3(c.a));
   c.rgb = mix(c.rgb, vec3(c.a), v_white);
   o = c;
@@ -281,6 +308,34 @@ void main() {
     sum += tintW(v_col, 0.4) * (1.0 - smoothstep(w * 0.5 - 0.5, w * 0.5 + 0.5, sd)) * min(1.0, 1.1 * fade);
   }
   o = vec4(sum * edgeFade(v_y), 0.0);
+}`],
+  // the effect "particles": sparks thrown up by every hit and embers rising from a held note, 24 per event, their paths computed in the vertex shader from the event's time
+  // (a hash gives each its direction, speed and life; gravity pulls them back): nothing is stored per particle. Instances = events with a divisor of 24; additive.
+  sparks: [`${COMMON}in vec4 b0; in vec4 b1; uniform float u_span; out vec2 v_p; out float v_k, v_y, v_r; out vec3 v_col;
+float hash(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
+void main() {
+  vec2 c = vec2(float(gl_VertexID & 1), float((gl_VertexID >> 1) & 1));
+  float fi = float(gl_InstanceID % 24);
+  float seed = b0.x * 97.0 + fi * 13.7;
+  float r1 = hash(seed), r2 = hash(seed + 1.3), r3 = hash(seed + 2.9);
+  float life = 0.45 + 0.6 * r3;
+  float past = u_t - b0.x, age, alive;
+  if (b1.w < 0.5 || u_span > 0.5) { age = past; alive = (past >= 0.0 && past < life) ? 1.0 : 0.0; } // a hit (a bar or a note)
+  else { age = mod(past + r1 * life, life); alive = (past >= 0.0 && past <= b0.z - b0.x + 0.05 && fi < 12.0) ? 1.0 : 0.0; } // embers while held
+  float k = age / life;
+  vec2 origin = u_span > 0.5 ? project(0.0, 0.0) + vec2((r2 - 0.5) * 2.0 * u_half * u_laneW * 0.95, 0.0) : project(b0.y + 0.5 - u_half, 0.0) + vec2((r2 - 0.5) * u_laneW * 0.45, 0.0);
+  float ang = -1.5707963 + (r1 - 0.5) * (u_span > 0.5 ? 0.9 : 2.2);
+  float speed = u_laneW * (u_span > 0.5 ? 1.3 : 2.4) * (0.45 + r2);
+  vec2 p = origin + vec2(cos(ang), sin(ang) * 0.85) * speed * age + vec2(0.0, u_laneW * 3.2 * age * age);
+  float r = max(1.2, u_laneW * (0.02 + 0.03 * r3) * (1.0 - 0.6 * k)); // radius in px
+  vec2 px = p + (c - 0.5) * 2.0 * r * 1.6;
+  gl_Position = alive > 0.5 ? clipPos(px) : vec4(2.0, 2.0, 2.0, 1.0);
+  v_p = (c - 0.5) * 2.0; v_k = k; v_y = px.y; v_r = r; v_col = mix(b1.rgb, vec3(1.0), 0.35 + 0.4 * r2);
+}`, `${FS_HEAD}in vec2 v_p; in float v_k, v_y, v_r; in vec3 v_col; out vec4 o;
+void main() {
+  float d = length(v_p); // 1 at the edge of the quad, whose half size is 1.6 radii
+  float a = (1.0 - smoothstep(0.4, 0.62, d)) * (1.0 - v_k) * (1.0 - v_k) + 0.3 * (1.0 - smoothstep(0.0, 1.0, d)) * (1.0 - v_k); // a hot core and a round soft halo
+  o = vec4(v_col * a * edgeFade(v_y), 0.0);
 }`],
 };
 
@@ -600,7 +655,7 @@ export class GLBoard {
   shared(pr, t, v) {
     const gl = this.gl, u = pr.u;
     if (u.u_res) gl.uniform2f(u.u_res, v.res[0], v.res[1]);
-    const vals = { u_hit: v.hit, u_vy: v.vy, u_k: v.k, u_c: v.c, u_cx: v.cx, u_laneW: v.laneW, u_half: v.half, u_t: t, u_win: v.win, u_flip: v.flip, u_headR: v.headR, u_end: v.end, u_fh: v.fh, u_padB: v.padB, u_board: v.board, u_tailW: v.tailW, u_bar: v.bar };
+    const vals = { u_hit: v.hit, u_vy: v.vy, u_k: v.k, u_c: v.c, u_cx: v.cx, u_laneW: v.laneW, u_half: v.half, u_t: t, u_win: v.win, u_flip: v.flip, u_headR: v.headR, u_end: v.end, u_fh: v.fh, u_padB: v.padB, u_board: v.board, u_tailW: v.tailW, u_bar: v.bar, u_taper: v.taper, u_fog: v.fog, u_relief: v.relief, u_flow: v.flow };
     for (const n in vals) if (u[n]) gl.uniform1f(u[n], vals[n]);
   }
 
@@ -648,8 +703,10 @@ export class GLBoard {
     const headR = HEAD_R * o.noteSize;
     const padRy = laneW * headR * 1.05 * 0.55;
     const padB = hit + padRy;
+    const fx = o.fx || {}; // the optional effects (taper, fog, relief, particles, fluid): each is on or off
     const v = {
       res: [w, h], hit, vy: proj.vy, k: proj.k, c: proj.c, cx: w / 2, laneW, half: lanes / 2, win: o.windowSec, flip: o.leftHanded ? -1 : 1, headR,
+      taper: fx.taper ? 1 : 0, fog: fx.fog ? 1 : 0, relief: fx.relief ? 1 : 0, flow: fx.fluid ? 1 : 0,
       end: proj.end, fh: h * 0.26, padB: h - padB > 2 ? padB : h * 4, board: o.boardK, tailW: o.sustainWidth, bar: BAR_DEPTH * o.kickBar,
     };
     const win = v.win;
@@ -762,6 +819,18 @@ export class GLBoard {
       use('barburst');
       this.vao(d, 'barB', () => { gl.bindBuffer(gl.ARRAY_BUFFER, d.barB.buf); this.attrib(pr, 'b0', 4, 32, kFrom * 32, 1); this.attrib(pr, 'b1', 4, 32, kFrom * 32 + 16, 1); });
       this.inst(gl.TRIANGLE_STRIP, 0, 4, kTo - kFrom);
+    }
+    if (fx.particles) {
+      use('sparks');
+      const sparks = (list, from, to, vaoName, span) => {
+        if (to <= from) return;
+        gl.uniform1f(pr.u.u_span, span);
+        this.vao(d, vaoName, () => { gl.bindBuffer(gl.ARRAY_BUFFER, list.buf); this.attrib(pr, 'b0', 4, 32, from * 32, 24); this.attrib(pr, 'b1', 4, 32, from * 32 + 16, 24); });
+        this.inst(gl.TRIANGLE_STRIP, 0, 4, 24 * (to - from));
+      };
+      sparks(d.hitB, lowerBound(d.hitB.times, t - 1.1), lowerBound(d.hitB.times, t + 1e-6), 'hitS', 0);
+      sparks(d.heldB, lowerBound(d.heldB.times, t - d.heldB.maxLen - 1.1), lowerBound(d.heldB.times, t + 1e-6), 'heldS', 0);
+      sparks(d.barB, lowerBound(d.barB.times, t - 1.1), lowerBound(d.barB.times, t + 1e-6), 'barS', 1);
     }
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     this.drawn += drawn;

@@ -89,6 +89,14 @@ function renderBackground(t) {
   if (driver.prepare(w, h, t, STAGE_RGB, 1)) (vizPorts[id] ??= PORTS[id](bgGl)).draw(driver.state, driver.data, w, h, vizScale);
 }
 
+// The optional effects of the board (?fx=taper,fog,... lists the ones that start on; no ?fx: all of them), one checkbox each.
+const FX = {};
+for (const box of document.querySelectorAll('[data-fx]')) {
+  if (params.get('fx') !== null) box.checked = params.get('fx').split(',').includes(box.dataset.fx);
+  FX[box.dataset.fx] = box.checked;
+  box.addEventListener('change', () => { FX[box.dataset.fx] = box.checked; });
+}
+
 function render(t) {
   renderBackground(t);
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -100,7 +108,7 @@ function render(t) {
     board.drawPane(p.chart, t, { x: i * pw, y: 0, w, h: H }, {
       neck: Number($('neck').value), perspective: Number($('persp').value), curve, noteSize: 1, sustainWidth: 1, kickBar: 1, hitLine: params.get('hitline') !== '0', laneStripes: true,
       trackOpacity: 0.75, boardK: 1, leftHanded: params.get('lefty') === '1', heldMotion: true, starPowerBand: true, soloBand: true, fillBand: true, breBand: 'pulse', bandBorders: true,
-      beatStyle: BEATS, windowSec: (DEPTH_SEC / Number($('neck').value)) * laneLookFactor(H),
+      fx: FX, beatStyle: BEATS, windowSec: (DEPTH_SEC / Number($('neck').value)) * laneLookFactor(H),
     });
   });
 }
