@@ -733,7 +733,8 @@ let XI = 0; // the cap's inner edge at the new top
 let YN_CAP = null; // the left cap; the right one is mirrored
 let YN_BODY = null;
 let YN_HOPO_STRIP = null; // the band beside a cap (HOPO / accent white strip)
-let YN_TAP_CENTRE = null; // the tap / ghost dark centre
+let YN_TAP_CENTRE = null; // the tap dark centre (the ghost's old one; unused now)
+let YN_TOP_BAR = null; // the accent / ghost rounded bar at the top of the coloured part
 let CAP_SLABS = null;
 // The band beside a cap (HOPO / accent white strip): from under the cap to the cap's inner edge moved `s` units in; both sides go in one path.
 const strip = (s) => sampleDesign([30, YT], [[XI + s, YT], [31.6 + s, 46], [30.8 + s, 50, 30.6 + s, 55, 31.2 + s, 60], [35 + s, 89], [30, 89]]);
@@ -750,6 +751,10 @@ export function rebuildYNote(cut = YNOTE_CUT) {
   YN_BODY = sampleDesign([XI, YT], [[220 - XI, YT], [191.4, 46], [192.2, 50, 192.4, 55, 191.8, 60], [188, 89], [32, 89], [28.2, 60], [27.6, 55, 27.8, 50, 28.6, 46]]);
   YN_HOPO_STRIP = strip(30); // design units (0.3 of the half width, as before)
   YN_TAP_CENTRE = centre(17);
+  { // a rounded bar along the top of the coloured part, between the caps (the accent's darker, the ghost's lighter one)
+    const bx0 = XI + 7, bx1 = 220 - XI - 7, by0 = YT + 5, bh = Math.max(8, (89 - YT) * 0.3), r = bh / 2, kc = 0.5523 * r; // (kc: the cubic's handle for a quarter circle)
+    YN_TOP_BAR = sampleDesign([bx0 + r, by0], [[bx1 - r, by0], [bx1 - r + kc, by0, bx1, by0 + r - kc, bx1, by0 + r], [bx1, by0 + r + kc, bx1 - r + kc, by0 + bh, bx1 - r, by0 + bh], [bx0 + r, by0 + bh], [bx0 + r - kc, by0 + bh, bx0, by0 + r + kc, bx0, by0 + r], [bx0, by0 + r - kc, bx0 + r - kc, by0, bx0 + r, by0]]);
+  }
   // The cap's shading follows its ridge, which is (nearly) a straight slanted line in three stretches: [top row, bottom row, ridge x at the top, at the bottom]
   // (design units). Each slab of the cap is filled with the cap profile sheared along its stretch; a slab reaches 0.6 units into the next one, which is drawn
   // over it, so their shared edge has no anti-aliasing seam.
@@ -1074,18 +1079,17 @@ function drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side) 
   g.fill();
   g.fillStyle = S.baseEnds;
   g.fill();
-  // the body (a ghost: the colour, lighter, stays on the strips and the centre is dark; a HOPO: white strips; a tap: the HOPO's look with black strips; an accent: two strips
-  // beside the caps in a darker shade of the note's colour), then its darker ends over all of it
+  // the body (a HOPO: white strips beside the caps; a tap: the HOPO's look with black strips; an accent: a rounded bar along the top of the coloured part in a darker shade
+  // of the note's colour; a ghost: the same bar, lighter), then its darker ends over all of it
   g.beginPath();
   traceYN(g, YN_BODY, 1, k, side);
-  const dark = n.ghost;
-  g.fillStyle = bodyGradient(g, dark ? shadeColor(n.sp ? dcol(laneColor) : bodyColor, -0.4) : bodyColor);
+  g.fillStyle = bodyGradient(g, bodyColor);
   g.fill();
-  if (dark || n.hopo || n.tap || n.accent) {
+  if (n.hopo || n.tap || n.accent || n.ghost) {
     g.beginPath();
-    if (dark) traceYN(g, YN_TAP_CENTRE, 1, k, side);
-    else { traceYN(g, YN_HOPO_STRIP, 1, k, side); traceYN(g, YN_HOPO_STRIP, -1, k, side); }
-    g.fillStyle = bodyGradient(g, dark || n.tap ? '#1b1c1f' : n.hopo ? '#f4f4f4' : shadeColor(bodyColor, 0.62));
+    if (n.hopo || n.tap) { traceYN(g, YN_HOPO_STRIP, 1, k, side); traceYN(g, YN_HOPO_STRIP, -1, k, side); }
+    else traceYN(g, YN_TOP_BAR, 1, k, side);
+    g.fillStyle = bodyGradient(g, n.tap ? '#1b1c1f' : n.hopo ? '#f4f4f4' : shadeColor(bodyColor, n.ghost ? -0.4 : 0.62));
     g.fill();
     g.beginPath();
     traceYN(g, YN_BODY, 1, k, side);
