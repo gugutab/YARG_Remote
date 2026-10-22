@@ -63,7 +63,6 @@ import {
   fillTailHalo,
   noteScale,
   HOPO_SCALE,
-  glowYNote,
   noteColor,
   tailShimmer,
   heldPulse,
@@ -1598,7 +1597,6 @@ export class Highway {
       const faced = !n.cymbal && this.noteStyle === 'rect'; // a note in the rectangular style: the vector note after the design (chrome caps, coloured band, base)
       if (faced) {
         const nhw = r * wide * NOTE_RECT_W * (n.tap ? HOPO_SCALE : 1), nhh = r * NOTE_RECT_H * (n.tap ? HOPO_SCALE : 1);
-        if (n.accent) glowYNote(g, cx, cy, nhw, nhh, 0, YNOTE_SIDE_2D * this.noteBase, noteColor(n, colors), 1); // (an accent: the plain note with a glow behind it)
         drawYNote(g, cx, cy, nhw, nhh, n, colors[n.lane], tintWhite(n.sp ? noteColor(n, colors) : colors[n.lane], white), 0, YNOTE_SIDE_2D * this.noteBase, white === 0);
         if (n.activation && this.fillActivation) marks.push(n, cx, cy, r * wide * NOTE_RECT_W, r * NOTE_RECT_H, g.globalAlpha);
         continue;
