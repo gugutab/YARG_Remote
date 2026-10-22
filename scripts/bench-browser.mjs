@@ -1,6 +1,6 @@
 // Frame-time benchmark of the stage in a real browser (Firefox by default, Chromium to compare), through Playwright.
 //   node scripts/bench-browser.mjs [--browser firefox|chromium] [--view 3d|2d] [--seconds 6] [--runs 3]
-//        [--song "Folder/Artist - Title"] [--instrument drums-five:expert] [--at 70] [--throttle 4] [--settings '{"perf.fpsCap":"60"}']
+//        [--song "Folder/Artist - Title"] [--instrument drums-five:expert] [--at 70] [--throttle 4] [--viewport 2560x1440] [--settings '{"perf.fpsCap":"60"}']
 //        [--url http://localhost:8091/] [--headless] [--executable <path to firefox.exe>] [--playwright <dir of playwright-core>] [--snippet]
 // It opens the app in a fresh context (muted, onboarding off), starts the song at --at seconds, wraps requestAnimationFrame to time the
 // app's callback, and prints per run: average fps, 1% low fps, frames over 20 ms, the callback's mean / p95 ms and stage draws per second and how far the song advanced (about --seconds when it is really playing).
@@ -70,7 +70,8 @@ let tries = 0;
 for (const v of variants) {
   const vs = { ...settings, ...v.settings };
   for (let r = 0; r < runs; r++) {
-    const ctx = await browser.newContext({ viewport: { width: 1300, height: 760 } });
+    const [vw, vh] = String(args.viewport || '1300x760').split('x').map(Number);
+    const ctx = await browser.newContext({ viewport: { width: vw, height: vh } });
     try {
       await ctx.addInitScript((s) => { try { localStorage.setItem('yargremote.master', '0.02'); localStorage.setItem('yargremote.onboarded', '1'); localStorage.setItem('yargremote.settings', JSON.stringify(s)); } catch { /* storage blocked */ } }, vs);
       const page = await ctx.newPage();

@@ -898,7 +898,7 @@ rebuildYNote(YNOTE_CUT); // (after the gradient caches it resets exist)
 // width from a scaled cached picture (ynSprite3D; at any opacity: the picture fades as one piece). In a GPU canvas a note's ~13 fills cost far more than one
 // drawImage (Highway Star, 3 panes: the rectangular notes cost about as much as the round ones this way); the nearest notes of a big window stay direct.
 // Setting highway.fast3dNotes: every 3D note from the cached pictures, whatever its size.
-let fast3d = false;
+let fast3d = true; // (the setting's default: app.js applies the stored value at start)
 const NOTE_SPRITE_PX = 48;
 export const noteSpritePx = () => (fast3d ? Infinity : NOTE_SPRITE_PX); // (the size limit of 3D pictures, for the cymbal discs too)
 export function setFast3dNotes(on) { fast3d = !!on; }

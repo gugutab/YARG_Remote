@@ -58,7 +58,7 @@ and the working conventions.
   link button that copies a link to the song, plain info chips, a fullscreen cover and a Listen player that folds.
 - **Left-handed lanes:** a global setting plus a per-instrument choice (Normal / Mirrored) in each instrument's View window.
 - **Performance:** Settings -> Performance has a frame-rate limit, an economy mode, a render quality (resolution) choice and
-  adaptive quality that lowers the load only when frames run late; "Faster 3D notes" (experimental) caches 3D note pictures.
+  adaptive quality that lowers the load only when frames run late; "Faster 3D notes" (on by default) caches the nearest 3D note pictures too.
   The Highway Visualizer menu has Aurora, Synthwave, Warp, Beat rings, Spotlights, Tunnel and more.
 - **Install and screen:** the app has a web manifest (installable on https or localhost) and keeps the screen awake while a song
   plays (Settings -> General -> Playback).
