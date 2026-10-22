@@ -49,6 +49,7 @@ import { snapPoints, snapTime, clampLoop, currentSectionRange, sectionRange, loo
 import { trainerConfig, startTrainer, nextTrainerState, trainerStatus, stepNote } from './trainer.js';
 import { VISUALIZERS, showsStage, createDriver as createVisualizerDriver } from './visualizers.js';
 import { paintRange, installRangeUi } from './range-ui.js';
+import { canSkipDraw as idleCanSkip, IDLE_AFTER_MS, IDLE_REFRESH_MS } from './idle.js';
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries([
@@ -3422,19 +3423,21 @@ function visualChartTime(ct) {
 // Idle redraws: when the music is paused and nothing moves (no seek animation, no visualizer, no pointer or key activity for a few
 // seconds, no change to the highway), the picture would be identical, so most frames skip the whole draw. Anything that can change it
 // wakes the loop: user input (any event below), a change to the highway's state (`highway.dirtyAt`), a new time, or a new canvas size.
-// A slow refresh (IDLE_REFRESH_MS) still runs, to catch what no event announces (a hover tooltip delay, lyric sheet easing).
-const IDLE_AFTER_MS = 3000;
-const IDLE_REFRESH_MS = 250;
+// A slow refresh (IDLE_REFRESH_MS, idle.js) still runs, to catch what no event announces (a hover tooltip delay, lyric sheet easing).
 let lastInputAt = performance.now();
 const wakeUp = () => { lastInputAt = performance.now(); wakeLoop(); };
 for (const type of ['pointermove', 'pointerdown', 'pointerup', 'wheel', 'keydown', 'keyup', 'input', 'change', 'click', 'touchstart', 'dragover', 'drop']) document.addEventListener(type, wakeUp, { capture: true, passive: true });
 for (const type of ['resize', 'hashchange', 'popstate', 'focus', 'visibilitychange']) window.addEventListener(type, wakeUp);
+window.__yargDraws = 0; // frames the stage was actually drawn (tests and Playwright read it to check that an idle page stays still)
 const lastDraw = { at: -Infinity, t: NaN, w: 0, h: 0, dpr: 0, panes: null, chart: null };
 function canSkipDraw(now, t) {
-  if (player.playing || vis.anim || seeking || perfMode !== 'off') return false;
-  if (now - Math.max(lastInputAt, highway.dirtyAt) < IDLE_AFTER_MS || now - lastDraw.at >= IDLE_REFRESH_MS) return false;
   const c = els.highway;
-  return lastDraw.t === t && lastDraw.w === c.clientWidth && lastDraw.h === c.clientHeight && lastDraw.dpr === renderDpr() && lastDraw.panes === highway.panes && lastDraw.chart === chart;
+  return idleCanSkip({
+    playing: player.playing,
+    animating: vis.anim || seeking || perfMode !== 'off' || !!startDone || !!resumeTimer || !!loopWait, // (a wait with a countdown on the stage keeps drawing)
+    now, lastInputAt, dirtyAt: highway.dirtyAt, lastDrawAt: lastDraw.at,
+    same: lastDraw.t === t && lastDraw.w === c.clientWidth && lastDraw.h === c.clientHeight && lastDraw.dpr === renderDpr() && lastDraw.panes === highway.panes && lastDraw.chart === chart,
+  });
 }
 // Deep idle: on top of the idle conditions above, nothing that animates by itself (no visualizer, no loading backdrop, no start/resume/loop wait).
 // The loop then ticks at IDLE_REFRESH_MS on a timer instead of every display frame (the refresh it would draw anyway), and any input,
@@ -3452,6 +3455,7 @@ function wakeLoop() {
 function noteDraw(now, t) {
   const c = els.highway;
   const d = lastDraw; // (one object, updated in place)
+  window.__yargDraws++;
   d.at = now; d.t = t; d.w = c.clientWidth; d.h = c.clientHeight; d.dpr = renderDpr(); d.panes = highway.panes; d.chart = chart;
 }
 
