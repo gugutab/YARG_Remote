@@ -734,6 +734,7 @@ let YN_CAP = null; // the left cap; the right one is mirrored
 let YN_BODY = null;
 let YN_HOPO_STRIP = null; // the band beside a cap (HOPO / accent white strip)
 let YN_TAP_CENTRE = null; // the tap / ghost dark centre
+let YN_SIL = null; // the whole note's outline (both caps and the body between them, rows YT .. 92), for the accent outline
 let CAP_SLABS = null;
 // The band beside a cap (HOPO / accent white strip): from under the cap to the cap's inner edge moved `s` units in; both sides go in one path.
 const strip = (s) => sampleDesign([30, YT], [[XI + s, YT], [31.6 + s, 46], [30.8 + s, 50, 30.6 + s, 55, 31.2 + s, 60], [35 + s, 89], [30, 89]]);
@@ -747,6 +748,12 @@ export function rebuildYNote(cut = YNOTE_CUT) {
   const [XE, OUTER_REST] = outerAt(YT + 5.5); // the outer edge where the corner ends
   XI = 31.6 + ((46 - YT) * 7.4) / 30;
   YN_CAP = sampleDesign([XI, YT], [[XE + 7.4, YT], [XE + 2.9, YT, XE + 1, YT + 2, XE, YT + 5.5], ...OUTER_REST, [35.4, 92], [35, 89], [31.2, 60], [30.6, 55, 30.8, 50, 31.6, 46]]);
+  { // the outline of caps + body together: the left half from the top middle down to the bottom (the cap's outer edge), then the same mirrored back up
+    const half = sampleDesign([110, YT], [[XE + 7.4, YT], [XE + 2.9, YT, XE + 1, YT + 2, XE, YT + 5.5], ...OUTER_REST]);
+    const sil = Array.from(half);
+    for (let i = half.length - 2; i >= 2; i -= 2) sil.push(-half[i], half[i + 1]);
+    YN_SIL = Float32Array.from(sil);
+  }
   YN_BODY = sampleDesign([XI, YT], [[220 - XI, YT], [191.4, 46], [192.2, 50, 192.4, 55, 191.8, 60], [188, 89], [32, 89], [28.2, 60], [27.6, 55, 27.8, 50, 28.6, 46]]);
   YN_HOPO_STRIP = strip(30); // design units (0.3 of the half width, as before)
   YN_TAP_CENTRE = centre(17);
@@ -902,6 +909,15 @@ let fast3d = true; // (the setting's default: app.js applies the stored value at
 const NOTE_SPRITE_PX = 48;
 export const noteSpritePx = () => (fast3d ? Infinity : NOTE_SPRITE_PX); // (the size limit of 3D pictures, for the cymbal discs too)
 export function setFast3dNotes(on) { fast3d = !!on; }
+// Adds the outline of a rectangular note drawn by drawYNote with the same arguments (cut, caps, perspective) to the current path, for the accent outline: the caller
+// strokes it (beginPath before, lineWidth and strokeStyle set, in screen px: the path is built under the note's transform, which is dropped before the stroke).
+export function traceYNoteOutline(g, x, y, hw, hh, taper = 0, side = 1) {
+  g.save();
+  g.translate(x, y - ((YT - YN_CY + YN_BASE_V) / 2) * (hh / YN_HH));
+  g.scale(hw / YN_HW, hh / YN_HH);
+  traceYN(g, YN_SIL, 1, taper * (hh / YN_HH), side);
+  g.restore();
+}
 export function drawYNote(g, x, y, hw, hh, n, laneColor, bodyColor, taper = 0, side = 1, cacheable = false) {
   if (cacheable && g.filter === 'none' && g.globalCompositeOperation === 'source-over' && typeof g.getTransform === 'function'
     && (taper === 0 ? !desat && g.globalAlpha === 1 && ynSprite(g, x, y, hw, hh, n, laneColor, bodyColor, side) : ynSprite3D(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side, noteSpritePx()))) return;
