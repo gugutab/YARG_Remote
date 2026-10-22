@@ -867,7 +867,7 @@ function toneColor(color, strong) {
   const mx = Math.max(...c), mn = Math.min(...c), d = mx - mn;
   let l = (mx + mn) / 2, sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
   let h = d === 0 ? 0 : mx === c[0] ? ((c[1] - c[2]) / d + 6) % 6 : mx === c[1] ? (c[2] - c[0]) / d + 2 : (c[0] - c[1]) / d + 4;
-  if (strong) { sat = 1; l *= 0.8; } else { sat *= 0.4; l += (1 - l) * 0.35; }
+  if (strong) { sat = 1; l *= 0.55; } else { sat *= 0.4; l += (1 - l) * 0.5; }
   const f = (n) => { const k = (n + h * 2) % 12; return l - sat * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1)); }; // (h is in sixths of the circle, the formula wants twelfths)
   return `rgb(${[f(0), f(8), f(4)].map((v) => Math.round(v * 255)).join(',')})`;
 }
