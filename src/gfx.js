@@ -918,6 +918,20 @@ export function traceYNoteOutline(g, x, y, hw, hh, taper = 0, side = 1) {
   traceYN(g, YN_SIL, 1, taper * (hh / YN_HH), side);
   g.restore();
 }
+// The accent's glow: the note's outline stroked three times, wide and faint to narrow and brighter, in `color`, drawn BEFORE the note so only the part outside it shows.
+// `unit` is the pixel width of a design-size stroke (the note's scale in 3D, 1 in 2D).
+export function glowYNote(g, x, y, hw, hh, taper, side, color, unit) {
+  g.save();
+  g.lineJoin = 'round';
+  for (const [w, a] of [[16, 0.09], [10, 0.16], [5, 0.3]]) {
+    g.beginPath();
+    traceYNoteOutline(g, x, y, hw, hh, taper, side);
+    g.lineWidth = w * unit;
+    g.strokeStyle = withAlpha(color, a);
+    g.stroke();
+  }
+  g.restore();
+}
 export function drawYNote(g, x, y, hw, hh, n, laneColor, bodyColor, taper = 0, side = 1, cacheable = false) {
   if (cacheable && g.filter === 'none' && g.globalCompositeOperation === 'source-over' && typeof g.getTransform === 'function'
     && (taper === 0 ? !desat && g.globalAlpha === 1 && ynSprite(g, x, y, hw, hh, n, laneColor, bodyColor, side) : ynSprite3D(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side, noteSpritePx()))) return;
@@ -940,7 +954,7 @@ function ynSprite3D(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side, maxPx
   if (!(hw < maxPx)) return false; // (a cheap first test in note units)
   const kq = Math.round(taper * (hh / YN_HH) * 1e7); // the taper per design unit (equal up to rounding noise at every depth)
   const dark = n.ghost;
-  const key = `${bodyColor}|${dark && n.sp ? laneColor : ''}|${n.sp ? 1 : 0}${n.tap ? 1 : 0}${n.ghost ? 1 : 0}${n.hopo || n.accent ? 1 : 0}|${kq}|${Math.round((hh * 1e4) / hw)}|${side}|${hw >= 24 ? 2 : hw >= 16 ? 1 : 0}${hw >= 9 ? 1 : 0}`;
+  const key = `${bodyColor}|${dark && n.sp ? laneColor : ''}|${n.sp ? 1 : 0}${n.tap ? 1 : 0}${n.ghost ? 1 : 0}${n.hopo ? 1 : 0}|${kq}|${Math.round((hh * 1e4) / hw)}|${side}|${hw >= 24 ? 2 : hw >= 16 ? 1 : 0}${hw >= 9 ? 1 : 0}`;
   // the note's extent around (x, y) as in ynSprite, widened by the taper at the farthest row, in units of hw
   const mid = (YT - YN_CY + YN_BASE_V) / 2;
   const vLo = YT - YN_CY;
@@ -1037,7 +1051,7 @@ function ynSprite(g, x, y, hw, hh, n, laneColor, bodyColor, side) {
   if (fx === YN_SPRITE_Q) { fx = 0; ix++; }
   if (fy === YN_SPRITE_Q) { fy = 0; iy++; }
   const dark = n.ghost;
-  const key = `${bodyColor}|${dark && n.sp ? laneColor : ''}|${n.sp ? 1 : 0}${n.tap ? 1 : 0}${n.ghost ? 1 : 0}${n.hopo || n.accent ? 1 : 0}|${hw}|${hh}|${side}|${m.a}|${m.d}|${fx}|${fy}`;
+  const key = `${bodyColor}|${dark && n.sp ? laneColor : ''}|${n.sp ? 1 : 0}${n.tap ? 1 : 0}${n.ghost ? 1 : 0}${n.hopo ? 1 : 0}|${hw}|${hh}|${side}|${m.a}|${m.d}|${fx}|${fy}`;
   let sp = ynSprites.get(key);
   if (!sp) {
     // the note's extent around (x, y), in note units: u within +-100 design units (base and shadow end ~96), v from the cut top to under the floor shadow
@@ -1085,13 +1099,13 @@ function drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side) 
   g.fill();
   g.fillStyle = S.baseEnds;
   g.fill();
-  // the body (a ghost: the colour stays on the strips, the centre is dark; a HOPO or accent: white strips; a tap: the HOPO's look with black strips), then its darker ends over all of it
+  // the body (a ghost: the colour stays on the strips, the centre is dark; a HOPO: white strips; a tap: the HOPO's look with black strips; an accent is the plain note, with a glow drawn behind it: glowYNote), then its darker ends over all of it
   g.beginPath();
   traceYN(g, YN_BODY, 1, k, side);
   const dark = n.ghost;
   g.fillStyle = bodyGradient(g, dark && n.sp ? dcol(laneColor) : bodyColor);
   g.fill();
-  if (dark || n.hopo || n.accent || n.tap) {
+  if (dark || n.hopo || n.tap) {
     g.beginPath();
     if (dark) traceYN(g, YN_TAP_CENTRE, 1, k, side);
     else { traceYN(g, YN_HOPO_STRIP, 1, k, side); traceYN(g, YN_HOPO_STRIP, -1, k, side); }

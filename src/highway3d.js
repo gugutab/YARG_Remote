@@ -4,14 +4,13 @@
 import {
   NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, sprite3D, noteSpritePx, NOTE_RECT_W, NOTE_RECT_H, NOTE_TRI_W, NOTE_TRI_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
   ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, setDesaturated, isDesaturated, dcol, desaturate, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, ROLL_COLUMN_ALPHA, ROLL_LEAD_SEC, HIT_LINE_COLOR, HIT_LINE_BORDER, HIT_LINE_BORDER_SOFT, drawHitBurst, drawBarBurst, BURST_SEC, BAR_BURST_SEC, BURST_LOOP_SEC, BURST_VANISH_SEC, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
-  laneLookFactor, HIT_Y, HOPO_SCALE, traceYNoteOutline
+  laneLookFactor, HIT_Y, HOPO_SCALE, glowYNote
 } from './gfx.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the flat view shows 2.5)
 const FAR_SCALE = 0.3; // size of things at the far edge relative to the hit line
 const FAR_TOP = 0.05; // far edge position, as a fraction of the canvas height
 const HEAD_R = 0.36; // note head radius, in lane widths
-const ACCENT_OUTLINE_RECT_3D = 1.6; // the accent outline of a rectangular note is this many times thicker than ACCENT_OUTLINE_WIDTH
 const RECT_SCALE = 1.15; // the rectangular notes (and the pads they land on) are this much larger than the other heads
 const RECT_H = 1.1; // the height of a rectangular note that is not a HOPO, on top of RECT_SCALE (the pads keep RECT_SCALE)
 const RECT_HOPO_W = 0.85; // a rectangular HOPO note is narrower and taller than the (already smaller) HOPO size: these factors on its width and height
@@ -809,14 +808,8 @@ export function renderLanes3D(hw, t, w, h) {
       const hopoLike = n.hopo || n.tap; // (a tap is drawn like a HOPO, with black strips instead of white ones)
       const fw = RECT_SCALE * (hopoLike ? RECT_HOPO_W : 1) * (n.tap ? HOPO_SCALE : 1), fh = RECT_SCALE * (hopoLike ? RECT_HOPO_H : RECT_H) * (n.tap ? HOPO_SCALE : 1);
       const nhw = rx * NOTE_RECT_W * fw, nhh = ry * NOTE_RECT_H * fh;
+      if (n.accent) glowYNote(g, x, y, nhw, nhh, TAPER_GAIN / (y - vy), YNOTE_SIDE_3D * hw.noteBase, noteColor(n, colors), p); // (an accent: the plain note with a glow behind it)
       drawYNote(g, x, y, nhw, nhh, n, colors[n.lane], body, TAPER_GAIN / (y - vy), YNOTE_SIDE_3D * hw.noteBase, kx === 0 && amt === 0); // (a held or exiting note changes tint and size every frame: drawn directly)
-      if (n.accent) {
-        g.beginPath();
-        traceYNoteOutline(g, x, y, nhw, nhh, TAPER_GAIN / (y - vy), YNOTE_SIDE_3D * hw.noteBase); // (the outline of the note as drawn: its cut, caps and perspective)
-        g.lineWidth = ACCENT_OUTLINE_WIDTH * ACCENT_OUTLINE_RECT_3D * p;
-        g.strokeStyle = darken(colors[n.lane], ACCENT_OUTLINE_DARKEN);
-        g.stroke();
-      }
       if (n.activation && hw.fillActivation) drawActivationMark(g, x, y, rx * NOTE_RECT_W * fw, ry * NOTE_RECT_H * fh, p, t);
       continue;
     }
