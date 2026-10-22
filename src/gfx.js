@@ -1201,7 +1201,57 @@ function fillCircleScaled(g, gradient, r, s) {
   g.fill();
   g.restore();
 }
+// The cymbal of the 3D view (a flattened disc), after a flat design: a light disc, and on it a dome in the note's colour with a simple vertical gradient, whose tip rises above
+// the disc's outline (so no clip). Design units of the reference (disc: centre (74, 46), radii 63 x 17; dome: 52 wide, tip at y 15): u = (x - 74) / 63, v = (y - 46) / 17.
+const CYMBAL_TOP = ['#ededed', '#f3e2a0', desaturate('#f3e2a0')]; // (plain, star power gold, gold desaturated)
+function drawCymbalFlat(g, x, y, rx, ry, n, laneColor) {
+  const lane = dcol(laneColor);
+  g.save();
+  g.translate(x, y);
+  g.scale(1, ry / rx); // work in a circle of radius rx, the ellipse comes from this scale
+  g.beginPath();
+  g.arc(0, 0, rx + 0.5, 0, Math.PI * 2);
+  g.fillStyle = CYMBAL_TOP[goldIndex(n.sp)];
+  g.fill();
+  if (n.ghost) { // a dark centre in a ring of the colour, flat on the disc
+    g.beginPath();
+    g.arc(0, 0, rx * 0.55, 0, Math.PI * 2);
+    g.fillStyle = '#1b1c1f';
+    g.fill();
+    g.strokeStyle = lane;
+    g.lineWidth = rx * 0.11;
+    g.stroke();
+  } else {
+    if (n.accent) { // the accent: a ring of the colour round a smaller dome
+      g.beginPath();
+      g.arc(0, 0, rx * 0.84, 0, Math.PI * 2);
+      g.strokeStyle = lane;
+      g.lineWidth = rx * 0.09;
+      g.stroke();
+    }
+    const sd = n.accent ? 0.74 : 1; // the dome's scale
+    const kv = 0.75; // the reference disc is flatter (17 / 63) than ours (about 0.55): the dome's height is brought down with it
+    const P = (px, py) => [((px - 74) / 63) * rx * sd, ((py - 46) / 17) * rx * sd * kv];
+    const c = (x1, y1, x2, y2, x3, y3) => g.bezierCurveTo(...P(x1, y1), ...P(x2, y2), ...P(x3, y3));
+    g.beginPath();
+    g.moveTo(...P(22, 46));
+    c(24, 32, 48, 30, 60, 25);
+    c(67, 22, 71, 18, 74, 15);
+    c(77, 18, 81, 22, 88, 25);
+    c(100, 30, 124, 32, 126, 46);
+    g.ellipse(0, 0, (52 / 63) * rx * sd, (11 / 17) * rx * sd * kv, 0, 0, Math.PI, false); // (the base of the dome: its lower half, from the right end back to the left)
+    g.closePath();
+    const top = P(74, 15)[1];
+    const gr = g.createLinearGradient(0, top, 0, P(74, 57)[1]);
+    gr.addColorStop(0, shadeColor(lane, -0.12));
+    gr.addColorStop(1, shadeColor(lane, 0.82));
+    g.fillStyle = gr;
+    g.fill();
+  }
+  g.restore();
+}
 export function drawCymbalFace(g, x, y, rx, ry, n, laneColor) {
+  if (ry / rx < 0.8) return drawCymbalFlat(g, x, y, rx, ry, n, laneColor); // (the 3D view's flattened disc; the 2D view's round one below)
   const grads = cymbalGradients(g);
   g.save();
   g.clip();

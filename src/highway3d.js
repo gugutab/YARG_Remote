@@ -39,11 +39,11 @@ function discEdgeGradient(g, sp) {
   const i = sp ? (isDesaturated() ? 2 : 1) : 0;
   if (!discEdges[i]) {
     const edge = g.createLinearGradient(0, 0, 0, 1);
-    const m = sp ? ['#d9b64a', '#a07d18', '#4d3b08'].map(i === 2 ? desaturate : (c) => c) : ['#9ea2a9', '#6e7278', '#3a3c40']; // (the metal of the rectangular note's caps: light to dark grey or gold)
+    const m = sp ? ['#cfae45', '#c4a23a', '#a88a2a'].map(i === 2 ? desaturate : (c) => c) : ['#c8c8c8', '#bdbdbd', '#a9a9a9']; // (the flat design's base: #bdbdbd; gold likewise)
     edge.addColorStop(0, m[0]);
     edge.addColorStop(0.45, m[1]);
     edge.addColorStop(0.75, m[2]);
-    edge.addColorStop(1, sp ? (i === 2 ? withAlpha(desaturate('#4d3b08'), 0.35) : 'rgba(77,59,8,0.35)') : 'rgba(58,60,64,0.35)'); // the metal fades into the road at the bottom: depth
+    edge.addColorStop(1, sp ? (i === 2 ? withAlpha(desaturate('#a88a2a'), 0.45) : 'rgba(168,138,42,0.45)') : 'rgba(169,169,169,0.45)'); // the metal fades into the road at the bottom: depth
     discEdges[i] = edge;
   }
   return discEdges[i];
@@ -487,7 +487,7 @@ function sideBorders3D(g, spans, left, right, xl, xr) {
 // disc with a metal edge); headStyle: the outline (cymbals of the other styles: a rounded triangle).
 function drawHead3D(g, x, y, rx, ry, vy, n, colors, body, lw, disc, headStyle) {
   // thickness: a thin darker edge underneath the top face (no cast shadow; all of it moves, grows and fades with the note)
-  const th = Math.max(0.5, rx * (disc ? 0.1 : 0.21)); // (the cymbal disc's metal edge hugs the disc: 0.1 of its radius, it was 0.27)
+  const th = Math.max(0.5, rx * (disc ? 0.19 : 0.21)); // (the cymbal disc's edge: the flat design's base, 6 units under a disc 17 high)
   if (disc) { // the rectangular style: the edge under the disc is metal like the caps (not a dark shade of the colour)
     const y0 = y + ry * 0.4; // the gradient runs from y0 down to y + th + ry: a unit gradient (0..1) under that translate and scale
     const span = y + th + ry - y0;
@@ -496,7 +496,7 @@ function drawHead3D(g, x, y, rx, ry, vy, n, colors, body, lw, disc, headStyle) {
     g.scale(1, span);
     g.beginPath();
     unitY.g = g; unitY.y0 = y0; unitY.k = 1 / span;
-    noteShape(unitY, x, y + th, rx, ry, headStyle, y + th - vy);
+    noteShape(unitY, x, y + th, rx * 1.045, ry, headStyle, y + th - vy); // (the base is a little wider than the top: 66 against 63)
     unitY.g = null;
     g.fillStyle = discEdgeGradient(g, n.sp);
     g.fill();
@@ -820,7 +820,7 @@ export function renderLanes3D(hw, t, w, h) {
       const dist = y - vy;
       if (!(kx === 0 && amt === 0 && g.filter === 'none' && g.globalCompositeOperation === 'source-over'
         && sprite3D(g, x, y, rx, noteSpritePx(), `disc|${body}|${colors[n.lane]}|${n.sp ? 1 : 0}${n.accent ? 1 : 0}${n.ghost ? 1 : 0}|${Math.round((lw * 100) / rx)}|${Math.round((dist * 100) / rx)}`,
-          1 + (TAPER_GAIN * 0.9 * rx) / dist + lw / rx, HEAD_TILT + 0.3 + lw / rx, (sg) => drawHead3D(sg, 0, 0, rx, ry, -dist, n, colors, body, lw, true, 'round')))) {
+          1.08 + (TAPER_GAIN * 0.9 * rx) / dist + lw / rx, 1.12 + lw / rx, (sg) => drawHead3D(sg, 0, 0, rx, ry, -dist, n, colors, body, lw, true, 'round')))) {
         drawHead3D(g, x, y, rx, ry, vy, n, colors, body, lw, true, 'round');
       }
     } else {
