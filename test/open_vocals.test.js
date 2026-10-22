@@ -88,3 +88,21 @@ test('lyric symbols: timing and scoring markers are not shown; = is a hyphen; §
   assert.equal(displayLyric('a§b'), 'a‿b');
   assert.equal(displayLyric('ca^t*'), 'cat');
 });
+
+test('tap notes: notes inside a tap SysEx window (code 4, all difficulties) are taps and are not HOPOs; notes outside are not', () => {
+  // tap window [0, 480) for every difficulty (0xFF); green notes at tick 0 (inside) and 960 (outside)
+  const sysexTap = (dt, value) => event(dt, [0xf0, 8, 0x50, 0x53, 0x00, 0x00, 0xff, 0x04, value, 0xf7]);
+  const midi = parseMidi(buildMidi(480, [[
+    tempo120(),
+    { dt: 0, bytes: trackName('PART GUITAR') },
+    sysexTap(0, 0x01),
+    { dt: 0, bytes: [0x90, 96, 100] },
+    { dt: 240, bytes: [0x80, 96, 0] },
+    sysexTap(240, 0x00),
+    { dt: 480, bytes: [0x90, 96, 100] },
+    { dt: 240, bytes: [0x80, 96, 0] },
+  ]]));
+  const chart = buildChart(midi, GUITAR, EXPERT);
+  assert.deepEqual(chart.notes.map((n) => n.tap), [true, false]);
+  assert.deepEqual(chart.notes.map((n) => n.hopo), [false, false]);
+});

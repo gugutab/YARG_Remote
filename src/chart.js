@@ -67,6 +67,7 @@ const VELOCITY_ACCENT = 127; // drum pads: accent (bigger) and ghost (dim), as Y
 const VELOCITY_GHOST = 1;
 const VOCAL_RANGE = [36, 84];
 const PHRASE_OPEN = 0x01; // PhaseShift SysEx phrase codes (YARG.Core PhaseShiftSysEx.cs)
+const PHRASE_TAP = 0x04; // (the "slider": Guitar Hero charts mark taps this way, with `sysex_slider = True` in song.ini, instead of note 104)
 
 // [start, end) tick windows for one phrase code, per difficulty index 0..3.
 // SysEx layout: "PS\0", type (0), difficulty (0..3, 0xFF = all), code, value (1 start, 0 end), F7. Anything else (short
@@ -239,8 +240,10 @@ export function buildChart(midi, instrument, difficulty, ini = {}) {
     return buildDrumChart(midi, track, instrument.drumMode ?? drumKind(track, ini), difficulty, timed, toSec, settings);
   }
 
-  // Tap: note 104 marks a window [start, end) in which every note of the guitar is a tap (MidReader.cs).
+  // Tap: note 104 marks a window [start, end) in which every note of the guitar is a tap (MidReader.cs); so does the PhaseShift SysEx
+  // phrase 4, per difficulty (all of them when its difficulty byte is 0xFF).
   const tapWindows = windowsOf(track.notes.filter((n) => n.pitch === TAP_NOTE));
+  const tapSysexWindows = phraseWindows(track, PHRASE_TAP)[DIFFICULTIES.indexOf(difficulty)];
   // Forced HOPO (offset +5) and forced strum (offset +6) windows for this difficulty.
   const hopoWindows = windowsOf(track.notes.filter((n) => n.pitch === difficulty.base + 5));
   const strumWindows = windowsOf(track.notes.filter((n) => n.pitch === difficulty.base + 6));
@@ -262,7 +265,7 @@ export function buildChart(midi, instrument, difficulty, ini = {}) {
     const open = enhancedOpen || inWindows(openWindowsHere, n.tick);
     // notes.chart notes carry their own flags (src/chartfile.js): tap (N 6) and forced (N 5), which flips the natural HOPO
     // (MoonNote.IsHopo: IsNaturalHopo != forced). Both are per difficulty, unlike the .mid windows.
-    const tap = Boolean(n.tap) || inWindows(tapWindows, n.tick);
+    const tap = Boolean(n.tap) || inWindows(tapWindows, n.tick) || inWindows(tapSysexWindows, n.tick);
     // A forced strum wins over a forced HOPO; without either, the note is a HOPO only if it is natural.
     const hopo = !tap && (inWindows(strumWindows, n.tick) ? false
       : inWindows(hopoWindows, n.tick) ? true : natural.get(n) !== Boolean(n.forced));
