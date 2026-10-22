@@ -542,7 +542,10 @@ export function renderLanes3D(hw, t, w, h) {
   const laneW = roadW / lanes;
   const headR = HEAD_R * hw.noteSize; // (setting highway.noteScale: heads and pads)
   const padRy = laneW * headR * 1.05 * HEAD_TILT; // vertical radius of the hit pads
-  const hitY = h - (padRy + 26); // hit line (the pads): the 26 px below them hold the bottom fade
+  // The hit line (the pads) sits at a height that depends on the pane's height alone, so the panes of a stage (different instruments, different widths) stay aligned whatever the resize:
+  // the pad radius it leaves room for is that of the widest road a 4-lane pane can have (the road is capped at 1.2 of the height). The 26 px below the pads hold the bottom fade.
+  const padRyRef = ((h * 1.2) / 4) * headR * 1.05 * HEAD_TILT;
+  const hitY = h - (Math.max(padRy, padRyRef) + 26);
   const cx = w / 2;
   const windowSec = (DEPTH_SEC / hw.neck) * laneLookFactor(h); // neck speed shortens or stretches the visible time; a taller window shows more of it (fixed pixel speed)
   const proj = projection3D(h, hitY, hw.perspective, hw.curve); // (settings highway.perspective and highway.curve)
