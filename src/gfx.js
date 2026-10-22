@@ -813,7 +813,7 @@ function capProfile(pal) {
   }
   return stops;
 }
-const CAP_CHROME = { fill: '#2a2a2a', outer: '#0e0e0e', ridge: '#7a7a7a', light: '#bdbdbd', white: '#f4f4f4', inner: '#1a1a1a' };
+const CAP_CHROME = { fill: '#55585d', outer: '#3a3c40', ridge: '#9a9ea5', light: '#c4c8ce', white: '#e2e5ea', inner: '#45484d' }; // (dark grey to light grey: a metal look; it was near black to near white)
 const CAP_GOLD = { fill: '#3a2c00', outer: '#140e00', ridge: '#a77d00', light: '#e8b923', white: '#fff3b8', inner: '#241a00' };
 const goldDesat = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, desaturate(v)]));
 const CAP_STOPS = [capProfile(CAP_CHROME), capProfile(CAP_GOLD), capProfile(goldDesat(CAP_GOLD))]; // (the third: star power's gold when desaturated)
@@ -832,7 +832,7 @@ function ynGradients(g, side, gold) {
     ynShared = {
       ends: linGrad(g, -82, 0, 82, 0, [[0, 'rgba(0,0,0,0.4)'], [0.1, 'rgba(0,0,0,0)'], [0.9, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.4)']]),
       baseEnds: linGrad(g, -95.5, 0, 95.5, 0, [[0, 'rgba(0,0,0,0.75)'], [0.06, 'rgba(0,0,0,0.64)'], [0.2, 'rgba(0,0,0,0.26)'], [0.34, 'rgba(0,0,0,0)'], [0.66, 'rgba(0,0,0,0)'], [0.8, 'rgba(0,0,0,0.26)'], [0.94, 'rgba(0,0,0,0.64)'], [1, 'rgba(0,0,0,0.75)']]), // the base fades to black at both ends: it curves away
-      capV: linGrad(g, 0, YT - YN_CY, 0, 35, [[0, 'rgba(0,0,0,0.6)'], [0.38, 'rgba(0,0,0,0)'], [0.7, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.35)']]),
+      capV: linGrad(g, 0, YT - YN_CY, 0, 35, [[0, 'rgba(0,0,0,0.38)'], [0.38, 'rgba(0,0,0,0)'], [0.7, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.22)']]),
       cap: CAP_STOPS.map((stops) => linGrad(g, CAP_FROM, 0, CAP_TO, 0, stops)),
     };
   }
