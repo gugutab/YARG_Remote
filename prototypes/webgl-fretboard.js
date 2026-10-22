@@ -12,9 +12,12 @@
 //
 // Panes: one per instrument, side by side, each in its own viewport (like the app's stage). Drums: pads, cymbals, the kick as a bar, accent and ghost notes.
 // Bands: star power and solo. Feedback: a pad lights up while a note is being hit or held.
+// The app's default hit animation (burst: the note shrinks into the line, a rounded ripple, a flash and eight sparks, looping three at a time while a long note is held)
+// and its default sustain style (flow: a tapered body with a lighter core and spine and a rounded tip, swelling waves and chevrons running down it while it is held, a halo
+// and a glow where it meets the hit line) are drawn in the shaders too, with the same constants and formulas as highway3d.js / gfx.js.
 //
-// Simplifications against the app (it is a prototype of the drawing, not a replacement): no audio, no hit burst, no rolls and fills, no BRE, no flow / wave
-// sustains, no per-note taper (the sprites are scaled uniformly with depth, as the app's 3D sprite cache does), no curved road, no 2D view, no vocals.
+// Simplifications against the app (it is a prototype of the drawing, not a replacement): no audio, no rolls and fills, no BRE, no bursts for kick / open bars, no classic
+// hit animation or sustain style, no per-note taper (the sprites are scaled uniformly with depth, as the app's 3D sprite cache does), no curved road, no 2D view, no vocals.
 import { parseMidi } from '../src/midi.js';
 import { buildChart, instrumentOptions, DIFFICULTIES } from '../src/chart.js';
 import { projection3D } from '../src/highway3d.js';
@@ -165,8 +168,8 @@ void main() {
   gl_Position = a_b.x < u_t ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(vec2(mix(l.x, r.x, c.x), l.y + (c.y - 0.5) * th));
   v_col = vec4(1.0, 1.0, 1.0, (a_b.y > 1.5 ? 0.5 : a_b.y > 0.5 ? 0.3 : 0.15) * (1.0 - smoothstep(0.5, 1.0, d)));
 }`, FS_COLOR],
-  // sustains and bands: a trapezoid from the head to the end, one instance each (t0, t1, lane, width) + colour
-  tails: [`${COMMON}in vec4 a_t; in vec4 a_col; out vec4 v_col;
+  // bands: a trapezoid from the start to the end, one instance each (t0, t1, lane, width) + colour
+  bands: [`${COMMON}in vec4 a_t; in vec4 a_col; out vec4 v_col;
 void main() {
   float side = (gl_VertexID & 1) == 0 ? -1.0 : 1.0; float far = float((gl_VertexID >> 1) & 1);
   float tt = max(far > 0.5 ? a_t.y : a_t.x, u_t); float d = clamp((tt - u_t) / u_win, 0.0, 1.2); float p = scaleAt(d);
@@ -174,19 +177,120 @@ void main() {
   gl_Position = clipPos(vec2(c.x + side * w, c.y));
   v_col = vec4(a_col.rgb, a_col.a * step(u_t, a_t.y) * (1.0 - smoothstep(0.5, 1.0, d)));
 }`, FS_COLOR],
+  // sustains, in the app's "flow" style: a strip of segments from the head to the end, tapered (TAIL_TAPER_POWER 3, never thinner than 0.3), swelling in waves while held
+  // (WAVE_LEN 0.45 s, WAVE_PERIOD 0.6 s, WAVE_AMP 0.26), with a rounded tip. One instance each (t0, t1, lane, width) + colour, drawn once per pass (halo, body, core, spine,
+  // chevrons: u_mult is the half width factor, u_pass = alpha (-1: the body's 0.6 + 0.3 held), white mix, held only, chevron pass)
+  tails: [`${COMMON}in vec4 a_t; in vec4 a_col; uniform float u_mult, u_waveMul; uniform vec4 u_pass;
+const float SEGS = 20.0;
+out vec4 v_col; out float v_ahead, v_l, v_hp, v_pxs, v_left;
+void main() {
+  int id = gl_VertexID; int nb = 2 * (int(SEGS) + 1);
+  float side = ((id & 1) == 0) ? -1.0 : 1.0;
+  float t0 = a_t.x, t1 = a_t.y;
+  float ramp = clamp((u_t - t0) / 0.2, 0.0, 1.0); float rampIn = ramp * ramp * (3.0 - 2.0 * ramp);
+  float rampOut = u_t <= t1 ? 1.0 : max(0.0, 1.0 - (u_t - t1) / 0.25);
+  float amt = u_t >= t0 ? min(rampIn, rampOut) : 0.0;
+  float dBot = clamp((max(t0, u_t) - u_t) / u_win, 0.0, 1.0), dTop = clamp((t1 - u_t) / u_win, 0.0, 1.0);
+  bool dead = dTop <= dBot || (u_pass.z > 0.5 && amt <= 0.0);
+  bool tip = t1 <= u_t + u_win; bool isTip = id >= nb;
+  float u = isTip ? 1.0 : float(id >> 1) / SEGS;
+  float d = dBot + (dTop - dBot) * u;
+  float sc = scaleAt(d), sRef = scaleAt(dBot);
+  float S = sin(6.2831853 * ((d - dBot) * u_win / 0.45 - u_t / 0.6));
+  float hp = ${HEAD_R.toFixed(3)} * 0.38 * (1.0 + 0.04 * amt) * u_mult * (0.3 + 0.7 * pow(sc / sRef, 3.0)) * u_laneW * sc * (1.0 + 0.26 * amt * u_waveMul * S);
+  vec2 c = project(a_t.z + 0.5 - u_half, d); vec2 pos = vec2(c.x + side * hp, c.y); float lat = side;
+  if (isTip) {
+    float ty = hp * 1.1; float hh = hp; float dy = 0.0;
+    if (tip) { bool r0 = ((id - nb) >> 1) == 0; hh = r0 ? 0.7 * hp : 0.0; dy = r0 ? -0.7 * ty : -ty; }
+    pos = vec2(c.x + side * hh, c.y + dy); lat = side * (hp > 0.0 ? hh / hp : 0.0);
+  }
+  gl_Position = dead ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(pos);
+  float alpha = u_pass.x < 0.0 ? 0.6 + 0.3 * amt : u_pass.x;
+  v_col = vec4(mix(a_col.rgb, vec3(1.0), u_pass.y), alpha * (1.0 - smoothstep(0.5, 1.0, d)) * (u_pass.z > 0.5 ? amt : 1.0));
+  v_ahead = d * u_win; v_l = lat; v_hp = hp; v_pxs = (u_hit - u_vy) * u_k * sc * sc / u_win; v_left = t1 - u_t;
+}`, `#version 300 es
+precision highp float;
+in vec4 v_col; in float v_ahead, v_l, v_hp, v_pxs, v_left; uniform float u_t; uniform vec4 u_pass; out vec4 o;
+void main() {
+  float a = v_col.a;
+  if (u_pass.w > 0.5) { // the chevrons: Vs pointing away from the hit line, one every FLOW_SPACING seconds, running up the tail (FLOW_PERIOD)
+    float ph = fract(u_t / 0.1);
+    float cn = ceil(v_ahead / 0.18 - ph);
+    float apex = 0.18 * (cn + ph);
+    float f = min(1.0, min((v_left - apex) / 0.12, apex / 0.06));
+    float back = (apex - v_ahead) * v_pxs;
+    float al = abs(v_l);
+    float lo = 1.1 * v_hp * al, th = 0.85 * v_hp * f;
+    a *= step(0.0, f) * step(cn, 12.0) * step(al, f) * smoothstep(lo - 0.7, lo + 0.7, back) * (1.0 - smoothstep(lo + th - 0.7, lo + th + 0.7, back));
+  }
+  o = vec4(v_col.rgb * a, a);
+}`],
   // notes and pads: sprites from the atlas, one instance each (time, lane, uv rect, size factors); a pad is lit by its lane's flash
-  notes: [`${COMMON}in vec4 a0; in vec4 a1; uniform float u_pad; uniform float u_atlas; uniform float u_flash[8]; out vec2 v_uv; out float v_a; out float v_boost;
+  notes: [`${COMMON}in vec4 a0; in vec4 a1; in vec4 a2; uniform float u_pad; uniform float u_atlas; uniform float u_flash[8]; out vec2 v_uv; out float v_a; out float v_boost;
 void main() {
   vec2 c = vec2(float(gl_VertexID & 1), float((gl_VertexID >> 1) & 1));
   float dr = (a0.x - u_t) / u_win; float d = u_pad > 0.5 ? 0.0 : clamp(dr, 0.0, 1.0);
   vec2 centre = project(a0.y + 0.5 - u_half, d);
-  vec2 size = (a1.xy - a0.zw) * u_atlas * (u_laneW * ${HEAD_R.toFixed(3)} * scaleAt(d) / ${REF_RX.toFixed(1)}) * a1.zw;
-  gl_Position = (u_pad < 0.5 && dr < -0.04) ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(centre + (c - 0.5) * size);
+  float past = u_t - (a0.x + a2.x); float kx = clamp(past / 0.1, 0.0, 1.0); // (the burst: the head shrinks into the line and is gone after 0.1 s; a long note that has arrived is not drawn)
+  bool gone = u_pad < 0.5 && (past > 0.1 || (a2.x > 0.0 && u_t >= a0.x));
+  vec2 size = (a1.xy - a0.zw) * u_atlas * (u_laneW * ${HEAD_R.toFixed(3)} * scaleAt(d) / ${REF_RX.toFixed(1)}) * a1.zw * (u_pad > 0.5 ? 1.0 : 1.0 - 0.5 * kx);
+  gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(centre + (c - 0.5) * size);
   v_uv = mix(a0.zw, a1.xy, c); v_a = u_pad > 0.5 ? 1.0 : clamp((1.0 - d) / 0.12, 0.0, 1.0);
   v_boost = u_pad > 0.5 ? u_flash[int(clamp(a0.y, 0.0, 7.0))] : 0.0;
 }`, `#version 300 es
 precision mediump float; uniform sampler2D u_tex; in vec2 v_uv; in float v_a; in float v_boost; out vec4 o;
 void main() { vec4 c = texture(u_tex, v_uv) * v_a; c.rgb = min(c.rgb * (1.0 + v_boost * 1.4) + c.a * v_boost * 0.35, vec3(c.a)); o = c; }`],
+
+  // the hit burst: a rounded ripple, a flash and eight sparks on the hit line (drawHitBurst), looping three at a time while a long note is held, plus the glow where
+  // its tail meets the line; one quad per burst, drawn additively, the pattern computed per pixel. Instances (time, lane, end, 0) + (r, g, b, held), each shared by 3 quads.
+  burst: [`${COMMON}in vec4 b0; in vec4 b1; out vec2 v_p; out float v_k, v_rx, v_seed, v_glow, v_rg; out vec3 v_col;
+void main() {
+  vec2 c = vec2(float(gl_VertexID & 1), float((gl_VertexID >> 1) & 1));
+  float j = float(gl_InstanceID % 3);
+  float past = u_t - b0.x; float k, scl, seed, alive;
+  if (b1.w < 0.5) { alive = (j < 0.5 && past >= 0.0 && past <= 0.45) ? 1.0 : 0.0; k = past / 0.45; scl = 0.5; seed = b0.x; }
+  else { alive = (past >= 0.0 && past <= b0.z - b0.x) ? 1.0 : 0.0; float ph = past / 0.36 + j / 3.0; k = fract(ph); seed = b0.x + floor(ph) * 0.137 + j * 0.31; scl = 0.31; }
+  float rx = u_laneW * ${HEAD_R.toFixed(3)} * 0.72 * scl;
+  float x = clamp(past / 0.2, 0.0, 1.0); float amt = x * x * (3.0 - 2.0 * x);
+  float rg = u_laneW * ${HEAD_R.toFixed(3)} * 0.38 * (1.0 + 0.04 * amt) * 2.4;
+  vec2 hs = vec2(max(rx * 5.2, rg * 1.05), max(rx * 3.6, rg * 0.3));
+  vec2 centre = project(b0.y + 0.5 - u_half, 0.0);
+  vec2 off = (c - 0.5) * 2.0 * hs;
+  gl_Position = alive > 0.5 ? clipPos(centre + off) : vec4(2.0, 2.0, 2.0, 1.0);
+  v_p = off; v_k = k; v_rx = rx; v_seed = seed; v_col = b1.rgb; v_rg = rg;
+  v_glow = (b1.w > 0.5 && j < 0.5) ? 0.5 * amt * (0.85 + 0.15 * sin(u_t * 22.0)) : 0.0;
+}`, `#version 300 es
+precision highp float;
+in vec2 v_p; in float v_k, v_rx, v_seed, v_glow, v_rg; in vec3 v_col; out vec4 o;
+vec3 tintW(vec3 c, float a) { return mix(c, vec3(1.0), a); }
+float sdRound(vec2 p, vec2 h, float r) { vec2 q = abs(p) - (h - r); return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
+float segDist(vec2 p, vec2 a, vec2 b) { vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0); return length(pa - ba * h); }
+void main() {
+  float k = v_k, rx = v_rx, ry = rx * 0.55;
+  float e = 1.0 - (1.0 - k) * (1.0 - k), fade = (1.0 - k) * (1.0 - k);
+  vec3 sum = vec3(0.0);
+  float rw = rx * 1.05 * (0.7 + 2.4 * e), rh = ry * 0.68 * (0.7 + 2.4 * e);
+  float lw = max(0.8, rx * 0.24 * (1.0 - k));
+  sum += tintW(v_col, 0.45) * (1.0 - smoothstep(lw * 0.5 - 0.5, lw * 0.5 + 0.5, abs(sdRound(v_p, vec2(rw, rh), min(rw, rh) * 0.45)))) * min(1.0, 1.15 * fade);
+  if (k < 0.4) {
+    float env = sin(3.14159265 * k / 0.4);
+    float cw = rx * 1.05 * (0.6 + 0.5 * e), ch = ry * 0.68 * (0.6 + 0.5 * e);
+    sum += tintW(v_col, 0.7) * (1.0 - smoothstep(-0.5, 0.5, sdRound(v_p, vec2(cw, ch), min(cw, ch) * 0.45))) * 0.55 * env * env;
+  }
+  float base = floor(mod(v_seed * 1000.0, 97.0));
+  for (int i = 0; i < 8; i++) {
+    float fi = float(i);
+    float r = mod(base * 31.0 + fi * 57.0, 100.0) / 100.0;
+    float a = -1.5707963 + (fi / 7.0 - 0.5) * 2.4 + (r - 0.5) * 0.3;
+    float reach = rx * (2.0 + 2.4 * r) * e, tl = rx * (0.5 + 0.8 * r) * (1.0 - e * 0.5);
+    float cs = cos(a), sn = sin(a), s0 = max(0.0, reach - tl);
+    float sd = segDist(v_p, vec2(cs * s0, sn * s0 * 0.62), vec2(cs * reach, sn * reach * 0.62 - e * rx * 0.5 * (0.4 + r)));
+    float w = max(0.8, rx * 0.17 * (1.0 - k));
+    sum += tintW(v_col, 0.25) * (1.0 - smoothstep(w * 0.5 - 0.5, w * 0.5 + 0.5, sd)) * min(1.0, 1.1 * fade);
+  }
+  if (v_glow > 0.0) sum += v_col * v_glow * (1.0 - smoothstep(0.85, 1.0, length(v_p / vec2(v_rg, v_rg * 0.275))));
+  o = vec4(sum, 0.0);
+}`],
 };
 const progs = {};
 function compile(name) {
@@ -245,12 +349,12 @@ function makePane(label, chart) {
     n.sp = si < spans.length && n.time >= spans[si].start;
   }
   const laneColor = (l) => colors[Math.min(Math.max(l, 0), colors.length - 1)];
-  const inst = new Float32Array(src.length * 8); // time, lane, u0, v0 | u1, v1, sx, sy   (stored latest first: far notes are drawn before near ones)
+  const inst = new Float32Array(src.length * 12); // time, lane, u0, v0 | u1, v1, sx, sy | length, 0, 0, 0   (stored latest first: far notes are drawn before near ones)
   const times = new Float32Array(src.length);
   const lanesOf = new Float32Array(src.length);
-  const tails = [];
+  const tails = [], hitList = [], heldList = []; // (the bursts: a hit each, or a loop while a long note is held)
   src.forEach((n, i) => {
-    const o = (src.length - 1 - i) * 8;
+    const o = (src.length - 1 - i) * 12;
     const bar = n.open || n.lane < 0;
     let uv;
     if (bar) uv = cellFor('bar', barColor, false);
@@ -258,12 +362,16 @@ function makePane(label, chart) {
     else uv = cellFor(n.tap ? 't' : n.hopo ? 'h' : 'n', laneColor(n.lane), n.sp);
     times[i] = n.time;
     lanesOf[i] = bar ? -1 : n.lane;
-    inst.set([n.time, bar ? lanes / 2 - 0.5 : n.lane, uv[0], uv[1], uv[2], uv[3], bar ? (lanes * REF_RX) / (HEAD_R * CELL_W * 0.955) : 1, 1], o); // (a bar is as wide as the road: its sprite is 0.955 of the cell)
-    if (!bar && n.length > 0.09) tails.push({ t0: n.time, t1: n.time + n.length, lane: n.lane });
+    inst.set([n.time, bar ? lanes / 2 - 0.5 : n.lane, uv[0], uv[1], uv[2], uv[3], bar ? (lanes * REF_RX) / (HEAD_R * CELL_W * 0.955) : 1, 1, !bar && n.length > 0.09 ? n.length : 0, 0, 0, 0], o); // (a bar is as wide as the road: its sprite is 0.955 of the cell)
+    if (!bar) {
+      const rgb = hexRgb(noteColor({ lane: 0, sp: n.sp }, [laneColor(n.lane)])); // (a star power note's tail and burst take its tinted colour)
+      if (n.length > 0.09) { tails.push({ t0: n.time, t1: n.time + n.length, lane: n.lane, rgb }); heldList.push(n.time, n.lane, n.time + n.length, 0, ...rgb, 1); }
+      else hitList.push(n.time, n.lane, n.time, 0, ...rgb, 0);
+    }
   });
   tails.sort((a, b) => a.t0 - b.t0);
   const tailData = new Float32Array(tails.length * 8);
-  tails.forEach((t, i) => tailData.set([t.t0, t.t1, t.lane, 1, ...hexRgb(laneColor(t.lane)), 0.62], (tails.length - 1 - i) * 8));
+  tails.forEach((t, i) => tailData.set([t.t0, t.t1, t.lane, 1, ...t.rgb, 1], (tails.length - 1 - i) * 8));
   let maxLen = 0;
   for (const t of tails) maxLen = Math.max(maxLen, t.t1 - t.t0);
   const bandData = (list, rgb, a) => { const s = [...list].sort((x, y) => x.start - y.start); const d = new Float32Array(s.length * 8); s.forEach((b, i) => d.set([b.start, b.end, lanes / 2 - 0.5, lanes * BAND_W, ...rgb, a], i * 8)); return { buf: buffer(d), count: s.length, starts: Float32Array.from(s, (b) => b.start), ends: Float32Array.from(s, (b) => b.end) }; };
@@ -275,6 +383,8 @@ function makePane(label, chart) {
     label, chart, lanes,
     notes: { buf: buffer(inst), count: src.length, times, lanes: lanesOf },
     tails: { buf: buffer(tailData), count: tails.length, starts: Float32Array.from(tails, (t) => t.t0), ends: Float32Array.from(tails, (t) => t.t1), lane: Float32Array.from(tails, (t) => t.lane), maxLen },
+    hitB: { buf: buffer(f32(hitList)), count: hitList.length / 8, times: Float32Array.from({ length: hitList.length / 8 }, (_, i) => hitList[i * 8]) },
+    heldB: { buf: buffer(f32(heldList)), count: heldList.length / 8, starts: Float32Array.from({ length: heldList.length / 8 }, (_, i) => heldList[i * 8]), maxLen },
     sp: bandData(chart.starPower || [], [1, 0.69, 0], 0.17),
     solo: bandData(chart.solos || [], [0, 0.59, 0.86], 0.15),
     beats: { buf: buffer(f32(beats)), times: Float32Array.from(chart.beats || [], (b) => b.time) },
@@ -284,7 +394,7 @@ function makePane(label, chart) {
   };
 }
 function disposePane(p) {
-  for (const k of ['notes', 'tails', 'sp', 'solo', 'beats', 'pads', 'road']) gl.deleteBuffer(p[k].buf);
+  for (const k of ['notes', 'tails', 'hitB', 'heldB', 'sp', 'solo', 'beats', 'pads', 'road']) gl.deleteBuffer(p[k].buf);
   for (const v of Object.values(p.vaos)) gl.deleteVertexArray(v);
 }
 
@@ -344,6 +454,10 @@ function updateFlash(p, t) {
   for (let i = lowerBound(tl.starts, t - tl.maxLen); i < tl.count && tl.starts[i] <= t; i++) if (tl.ends[i] >= t && tl.lane[i] < 8) f[tl.lane[i]] = 1;
 }
 
+let calls = 0; // (draw calls of the frame, for the HUD)
+const drawInst = (mode, first, count, n) => { calls++; gl.drawArraysInstanced(mode, first, count, n); };
+const TAIL_VERTS = 2 * 21 + 4; // the tail strip: 21 segment rows (SEGS 20) and the two rows of the tip
+
 function drawPane(p, t, x0, w, h) {
   gl.viewport(x0, 0, w, h);
   gl.scissor(x0, 0, w, h);
@@ -354,16 +468,17 @@ function drawPane(p, t, x0, w, h) {
   let pr = progs.flat;
   gl.useProgram(pr.p); setShared(pr, t, v);
   vao(p, 'road', () => { gl.bindBuffer(gl.ARRAY_BUFFER, p.road.buf); attrib(pr, 'a_pos', 2, 24, 0, 0); attrib(pr, 'a_col', 4, 24, 8, 0); });
+  calls++;
   gl.drawArrays(gl.TRIANGLES, 0, p.road.count);
 
   // the star power and solo bands (the spans do not overlap: the ones in view are a contiguous run)
-  pr = progs.tails;
+  pr = progs.bands;
   gl.useProgram(pr.p); setShared(pr, t, v);
   for (const band of [p.sp, p.solo]) {
     const from = lowerBound(band.ends, t), to = lowerBound(band.starts, t + win + 1e-6);
     if (to <= from) continue;
     vao(p, band === p.sp ? 'sp' : 'solo', () => { gl.bindBuffer(gl.ARRAY_BUFFER, band.buf); attrib(pr, 'a_t', 4, 32, from * 32, 1); attrib(pr, 'a_col', 4, 32, from * 32 + 16, 1); });
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, to - from);
+    drawInst(gl.TRIANGLE_STRIP, 0, 4, to - from);
   }
 
   // the beat lines in the window
@@ -371,16 +486,19 @@ function drawPane(p, t, x0, w, h) {
   const bFrom = lowerBound(p.beats.times, t), bTo = lowerBound(p.beats.times, t + win);
   gl.useProgram(pr.p); setShared(pr, t, v);
   vao(p, 'beats', () => { gl.bindBuffer(gl.ARRAY_BUFFER, p.beats.buf); attrib(pr, 'a_b', 2, 8, bFrom * 8, 1); });
-  if (bTo > bFrom) gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, bTo - bFrom);
+  if (bTo > bFrom) drawInst(gl.TRIANGLE_STRIP, 0, 4, bTo - bFrom);
 
-  // the sustains: starts in [t - the longest sustain, t + window]
+  // the sustains (flow style): starts in [t - the longest sustain, t + window]; a halo (held only), the body, a lighter core, a bright spine and the chevrons (held only)
   pr = progs.tails;
   const tFrom = lowerBound(p.tails.starts, t - p.tails.maxLen), tTo = lowerBound(p.tails.starts, t + win);
   if (tTo > tFrom) {
     gl.useProgram(pr.p); setShared(pr, t, v);
     const first = p.tails.count - tTo; // stored latest first
     vao(p, 'tails', () => { gl.bindBuffer(gl.ARRAY_BUFFER, p.tails.buf); attrib(pr, 'a_t', 4, 32, first * 32, 1); attrib(pr, 'a_col', 4, 32, first * 32 + 16, 1); });
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, tTo - tFrom);
+    for (const [mult, waveMul, a, white, heldOnly, chev] of [[1.9, 1, 0.16, 0, 1, 0], [1, 1, -1, 0, 0, 0], [0.55, 1, 0.16, 1, 0, 0], [0.16, 0.5, 0.42, 1, 0, 0], [1.05, 1, 0.75, 0.75, 1, 1]]) {
+      gl.uniform1f(pr.u.u_mult, mult); gl.uniform1f(pr.u.u_waveMul, waveMul); gl.uniform4f(pr.u.u_pass, a, white, heldOnly, chev);
+      drawInst(gl.TRIANGLE_STRIP, 0, TAIL_VERTS, tTo - tFrom);
+    }
   }
 
   // the pads, then the notes
@@ -391,16 +509,32 @@ function drawPane(p, t, x0, w, h) {
   gl.uniform1fv(pr.u.u_flash, p.flash);
   gl.uniform1f(pr.u.u_pad, 1);
   vao(p, 'pads', () => { gl.bindBuffer(gl.ARRAY_BUFFER, p.pads.buf); attrib(pr, 'a0', 4, 32, 0, 1); attrib(pr, 'a1', 4, 32, 16, 1); });
-  gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, p.pads.count);
+  drawInst(gl.TRIANGLE_STRIP, 0, 4, p.pads.count);
   gl.uniform1f(pr.u.u_pad, 0);
   const nn = p.notes.count;
   const nFrom = lowerBound(p.notes.times, t - 0.12), nTo = lowerBound(p.notes.times, t + win);
   if (nTo > nFrom) {
     const first = nn - nTo;
-    vao(p, 'notes', () => { gl.bindBuffer(gl.ARRAY_BUFFER, p.notes.buf); attrib(pr, 'a0', 4, 32, first * 32, 1); attrib(pr, 'a1', 4, 32, first * 32 + 16, 1); });
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, nTo - nFrom);
+    vao(p, 'notes', () => { gl.bindBuffer(gl.ARRAY_BUFFER, p.notes.buf); attrib(pr, 'a0', 4, 48, first * 48, 1); attrib(pr, 'a1', 4, 48, first * 48 + 16, 1); attrib(pr, 'a2', 4, 48, first * 48 + 32, 1); });
+    drawInst(gl.TRIANGLE_STRIP, 0, 4, nTo - nFrom);
   }
   p.drawn = Math.max(0, nTo - nFrom);
+
+  // the hit bursts and the held glow, added over everything (three quads per instance: the looping bursts of a held note)
+  pr = progs.burst;
+  gl.blendFunc(gl.ONE, gl.ONE);
+  gl.useProgram(pr.p); setShared(pr, t, v);
+  const hFrom = lowerBound(p.hitB.times, t - 0.45), hTo = lowerBound(p.hitB.times, t + 1e-6);
+  if (hTo > hFrom) {
+    vao(p, 'hitB', () => { gl.bindBuffer(gl.ARRAY_BUFFER, p.hitB.buf); attrib(pr, 'b0', 4, 32, hFrom * 32, 3); attrib(pr, 'b1', 4, 32, hFrom * 32 + 16, 3); });
+    drawInst(gl.TRIANGLE_STRIP, 0, 4, 3 * (hTo - hFrom));
+  }
+  const lFrom = lowerBound(p.heldB.starts, t - p.heldB.maxLen), lTo = lowerBound(p.heldB.starts, t + 1e-6);
+  if (lTo > lFrom) {
+    vao(p, 'heldB', () => { gl.bindBuffer(gl.ARRAY_BUFFER, p.heldB.buf); attrib(pr, 'b0', 4, 32, lFrom * 32, 3); attrib(pr, 'b1', 4, 32, lFrom * 32 + 16, 3); });
+    drawInst(gl.TRIANGLE_STRIP, 0, 4, 3 * (lTo - lFrom));
+  }
+  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 }
 
 function render(t) {
@@ -415,6 +549,7 @@ function render(t) {
   gl.enable(gl.SCISSOR_TEST);
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  calls = 0;
   const P = panes.length, pw = Math.floor(W / P);
   panes.forEach((p, i) => drawPane(p, t, i * pw, i === P - 1 ? W - i * pw : pw, H));
 }
@@ -472,7 +607,7 @@ setInterval(() => {
   $('hud').innerHTML = `<b>WebGL 2</b> &nbsp; ${panes.map((p) => `${p.label} ${p.notes.count}`).join(' | ') || '…'} notes<br>` +
     `fps <b>${fps.toFixed(0)}</b> &nbsp; JS per frame <b>${avg(stats.js).toFixed(3)} ms</b> (p95 ${p95(stats.js).toFixed(3)}) &nbsp; ${panes.length} pane${panes.length === 1 ? '' : 's'}<br>` +
     `GPU per frame <b>${stats.gpu.length ? avg(stats.gpu).toFixed(3) + ' ms' : 'n/a'}</b><br>` +
-    `notes in view <b>${Math.round(avg(stats.notes))}</b> &nbsp; draw calls <b>${panes.length * 7}</b>`;
+    `notes in view <b>${Math.round(avg(stats.notes))}</b> &nbsp; draw calls <b>${calls}</b>`;
 }, 250);
 
 // ---- controls ---------------------------------------------------------------------------------------------------------------------------------------------------
