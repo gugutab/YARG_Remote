@@ -21,7 +21,7 @@ const exe = args.firefox || 'C:/Program Files/Mozilla Firefox/firefox.exe';
 const songUrl = `${base}#/song/${encodeURIComponent(song)}/play?i=${instrument}&t=${at}`;
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'yarg-ff-'));
-fs.writeFileSync(path.join(profile, 'user.js'), 'user_pref("browser.shell.checkDefaultBrowser", false);\nuser_pref("datareporting.policy.dataSubmissionEnabled", false);\nuser_pref("browser.aboutwelcome.enabled", false);\nuser_pref("browser.startup.homepage_override.mstone", "ignore");\nuser_pref("media.autoplay.default", 0);\n');
+fs.writeFileSync(path.join(profile, 'user.js'), 'user_pref("browser.shell.checkDefaultBrowser", false);\nuser_pref("datareporting.policy.dataSubmissionEnabled", false);\nuser_pref("browser.aboutwelcome.enabled", false);\nuser_pref("browser.startup.homepage_override.mstone", "ignore");\nuser_pref("media.autoplay.default", 0);\nuser_pref("widget.windows.window_occlusion_tracking.enabled", false);\n');
 const ff = spawn(exe, ['-no-remote', '-profile', profile, '--remote-debugging-port', String(port), 'about:blank'], { stdio: 'ignore' });
 const cleanup = () => { try { ff.kill(); } catch { /* gone */ } setTimeout(() => fs.rmSync(profile, { recursive: true, force: true }), 1500); };
 process.on('exit', cleanup);
@@ -52,6 +52,18 @@ const clickPlay = async () => { // a real pointer click on the Play button (a sc
 };
 const [vw, vh] = String(args.viewport || '1300x760').split('x').map(Number);
 await send('browsingContext.setViewport', { context, viewport: { width: vw, height: vh } }).catch(() => {});
+// The window at the top left (0,0: the primary monitor on Windows), raised: a window under another one can be slowed down as "covered" (the pref above turns that off too).
+// --no-place leaves it where the system puts it. browser.setClientWindowState needs a recent Firefox: a failure is only reported.
+if (!args['no-place']) {
+  try {
+    const { clientWindows } = await send('browser.getClientWindows', {});
+    const w = clientWindows[0];
+    await send('browser.setClientWindowState', { clientWindow: w.clientWindow, state: 'normal', x: 0, y: 0 });
+    await send('browsingContext.activate', { context }).catch(() => {});
+    const after = (await send('browser.getClientWindows', {})).clientWindows[0];
+    console.log(`window at ${after.x},${after.y} ${after.width}x${after.height} (${after.state})`);
+  } catch (e) { console.error(`(could not place the Firefox window: ${String(e).slice(0, 120)})`); }
+}
 
 const MEASURE = `(async () => {
   const secs = ${seconds}, d = [], cb = []; const raf = window.requestAnimationFrame.bind(window); const orig = window.requestAnimationFrame;

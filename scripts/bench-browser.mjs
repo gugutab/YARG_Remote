@@ -1,7 +1,9 @@
 // Frame-time benchmark of the stage in a real browser (Firefox by default, Chromium to compare), through Playwright.
 //   node scripts/bench-browser.mjs [--browser firefox|chromium] [--view 3d|2d] [--seconds 6] [--runs 3]
 //        [--song "Folder/Artist - Title"] [--instrument drums-five:expert] [--at 70] [--throttle 4] [--viewport 2560x1440] [--settings '{"perf.fpsCap":"60"}']
-//        [--url http://localhost:8091/] [--headless] [--executable <path to firefox.exe>] [--playwright <dir of playwright-core>] [--snippet]
+//        [--url http://localhost:8091/] [--headless] [--no-place] [--executable <path to firefox.exe>] [--playwright <dir of playwright-core>] [--snippet]
+// A visible window is put at the top left (0,0: the primary monitor on Windows), raised, and kept from being throttled as "covered" (see placeWindow): a window under
+// another one, even a translucent one, can be slowed down by the browser and skew the numbers. --no-place leaves the windows where the system puts them.
 // It opens the app in a fresh context (muted, onboarding off), starts the song at --at seconds, wraps requestAnimationFrame to time the
 // app's callback, and prints per run: average fps, 1% low fps, frames over 20 ms, the callback's mean / p95 ms and stage draws per second and how far the song advanced (about --seconds when it is really playing).
 // --snippet prints a console snippet that measures the same thing in YOUR OWN browser (paste it in the devtools console while a song plays).
@@ -46,9 +48,25 @@ const url = `${base}#/song/${encodeURIComponent(song)}/play?i=${instrument}&t=${
 const settings = { 'playback.linkAutoplay': false, 'playback.songInfoOverlay': false, 'highway.view': view, ...(args.settings ? JSON.parse(args.settings) : {}) };
 
 const launchOpts = { headless: !!args.headless };
+if (kind === 'chromium') { // (do not slow a covered window down: the occlusion tracking, backgrounding and timer throttling of Chromium)
+  launchOpts.args = ['--window-position=0,0', '--disable-backgrounding-occluded-windows', '--disable-features=CalculateNativeWinOcclusion', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'];
+}
 if (args.executable) launchOpts.executablePath = args.executable;
 const browser = await pw[kind].launch(launchOpts);
 console.log(`${kind} ${browser.version()}  ${view}  ${instrument}  t=${at}s  ${seconds}s x ${runs}  cpu x${throttle}  settings ${JSON.stringify(settings)}`);
+
+// Chromium: moves the page's window to (0,0) through the DevTools protocol (a new context opens its window wherever the system likes) and raises it.
+async function placeWindow(ctx, page) {
+  if (args.headless || args['no-place']) return;
+  try {
+    if (kind === 'chromium') {
+      const cdp = await ctx.newCDPSession(page);
+      const { windowId } = await cdp.send('Browser.getWindowForTarget');
+      await cdp.send('Browser.setWindowBounds', { windowId, bounds: { windowState: 'normal', left: 0, top: 0 } });
+    }
+    await page.bringToFront();
+  } catch (e) { console.error(`(could not place the window: ${String(e).slice(0, 100)})`); }
+}
 
 const measure = async (page) => page.evaluate(async (secs) => {
   const d = [], cb = []; const raf = window.requestAnimationFrame.bind(window); let last = performance.now(); const t0 = last;
@@ -75,6 +93,7 @@ for (const v of variants) {
     try {
       await ctx.addInitScript((s) => { try { localStorage.setItem('yargremote.master', '0.02'); localStorage.setItem('yargremote.onboarded', '1'); localStorage.setItem('yargremote.settings', JSON.stringify(s)); } catch { /* storage blocked */ } }, vs);
       const page = await ctx.newPage();
+      await placeWindow(ctx, page);
       await page.goto(url);
       await page.waitForFunction(() => document.getElementById('seek') && !document.getElementById('seek').disabled, null, { timeout: 60000 }).catch(() => {});
       await page.waitForTimeout(8000);
