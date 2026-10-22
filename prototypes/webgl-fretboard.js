@@ -6,11 +6,13 @@
 //   ...&bench=6      a measured run of 6 s (window.__bench: fps, JS ms per frame, notes in view)
 //
 // What it is: a harness for GLBoard (src/highway-gl.js), the WebGL 2 renderer the app can use for its fretboards (setting highway.renderer): chart in, panes side by side
-// out, a benchmark (?bench=6) and a song picker. The drawing itself lives in src/highway-gl.js.
+// out, a background visualizer (?viz=rings|aurora|warp), a benchmark (?bench=6) and a song picker. The drawing itself lives in src/highway-gl.js.
 import { parseMidi } from '../src/midi.js';
 import { buildChart, instrumentOptions, DIFFICULTIES } from '../src/chart.js';
 import { GLBoard } from '../src/highway-gl.js';
 import { NOTE_PALETTE, laneLookFactor } from '../src/gfx.js';
+import { createDriver } from '../src/visualizers.js';
+import { PORTS } from './webgl-viz-ports.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the app's DEPTH_SEC)
 const params = new URLSearchParams(location.search);
@@ -63,7 +65,32 @@ const timerExt = gl.getExtension('EXT_disjoint_timer_query_webgl2');
 const BEATS = ['rgba(255,255,255,0.5)', 'rgba(255,255,255,0.3)', 'rgba(255,255,255,0.15)']; // (the app's normal beat lines)
 const curve = Number(params.get('curve') ?? 0.4);
 
+// The background: one of the WebGL visualizer ports (webgl-viz-ports.js) on a canvas under the fretboards, fed by the charts on screen (?viz=rings|aurora|warp,
+// ?vizscale=0.6: the fraction of the resolution it is drawn at, as in the app).
+const bgCanvas = $('bg');
+const bgGl = bgCanvas.getContext('webgl2', { antialias: false, alpha: true, premultipliedAlpha: true });
+const vizScale = Number(params.get('vizscale') || 0.6);
+const STAGE_RGB = '11, 14, 22';
+const KIND = (label) => (label.startsWith('drums') ? 'drum' : label.startsWith('vocals') ? 'mic' : label.split(/[ (]/)[0]);
+const driver = createDriver({ getSource: () => ({ key: panes.map((p) => p.label).join('|'), song: { title: 'prototype', artist: '' }, charts: panes.map((p) => p.chart), kinds: panes.map((p) => KIND(p.label)), shown: panes.map(() => true) }) });
+const vizPorts = {};
+function renderBackground(t) {
+  const id = $('viz').value;
+  if (id === 'none' || !bgGl || !panes.length) { bgCanvas.style.display = 'none'; return; }
+  bgCanvas.style.display = '';
+  const w = bgCanvas.clientWidth, h = bgCanvas.clientHeight;
+  const W = Math.max(2, Math.round(w * vizScale)), H = Math.max(2, Math.round(h * vizScale));
+  if (bgCanvas.width !== W || bgCanvas.height !== H) { bgCanvas.width = W; bgCanvas.height = H; }
+  bgGl.viewport(0, 0, W, H);
+  bgGl.enable(bgGl.BLEND);
+  bgGl.clearColor(0, 0, 0, 0);
+  bgGl.clear(bgGl.COLOR_BUFFER_BIT);
+  driver.select(id);
+  if (driver.prepare(w, h, t, STAGE_RGB, 1)) (vizPorts[id] ??= PORTS[id](bgGl)).draw(driver.state, driver.data, w, h, vizScale);
+}
+
 function render(t) {
+  renderBackground(t);
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const W = Math.max(2, canvas.clientWidth), H = Math.max(2, canvas.clientHeight);
   board.begin(W, H, dpr, '1');
@@ -149,6 +176,7 @@ function reload() {
   $('seek').max = duration;
   songTime = Math.min(songTime, duration);
 }
+if (params.get('viz')) $('viz').value = params.get('viz');
 async function useMidi(buf) {
   midi = parseMidi(new Uint8Array(buf));
   $('synth').value = 0;
