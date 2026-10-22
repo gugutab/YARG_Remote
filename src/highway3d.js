@@ -12,6 +12,7 @@ const FAR_SCALE = 0.3; // size of things at the far edge relative to the hit lin
 const FAR_TOP = 0.05; // far edge position, as a fraction of the canvas height
 const HEAD_R = 0.36; // note head radius, in lane widths
 const RECT_SCALE = 1.15; // the rectangular notes (and the pads they land on) are this much larger than the other heads
+const RECT_H = 1.1; // the height of a rectangular note that is not a HOPO, on top of RECT_SCALE (the pads keep RECT_SCALE)
 const RECT_HOPO_W = 0.85; // a rectangular HOPO note is narrower and taller than the (already smaller) HOPO size: these factors on its width and height
 const RECT_HOPO_H = 1.2;
 const HEAD_TILT = 0.55; // vertical squash of the heads (they lie on the road)
@@ -804,7 +805,7 @@ export function renderLanes3D(hw, t, w, h) {
     const body = tintWhite(n.sp ? noteColor(n, colors) : n.tap && !faced ? NOTE_PALETTE.tap : colors[n.lane], Math.min(1, kx + amt * (0.32 + 0.12 * shimmer))); // an active long note's head is lighter, like its tail
     g.globalAlpha = (1 - kx) * hw.noteAlpha(n) * Math.min(1, (1 - d) / FADE_IN);
     if (faced) { // the rectangular style: the vector note after the design, with its base in perspective (no separate thickness edge)
-      const fw = RECT_SCALE * (n.hopo ? RECT_HOPO_W : 1), fh = RECT_SCALE * (n.hopo ? RECT_HOPO_H : 1);
+      const fw = RECT_SCALE * (n.hopo ? RECT_HOPO_W : 1), fh = RECT_SCALE * (n.hopo ? RECT_HOPO_H : RECT_H);
       drawYNote(g, x, y, rx * NOTE_RECT_W * fw, ry * NOTE_RECT_H * fh, n, colors[n.lane], body, TAPER_GAIN / (y - vy), YNOTE_SIDE_3D * hw.noteBase, kx === 0 && amt === 0); // (a held or exiting note changes tint and size every frame: drawn directly)
       if (n.accent) {
         g.beginPath();
