@@ -557,7 +557,7 @@ const auroraViz = (ctx) => {
         return gr;
       });
       g.fillRect(0, 0, w, h);
-      g.globalCompositeOperation = 'lighter';
+      g.globalCompositeOperation = 'source-over';
       g.lineCap = 'round';
       g.lineJoin = 'round';
       const gw = Math.max(16, Math.ceil(w / AURORA_GLOW_DIV)), gh = Math.max(16, Math.ceil(h / AURORA_GLOW_DIV));
@@ -565,7 +565,7 @@ const auroraViz = (ctx) => {
       const o = glow.getContext('2d');
       o.setTransform(1, 0, 0, 1, 0, 0);
       o.clearRect(0, 0, gw, gh);
-      o.globalCompositeOperation = 'lighter';
+      o.globalCompositeOperation = 'source-over';
       o.lineCap = 'round';
       o.lineJoin = 'round';
       o.setTransform(gw / w, 0, 0, gh / h, 0, 0);
@@ -607,7 +607,8 @@ const auroraViz = (ctx) => {
           g.lineWidth = thick * 0.4; g.strokeStyle = rgba(col, 0.15 * a); g.stroke(path);
         }
       }
-      g.drawImage(glow, 0, 0, w, h); // (additive, like the passes it replaces)
+      g.globalCompositeOperation = 'lighter'; // (the one additive blend: the soft glow over the sky)
+      g.drawImage(glow, 0, 0, w, h);
       g.restore();
     },
   };

@@ -1,6 +1,6 @@
 // Frame-time benchmark in the REAL installed Firefox (its own GPU settings), driven over WebDriver BiDi: no Playwright, no geckodriver.
 //   node scripts/bench-firefox-bidi.mjs [--view 3d|2d] [--seconds 6] [--runs 2] [--song "Folder/Artist - Title"] [--instrument drums-five:expert]
-//        [--at 70] [--variants '[{"name":"x","settings":{}}]'] [--callprof] [--settings '{"perf.fpsCap":"60"}'] [--url http://localhost:8091/] [--firefox "C:/Program Files/Mozilla Firefox/firefox.exe"] [--port 9223]
+//        [--at 70] [--viewport 2560x1440] [--variants '[{"name":"x","settings":{}}]'] [--callprof] [--settings '{"perf.fpsCap":"60"}'] [--url http://localhost:8091/] [--firefox "C:/Program Files/Mozilla Firefox/firefox.exe"] [--port 9223]
 // It starts a separate Firefox with a throw-away profile (your open Firefox is not touched), opens the app with the same setup as
 // scripts/bench-browser.mjs, clicks Play with a real pointer event, waits for the song to move and prints the same table.
 import { spawn } from 'node:child_process';
@@ -50,7 +50,8 @@ const clickPlay = async () => { // a real pointer click on the Play button (a sc
   const r = JSON.parse(await evalJs(`(() => { const b = document.getElementById('play').getBoundingClientRect(); return JSON.stringify({ x: Math.round(b.x + b.width / 2), y: Math.round(b.y + b.height / 2) }); })()`));
   await send('input.performActions', { context, actions: [{ type: 'pointer', id: 'mouse', parameters: { pointerType: 'mouse' }, actions: [{ type: 'pointerMove', x: r.x, y: r.y }, { type: 'pointerDown', button: 0 }, { type: 'pointerUp', button: 0 }] }] });
 };
-await send('browsingContext.setViewport', { context, viewport: { width: 1300, height: 760 } }).catch(() => {});
+const [vw, vh] = String(args.viewport || '1300x760').split('x').map(Number);
+await send('browsingContext.setViewport', { context, viewport: { width: vw, height: vh } }).catch(() => {});
 
 const MEASURE = `(async () => {
   const secs = ${seconds}, d = [], cb = []; const raf = window.requestAnimationFrame.bind(window); const orig = window.requestAnimationFrame;
