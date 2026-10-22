@@ -1608,10 +1608,10 @@ export class Highway {
       g.fillStyle = tintWhite(n.sp ? noteColor(n, colors) : n.tap ? NOTE_PALETTE.tap : colors[n.lane], white);
       g.fill();
       if (disc) drawCymbalFace(g, cx, cy, r * 0.95, r * 0.95, n, colors[n.lane]);
-      // accent: same size, with a thicker outline in a darker shade of the note's colour
+      // accent: same size, with a thicker outline in a darker shade of the note's colour (not on a cymbal disc: its current path is the cone's after drawCymbalFace, and the disc has no outline)
       g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH : 2;
       g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : 'rgba(0,0,0,0.5)'; // (star power notes have no coloured outline: the white body and, in the rectangular style, the gold caps mark them)
-      g.stroke();
+      if (!disc) g.stroke();
       if (n.hopo) { // guitar HOPO: a white dot in the head (the rectangular style has white strips instead)
         g.beginPath();
         noteShape(g, cx, cy, r * 0.35, r * 0.35, this.noteStyle);

@@ -511,7 +511,10 @@ function drawHead3D(g, x, y, rx, ry, vy, n, colors, body, lw, disc, headStyle) {
   noteShape(g, x, y, rx, ry, headStyle, y - vy);
   g.fillStyle = body;
   g.fill();
-  if (disc) drawCymbalFace(g, x, y, rx, ry, n, colors[n.lane]);
+  if (disc) { // (a disc has no outline: after drawCymbalFace the current path is the cone's, so a stroke here ringed the cone; the accent has its white ring)
+    drawCymbalFace(g, x, y, rx, ry, n, colors[n.lane]);
+    return;
+  }
   g.lineWidth = lw;
   g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : 'rgba(0,0,0,0.5)';
   g.stroke();

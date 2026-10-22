@@ -1186,8 +1186,8 @@ function cymbalGradients(g) {
     const cone = g.createRadialGradient(-0.25, -0.3, 0, 0, 0, 1);
     cone.addColorStop(0, 'rgba(255,255,255,0.6)');
     cone.addColorStop(1, 'rgba(0,0,0,0.12)');
-    // (the metal of the rectangular note's caps: centre to rim, light to dark grey or gold)
-    cymbalGrads = { chrome: [chrome(['#b8bcc2', '#7f8389', '#9ea2a9', '#3a3c40']), chrome(['#d9b64a', '#a07d18', '#bf9627', '#4d3b08']), chrome(['#d9b64a', '#a07d18', '#bf9627', '#4d3b08'].map((c) => desaturate(c)))], cone };
+    // (YARG's cymbal: a light silver (or gold) disc, brighter in the middle and darker at the rim)
+    cymbalGrads = { chrome: [chrome(['#dde0e5', '#aeb3ba', '#c9cdd3', '#5a5e64']), chrome(['#f0d98a', '#c9a233', '#e2c15c', '#6b5410']), chrome(['#f0d98a', '#c9a233', '#e2c15c', '#6b5410'].map((c) => desaturate(c)))], cone };
   }
   return cymbalGrads;
 }
@@ -1208,6 +1208,17 @@ export function drawCymbalFace(g, x, y, rx, ry, n, laneColor) {
   g.translate(x, y);
   g.scale(1, ry / rx); // work in a circle of radius rx, the ellipse comes from this scale
   fillCircleScaled(g, grads.chrome[goldIndex(n.sp)], rx + 1, rx);
+  { // the light catching the lower front of the rim: a white crescent that fades out upwards, as on YARG's cymbal
+    const hl = g.createLinearGradient(0, 0.25 * rx, 0, 0.95 * rx);
+    hl.addColorStop(0, 'rgba(255,255,255,0)');
+    hl.addColorStop(1, 'rgba(255,255,255,0.9)');
+    g.beginPath();
+    g.arc(0, 0, 0.94 * rx, 0.3, Math.PI - 0.3);
+    g.arc(0, -0.18 * rx, 0.7 * rx, Math.PI - 0.3, 0.3, true);
+    g.closePath();
+    g.fillStyle = hl;
+    g.fill();
+  }
   if (n.accent) { // the white ring
     g.strokeStyle = '#ffffff';
     g.lineWidth = rx * 0.14;
@@ -1224,10 +1235,23 @@ export function drawCymbalFace(g, x, y, rx, ry, n, laneColor) {
     g.strokeStyle = dcol(laneColor);
     g.lineWidth = rx * 0.11;
     g.stroke();
-  } else { // the cone: the colour with a light top
+  } else { // the cone: the colour with a light top, wide, and its low tip rising from the middle (YARG's cymbal is a flat disc with a cone on it); the accent keeps the smaller cone inside its ring
+    const cr = (n.accent ? 0.62 : 0.74) * rx;
+    g.beginPath(); // the cone's silhouette: its sides rise from the two ends of the base to the tip, the lower half is the base's ellipse
+    const flat = Math.min(1, (1 - ry / rx) / 0.45); // 1 for the 3D view's flattened disc (ry / rx about 0.55): the full tip; 0 for the 2D view's round one: a dome, no tip
+    const tip = cr * (1 + 0.243 * flat); // (the tip's height above the base's middle: 0.92 rx for the plain cone in 3D)
+    const side = tip * (0.565 + 0.435 * (1 - flat)); // (where the sides bend: lower with a tip, up with a dome)
+    g.moveTo(-cr, 0);
+    g.quadraticCurveTo(-0.92 * cr, -side, 0, -tip);
+    g.quadraticCurveTo(0.92 * cr, -side, cr, 0);
+    g.arc(0, 0, cr, 0, Math.PI);
+    g.closePath();
     g.fillStyle = dcol(laneColor);
     g.fill();
-    fillCircleScaled(g, grads.cone, inner, inner);
+    g.save();
+    g.clip(); // (the gloss is a circle: only the part inside the cone's silhouette, or it would ring the tip)
+    fillCircleScaled(g, grads.cone, cr, cr);
+    g.restore();
   }
   g.restore();
 }
