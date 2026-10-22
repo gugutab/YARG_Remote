@@ -1392,11 +1392,11 @@ export function createDriver({ getSource }) {
     },
     // The draw function for Highway, or null when nothing is selected.
     get fn() { return id === 'none' ? null : driver.draw; },
-    draw(g, w, h, t, bgRgb) {
-      if (id === 'none' || failed) return;
-      const t0 = performance.now();
+    // Brings the song data and the shared state (`driver.data`, `driver.state`: the clock, the beat, the density, star power...) up to time t. draw() does this and then
+    // draws; a renderer of its own (the WebGL prototype) calls it and draws from the state. Returns false while there is nothing to draw.
+    prepare(w, h, t, bgRgb, dpr = 1) {
       const src = getSource();
-      if (!src?.charts?.length) return;
+      if (!src?.charts?.length) return false;
       if (dataKey !== src.key) {
         dataKey = src.key;
         const prev = data;
@@ -1413,14 +1413,10 @@ export function createDriver({ getSource }) {
           }).catch(() => { /* an unreadable cover: keep the fallback palette */ });
         }
       }
-      if (!viz || vizFor !== id) {
-        viz = VISUALIZERS.find((v) => v.id === id).create({ song: data });
-        vizFor = id;
-      }
       const s = state;
       s.t = t; s.w = w; s.h = h;
       s.stage = bgRgb; // the stage colour, 'r, g, b': for effects that want to use it
-      s.dpr = g.getTransform().a || 1;
+      s.dpr = dpr;
       s.clock = performance.now() / 1000;
       beatInfo(data.beats, t, s.beat);
       s.beat.pulse = 0; // no punch on the beat (it read as flicker); the tempo-locked motion (beat.pos) stays
@@ -1440,9 +1436,21 @@ export function createDriver({ getSource }) {
       s.perc = pulseAfter(data.percussion, t, 0.3);
       s.hit = data.layers.length ? Math.max(...data.layers.map((l) => (l.shown ? hitLevel(l.events, t, layerGain(l.kind)) : 0))) : hitLevel(data.events, t); // (the instruments on screen, exaggerated)
       s.section = sectionAt(data.sections, t);
+      return true;
+    },
+    get state() { return state; },
+    get data() { return data; },
+    draw(g, w, h, t, bgRgb) {
+      if (id === 'none' || failed) return;
+      const t0 = performance.now();
+      if (!driver.prepare(w, h, t, bgRgb, g.getTransform().a || 1)) return;
+      if (!viz || vizFor !== id) {
+        viz = VISUALIZERS.find((v) => v.id === id).create({ song: data });
+        vizFor = id;
+      }
       g.save();
       try {
-        viz.draw(g, s); // (the blur is the CSS #bgGlass layer, not drawn here)
+        viz.draw(g, state); // (the blur is the CSS #bgGlass layer, not drawn here)
       } catch (err) {
         failed = true; // never take the whole chart down with a background
         console.error('Visualizer failed:', err);

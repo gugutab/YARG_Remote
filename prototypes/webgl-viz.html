@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebGL visualizer prototype</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #0d1117; color: #c9ccd3; font: 13px system-ui, sans-serif; overflow: hidden; }
+  #stage { position: fixed; inset: 0 0 56px 0; display: flex; }
+  #stage canvas { flex: 1 1 0; min-width: 0; width: 100%; height: 100%; display: block; }
+  #bar { position: fixed; left: 0; right: 0; bottom: 0; height: 56px; display: flex; gap: 14px; align-items: center; padding: 0 14px; background: #131722; border-top: 1px solid #232838; box-sizing: border-box; }
+  select, button { background: #1c2130; color: inherit; border: 1px solid #2a3042; border-radius: 6px; padding: 4px 8px; font: inherit; }
+  #hud { position: fixed; top: 8px; left: 10px; background: rgba(10, 12, 20, 0.72); border: 1px solid #232838; border-radius: 8px; padding: 8px 10px; line-height: 1.5; font-variant-numeric: tabular-nums; pointer-events: none; }
+  #hud b { color: #fff; font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="c2d"></canvas><canvas id="cgl"></canvas></div>
+<div id="hud">loading…</div>
+<div id="bar">
+  <label>visualizer <select id="viz"><option value="rings">Beat rings</option><option value="aurora">Aurora</option><option value="warp">Warp</option></select></label>
+  <label>renderer <select id="mode"><option value="both">both (2D | WebGL)</option><option value="canvas">2D canvas</option><option value="webgl">WebGL</option></select></label>
+  <button id="play">Pause</button>
+</div>
+<script type="module" src="webgl-viz.js"></script>
+</body>
+</html>
