@@ -4,7 +4,7 @@
 import {
   NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, sprite3D, noteSpritePx, NOTE_RECT_W, NOTE_RECT_H, NOTE_TRI_W, NOTE_TRI_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
   ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, setDesaturated, isDesaturated, dcol, desaturate, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, ROLL_COLUMN_ALPHA, ROLL_LEAD_SEC, HIT_LINE_COLOR, HIT_LINE_BORDER, HIT_LINE_BORDER_SOFT, drawHitBurst, drawBarBurst, BURST_SEC, BAR_BURST_SEC, BURST_LOOP_SEC, BURST_VANISH_SEC, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
-  laneLookFactor
+  laneLookFactor, HIT_Y
 } from './gfx.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the flat view shows 2.5)
@@ -542,10 +542,9 @@ export function renderLanes3D(hw, t, w, h) {
   const laneW = roadW / lanes;
   const headR = HEAD_R * hw.noteSize; // (setting highway.noteScale: heads and pads)
   const padRy = laneW * headR * 1.05 * HEAD_TILT; // vertical radius of the hit pads
-  // The hit line (the pads) sits at a height that depends on the pane's height alone, so the panes of a stage (different instruments, different widths) stay aligned whatever the resize:
-  // the pad radius it leaves room for is that of the widest road a 4-lane pane can have (the road is capped at 1.2 of the height). The 26 px below the pads hold the bottom fade.
-  const padRyRef = ((h * 1.2) / 4) * headR * 1.05 * HEAD_TILT;
-  const hitY = h - (Math.max(padRy, padRyRef) + 26);
+  // The hit line (the pads) sits at HIT_Y of the pane's height, the same fraction as in 2D, so the panes of a stage (different instruments, different widths) stay aligned whatever the
+  // resize. The pads are cut by the pane's bottom edge a little, as the road fades out there.
+  const hitY = h * HIT_Y;
   const cx = w / 2;
   const windowSec = (DEPTH_SEC / hw.neck) * laneLookFactor(h); // neck speed shortens or stretches the visible time; a taller window shows more of it (fixed pixel speed)
   const proj = projection3D(h, hitY, hw.perspective, hw.curve); // (settings highway.perspective and highway.curve)

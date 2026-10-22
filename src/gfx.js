@@ -162,7 +162,7 @@ export const BASE_LOOKAHEAD_SEC = 2.5; // time from the top edge to the hit line
 export const LANE_REF_H = 700;
 export const laneLookFactor = (h) => Math.min(2.5, Math.max(0.5, h / LANE_REF_H));
 export const ENTRY_MARGIN_SEC = 0.3; // extra window above the top edge, so notes are already moving when they enter
-export const HIT_Y = 0.93; // hit line position as a fraction of canvas height
+export const HIT_Y = 0.97; // hit line position as a fraction of canvas height (2D and 3D alike: the panes of different instruments share one height)
 
 // First note that can still be drawn at time t. Heads stay for FADE_SEC after they pass the hit line,
 // and a sustain stays until its end, so look back by the longest sustain in the chart.
