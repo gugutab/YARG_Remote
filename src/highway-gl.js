@@ -306,45 +306,70 @@ void main() {
   }
   o = vec4(sum * edgeFade(v_y), 0.0);
 }`],
-  // the effect "solid": a note as a real block lying on the road (its top, its front and the side that faces the middle of the road), lit from above and in front, with a
-  // bevelled rim, a glossy top and the HOPO dot / tap stripe on it. Each corner is projected like the rest of the road (the height lifts it on the screen by the perspective
-  // scale at its depth), so the block gets a true perspective: its far edge is narrower than its near edge, its top is a trapezoid. 3 quads of 6 vertices per note.
-  // Instances (time, lane, length, flags) + (r, g, b, 0); flags: 1 HOPO, 2 tap, 4 accent, 8 ghost. The sprite of the same note is hidden (u_solid in the notes program).
-  solid: [`${COMMON}in vec4 s0; in vec4 s1; out vec4 v_col; out vec2 v_uv; out float v_q, v_y, v_d, v_f;
+  // the effect "solid": the note as a pill lying flat on the road: a capsule of gold metal (the wall all around it and a bezel on top) with a glass dome in the middle,
+  // lit from inside in the lane's colour (a bright core fading to a dark edge, a streak of reflected light, a thin rim light). Each corner of the block is projected like
+  // the road (the height lifts it on the screen by the perspective scale at its depth), so its far edge is narrower than its near edge. Two quads per note (the top and the
+  // front wall; the capsule's ends are round, so there is no side face: the wall is shaded as a cylinder). Instances (time, lane, length, flags) + (r, g, b, 0); flags: 1 HOPO,
+  // 2 tap, 4 accent, 8 ghost. The sprite of the same note is hidden (u_solid in the notes program).
+  solid: [`${COMMON}in vec4 s0; in vec4 s1; out vec4 v_col; out vec3 v_lane; out vec2 v_uv, v_px; out float v_q, v_y, v_d, v_f;
 void main() {
   int q = gl_VertexID / 6; int k = gl_VertexID - q * 6;
   vec2 uv = vec2((k == 1 || k == 3 || k == 4) ? 1.0 : 0.0, (k == 2 || k == 4 || k == 5) ? 1.0 : 0.0);
   float f = s0.w; bool hopo = mod(f, 2.0) >= 1.0, tap = mod(floor(f / 2.0), 2.0) >= 1.0, accent = mod(floor(f / 4.0), 2.0) >= 1.0, ghost = mod(floor(f / 8.0), 2.0) >= 1.0;
   float past = u_t - (s0.x + s0.z); float kx = clamp(past / 0.1, 0.0, 1.0); float sh = 1.0 - 0.5 * kx;
-  bool gone = past > 0.1 || (s0.z > 0.0 && u_t >= s0.x);
+  bool gone = past > 0.1 || (s0.z > 0.0 && u_t >= s0.x) || q > 1;
   float d = clamp((s0.x - u_t) / u_win, 0.0, 1.0);
-  float hw = 0.435 * u_headR / ${HEAD_R.toFixed(2)} * ((hopo || tap) ? 0.7 : 1.0) * sh, hh = (hopo ? 0.2 : 0.16) * u_headR / ${HEAD_R.toFixed(2)} * sh, dd = 0.0065 * (hopo ? 1.15 : 1.0) * sh;
-  float lx = s0.y + 0.5 - u_half; float sgn = lx > 0.0 ? -1.0 : 1.0;
+  float hs = u_headR / ${HEAD_R.toFixed(2)};
+  float hw = 0.435 * hs * ((hopo || tap) ? 0.72 : 1.0) * sh, hh = (hopo ? 0.17 : 0.13) * hs * sh, dd = 0.0085 * (hopo ? 1.1 : 1.0) * sh;
+  float lx = s0.y + 0.5 - u_half;
   float x, dep, hgt;
   if (q == 0) { x = lx + (uv.x * 2.0 - 1.0) * hw; dep = d + dd - uv.y * 2.0 * dd; hgt = hh; } // the top
-  else if (q == 1) { x = lx + (uv.x * 2.0 - 1.0) * hw; dep = d - dd; hgt = (1.0 - uv.y) * hh; } // the front
-  else { x = lx - sgn * hw; dep = d - dd + uv.x * 2.0 * dd; hgt = (1.0 - uv.y) * hh; } // the side towards the middle of the road
-  vec2 px = project(x, dep) - vec2(0.0, hgt * u_laneW * scaleAt(dep));
+  else { x = lx + (uv.x * 2.0 - 1.0) * hw; dep = d - dd; hgt = (1.0 - uv.y) * hh; } // the front wall
+  float sc = scaleAt(dep);
+  vec2 px = project(x, dep) - vec2(0.0, hgt * u_laneW * sc);
   gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(px); v_y = px.y; v_d = d;
-  vec3 col = s1.rgb; if (tap) col = mix(col, vec3(0.1), 0.35);
-  float lit = q == 0 ? 1.0 : q == 1 ? 0.68 : 0.46;
-  vec3 c = col * lit; if (q == 0) c = mix(c, vec3(1.0), 0.2);
-  if (accent) c = mix(c, vec3(1.0), 0.18);
+  v_px = vec2(2.0 * hw * u_laneW * sc, q == 0 ? max(1.0, (u_hit - u_vy) * u_k * sc * sc * 2.0 * dd) : max(1.0, hh * u_laneW * sc)); // the quad's size in px
   float far = clamp((1.0 - d) / 0.14, 0.0, 1.0);
-  v_col = vec4(c, far * (ghost ? 0.5 : 1.0)); v_uv = uv; v_q = float(q); v_f = f;
-}`, `${FS_HEAD}in vec4 v_col; in vec2 v_uv; in float v_q, v_y, v_d, v_f; out vec4 o;
+  v_col = vec4(1.0, 1.0, 1.0, far * (ghost ? 0.5 : 1.0)); v_lane = s1.rgb; v_uv = uv; v_q = float(q); v_f = f + (accent ? 0.0 : 0.0);
+}`, `${FS_HEAD}in vec4 v_col; in vec3 v_lane; in vec2 v_uv, v_px; in float v_q, v_y, v_d, v_f; out vec4 o;
+const vec3 GOLD = vec3(0.93, 0.74, 0.30);
+float sdCapsule(vec2 p, float L, float r) { vec2 q = vec2(max(abs(p.x) - L, 0.0), p.y); return length(q) - r; }
 void main() {
-  vec3 c = v_col.rgb;
-  float e = min(min(v_uv.x, 1.0 - v_uv.x), min(v_uv.y, 1.0 - v_uv.y));
-  c *= mix(0.55, 1.0, smoothstep(0.0, 0.14, e)); // the bevelled rim
-  if (v_q < 0.5) {
-    c += vec3(0.16) * (1.0 - pow(abs(v_uv.x * 2.0 - 1.0), 2.0)) * (1.0 - v_uv.y * 0.6); // the gloss of the top
-    bool hopo = mod(v_f, 2.0) >= 1.0, tap = mod(floor(v_f / 2.0), 2.0) >= 1.0;
-    if (hopo) c = mix(c, vec3(1.0), 0.9 * (1.0 - smoothstep(0.1, 0.17, length((v_uv - 0.5) * vec2(1.0, 0.45)))));
-    if (tap) c = mix(c, vec3(0.04), 0.9 * (1.0 - smoothstep(0.14, 0.2, abs(v_uv.x - 0.5))));
+  float hopo = mod(v_f, 2.0) >= 1.0 ? 1.0 : 0.0, tap = mod(floor(v_f / 2.0), 2.0) >= 1.0 ? 1.0 : 0.0, accent = mod(floor(v_f / 4.0), 2.0) >= 1.0 ? 1.0 : 0.0;
+  vec3 col = v_lane; vec3 c; float alpha = 1.0;
+  if (v_q < 0.5) { // the top: the gold bezel and the glass dome of the capsule
+    float ar = v_px.x / v_px.y; vec2 p = (v_uv - 0.5) * vec2(ar, 1.0); // in units of the capsule's thickness
+    float L = max(0.0, ar * 0.5 - 0.5);
+    float dist = sdCapsule(p, L, 0.5);
+    float aa = 1.0 / v_px.y;
+    alpha = 1.0 - smoothstep(-aa, aa, dist);
+    float bw = 0.15 + 0.05 * accent; // the bezel's width
+    float rr = -dist - bw; // inside the glass: the distance from its edge
+    float metal = 0.62 + 0.55 * (0.5 - p.y * 0.9) + 0.18 * sin(p.x * 11.0 + p.y * 3.0); // a brushed gold bezel, lit from the near side
+    vec3 bez = GOLD * metal; bez += vec3(0.4) * (1.0 - smoothstep(0.0, 0.035, -dist)); // the bright outer edge
+    bez = mix(bez, col, 0.06);
+    float t = clamp(rr / (0.5 - bw), 0.0, 1.0);
+    float along = 1.0 - pow(clamp(abs(p.x) / (L + 0.45), 0.0, 1.0), 2.5);
+    float core = pow(t, 0.6) * (0.35 + 0.65 * along); // the light inside: strongest in the middle of the dome
+    vec3 glass = mix(col * 0.22, mix(col, vec3(1.0), 0.4) * 1.55, core);
+    glass += vec3(0.55) * (1.0 - smoothstep(0.0, 0.05, abs(p.y + 0.12))) * smoothstep(L * 0.95 + 0.3, L * 0.3, abs(p.x)) * t; // the streak of reflected light
+    glass += col * 0.5 * (1.0 - smoothstep(0.0, 0.05, rr)) * step(0.0, rr); // the rim light where the glass meets the metal
+    if (hopo > 0.5) glass = mix(glass, vec3(1.0), 0.85 * (1.0 - smoothstep(0.08, 0.15, length(p * vec2(0.7, 1.0))))); // a pearl in the middle
+    if (tap > 0.5) glass = mix(glass, vec3(0.02), 0.85 * (1.0 - smoothstep(0.1, 0.16, abs(p.x))) * t); // a dark stripe across
+    c = rr > 0.0 ? glass : bez;
+    if (accent > 0.5 && rr <= 0.0) c += vec3(0.2);
+  } else { // the front wall: gold, shaded as the side of a cylinder (darker towards the ends), lit at the top edge and darker at the base
+    float cyl = 0.55 + 0.45 * (1.0 - pow(abs(v_uv.x * 2.0 - 1.0), 2.2));
+    float vert = mix(1.12, 0.42, v_uv.y);
+    c = GOLD * cyl * vert;
+    c += vec3(0.35) * (1.0 - smoothstep(0.0, 0.1, v_uv.y)) * cyl; // the edge where the top meets the wall
+    c = mix(c, col, 0.16 * (1.0 - v_uv.y)); // the dome's light spills on the metal
+    vec2 pp = (v_uv - 0.5) * v_px; float r = min(v_px.y * 0.5, 9.0);
+    vec2 qq = abs(pp) - (v_px * 0.5 - r); float sdf = length(max(qq, 0.0)) + min(max(qq.x, qq.y), 0.0) - r;
+    alpha = v_uv.y < 0.5 ? 1.0 : 1.0 - smoothstep(-0.7, 0.7, sdf); // (the lower corners are rounded)
   }
   c = mix(c, vec3(0.10, 0.14, 0.24), u_fog * 0.5 * smoothstep(0.1, 1.0, v_d)); // (the fog of the other effect, when it is on)
-  float a = v_col.a * edgeFade(v_y);
+  float a = alpha * v_col.a * edgeFade(v_y);
   o = vec4(c * a, a);
 }`],
 
@@ -841,7 +866,7 @@ export class GLBoard {
         use('solid');
         const first = sol.count - sTo;
         this.vao(d, 'solid', () => { gl.bindBuffer(gl.ARRAY_BUFFER, sol.buf); this.attrib(pr, 's0', 4, 32, first * 32, 1); this.attrib(pr, 's1', 4, 32, first * 32 + 16, 1); });
-        this.inst(gl.TRIANGLES, 0, 18, sTo - sFrom);
+        this.inst(gl.TRIANGLES, 0, 12, sTo - sFrom);
       }
     }
 
