@@ -596,6 +596,7 @@ export class Highway {
     this.glActive = this.glWanted(w, h, Math.min(lanePanes, Math.max(1, Math.floor(w / this.paneMin))));
     if (this.glActive) this.glBoard.begin(w, h, this.canvas.width / w, `${this.noteBase}`); // (clears the board's canvas: the panes it draws are painted below)
     else if (this.glBoard && this.glWas) this.glBoard.begin(w, h, 1), this.glBoard.dropAll(); // (switched to the 2D code: blank canvas, buffers freed)
+    if (this.glBoard && this.glWas !== this.glActive) this.glCanvas.style.display = this.glActive ? '' : 'none'; // (a board that is not drawing this frame costs no compositing)
     this.glWas = this.glActive;
     if (!this.panes.length) return; // the page shows its own welcome / loading overlay
     let vocal = null; // the first vocal chart, and the other charts in order (loops over scratch arrays: find/filter/slice/map made new ones per frame)

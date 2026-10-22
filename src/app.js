@@ -73,7 +73,7 @@ let frameSleep = 0; // the timer while the frame loop ticks slowly (paused and i
 { const invalidate = highway.invalidate; highway.invalidate = function () { invalidate.call(this); wakeLoop(); }; } // (any change to the picture wakes a sleeping loop)
 highway.setBackgroundCanvas(document.getElementById('bgCanvas'));
 highway.setGlCanvas(document.getElementById('highwayGl'));
-{ const r = new URLSearchParams(location.search).get('renderer'); if (r === 'webgl' || r === 'auto' || r === 'canvas') highway.renderer = r; } // (until the setting exists: ?renderer=webgl|auto|canvas)
+const urlRenderer = (() => { const r = new URLSearchParams(location.search).get('renderer'); return r === 'webgl' || r === 'auto' || r === 'canvas' ? r : null; })(); // (?renderer=webgl|auto|canvas overrides the setting perf.renderer: for tests and benchmarks)
 const perf = new PerfMeter();
 let perfMode = 'off'; // the perf.overlay setting, kept here so the frame loop does not read the prefs every frame
 const perfOverlay = createPerfOverlay({
@@ -3815,6 +3815,7 @@ const EFFECTS = {
   'perf.fpsCap': (v) => { frameCap.set(v === 'auto' ? 0 : Number(v)); adaptive.quiet(performance.now()); },
   'perf.economy': (v) => { economyOn = !!v; applyQuality(); },
   'perf.renderScale': () => applyQuality(),
+  'perf.renderer': (v) => { highway.renderer = urlRenderer ?? v; },
   'perf.adaptive': (v) => { adaptiveOn = !!v; adaptive.reset(); applyQuality(); },
   'details.chips': applyDetails, 'details.cover': applyDetails, 'details.quote': applyDetails, 'details.sections': applyDetails,
   'details.layout': applyDetails, 'details.stemNames': applyDetails, 'details.maxWidth': applyDetails, 'details.compact': applyDetails,

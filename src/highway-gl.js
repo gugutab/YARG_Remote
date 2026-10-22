@@ -69,6 +69,7 @@ const FS_HEAD = `#version 300 es
 precision highp float;
 ${UNIFORMS}
 float sm5(float u) { u = clamp(u, 0.0, 1.0); return u * u * u * (u * (u * 6.0 - 15.0) + 10.0); }
+float topFade(float y) { return sm5((y - u_c) / u_fh); }
 float edgeFade(float y) {
   float top = sm5((y - u_c) / u_fh);
   float b = clamp((y - u_padB) / max(1.0, u_res.y - u_padB), 0.0, 1.0);
@@ -77,7 +78,7 @@ float edgeFade(float y) {
 }
 `;
 const FS_COLOR = `${FS_HEAD}in vec4 v_col; in float v_y; uniform float u_noFade; out vec4 o;
-void main() { float a = v_col.a * mix(edgeFade(v_y), 1.0, u_noFade); o = vec4(v_col.rgb * a, a); }`;
+void main() { float a = v_col.a * (u_noFade > 1.5 ? topFade(v_y) : mix(edgeFade(v_y), 1.0, u_noFade)); o = vec4(v_col.rgb * a, a); } // (u_noFade: 0 the whole fade, 1 none, 2 the far edge only: the dark base reaches the bottom of the pane)`;
 
 const PROGRAMS = {
   // the road, lane lines and rails (triangles in (lane x, fraction of the depth range) space) and the dark base
@@ -402,9 +403,9 @@ export class GLBoard {
       quad(-half - 0.03, -half + 0.03, d0, d1, [1, 1, 1, 0.4]); // the rails
       quad(half - 0.03, half + 0.03, d0, d1, [1, 1, 1, 0.4]);
     }
-    const base = [];
-    for (const [x, d] of [[-half, 0], [half, 0], [-half, 1], [half, 0], [half, 1], [-half, 1]]) base.push(x, d, 0, 0, 0, 1);
-    r = { road: { buf: this.buffer(f32(v)), count: v.length / 6 }, base: { buf: this.buffer(f32(base)), count: 6 } };
+    const base = []; // (in rows like the road: a curved road bends its edges, and a single quad would stay straight and stick out past the rails)
+    for (let i = 0; i < S; i++) for (const [x, d] of [[-half, i / S], [half, i / S], [-half, (i + 1) / S], [half, i / S], [half, (i + 1) / S], [-half, (i + 1) / S]]) base.push(x, d, 0, 0, 0, 1);
+    r = { road: { buf: this.buffer(f32(v)), count: v.length / 6 }, base: { buf: this.buffer(f32(base)), count: base.length / 6 } };
     this.roads.set(key, r);
     return r;
   }
@@ -662,7 +663,7 @@ export class GLBoard {
     // the road, then its dark base behind it (premultiplied blending cannot draw behind: the base goes first, the road on top of it)
     const road = this.roadGeometry(lanes, o.laneStripes);
     use('flat');
-    gl.uniform1f(pr.u.u_noFade, 1);
+    gl.uniform1f(pr.u.u_noFade, 2);
     gl.uniform1f(pr.u.u_amul, o.trackOpacity * o.boardK);
     this.vao(d, 'base', () => { gl.bindBuffer(gl.ARRAY_BUFFER, road.base.buf); this.attrib(pr, 'a_pos', 2, 24, 0, 0); this.attrib(pr, 'a_col', 4, 24, 8, 0); });
     this.calls++;
