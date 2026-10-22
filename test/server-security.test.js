@@ -40,6 +40,10 @@ function makeApp() {
   put('src/notes.md', 'markdown');
   put('vendor/soundtouch.js', 'vendor');
   put('vendor/README.md', 'readme');
+  put('prototypes/p.html', '<html>proto</html>');
+  put('prototypes/p.js', 'export default 2;');
+  put('prototypes/secret.mid', 'MIDI SECRET');
+  put('prototypes/notes.md', 'markdown');
   put('server.mjs', 'SERVER SECRET');
   put('package.json', '{"secret":1}');
   put('CLAUDE.md', 'notes');
@@ -84,6 +88,7 @@ test('item 1: encoded traversal inside the app root is refused', async () => {
       '/src/..%2fCLAUDE.md', '/src/..%2fREADME.md', '/src/..%2ftest/x.test.js', '/src/..%2fscripts/s.mjs',
       '/src/%2e%2e%2fserver.mjs', '/src/%2e%2e/server.mjs', '/src/..%2f..%2fserver.mjs', '/src/%252e%252e%252fserver.mjs',
       '/src/.hidden.js', '/src/notes.md', '/vendor/README.md', '/src%2f..%2fserver.mjs', '/src/%00.js', '/src/app.js%00.txt',
+      '/prototypes/secret.mid', '/prototypes/notes.md', '/prototypes/..%2fserver.mjs', '/prototypes/%2e%2e%2fpackage.json',
       '/server.mjs', '/package.json', '/CLAUDE.md', '/.git/config', '/.cache/library.json', '/test/x.test.js', '/src/..%5c..%5cserver.mjs',
       '/src/%ZZ', '/src/app.js::$DATA',
     ];
@@ -98,7 +103,7 @@ test('item 1: encoded traversal inside the app root is refused', async () => {
 test('item 1: the app files the page needs are still served', async () => {
   await withServer({}, async (base) => {
     for (const [p, type] of [['/', 'text/html'], ['/index.html', 'text/html'], ['/styles.css', 'text/css'],
-      ['/src/app.js', 'text/javascript'], ['/vendor/soundtouch.js', 'text/javascript']]) {
+      ['/src/app.js', 'text/javascript'], ['/vendor/soundtouch.js', 'text/javascript'], ['/prototypes/p.html', 'text/html'], ['/prototypes/p.js', 'text/javascript']]) {
       const r = await raw(base, p);
       assert.equal(r.status, 200, p);
       assert.ok(r.headers['content-type'].startsWith(type), p);

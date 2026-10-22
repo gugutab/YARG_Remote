@@ -23,7 +23,7 @@ import { parseSng, readSngBytes, findSngFile, isSngName } from './src/sng.js';
 
 const APP_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP_FILES = new Set(['index.html', 'styles.css', 'manifest.webmanifest', 'sw.js']);
-const APP_DIRS = ['src', 'vendor'];
+const APP_DIRS = ['src', 'vendor', 'prototypes']; // (prototypes: standalone pages like prototypes/webgl-fretboard.html, which import ../src; only web file types, see APP_EXTS)
 // Inside APP_DIRS only what the page loads (scripts, styles, markup, images); never README/licence text or dotfiles.
 const APP_EXTS = new Set(['.js', '.mjs', '.css', '.html', '.json', '.png', '.jpg', '.jpeg', '.webp', '.svg', '.woff2']);
 // /songs serves song packs only: no extension that a browser would run (html, js, css, svg...) is ever sent from the app origin.

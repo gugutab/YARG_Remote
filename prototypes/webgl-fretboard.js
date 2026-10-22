@@ -434,6 +434,30 @@ $('file').addEventListener('change', async (e) => {
   reload();
 });
 for (const id of ['part', 'diff', 'synth']) $(id).addEventListener('change', reload);
+// Served by the app's own server (npm start): its library fills a song list, and a song's notes.mid is fetched from /songs/<folder>/notes.mid.
+async function loadSongList() {
+  try {
+    const lib = await (await fetch('/api/library')).json();
+    const songs = (lib.songs || []).filter((s) => s.folder).sort((a, b) => `${a.artist} ${a.title}`.localeCompare(`${b.artist} ${b.title}`));
+    if (!songs.length) return;
+    $('song').innerHTML = '<option value="">(pick a song)</option>' + songs.map((s) => `<option value="${encodeURIComponent(s.folder).replace(/%2F/g, '/')}">${(s.artist || '?').replace(/</g, '&lt;')} - ${(s.title || s.folder).replace(/</g, '&lt;')}</option>`).join('');
+    $('songLabel').hidden = false;
+  } catch { /* not served by the app's server: only the file input and the synthetic notes */ }
+}
+$('song').addEventListener('change', async () => {
+  if (!$('song').value) return;
+  try {
+    const res = await fetch(`/songs/${$('song').value}/notes.mid`);
+    if (!res.ok) throw new Error(`${res.status}`);
+    midi = parseMidi(new Uint8Array(await res.arrayBuffer()));
+    $('synth').value = 0;
+    $('msg').textContent = '';
+    fillSelectors();
+    reload();
+    songTime = 0;
+  } catch (e) { $('msg').textContent = `This song has no notes.mid (${e.message}); .chart and .sng songs are not read by the prototype.`; }
+});
+loadSongList();
 $('play').addEventListener('click', () => { playing = !playing; $('play').textContent = playing ? 'Pause' : 'Play'; });
 $('seek').addEventListener('input', () => { songTime = Number($('seek').value); });
 
