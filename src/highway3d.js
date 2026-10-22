@@ -39,11 +39,11 @@ function discEdgeGradient(g, sp) {
   const i = sp ? (isDesaturated() ? 2 : 1) : 0;
   if (!discEdges[i]) {
     const edge = g.createLinearGradient(0, 0, 0, 1);
-    const m = sp ? ['#f0d060', '#a37c00', '#3d2e00'].map(i === 2 ? desaturate : (c) => c) : ['#d4dae1', '#7f8893', '#30353b'];
+    const m = sp ? ['#d9b64a', '#a07d18', '#4d3b08'].map(i === 2 ? desaturate : (c) => c) : ['#9ea2a9', '#6e7278', '#3a3c40']; // (the metal of the rectangular note's caps: light to dark grey or gold)
     edge.addColorStop(0, m[0]);
     edge.addColorStop(0.45, m[1]);
     edge.addColorStop(0.75, m[2]);
-    edge.addColorStop(1, sp ? (i === 2 ? withAlpha(desaturate('#3d2e00'), 0.35) : 'rgba(61,46,0,0.35)') : 'rgba(48,53,59,0.35)'); // the metal fades into the road at the bottom: depth
+    edge.addColorStop(1, sp ? (i === 2 ? withAlpha(desaturate('#4d3b08'), 0.35) : 'rgba(77,59,8,0.35)') : 'rgba(58,60,64,0.35)'); // the metal fades into the road at the bottom: depth
     discEdges[i] = edge;
   }
   return discEdges[i];
@@ -487,7 +487,7 @@ function sideBorders3D(g, spans, left, right, xl, xr) {
 // disc with a metal edge); headStyle: the outline (cymbals of the other styles: a rounded triangle).
 function drawHead3D(g, x, y, rx, ry, vy, n, colors, body, lw, disc, headStyle) {
   // thickness: a thin darker edge underneath the top face (no cast shadow; all of it moves, grows and fades with the note)
-  const th = Math.max(0.5, rx * (disc ? 0.27 : 0.21)); // (a little thicker in the rectangular style)
+  const th = Math.max(0.5, rx * (disc ? 0.1 : 0.21)); // (the cymbal disc's metal edge hugs the disc: 0.1 of its radius, it was 0.27)
   if (disc) { // the rectangular style: the edge under the disc is metal like the caps (not a dark shade of the colour)
     const y0 = y + ry * 0.4; // the gradient runs from y0 down to y + th + ry: a unit gradient (0..1) under that translate and scale
     const span = y + th + ry - y0;

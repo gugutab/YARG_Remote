@@ -1186,7 +1186,8 @@ function cymbalGradients(g) {
     const cone = g.createRadialGradient(-0.25, -0.3, 0, 0, 0, 1);
     cone.addColorStop(0, 'rgba(255,255,255,0.6)');
     cone.addColorStop(1, 'rgba(0,0,0,0.12)');
-    cymbalGrads = { chrome: [chrome(['#eef2f6', '#9aa3ad', '#e3e9f0', '#2e3237']), chrome(['#fff0a0', '#b88a00', '#ffe27a', '#3d2e00']), chrome(['#fff0a0', '#b88a00', '#ffe27a', '#3d2e00'].map((c) => desaturate(c)))], cone };
+    // (the metal of the rectangular note's caps: centre to rim, light to dark grey or gold)
+    cymbalGrads = { chrome: [chrome(['#b8bcc2', '#7f8389', '#9ea2a9', '#3a3c40']), chrome(['#d9b64a', '#a07d18', '#bf9627', '#4d3b08']), chrome(['#d9b64a', '#a07d18', '#bf9627', '#4d3b08'].map((c) => desaturate(c)))], cone };
   }
   return cymbalGrads;
 }
