@@ -813,7 +813,7 @@ function capProfile(pal) {
   }
   return stops;
 }
-const CAP_CHROME = { fill: '#55585d', outer: '#3a3c40', ridge: '#9a9ea5', light: '#c4c8ce', white: '#e2e5ea', inner: '#45484d' }; // (dark grey to light grey: a metal look; it was near black to near white)
+const CAP_CHROME = { fill: '#4d5055', outer: '#3a3c40', ridge: '#7f8389', light: '#9ea2a9', white: '#b8bcc2', inner: '#45484d' }; // (dark grey to light grey: a metal look; it was near black to near white)
 const CAP_GOLD = { fill: '#3a2c00', outer: '#140e00', ridge: '#a77d00', light: '#e8b923', white: '#fff3b8', inner: '#241a00' };
 const goldDesat = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, desaturate(v)]));
 const CAP_STOPS = [capProfile(CAP_CHROME), capProfile(CAP_GOLD), capProfile(goldDesat(CAP_GOLD))]; // (the third: star power's gold when desaturated)
