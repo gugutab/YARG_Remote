@@ -814,7 +814,7 @@ function capProfile(pal) {
   return stops;
 }
 const CAP_CHROME = { fill: '#4d5055', outer: '#3a3c40', ridge: '#7f8389', light: '#9ea2a9', white: '#b8bcc2', inner: '#45484d' }; // (dark grey to light grey: a metal look; it was near black to near white)
-const CAP_GOLD = { fill: '#3a2c00', outer: '#140e00', ridge: '#a77d00', light: '#e8b923', white: '#fff3b8', inner: '#241a00' };
+const CAP_GOLD = { fill: '#6b5410', outer: '#4d3b08', ridge: '#a07d18', light: '#bf9627', white: '#d9b64a', inner: '#58440a' }; // (dark gold to light gold, as the chrome's dark grey to light grey)
 const goldDesat = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, desaturate(v)]));
 const CAP_STOPS = [capProfile(CAP_CHROME), capProfile(CAP_GOLD), capProfile(goldDesat(CAP_GOLD))]; // (the third: star power's gold when desaturated)
 const goldIndex = (sp) => (sp ? (desat ? 2 : 1) : 0);
@@ -845,9 +845,9 @@ function ynGradients(g, side, gold) {
     const fr = 3.4 * Math.max(0.5, side); // half height of the floor shadow
     const shadow = linGrad(g, 0, fy - fr, 0, fy + fr, [[0, 'rgba(0,0,0,0)'], [0.5, 'rgba(0,0,0,0.55)'], [1, 'rgba(0,0,0,0)']]);
     // the top face's dark line at row 88 is the design's contact shadow under the body
-    const gold = ['#1c1600', '#120e00', '#5a4a14', ['#2a2200', '#6a5415', '#98801f', '#3c3008', '#120d00']];
+    const gold = ['#3d3208', '#30270a', '#7a6218', ['#4a3c0c', '#8a6d1a', '#b08c28', '#5e4a10', '#3a2e08']]; // (the base: dark gold to light gold)
     const goldD = [...gold.slice(0, 3).map((c) => desaturate(c)), gold[3].map((c) => desaturate(c))];
-    pair = [['#141414', '#0c0c0c', '#4a4a4a', ['#23272b', '#5e646c', '#8d939b', '#3a3e43', '#121416']], gold, goldD].map((c) => ({
+    pair = [['#2f3135', '#26282b', '#5a5d62', ['#3d4045', '#7f8389', '#9ea2a9', '#55585d', '#34363a']], gold, goldD].map((c) => ({
       top: linGrad(g, 0, Math.min(top0, top1 - 0.01), 0, top1, [[0, c[0]], [0.7, c[1]], [1, c[2]]]),
       front: linGrad(g, 0, top1, 0, Math.max(front1, top1 + 0.01), c[3].map((col, i) => [[0, 0.3, 0.55, 0.8, 1][i], col])),
       shadow, fy, fr,
