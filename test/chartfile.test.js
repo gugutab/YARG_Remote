@@ -189,7 +189,7 @@ test('per difficulty: star power, solo and forced/tap/open flags stay in their o
 
 test('per difficulty: drum fills, rolls and cymbal flags do not leak', () => {
   const midi = parseChart(chartText({
-    extra: section('ExpertDrums', ['  0 = N 2 0', '  0 = N 66 0', '  48 = N 2 0', '  0 = S 65 96', '  500 = S 64 100'])
+    extra: section('ExpertDrums', ['  0 = N 2 0', '  0 = N 66 0', '  48 = N 2 0', '  48 = N 66 0', '  0 = S 65 96', '  500 = S 64 100'])
       + section('HardDrums', ['  0 = N 2 0', '  192 = N 1 0', '  224 = N 2 0', '  256 = N 1 0', '  192 = S 66 96']),
   }));
   const pro = instrumentOptions(midi).find((o) => o.id === 'drums-pro');

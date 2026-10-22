@@ -84,3 +84,18 @@ test('drum rolls: markers over one or two notes are not lanes (YARG validation)'
   ]);
   assert.deepEqual(buildChart(midi, DRUMS, EXPERT).rolls, []);
 });
+
+test('drum rolls: in 4 lanes a tremolo ends at the same-colour counterpart and a lone-kick start is invalid', () => {
+  const tom = (tick, pitch) => ({ tick, pitch, len: 40 });
+  // yellow (98) tom, yellow again, then the yellow cymbal (110 marker toggles it) and a last tom: the tremolo ends at the cymbal hit
+  const midi = trackMidi('PART DRUMS', [
+    tom(0, 98), tom(120, 98), tom(240, 98), tom(360, 98), { tick: 240, pitch: 110, len: 40 }, { tick: 0, pitch: 126, len: 480 },
+  ]);
+  const four = buildChart(midi, DRUMS, EXPERT).rolls;
+  assert.equal(four.length, 1);
+  assert.deepEqual(four[0].lanes, [1]);
+  assert.ok(four[0].end <= 0.25 + 1e-6, 'ends where the cymbal is hit'); // 240 ticks = 0.25 s at 120 bpm
+  // a tremolo that starts on a lone kick is not a lane
+  const kickFirst = trackMidi('PART DRUMS', [tom(0, 96), tom(120, 98), tom(240, 98), { tick: 0, pitch: 126, len: 480 }]);
+  assert.deepEqual(buildChart(kickFirst, DRUMS, EXPERT).rolls, []);
+});

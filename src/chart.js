@@ -330,7 +330,10 @@ function rollSpans(track, toSec) {
 //  - trill: at least three hits, the first a single pad, the second a different single pad, the third the first pad again (kicks ignored);
 //  - kick lane: more than one kick.
 // A hit is the notes sharing a time; `notes` are sorted by time (lane -1 = a kick).
-export function validRolls(rolls, notes) {
+// `fourLane` (the 4-lane and Pro drums, not 5 lanes): the tom and the cymbal of a colour are different pads, and a tremolo ends when the other pad of its colour shows up
+// (GetDrumTremoloPad / GetDrumTremoloNotes: a tremolo that starts on a chord goes to the first of its pads that comes back alone; the other pad of the same colour
+// before that rules a pad out, or invalidates a single-pad tremolo; a lone kick as the first hit is invalid).
+export function validRolls(rolls, notes, fourLane = false) {
   return rolls.filter((r) => {
     const hits = [];
     for (const n of notes) {
@@ -342,10 +345,28 @@ export function validRolls(rolls, notes) {
     const padsOf = (h) => h.notes.filter((n) => n.lane >= 0).map((n) => n.lane);
     if (r.type === 'kick') { r.lanes = [-1]; return hits.reduce((c, h) => c + h.notes.filter((n) => n.lane < 0).length, 0) > 1; }
     const pads = hits.map(padsOf).filter((p) => p.length > 0); // (kicks alone are not hits of a tremolo or a trill)
-    if (r.type === 'tremolo') { // the lane is the pad of the first hit that comes back
-      const lane = pads.length >= 2 ? pads[0].find((p) => pads.slice(1).some((q) => q.includes(p))) : undefined;
-      if (lane !== undefined) r.lanes = [lane];
-      return lane !== undefined;
+    if (r.type === 'tremolo') {
+      const key = (n) => n.lane + (fourLane && n.cymbal ? 'c' : 't'); // (a pad: its lane, and tom or cymbal in 4 lanes)
+      const counter = (k) => { const l = parseInt(k, 10); return fourLane && l >= 1 && l <= 3 ? l + (k.endsWith('c') ? 't' : 'c') : null; }; // (the other pad of the same colour)
+      const hitPads = hits.map((h) => h.notes.filter((n) => n.lane >= 0).map(key));
+      let cand = [...new Set(hitPads[0] || [])]; // (kicks cannot start a tremolo)
+      let pad = null;
+      if (hits.length >= 2 && cand.length === 1) {
+        const other = counter(cand[0]);
+        scan: for (let i = 1; i < hitPads.length; i++) for (const p of hitPads[i]) { if (other && p === other) break scan; if (p === cand[0]) { pad = p; break scan; } }
+      } else if (hits.length >= 2 && cand.length > 1) {
+        for (let i = 1; i < hitPads.length && pad === null; i++) {
+          const again = [];
+          for (const p of hitPads[i]) { if (cand.includes(p)) again.push(p); else { const o = counter(p); if (o) cand = cand.filter((c) => c !== o); } }
+          if (again.length === 1) pad = again[0];
+        }
+      }
+      if (pad === null) return false;
+      r.lanes = [parseInt(pad, 10)];
+      const other = counter(pad);
+      const stop = other ? hitPads.findIndex((p) => p.includes(other)) : -1;
+      if (stop > 0) r.end = hits[stop].time; // the tremolo ends where the other pad of its colour is hit
+      return true;
     }
     if (r.type === 'trill') {
       const ok = pads.length >= 3 && pads[0].length === 1 && pads[1].length === 1 && pads[1][0] !== pads[0][0] && pads[2].length === 1 && pads[2][0] === pads[0][0];
@@ -388,7 +409,7 @@ function buildDrumChart(midi, track, kind, difficulty, timed, toSec, settings) {
     });
   }
   const notes = [...kicks.values(), ...pads].sort((a, b) => a.time - b.time);
-  const chart = { mode: 'lanes', lanes, laneColors, laneKinds: extended ? EXTENDED_DRUM_LANES.map((l) => (l.cymbal ? 'cymbal' : 'tom')) : null, drumKind: kind, notes, rolls: validRolls(rollSpans(track, toSec), notes), ...commonParts(midi, track, toSec, settings, 'drums') };
+  const chart = { mode: 'lanes', lanes, laneColors, laneKinds: extended ? EXTENDED_DRUM_LANES.map((l) => (l.cymbal ? 'cymbal' : 'tom')) : null, drumKind: kind, notes, rolls: validRolls(rollSpans(track, toSec), notes, !extended && kind !== 'five'), ...commonParts(midi, track, toSec, settings, 'drums') };
   markFillNotes(chart);
   return chart;
 }
