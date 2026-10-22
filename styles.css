@@ -71,6 +71,7 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 /* ---------- Layout ---------- */
 .app { display: flex; height: 100vh; height: 100dvh; } /* dvh follows the visible area on phones; vh is the fallback */
 .main { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--stage, #0d1117); }
+/* (#bgCanvasGl, the WebGL twin of #bgCanvas, takes its place for Beat rings, Aurora and Warp: Highway.drawBackground; the idle one is [hidden]) */
 .bg-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 0; }
 .scrim { display: none; }
 

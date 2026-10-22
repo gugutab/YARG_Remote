@@ -1,5 +1,5 @@
 // Prototype: the three heaviest background visualizers (Beat rings, Aurora, Warp) in two renderers over the same song state: the app's 2D canvas code (createDriver, as
-// the page's background canvas runs it) and WebGL 2 ports (webgl-viz-ports.js).
+// the page's background canvas runs it) and WebGL 2 ports (src/visualizers-gl.js).
 //   npm start      http://localhost:8080/prototypes/webgl-viz.html?viz=aurora&mode=both&t=62&paused=1
 //   params: viz=rings|aurora|warp   mode=both|canvas|webgl   t=<start seconds>   paused=1   scale=0.6 (the app draws its background at this fraction of the resolution)
 //           song=<library folder>   bench=6 (a measured run of 6 s: window.__bench)
@@ -7,7 +7,7 @@
 import { parseMidi } from '../src/midi.js';
 import { buildChart, instrumentOptions, DIFFICULTIES } from '../src/chart.js';
 import { createDriver } from '../src/visualizers.js';
-import { PORTS } from './webgl-viz-ports.js';
+import { PORTS } from '../src/visualizers-gl.js';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
