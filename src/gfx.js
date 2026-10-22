@@ -918,12 +918,12 @@ export function traceYNoteOutline(g, x, y, hw, hh, taper = 0, side = 1) {
   traceYN(g, YN_SIL, 1, taper * (hh / YN_HH), side);
   g.restore();
 }
-// The accent's glow: the note's outline stroked three times, wide and faint to narrow and brighter, in `color`, drawn BEFORE the note so only the part outside it shows.
+// The accent's glow: the note's outline stroked four times, wide and faint to narrow and brighter, in `color`, drawn BEFORE the note so only the part outside it shows.
 // `unit` is the pixel width of a design-size stroke (the note's scale in 3D, 1 in 2D).
 export function glowYNote(g, x, y, hw, hh, taper, side, color, unit) {
   g.save();
   g.lineJoin = 'round';
-  for (const [w, a] of [[16, 0.09], [10, 0.16], [5, 0.3]]) {
+  for (const [w, a] of [[30, 0.08], [20, 0.14], [12, 0.24], [6, 0.4]]) {
     g.beginPath();
     traceYNoteOutline(g, x, y, hw, hh, taper, side);
     g.lineWidth = w * unit;
