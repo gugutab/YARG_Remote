@@ -3731,6 +3731,9 @@ function syncPauseInfo() {
     pauseInfoShown = false; // (the start screen has taken the window over)
   } else if (!want && pauseInfoShown) {
     fadeOutInfo();
+  } else if (!want && !pauseInfoShown && !startScreenOn && !infoTimer && !startDone && !resumeTimer && !loopWait && !prefs.get('playback.keepSongInfo')
+    && els.songInfo.classList.contains('show') && !els.songInfo.classList.contains('closing')) {
+    fadeOutInfo(); // a card nobody owns: the load's start screen ended (a slow load, as in Firefox) and left its `show` behind, so it stayed over the music
   }
 }
 let ppTimer = 0;
