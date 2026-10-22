@@ -537,9 +537,11 @@ const coverViz = (ctx) => {
 // time (never the beat count or a single hit, which made the first version jump), so the motion is steady and only happens when the music does. Instruments
 // that are not on screen are faint. Star power warms the colours.
 const AURORA_POINTS = 28;
+const AURORA_GLOW_DIV = 3; // the two wide, faint glow passes are drawn on a canvas this many times smaller (they are soft: nothing shows) and scaled up
 const auroraViz = (ctx) => {
   const mel = Array.from({ length: 8 }, () => ({ pitch: 0.5, energy: 0 }));
   const sky = memo();
+  let glow = null;
   return {
     draw(g, s) {
       const { w, h } = s;
@@ -558,6 +560,15 @@ const auroraViz = (ctx) => {
       g.globalCompositeOperation = 'lighter';
       g.lineCap = 'round';
       g.lineJoin = 'round';
+      const gw = Math.max(16, Math.ceil(w / AURORA_GLOW_DIV)), gh = Math.max(16, Math.ceil(h / AURORA_GLOW_DIV));
+      if (!glow || glow.width !== gw || glow.height !== gh) glow = makeCanvas(gw, gh);
+      const o = glow.getContext('2d');
+      o.setTransform(1, 0, 0, 1, 0, 0);
+      o.clearRect(0, 0, gw, gh);
+      o.globalCompositeOperation = 'lighter';
+      o.lineCap = 'round';
+      o.lineJoin = 'round';
+      o.setTransform(gw / w, 0, 0, gh / h, 0, 0);
       const step = w / AURORA_POINTS;
       for (let li = 0; li < L; li++) {
         const layer = layers[li];
@@ -580,23 +591,23 @@ const auroraViz = (ctx) => {
         for (let strand = 0; strand < 3; strand++) { // three strands per instrument, a little apart and out of step: a wide veil instead of a single line
           const off = (strand - 1) * thick * 2.6;
           const sph = ph + strand * 1.3;
-          g.beginPath();
+          const path = new Path2D();
           let px = 0;
           let py = 0;
           for (let k = 0; k <= AURORA_POINTS; k++) {
             const x = k * step;
             const y = y0 + off + Math.sin(x * f1 - s.bt * v1 + sph) * amp + Math.sin(x * f2 + s.bt * v2 + sph * 1.7) * amp * 0.5 + Math.sin(x * f3 + s.bt * v3 + sph * 0.6) * amp * 0.22;
-            if (k === 0) g.moveTo(x, y); else g.quadraticCurveTo(px, py, (px + x) / 2, (py + y) / 2); // (smoothed through the midpoints: fewer points than straight segments need)
+            if (k === 0) path.moveTo(x, y); else path.quadraticCurveTo(px, py, (px + x) / 2, (py + y) / 2); // (smoothed through the midpoints: fewer points than straight segments need)
             px = x; py = y;
           }
-          g.lineTo(px, py);
-          [[2.6, 0.03], [1.2, 0.075], [0.4, 0.15]].forEach(([wide, alpha]) => { // soft glow: the same line stroked wide and faint, then narrow and bright (three passes: the stroke is the cost)
-            g.lineWidth = thick * wide;
-            g.strokeStyle = rgba(col, alpha * k0 * (0.55 + 0.6 * e));
-            g.stroke();
-          });
+          path.lineTo(px, py);
+          const a = k0 * (0.55 + 0.6 * e);
+          o.lineWidth = thick * 2.6; o.strokeStyle = rgba(col, 0.03 * a); o.stroke(path); // soft glow: the same line stroked wide and faint, then narrower (both on the small canvas), then narrow and bright (at full size)
+          o.lineWidth = thick * 1.2; o.strokeStyle = rgba(col, 0.075 * a); o.stroke(path);
+          g.lineWidth = thick * 0.4; g.strokeStyle = rgba(col, 0.15 * a); g.stroke(path);
         }
       }
+      g.drawImage(glow, 0, 0, w, h); // (additive, like the passes it replaces)
       g.restore();
     },
   };

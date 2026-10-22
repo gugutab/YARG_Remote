@@ -62,22 +62,34 @@ const measure = async (page) => page.evaluate(async (secs) => {
   return { fps: +(1000 / avg(d)).toFixed(1), fps1pctLow: +(1000 / avg(low)).toFixed(1), over20ms: d.filter((x) => x > 20).length, cbMeanMs: +avg(cb).toFixed(2), cbP95Ms: +(cs[Math.floor(cs.length * 0.95)] || 0).toFixed(2), drawsPerSec: +(((window.__yargDraws || 0) - draws0) / secs).toFixed(0), songAdvancedS: +(Number(document.getElementById('seek')?.value) - seek0).toFixed(1) };
 }, seconds);
 
+// --variants '[{"name":"aurora","settings":{"highway.visualizer":"aurora"}}, ...]': each variant runs `runs` times on top of the base settings (rows are named by variant);
+// a run where the song did not really play is repeated (up to 3 times).
+const variants = args.variants ? JSON.parse(args.variants) : [{ name: 'base', settings: {} }];
 const rows = [];
-for (let r = 0; r < runs; r++) {
-  const ctx = await browser.newContext({ viewport: { width: 1300, height: 760 } });
-  try {
-    await ctx.addInitScript((s) => { try { localStorage.setItem('yargremote.master', '0.02'); localStorage.setItem('yargremote.onboarded', '1'); localStorage.setItem('yargremote.settings', JSON.stringify(s)); } catch { /* storage blocked */ } }, settings);
-    const page = await ctx.newPage();
-    await page.goto(url);
-    await page.waitForFunction(() => document.getElementById('seek') && !document.getElementById('seek').disabled, null, { timeout: 60000 }).catch(() => {});
-    await page.waitForTimeout(8000);
-    if (throttle > 1 && kind === 'chromium') { const cdp = await ctx.newCDPSession(page); await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle }); }
-    await page.click('#play'); // (a real click: browsers keep the AudioContext suspended after a scripted one)
-    // the wait countdown runs first: wait until the song has really moved on
-    const from = Number(await page.evaluate(() => document.getElementById('seek').value));
-    await page.waitForFunction((f) => Number(document.getElementById('seek').value) > f + 1, from, { timeout: 40000 }).catch(() => {});
-    rows.push(await measure(page));
-  } catch (e) { rows.push({ error: String(e).slice(0, 120) }); } finally { await ctx.close(); }
+let tries = 0;
+for (const v of variants) {
+  const vs = { ...settings, ...v.settings };
+  for (let r = 0; r < runs; r++) {
+    const ctx = await browser.newContext({ viewport: { width: 1300, height: 760 } });
+    try {
+      await ctx.addInitScript((s) => { try { localStorage.setItem('yargremote.master', '0.02'); localStorage.setItem('yargremote.onboarded', '1'); localStorage.setItem('yargremote.settings', JSON.stringify(s)); } catch { /* storage blocked */ } }, vs);
+      const page = await ctx.newPage();
+      await page.goto(url);
+      await page.waitForFunction(() => document.getElementById('seek') && !document.getElementById('seek').disabled, null, { timeout: 60000 }).catch(() => {});
+      await page.waitForTimeout(8000);
+      if (throttle > 1 && kind === 'chromium') { const cdp = await ctx.newCDPSession(page); await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle }); }
+      const from = Number(await page.evaluate(() => document.getElementById('seek').value));
+      for (let attempt = 0; attempt < 3; attempt++) { // (a click only while the button reads Play: a second one would pause it)
+        if (/^play/i.test(await page.evaluate(() => document.getElementById('play').getAttribute('aria-label') || ''))) await page.click('#play');
+        const moved = await page.waitForFunction((f) => Number(document.getElementById('seek').value) > f + 1, from, { timeout: 15000 }).then(() => true, () => false);
+        if (moved) break;
+      }
+      const row = await measure(page);
+      if (row.songAdvancedS < seconds * 0.8 && tries++ < 3) { r--; continue; }
+      tries = 0;
+      rows.push({ variant: v.name, ...row });
+    } catch (e) { rows.push({ variant: v.name, error: String(e).slice(0, 120) }); } finally { await ctx.close(); }
+  }
 }
 console.table(rows);
 await browser.close();
