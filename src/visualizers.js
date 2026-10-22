@@ -922,9 +922,7 @@ const eqViz = (ctx) => {
         const idleAt = (k) => 0.04 + 0.03 * Math.sin(k * 0.45 + s.beat.pos * 1.3 + li);
         if (!on) { // an instrument that is not on screen: a faint plain version
           g.fillStyle = rgba(col, 0.15);
-          g.beginPath();
-          for (let k = 0; k < n; k++) g.rect(k * bw + bw * 0.12, 0, bw * 0.76, Math.min(1.3, level(now[k]) + idleAt(k)) * maxH);
-          g.fill();
+          for (let k = 0; k < n; k++) g.fillRect(k * bw + bw * 0.12, 0, bw * 0.76, Math.min(1.3, level(now[k]) + idleAt(k)) * maxH);
           continue;
         }
         const key = `${Math.round(maxH)}|${col}|${L}`;
@@ -943,23 +941,17 @@ const eqViz = (ctx) => {
         echoes.forEach((dt, e) => { // trails: the same spectrum a moment earlier, longer and fainter
           spectrumAt(events, s.t - dt, n, past, spread);
           g.fillStyle = rgba(col, 0.16 - e * 0.04);
-          g.beginPath();
-          for (let k = 0; k < n; k++) g.rect(k * bw + bw * 0.1, 0, bw * 0.8, Math.min(1.3, level(past[k]) + 0.03) * maxH * (1 + 0.06 * (e + 1)));
-          g.fill();
+          for (let k = 0; k < n; k++) g.fillRect(k * bw + bw * 0.1, 0, bw * 0.8, Math.min(1.3, level(past[k]) + 0.03) * maxH * (1 + 0.06 * (e + 1)));
         });
         g.fillStyle = b.ramp;
-        g.beginPath();
-        for (let k = 0; k < n; k++) g.rect(k * bw + bw * 0.12, 0, bw * 0.76, Math.min(1.3, level(now[k]) + idleAt(k)) * maxH);
-        g.fill();
+        for (let k = 0; k < n; k++) g.fillRect(k * bw + bw * 0.12, 0, bw * 0.76, Math.min(1.3, level(now[k]) + idleAt(k)) * maxH);
         g.fillStyle = rgba(tint(col, 0.72), 0.95); // the tips and the peak caps: a light version of the colour, the brightest part of the picture
-        g.beginPath();
         for (let k = 0; k < n; k++) {
           const bh = Math.min(1.3, level(now[k]) + idleAt(k)) * maxH;
-          g.rect(k * bw + bw * 0.12, bh - 4, bw * 0.76, 4);
+          g.fillRect(k * bw + bw * 0.12, bh - 4, bw * 0.76, 4);
           const ph = Math.min(1.3, peak[k] + idleAt(k)) * maxH;
-          if (ph > bh + 6) g.rect(k * bw + bw * 0.12, ph - 3, bw * 0.76, 3);
+          if (ph > bh + 6) g.fillRect(k * bw + bw * 0.12, ph - 3, bw * 0.76, 3);
         }
-        g.fill();
       }
       g.restore();
     },
