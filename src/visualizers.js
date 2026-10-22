@@ -820,7 +820,7 @@ const ringsViz = (ctx) => {
       const unit = Math.min(w, h) / 760;
       const bar = (1 - s.beat.measurePhase) ** 5; // a swell at the downbeat that fades over the bar (the driver's measurePulse is switched off)
       g.save();
-      g.globalCompositeOperation = 'lighter';
+      g.globalCompositeOperation = 'source-over';
       g.lineCap = 'round';
       const rings = ringsAt(beats, s.t, s.beat.interval, life, alive);
       for (let r = 0; r < rings.length; r++) {
@@ -872,6 +872,7 @@ const ringsViz = (ctx) => {
         g.arc(cx, cy, 30 + (1 - s.perc) * maxR * 0.35, 0, TAU);
         g.stroke();
       }
+      g.globalCompositeOperation = 'lighter'; // (the one additive blend: the soft core)
       const core = g.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * (0.2 + 0.03 * bar));
       core.addColorStop(0, rgba(pal.va, 0.22 + 0.3 * bar + 0.2 * s.hit));
       core.addColorStop(1, rgba(pal.va, 0));
