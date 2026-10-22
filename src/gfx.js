@@ -831,7 +831,8 @@ function ynGradients(g, side, gold) {
   if (!ynShared) {
     ynShared = {
       ends: linGrad(g, -82, 0, 82, 0, [[0, 'rgba(0,0,0,0.4)'], [0.1, 'rgba(0,0,0,0)'], [0.9, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.4)']]),
-      baseEnds: linGrad(g, -95.5, 0, 95.5, 0, [[0, 'rgba(0,0,0,0.75)'], [0.06, 'rgba(0,0,0,0.64)'], [0.2, 'rgba(0,0,0,0.26)'], [0.34, 'rgba(0,0,0,0)'], [0.66, 'rgba(0,0,0,0)'], [0.8, 'rgba(0,0,0,0.26)'], [0.94, 'rgba(0,0,0,0.64)'], [1, 'rgba(0,0,0,0.75)']]), // the base fades to black at both ends: it curves away
+      // the base fades at both ends: it curves away. Towards the dark of the caps' metal (dark grey; dark gold; the desaturated gold), no longer to black
+      baseEnds: ['58,60,64', '77,59,8', '70,64,50'].map((c) => linGrad(g, -95.5, 0, 95.5, 0, [[0, 0.75], [0.06, 0.64], [0.2, 0.26], [0.34, 0], [0.66, 0], [0.8, 0.26], [0.94, 0.64], [1, 0.75]].map(([o, a]) => [o, `rgba(${c},${a})`]))),
       capV: linGrad(g, 0, YT - YN_CY, 0, 35, [[0, 'rgba(0,0,0,0.38)'], [0.38, 'rgba(0,0,0,0)'], [0.7, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.22)']]),
       cap: CAP_STOPS.map((stops) => linGrad(g, CAP_FROM, 0, CAP_TO, 0, stops)),
     };
@@ -1093,7 +1094,7 @@ function drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side) 
   traceYN(g, YN_BASE_TOP, 1, k, side);
   g.fillStyle = base.top;
   g.fill();
-  g.fillStyle = S.baseEnds;
+  g.fillStyle = S.baseEnds[goldIndex(n.sp)];
   g.fill();
   // the body (a HOPO: white strips beside the caps; a tap: the HOPO's look with black strips; an accent: a rounded bar along the top of the coloured part in a darker shade
   // of the note's colour; a ghost: the same bar, lighter), then its darker ends over all of it
@@ -1165,7 +1166,7 @@ function drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side) 
   traceYN(g, YN_BASE_FRONT, 1, k, side);
   g.fillStyle = base.front;
   g.fill();
-  g.fillStyle = S.baseEnds; // (the vertical fade above stays; this one only darkens the two ends)
+  g.fillStyle = S.baseEnds[goldIndex(n.sp)]; // (the vertical fade above stays; this one only darkens the two ends)
   g.fill();
   g.restore();
 }
