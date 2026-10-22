@@ -1287,7 +1287,7 @@ const tunnelViz = (ctx) => ({
     const warm = [255, 190, 90];
     const drift = s.t / 45; // one slow turn of the colour wheel in about three minutes
     g.save();
-    g.globalCompositeOperation = 'lighter';
+    g.globalCompositeOperation = 'source-over';
     g.lineJoin = 'round';
     for (let i = 0; i < TUNNEL_RINGS; i++) {
       const q = run + i / TUNNEL_RINGS;
@@ -1312,6 +1312,7 @@ const tunnelViz = (ctx) => ({
       g.lineWidth = (1.2 + 4.5 * z ** 1.5) * unit;
       g.stroke();
     }
+    g.globalCompositeOperation = 'lighter'; // (the one additive blend: the soft core)
     const core = g.createRadialGradient(cx, cy, 0, cx, cy, Math.min(w, h) * 0.3);
     core.addColorStop(0, rgba(mixRgb(pal.va, warm, 0.5 * s.sp), 0.12 + 0.12 * s.density));
     core.addColorStop(1, rgba(pal.va, 0));
