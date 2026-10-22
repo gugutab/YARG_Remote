@@ -169,7 +169,7 @@ void main() {
 }`],
   // notes, bars (kick, open) and pads: sprites from the atlas, one instance each (time, lane, uv rect, size factors, length, bar, bar width in lanes, depth offset of a double kick);
   // a pad is lit by its lane's flash. The burst animation: a head shrinks into the line and is gone after 0.1 s (a long note that has arrived is not drawn); a bar thins out and fades.
-  notes: [`${COMMON}in vec4 a0; in vec4 a1; in vec4 a2; uniform float u_pad, u_atlas, u_bar; uniform float u_flash[8]; out vec2 v_uv; out float v_a, v_boost, v_white, v_y, v_d;
+  notes: [`${COMMON}in vec4 a0; in vec4 a1; in vec4 a2; uniform float u_pad, u_atlas, u_bar, u_solid; uniform float u_flash[8]; out vec2 v_uv; out float v_a, v_boost, v_white, v_y, v_d;
 float easeOut(float k) { return 1.0 - (1.0 - k) * (1.0 - k); }
 void main() {
   vec2 c = vec2(float(gl_VertexID & 1), float((gl_VertexID >> 1) & 1));
@@ -177,7 +177,7 @@ void main() {
   float dr = (a0.x - u_t) / u_win; float d = u_pad > 0.5 ? 0.0 : clamp(dr, 0.0, 1.0) + (bar ? a2.w * u_bar : 0.0);
   vec2 centre = project(a0.y + 0.5 - u_half, d);
   float past = u_t - (a0.x + a2.x); float kx = clamp(past / 0.1, 0.0, 1.0); float e = easeOut(kx);
-  bool gone = u_pad < 0.5 && (past > 0.1 || (a2.x > 0.0 && u_t >= a0.x));
+  bool gone = u_pad < 0.5 && (past > 0.1 || (a2.x > 0.0 && u_t >= a0.x) || (u_solid > 0.5 && !bar && a2.w < 0.5)); // (a solid note has its own block; a2.w is 1 for a cymbal)
   float sc = scaleAt(d); vec2 size;
   if (bar) size = vec2(a2.z * u_laneW * sc / 0.955, max(2.0, (u_hit - u_vy) * u_k * sc * sc * u_bar * (1.0 - 0.55 * e)) * ${(CELL_H / 28).toFixed(3)});
   else size = (a1.xy - a0.zw) * u_atlas * (u_laneW * u_headR * sc / ${REF_RX.toFixed(1)}) * a1.zw * (u_pad > 0.5 ? 1.0 : 1.0 - 0.5 * kx);
@@ -306,6 +306,48 @@ void main() {
   }
   o = vec4(sum * edgeFade(v_y), 0.0);
 }`],
+  // the effect "solid": a note as a real block lying on the road (its top, its front and the side that faces the middle of the road), lit from above and in front, with a
+  // bevelled rim, a glossy top and the HOPO dot / tap stripe on it. Each corner is projected like the rest of the road (the height lifts it on the screen by the perspective
+  // scale at its depth), so the block gets a true perspective: its far edge is narrower than its near edge, its top is a trapezoid. 3 quads of 6 vertices per note.
+  // Instances (time, lane, length, flags) + (r, g, b, 0); flags: 1 HOPO, 2 tap, 4 accent, 8 ghost. The sprite of the same note is hidden (u_solid in the notes program).
+  solid: [`${COMMON}in vec4 s0; in vec4 s1; out vec4 v_col; out vec2 v_uv; out float v_q, v_y, v_d, v_f;
+void main() {
+  int q = gl_VertexID / 6; int k = gl_VertexID - q * 6;
+  vec2 uv = vec2((k == 1 || k == 3 || k == 4) ? 1.0 : 0.0, (k == 2 || k == 4 || k == 5) ? 1.0 : 0.0);
+  float f = s0.w; bool hopo = mod(f, 2.0) >= 1.0, tap = mod(floor(f / 2.0), 2.0) >= 1.0, accent = mod(floor(f / 4.0), 2.0) >= 1.0, ghost = mod(floor(f / 8.0), 2.0) >= 1.0;
+  float past = u_t - (s0.x + s0.z); float kx = clamp(past / 0.1, 0.0, 1.0); float sh = 1.0 - 0.5 * kx;
+  bool gone = past > 0.1 || (s0.z > 0.0 && u_t >= s0.x);
+  float d = clamp((s0.x - u_t) / u_win, 0.0, 1.0);
+  float hw = 0.435 * u_headR / ${HEAD_R.toFixed(2)} * ((hopo || tap) ? 0.7 : 1.0) * sh, hh = (hopo ? 0.2 : 0.16) * u_headR / ${HEAD_R.toFixed(2)} * sh, dd = 0.0065 * (hopo ? 1.15 : 1.0) * sh;
+  float lx = s0.y + 0.5 - u_half; float sgn = lx > 0.0 ? -1.0 : 1.0;
+  float x, dep, hgt;
+  if (q == 0) { x = lx + (uv.x * 2.0 - 1.0) * hw; dep = d + dd - uv.y * 2.0 * dd; hgt = hh; } // the top
+  else if (q == 1) { x = lx + (uv.x * 2.0 - 1.0) * hw; dep = d - dd; hgt = (1.0 - uv.y) * hh; } // the front
+  else { x = lx - sgn * hw; dep = d - dd + uv.x * 2.0 * dd; hgt = (1.0 - uv.y) * hh; } // the side towards the middle of the road
+  vec2 px = project(x, dep) - vec2(0.0, hgt * u_laneW * scaleAt(dep));
+  gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(px); v_y = px.y; v_d = d;
+  vec3 col = s1.rgb; if (tap) col = mix(col, vec3(0.1), 0.35);
+  float lit = q == 0 ? 1.0 : q == 1 ? 0.68 : 0.46;
+  vec3 c = col * lit; if (q == 0) c = mix(c, vec3(1.0), 0.2);
+  if (accent) c = mix(c, vec3(1.0), 0.18);
+  float far = clamp((1.0 - d) / 0.14, 0.0, 1.0);
+  v_col = vec4(c, far * (ghost ? 0.5 : 1.0)); v_uv = uv; v_q = float(q); v_f = f;
+}`, `${FS_HEAD}in vec4 v_col; in vec2 v_uv; in float v_q, v_y, v_d, v_f; out vec4 o;
+void main() {
+  vec3 c = v_col.rgb;
+  float e = min(min(v_uv.x, 1.0 - v_uv.x), min(v_uv.y, 1.0 - v_uv.y));
+  c *= mix(0.55, 1.0, smoothstep(0.0, 0.14, e)); // the bevelled rim
+  if (v_q < 0.5) {
+    c += vec3(0.16) * (1.0 - pow(abs(v_uv.x * 2.0 - 1.0), 2.0)) * (1.0 - v_uv.y * 0.6); // the gloss of the top
+    bool hopo = mod(v_f, 2.0) >= 1.0, tap = mod(floor(v_f / 2.0), 2.0) >= 1.0;
+    if (hopo) c = mix(c, vec3(1.0), 0.9 * (1.0 - smoothstep(0.1, 0.17, length((v_uv - 0.5) * vec2(1.0, 0.45)))));
+    if (tap) c = mix(c, vec3(0.04), 0.9 * (1.0 - smoothstep(0.14, 0.2, abs(v_uv.x - 0.5))));
+  }
+  c = mix(c, vec3(0.10, 0.14, 0.24), u_fog * 0.5 * smoothstep(0.1, 1.0, v_d)); // (the fog of the other effect, when it is on)
+  float a = v_col.a * edgeFade(v_y);
+  o = vec4(c * a, a);
+}`],
+
   // the effect "particles": sparks thrown up by every hit and embers rising from a held note, 24 per event, their paths computed in the vertex shader from the event's time
   // (a hash gives each its direction, speed and life; gravity pulls them back): nothing is stored per particle. Instances = events with a divisor of 24; additive.
   sparks: [`${COMMON}in vec4 b0; in vec4 b1; uniform float u_span; out vec2 v_p; out float v_k, v_y, v_r; out vec3 v_col;
@@ -478,7 +520,7 @@ export class GLBoard {
     });
     const inst = []; // stride 12, in time order; reversed below (far notes are drawn before near ones)
     const times = [], lanesOf = [];
-    const tails = [], hits = [], helds = [], barHits = [];
+    const tails = [], hits = [], helds = [], barHits = [], solids = [];
     src.forEach((n, i) => {
       const bar = n.open || n.lane < 0;
       const dk = bar && n.doubleKick ? 2 : 1;
@@ -488,10 +530,11 @@ export class GLBoard {
       else uv = this.cellFor(n.tap ? 't' : n.hopo ? 'h' : 'n', laneColor(n.lane), sp[i]);
       times.push(n.time);
       lanesOf.push(bar ? -1 : n.lane);
-      for (let j = 0; j < dk; j++) inst.push([n.time, bar ? lanes / 2 - 0.5 : n.lane, uv[0], uv[1], uv[2], uv[3], 1, 1, n.length > 0 && !bar ? n.length : 0, bar ? 1 : 0, lanes, j * 1.3]);
+      for (let j = 0; j < dk; j++) inst.push([n.time, bar ? lanes / 2 - 0.5 : n.lane, uv[0], uv[1], uv[2], uv[3], 1, 1, n.length > 0 && !bar ? n.length : 0, bar ? 1 : 0, lanes, bar ? j * 1.3 : (n.cymbal ? 1 : 0)]);
       if (bar) { barHits.push(n.time, 0, 0, 0, ...hexRgb(barColor), n.time); return; }
       const rgb = hexRgb(noteColor({ lane: n.lane, sp: sp[i] }, colors)); // (a star power note's tail and burst take its tinted colour)
       const cym = n.cymbal ? 1 : 0;
+      if (!cym) solids.push({ time: n.time, row: [n.time, n.lane, n.length > 0 ? n.length : 0, (n.hopo ? 1 : 0) + (n.tap ? 2 : 0) + (n.accent ? 4 : 0) + (n.ghost ? 8 : 0), ...rgb, 0] });
       if (n.length > 0) { tails.push({ t0: n.time, t1: n.time + n.length, lane: n.lane, rgb }); helds.push(n.time, n.lane, n.time + n.length, cym, ...rgb, 1); }
       else hits.push(n.time, n.lane, n.time, cym, ...rgb, 0);
     });
@@ -505,6 +548,8 @@ export class GLBoard {
     let maxLen = 0;
     for (const t of tails) maxLen = Math.max(maxLen, t.t1 - t.t0);
     const list = (arr, stride) => ({ buf: this.buffer(f32(arr)), count: arr.length / stride, times: Float32Array.from({ length: arr.length / stride }, (_, i) => arr[i * stride]), maxLen });
+    const solidData = new Float32Array(solids.length * 8);
+    solids.forEach((e, i) => solidData.set(e.row, (solids.length - 1 - i) * 8)); // (latest first, like the sprites)
     const heldB = list(helds, 8);
     heldB.maxLen = maxLen;
     const beatKinds = (chart.beats || []).map((b) => [b.time, b.measure ? 2 : b.strong ? 1 : 0]).flat();
@@ -517,6 +562,7 @@ export class GLBoard {
       tails: { buf: this.buffer(tailData), count: tails.length, starts: Float32Array.from(tails, (t) => t.t0), ends: Float32Array.from(tails, (t) => t.t1), lane: Float32Array.from(tails, (t) => t.lane), maxLen },
       hitB: list(hits, 8),
       heldB,
+      solid: { buf: this.buffer(solidData), count: solids.length, times: Float32Array.from(solids, (e) => e.time) },
       barB: list(barHits, 8),
       beats: { buf: this.buffer(f32(beatKinds)), times: Float32Array.from(chart.beats || [], (b) => b.time) },
       pads: { buf: this.buffer(f32(pads)), count: lanes },
@@ -581,7 +627,7 @@ export class GLBoard {
 
   freeData(d) {
     const gl = this.gl;
-    for (const k of ['notes', 'tails', 'hitB', 'heldB', 'barB', 'beats', 'pads']) gl.deleteBuffer(d[k].buf);
+    for (const k of ['notes', 'tails', 'hitB', 'heldB', 'barB', 'solid', 'beats', 'pads']) gl.deleteBuffer(d[k].buf);
     if (d.bands) gl.deleteBuffer(d.bands.buf);
     for (const v of Object.values(d.vaos)) gl.deleteVertexArray(v);
   }
@@ -700,7 +746,7 @@ export class GLBoard {
     const headR = HEAD_R * o.noteSize;
     const padRy = laneW * headR * 1.05 * 0.55;
     const padB = hit + padRy;
-    const fx = o.fx || {}; // the optional effects (taper, fog, relief, particles): each is on or off
+    const fx = o.fx || {}; // the optional effects (taper, fog, relief, particles, solid): each is on or off
     const v = {
       res: [w, h], hit, vy: proj.vy, k: proj.k, c: proj.c, cx: w / 2, laneW, half: lanes / 2, win: o.windowSec, flip: o.leftHanded ? -1 : 1, headR,
       taper: fx.taper ? 1 : 0, fog: fx.fog ? 1 : 0, relief: fx.relief ? 1 : 0,
@@ -779,6 +825,7 @@ export class GLBoard {
     use('notes');
     gl.uniform1i(pr.u.u_tex, 0); gl.uniform1f(pr.u.u_atlas, ATLAS);
     gl.uniform1f(pr.u.u_pad, 0);
+    gl.uniform1f(pr.u.u_solid, fx.solid ? 1 : 0);
     const notes = d.notes;
     const nFrom = lowerBound(notes.times, t - 0.12), nTo = lowerBound(notes.times, t + win);
     if (nTo > nFrom) {
@@ -787,6 +834,16 @@ export class GLBoard {
       this.inst(gl.TRIANGLE_STRIP, 0, 4, nTo - nFrom);
     }
     const drawn = Math.max(0, nTo - nFrom);
+    if (fx.solid) { // the blocks of the notes that are not cymbals, far ones first
+      const sol = d.solid;
+      const sFrom = lowerBound(sol.times, t - 0.12), sTo = lowerBound(sol.times, t + win);
+      if (sTo > sFrom) {
+        use('solid');
+        const first = sol.count - sTo;
+        this.vao(d, 'solid', () => { gl.bindBuffer(gl.ARRAY_BUFFER, sol.buf); this.attrib(pr, 's0', 4, 32, first * 32, 1); this.attrib(pr, 's1', 4, 32, first * 32 + 16, 1); });
+        this.inst(gl.TRIANGLES, 0, 18, sTo - sFrom);
+      }
+    }
 
     // the hit line bar over the notes and tails: a segment per lane (whiter while it is hit) and a border at each end (the open note / pedal colour when the chart has them)
     if (o.hitLine) {
