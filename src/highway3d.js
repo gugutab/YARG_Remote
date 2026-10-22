@@ -11,6 +11,7 @@ const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck 
 const FAR_SCALE = 0.3; // size of things at the far edge relative to the hit line
 const FAR_TOP = 0.05; // far edge position, as a fraction of the canvas height
 const HEAD_R = 0.36; // note head radius, in lane widths
+const RECT_SCALE = 1.15; // the rectangular notes (and the pads they land on) are this much larger than the other heads
 const HEAD_TILT = 0.55; // vertical squash of the heads (they lie on the road)
 const FADE_IN = 0.14; // fraction of the depth over which notes fade in at the far edge
 const TAIL_TAPER_POWER = 3; // like the heads' TAPER_GAIN: about 3x the natural perspective change
@@ -646,7 +647,9 @@ export function renderLanes3D(hw, t, w, h) {
   for (let i = 0; i < lanes && !hw.hitLine; i++) { // (with the hit line bar on, its coloured segments replace the pads)
     const x = cx + (i + 0.5 - half) * laneW;
     g.beginPath();
-    noteShape(g, x, hitY, padRx * 1.05, padRx * 1.05 * HEAD_TILT, chart.laneKinds?.[i] === 'cymbal' ? 'tri' : hw.noteStyle, hitY - vy);
+    const cymbalPad = chart.laneKinds?.[i] === 'cymbal';
+    const pk = !cymbalPad && hw.noteStyle === 'rect' ? RECT_SCALE : 1; // (the rectangular pads match the larger notes)
+    noteShape(g, x, hitY, padRx * 1.05 * pk, padRx * 1.05 * HEAD_TILT * pk, cymbalPad ? 'tri' : hw.noteStyle, hitY - vy);
     g.fillStyle = withAlpha(colors[i], Math.min(0.9, hw.padFill + 0.5 * flash[i] + 0.35 * barFlash));
     g.fill();
     g.lineWidth = 2;
@@ -799,15 +802,15 @@ export function renderLanes3D(hw, t, w, h) {
     const body = tintWhite(n.sp ? noteColor(n, colors) : n.tap && !faced ? NOTE_PALETTE.tap : colors[n.lane], Math.min(1, kx + amt * (0.32 + 0.12 * shimmer))); // an active long note's head is lighter, like its tail
     g.globalAlpha = (1 - kx) * hw.noteAlpha(n) * Math.min(1, (1 - d) / FADE_IN);
     if (faced) { // the rectangular style: the vector note after the design, with its base in perspective (no separate thickness edge)
-      drawYNote(g, x, y, rx * NOTE_RECT_W, ry * NOTE_RECT_H, n, colors[n.lane], body, TAPER_GAIN / (y - vy), YNOTE_SIDE_3D * hw.noteBase, kx === 0 && amt === 0); // (a held or exiting note changes tint and size every frame: drawn directly)
+      drawYNote(g, x, y, rx * NOTE_RECT_W * RECT_SCALE, ry * NOTE_RECT_H * RECT_SCALE, n, colors[n.lane], body, TAPER_GAIN / (y - vy), YNOTE_SIDE_3D * hw.noteBase, kx === 0 && amt === 0); // (a held or exiting note changes tint and size every frame: drawn directly)
       if (n.accent) {
         g.beginPath();
-        noteShape(g, x, y, rx, ry, 'ynote', y - vy);
+        noteShape(g, x, y, rx * RECT_SCALE, ry * RECT_SCALE, 'ynote', y - vy);
         g.lineWidth = ACCENT_OUTLINE_WIDTH * p;
         g.strokeStyle = darken(colors[n.lane], ACCENT_OUTLINE_DARKEN);
         g.stroke();
       }
-      if (n.activation && hw.fillActivation) drawActivationMark(g, x, y, rx * NOTE_RECT_W, ry * NOTE_RECT_H, p, t);
+      if (n.activation && hw.fillActivation) drawActivationMark(g, x, y, rx * NOTE_RECT_W * RECT_SCALE, ry * NOTE_RECT_H * RECT_SCALE, p, t);
       continue;
     }
     const lw = n.accent ? ACCENT_OUTLINE_WIDTH * p : Math.max(1, 1.5 * p);
