@@ -72,8 +72,7 @@ for (let r = 0; r < runs; r++) {
     await page.waitForFunction(() => document.getElementById('seek') && !document.getElementById('seek').disabled, null, { timeout: 60000 }).catch(() => {});
     await page.waitForTimeout(8000);
     if (throttle > 1 && kind === 'chromium') { const cdp = await ctx.newCDPSession(page); await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle }); }
-    await page.mouse.click(650, 300);
-    await page.keyboard.press('Space'); // (a trusted key press: browsers keep the AudioContext suspended after a scripted click)
+    await page.click('#play'); // (a real click: browsers keep the AudioContext suspended after a scripted one)
     // the wait countdown runs first: wait until the song has really moved on
     const from = Number(await page.evaluate(() => document.getElementById('seek').value));
     await page.waitForFunction((f) => Number(document.getElementById('seek').value) > f + 1, from, { timeout: 40000 }).catch(() => {});
