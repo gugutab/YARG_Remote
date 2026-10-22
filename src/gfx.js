@@ -865,6 +865,13 @@ function bodyGradient(g, color) {
 const ynSprites = new Map(); // cached flat notes (ynSprite)
 const yn3Sprites = new Map(); // cached 3D notes (ynSprite3D): key -> { page, sx, sy, X, Y }
 const yn3Pages = []; // (their atlas pages, see sprite3D)
+// The canvas a sprite is cached on. An OffscreenCanvas is the lighter choice, but in Firefox a drawImage from it into the stage costs about 0.3 ms a call (a copy each time), so it
+// gets a plain canvas element, which stays a GPU surface there.
+const IS_FIREFOX = typeof navigator !== 'undefined' && /Firefox\//.test(navigator.userAgent);
+function spriteCanvas(w, h) {
+  if (typeof OffscreenCanvas === 'function' && !IS_FIREFOX) return new OffscreenCanvas(w, h);
+  return Object.assign(document.createElement('canvas'), { width: w, height: h });
+}
 let yn3Cur = null; // the page being filled
 let yn3Use = 0; // (a counter: the page with the lowest last use is emptied first)
 rebuildYNote(YNOTE_CUT); // (after the gradient caches it resets exist)
@@ -963,7 +970,7 @@ function yn3Alloc(w, h) {
   if (p && p.x + w > YN3_PAGE) { p.x = 0; p.y += p.rowH + YN3_GAP; p.rowH = 0; }
   if (!p || p.y + h > YN3_PAGE) {
     if (yn3Pages.length < YN3_PAGES) {
-      const canvas = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(YN3_PAGE, YN3_PAGE) : Object.assign(document.createElement('canvas'), { width: YN3_PAGE, height: YN3_PAGE });
+      const canvas = spriteCanvas(YN3_PAGE, YN3_PAGE);
       p = { canvas, g: canvas.getContext('2d'), x: 0, y: 0, rowH: 0, used: 0, keys: [] };
       yn3Pages.push(p);
     } else {
@@ -1009,7 +1016,7 @@ function ynSprite(g, x, y, hw, hh, n, laneColor, bodyColor, side) {
     const vMax = Math.max(Math.abs(YT - YN_CY - mid), Math.abs(baseRow(96.5, side) + 3.4 * Math.max(0.5, side) - mid), Math.abs(baseRow(96, side) - mid));
     const X = Math.ceil((100 * hw / YN_HW) * m.a) + 3;
     const Y = Math.ceil(vMax * sy * m.d) + 3;
-    const canvas = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(2 * X, 2 * Y) : Object.assign(document.createElement('canvas'), { width: 2 * X, height: 2 * Y });
+    const canvas = spriteCanvas(2 * X, 2 * Y);
     const sg = canvas.getContext('2d');
     sg.setTransform(m.a, 0, 0, m.d, X + fx / YN_SPRITE_Q, Y + fy / YN_SPRITE_Q);
     drawYNoteDirect(sg, 0, 0, hw, hh, n, laneColor, bodyColor, 0, side);

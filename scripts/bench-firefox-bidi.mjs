@@ -1,6 +1,6 @@
 // Frame-time benchmark in the REAL installed Firefox (its own GPU settings), driven over WebDriver BiDi: no Playwright, no geckodriver.
 //   node scripts/bench-firefox-bidi.mjs [--view 3d|2d] [--seconds 6] [--runs 2] [--song "Folder/Artist - Title"] [--instrument drums-five:expert]
-//        [--at 70] [--settings '{"perf.fpsCap":"60"}'] [--url http://localhost:8091/] [--firefox "C:/Program Files/Mozilla Firefox/firefox.exe"] [--port 9223]
+//        [--at 70] [--variants '[{"name":"x","settings":{}}]'] [--callprof] [--settings '{"perf.fpsCap":"60"}'] [--url http://localhost:8091/] [--firefox "C:/Program Files/Mozilla Firefox/firefox.exe"] [--port 9223]
 // It starts a separate Firefox with a throw-away profile (your open Firefox is not touched), opens the app with the same setup as
 // scripts/bench-browser.mjs, clicks Play with a real pointer event, waits for the song to move and prints the same table.
 import { spawn } from 'node:child_process';
@@ -64,21 +64,44 @@ const MEASURE = `(async () => {
 })()`;
 
 console.log(`real Firefox ${settings['highway.view']}  ${instrument}  t=${at}s  ${seconds}s x ${runs}  settings ${JSON.stringify(settings)}`);
+// --variants '[{"name":"economy","settings":{"perf.economy":true}}, ...]': each variant runs `runs` times on top of the base settings, one table row each.
+// --callprof: wraps the 2D context's methods and prints the 12 most expensive ones (total ms per measured second, calls per second) for the last run.
+const variants = args.variants ? JSON.parse(args.variants) : [{ name: 'base', settings: {} }];
+const CALLPROF = `(() => { const P = CanvasRenderingContext2D.prototype; window.__cp = {}; for (const k of Object.getOwnPropertyNames(P)) { const d = Object.getOwnPropertyDescriptor(P, k); if (typeof d.value !== 'function') continue; const f = d.value; P[k] = function (...a) { const t = performance.now(); const r = f.apply(this, a); const key = k === 'drawImage' && a[0] ? 'drawImage ' + a[0].constructor.name + ((a[0].width || 0) * (a[0].height || 0) > 250000 ? ' large' : ' small') : k; const e = window.__cp[key] || (window.__cp[key] = { n: 0, ms: 0 }); e.n++; e.ms += performance.now() - t; return r; }; } window.__cpOn = true; })()`;
 const rows = [];
-for (let r = 0; r < runs; r++) {
-  try {
-    await goto('about:blank'); await goto(base);
-    await evalJs(`localStorage.setItem('yargremote.master','0.02'); localStorage.setItem('yargremote.onboarded','1'); localStorage.setItem('yargremote.settings', ${JSON.stringify(JSON.stringify(settings))}); 1`);
-    await goto('about:blank'); await goto(songUrl);
-    for (let i = 0; i < 80; i++) { await sleep(500); if (await evalJs(`Number(document.getElementById('seek')?.value) >= ${at - 0.5}`).catch(() => false)) break; }
-    await sleep(3000);
-    const from = Number(await evalJs(`document.getElementById('seek').value`));
-    await clickPlay();
-    for (let i = 0; i < 80; i++) { await sleep(500); if (Number(await evalJs(`document.getElementById('seek').value`)) > from + 1) break; }
-    rows.push(JSON.parse(await evalJs(MEASURE)));
-  } catch (e) { rows.push({ error: String(e).slice(0, 120) }); }
+let profRows = null;
+let tries = 0;
+for (const v of variants) {
+  const vs = { ...settings, ...v.settings };
+  for (let r = 0; r < runs; r++) {
+    try {
+      await goto('about:blank'); await goto(base);
+      await evalJs(`localStorage.setItem('yargremote.master','0.02'); localStorage.setItem('yargremote.onboarded','1'); localStorage.setItem('yargremote.settings', ${JSON.stringify(JSON.stringify(vs))}); 1`);
+      await goto('about:blank'); await goto(songUrl);
+      for (let i = 0; i < 80; i++) { await sleep(500); if (await evalJs(`Number(document.getElementById('seek')?.value) >= ${at - 0.5}`).catch(() => false)) break; }
+      for (let i = 0; i < 60; i++) { if (await evalJs(`!document.getElementById('play').disabled && document.getElementById('loadScreen')?.hidden !== false`).catch(() => false)) break; await sleep(500); } // (wait for the audio to load)
+      await sleep(5000);
+      const from = Number(await evalJs(`document.getElementById('seek').value`));
+      for (let attempt = 0; attempt < 3; attempt++) { // (a click only while the button reads Play: a second one would pause it)
+        if (/^play/i.test(await evalJs(`document.getElementById('play').getAttribute('aria-label') || ''`))) await clickPlay();
+        let moved = false;
+        for (let i = 0; i < 30 && !moved; i++) { await sleep(500); moved = Number(await evalJs(`document.getElementById('seek').value`)) > from + 1; }
+        if (moved) break;
+      }
+      if (args.callprof) await evalJs(CALLPROF + '; 1');
+      const row = JSON.parse(await evalJs(MEASURE));
+      if (row.songAdvancedS < seconds * 0.8 && tries++ < 3) { r--; continue; } // (the song was not playing: not a valid run, again)
+      tries = 0;
+      rows.push({ variant: v.name, ...row });
+      if (args.callprof) {
+        const cp = JSON.parse(await evalJs(`JSON.stringify(window.__cp)`));
+        profRows = Object.entries(cp).map(([k, e]) => ({ call: k, callsPerSec: Math.round(e.n / seconds), msPerSec: +(e.ms / seconds).toFixed(1) })).sort((x, y) => y.msPerSec - x.msPerSec).slice(0, 12);
+      }
+    } catch (e) { rows.push({ variant: v.name, error: String(e).slice(0, 120) }); }
+  }
 }
 console.table(rows);
+if (profRows) { console.log('2D context calls (last run, per second of measuring; the timer itself adds a little):'); console.table(profRows); }
 const info = await evalJs(`(() => { const c = document.createElement('canvas'); const g = c.getContext('webgl'); const e = g && g.getExtension('WEBGL_debug_renderer_info'); return navigator.userAgent + ' | GPU: ' + (e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : 'n/a'); })()`).catch(() => '');
 console.log(info);
 cleanup();
