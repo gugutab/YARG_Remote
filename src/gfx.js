@@ -868,6 +868,19 @@ const yn3Pages = []; // (their atlas pages, see sprite3D)
 // The canvas a sprite is cached on. An OffscreenCanvas is the lighter choice, but in Firefox a drawImage from it into the stage costs about 0.3 ms a call (a copy each time), so it
 // gets a plain canvas element, which stays a GPU surface there.
 const IS_FIREFOX = typeof navigator !== 'undefined' && /Firefox\//.test(navigator.userAgent);
+// In Firefox the atlas pages are also copied from an ImageBitmap snapshot (an immutable texture) once they stop changing: the sprite copies from a canvas element cost
+// about 0.2 ms each there. A page's `ver` counts the sprites drawn into it (or its emptying); `bmpVer` is the version the snapshot has: a sprite newer than that is drawn from the canvas.
+const USE_BITMAP = IS_FIREFOX && typeof createImageBitmap === 'function';
+function pageSource(sp) {
+  const p = sp.page;
+  if (!USE_BITMAP) return p.canvas;
+  if (p.bmpVer < p.ver && !p.pending) {
+    p.pending = true;
+    const v = p.ver;
+    createImageBitmap(p.canvas).then((b) => { if (p.bmp) p.bmp.close(); p.bmp = b; p.bmpVer = v; p.pending = false; }, () => { p.pending = false; });
+  }
+  return p.bmp && p.bmpVer >= sp.ver ? p.bmp : p.canvas;
+}
 function spriteCanvas(w, h) {
   if (typeof OffscreenCanvas === 'function' && !IS_FIREFOX) return new OffscreenCanvas(w, h);
   return Object.assign(document.createElement('canvas'), { width: w, height: h });
@@ -952,13 +965,13 @@ export function sprite3D(g, x, y, r, maxPx, key, ex, ey, draw) {
     sg.setTransform(m.a * f, 0, 0, m.d * f, sx + X, sy + Y);
     draw(sg);
     sg.restore();
-    sp = { page, sx, sy, X, Y };
+    sp = { page, sx, sy, X, Y, ver: ++page.ver };
     page.keys.push(fullKey);
     yn3Sprites.set(fullKey, sp);
   }
   sp.page.used = ++yn3Use;
   g.setTransform(1, 0, 0, 1, 0, 0);
-  g.drawImage(sp.page.canvas, sp.sx, sp.sy, 2 * sp.X, 2 * sp.Y, m.a * x + m.e - sp.X / f, m.d * y + m.f - sp.Y / f, (2 * sp.X) / f, (2 * sp.Y) / f);
+  g.drawImage(pageSource(sp), sp.sx, sp.sy, 2 * sp.X, 2 * sp.Y, m.a * x + m.e - sp.X / f, m.d * y + m.f - sp.Y / f, (2 * sp.X) / f, (2 * sp.Y) / f);
   g.setTransform(m);
   return true;
 }
@@ -971,7 +984,7 @@ function yn3Alloc(w, h) {
   if (!p || p.y + h > YN3_PAGE) {
     if (yn3Pages.length < YN3_PAGES) {
       const canvas = spriteCanvas(YN3_PAGE, YN3_PAGE);
-      p = { canvas, g: canvas.getContext('2d'), x: 0, y: 0, rowH: 0, used: 0, keys: [] };
+      p = { canvas, g: canvas.getContext('2d'), x: 0, y: 0, rowH: 0, used: 0, keys: [], ver: 0, bmp: null, bmpVer: -1, pending: false };
       yn3Pages.push(p);
     } else {
       p = yn3Pages.reduce((a, b) => (b.used < a.used ? b : a));
@@ -986,6 +999,7 @@ function yn3Empty(p) {
   for (const k of p.keys) yn3Sprites.delete(k);
   p.keys.length = 0;
   p.x = p.y = p.rowH = 0;
+  p.ver++;
   p.g.clearRect(0, 0, YN3_PAGE, YN3_PAGE);
 }
 
