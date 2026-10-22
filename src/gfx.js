@@ -923,7 +923,7 @@ const LOG_YN3_STEP = Math.log(YN3_STEP);
 function ynSprite3D(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side, maxPx) {
   if (!(hw < maxPx)) return false; // (a cheap first test in note units)
   const kq = Math.round(taper * (hh / YN_HH) * 1e7); // the taper per design unit (equal up to rounding noise at every depth)
-  const dark = n.tap || n.ghost;
+  const dark = n.ghost;
   const key = `${bodyColor}|${dark && n.sp ? laneColor : ''}|${n.sp ? 1 : 0}${n.tap ? 1 : 0}${n.ghost ? 1 : 0}${n.hopo || n.accent ? 1 : 0}|${kq}|${Math.round((hh * 1e4) / hw)}|${side}|${hw >= 24 ? 2 : hw >= 16 ? 1 : 0}${hw >= 9 ? 1 : 0}`;
   // the note's extent around (x, y) as in ynSprite, widened by the taper at the farthest row, in units of hw
   const mid = (YT - YN_CY + YN_BASE_V) / 2;
@@ -1020,7 +1020,7 @@ function ynSprite(g, x, y, hw, hh, n, laneColor, bodyColor, side) {
   let fy = Math.round((dy - iy) * YN_SPRITE_Q);
   if (fx === YN_SPRITE_Q) { fx = 0; ix++; }
   if (fy === YN_SPRITE_Q) { fy = 0; iy++; }
-  const dark = n.tap || n.ghost;
+  const dark = n.ghost;
   const key = `${bodyColor}|${dark && n.sp ? laneColor : ''}|${n.sp ? 1 : 0}${n.tap ? 1 : 0}${n.ghost ? 1 : 0}${n.hopo || n.accent ? 1 : 0}|${hw}|${hh}|${side}|${m.a}|${m.d}|${fx}|${fy}`;
   let sp = ynSprites.get(key);
   if (!sp) {
@@ -1069,17 +1069,17 @@ function drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side) 
   g.fill();
   g.fillStyle = S.baseEnds;
   g.fill();
-  // the body (a tap or ghost: the colour stays on the strips, the centre is dark; a HOPO or accent: white strips), then its darker ends over all of it
+  // the body (a ghost: the colour stays on the strips, the centre is dark; a HOPO or accent: white strips; a tap: the HOPO's look with black strips), then its darker ends over all of it
   g.beginPath();
   traceYN(g, YN_BODY, 1, k, side);
-  const dark = n.tap || n.ghost;
+  const dark = n.ghost;
   g.fillStyle = bodyGradient(g, dark && n.sp ? dcol(laneColor) : bodyColor);
   g.fill();
-  if (dark || n.hopo || n.accent) {
+  if (dark || n.hopo || n.accent || n.tap) {
     g.beginPath();
     if (dark) traceYN(g, YN_TAP_CENTRE, 1, k, side);
     else { traceYN(g, YN_HOPO_STRIP, 1, k, side); traceYN(g, YN_HOPO_STRIP, -1, k, side); }
-    g.fillStyle = bodyGradient(g, dark ? '#1b1c1f' : '#f4f4f4');
+    g.fillStyle = bodyGradient(g, dark || n.tap ? '#1b1c1f' : '#f4f4f4');
     g.fill();
     g.beginPath();
     traceYN(g, YN_BODY, 1, k, side);

@@ -62,6 +62,7 @@ import {
   spansOfKind,
   fillTailHalo,
   noteScale,
+  HOPO_SCALE,
   noteColor,
   tailShimmer,
   heldPulse,
@@ -1595,7 +1596,7 @@ export class Highway {
       }
       const faced = !n.cymbal && this.noteStyle === 'rect'; // a note in the rectangular style: the vector note after the design (chrome caps, coloured band, base)
       if (faced) {
-        drawYNote(g, cx, cy, r * wide * NOTE_RECT_W, r * NOTE_RECT_H, n, colors[n.lane], tintWhite(n.sp ? noteColor(n, colors) : colors[n.lane], white), 0, YNOTE_SIDE_2D * this.noteBase, white === 0);
+        drawYNote(g, cx, cy, r * wide * NOTE_RECT_W * (n.tap ? HOPO_SCALE : 1), r * NOTE_RECT_H * (n.tap ? HOPO_SCALE : 1), n, colors[n.lane], tintWhite(n.sp ? noteColor(n, colors) : colors[n.lane], white), 0, YNOTE_SIDE_2D * this.noteBase, white === 0);
         if (n.accent) {
           g.beginPath();
           noteShape(g, cx, cy, r * wide, r, 'ynote');
