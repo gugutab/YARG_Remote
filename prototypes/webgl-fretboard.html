@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebGL fretboard prototype</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #0b0e16; color: #c9ccd3; font: 13px system-ui, sans-serif; overflow: hidden; }
+  #stage { position: fixed; inset: 0 0 92px 0; }
+  canvas { width: 100%; height: 100%; display: block; }
+  #bar { position: fixed; left: 0; right: 0; bottom: 0; min-height: 56px; max-height: 92px; overflow: hidden; display: flex; gap: 14px; align-items: center; padding: 0 14px; background: #131722; border-top: 1px solid #232838; box-sizing: border-box; flex-wrap: wrap; }
+  #bar label { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  #bar input[type=range] { width: 120px; }
+  #seek { width: 260px !important; }
+  button, select, input[type=number] { background: #1c2130; color: inherit; border: 1px solid #2a3042; border-radius: 6px; padding: 4px 8px; font: inherit; }
+  #hud { position: fixed; top: 8px; left: 10px; background: rgba(10, 12, 20, 0.72); border: 1px solid #232838; border-radius: 8px; padding: 8px 10px; line-height: 1.5; font-variant-numeric: tabular-nums; pointer-events: none; }
+  #hud b { color: #fff; font-weight: 600; }
+  #msg { position: fixed; top: 8px; right: 10px; color: #8b909a; max-width: 38ch; text-align: right; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="gl"></canvas></div>
+<div id="hud">loading…</div>
+<div id="msg">Pick a notes.mid (any Rock Band / YARG chart) or use the synthetic notes. No audio: this is only the drawing.</div>
+<div id="bar">
+  <button id="play">Pause</button>
+  <input id="seek" type="range" min="0" max="100" step="0.01" value="0" aria-label="Position">
+  <span id="clock">0:00</span>
+  <label>notes.mid <input id="file" type="file" accept=".mid,.midi"></label>
+  <label>part <select id="part"></select></label>
+  <label>difficulty <select id="diff"></select></label>
+  <label>synthetic <input id="synth" type="number" min="0" max="400" step="10" value="0" style="width:64px" title="notes per second, 0 = off"> /s</label>
+  <label>neck <input id="neck" type="range" min="0.5" max="2" step="0.05" value="1"></label>
+  <label>perspective <input id="persp" type="range" min="0.6" max="1.6" step="0.05" value="1"></label>
+</div>
+<script type="module" src="webgl-fretboard.js"></script>
+</body>
+</html>
