@@ -134,7 +134,8 @@ button.link { background: none; border: 0; color: var(--accent); padding: 4px 0;
 
 /* ---------- Stage ---------- */
 .stage { position: relative; flex: 1; min-height: 0; background: transparent; }
-#highway { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#highway, #highwayGl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#highwayGl { pointer-events: none; } /* the WebGL fretboards (highway.renderer), under the 2D canvas that draws the dividers, the countdown and the other panes */
 .loading {
   position: absolute;
   inset: 0;
@@ -1496,7 +1497,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .end-screen { position: absolute; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center; padding: var(--lib-gap, 12px) var(--lib-gap, 12px) var(--lib-gap, 12px) var(--lib-inset, var(--lib-gap, 12px)); pointer-events: none; }
 .end-screen[hidden] { display: none; }
 @media (min-width: 701px) { .end-screen { transition: padding-left .22s ease; } }
-.app.song-ended #highway, .app.song-ended #paneTags { visibility: hidden; }
+.app.song-ended #highway, .app.song-ended #highwayGl, .app.song-ended #paneTags { visibility: hidden; }
 .end-card {
   position: relative; width: min(1100px, 100%); max-height: 100%; min-height: 0; display: flex; flex-direction: column; pointer-events: auto;
   background: color-mix(in srgb, var(--panel) 78%, transparent); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
@@ -1606,7 +1607,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 .app.stage-held #paneTags { visibility: hidden; }
 .bar-ghost { position: absolute !important; z-index: 13; margin: 0 !important; pointer-events: none; transition: opacity .35s ease; }
 .bar-ghost.leaving { opacity: 0; }
-:root[data-motion="on"] .app.stage-reveal #topbar, :root[data-motion="on"] .app.stage-reveal #highway, :root[data-motion="on"] .app.stage-reveal #paneTags { animation: stage-in .35s ease backwards; }
+:root[data-motion="on"] .app.stage-reveal #topbar, :root[data-motion="on"] .app.stage-reveal #highway, :root[data-motion="on"] .app.stage-reveal #highwayGl, :root[data-motion="on"] .app.stage-reveal #paneTags { animation: stage-in .35s ease backwards; }
 @keyframes stage-in { from { opacity: 0; } to { opacity: 1; } }
 .info-top-text strong, .info-top-text span { max-width: 100%; }
 
@@ -1658,7 +1659,7 @@ button.icon.primary:active:not(:disabled) { filter: brightness(.95); }
 #info.compact .info-scroll.thumb-scroll { padding-left: 5px; padding-top: 5px; padding-bottom: 6px; }
 
 /* While the held song's audio loads: plain background for the loading screen (no frozen fretboards, no visualizer picture) */
-.app.stage-loading #highway { visibility: hidden; } /* (the background canvas stays: the visualizer shows behind the loading screen) */
+.app.stage-loading #highway, .app.stage-loading #highwayGl { visibility: hidden; } /* (the background canvas stays: the visualizer shows behind the loading screen) */
 
 /* End window: the instrument tables have a maximum width */
 

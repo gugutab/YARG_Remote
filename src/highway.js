@@ -70,7 +70,8 @@ import {
   boardBase,
 } from './gfx.js';
 export { firstVisibleIndex } from './gfx.js';
-import { renderLanes3D } from './highway3d.js';
+import { renderLanes3D, lookahead3D } from './highway3d.js';
+import { GLBoard, glUnsupported } from './highway-gl.js';
 import { buildKaraokeLines, karaokeAt, syllableProgress } from './karaoke.js';
 import { countdownColors, vocalColors, mixHex } from './uicolors.js';
 import { waitCountdowns, countdownAt, countdownAlpha, measureStarts, measuresLeft, COUNTDOWN_HIDE_SEC, MIN_COUNTDOWN_SEC } from './countdown.js';
@@ -224,6 +225,16 @@ export class Highway {
     this._padLook = 1; // opacity of the resting pads (highway.padLook)
     this.padFill = PAD_FILL_ALPHA;
     this.padRing = PAD_RING_ALPHA;
+    // The WebGL board (highway-gl.js) can draw the lane panes of the 3D view under this canvas: highway.renderer 'canvas' (the 2D code, the default), 'webgl', or 'auto'
+    // (webgl on big stages, see glWanted). It needs the page's background canvas (the 2D canvas above it is transparent) and falls back to the 2D code per pane for what it
+    // does not draw (glUnsupported) and for good when the GPU context is lost.
+    this._renderer = 'canvas';
+    this.glCanvas = null;
+    this.glBoard = null;
+    this.glFailed = false;
+    this.glActive = false; // this frame's panes may be drawn by the board
+    this.glDraw = true; // false for the first samples of a motion blur: the board draws only the last one
+    this.glOpts = {};
     this._beatLines = 'normal'; // highway.beatLines
     this.beatStyles = { '2d': beatLineStyles('normal', '2d'), '3d': beatLineStyles('normal', '3d') };
     this._laneStripes = true; // the alternate lane tint (highway.laneStripes)
@@ -313,6 +324,31 @@ export class Highway {
     this.invalidate();
   }
 
+  // The canvas of the WebGL board (behind this one, same size) and the choice of renderer ('canvas' | 'webgl' | 'auto').
+  setGlCanvas(canvas) {
+    this.glCanvas = canvas;
+    this.syncGl();
+  }
+
+  get renderer() { return this._renderer; }
+  set renderer(v) { this._renderer = v; this.syncGl(); this.invalidate(); }
+
+  syncGl() {
+    if (this._renderer !== 'canvas' && this.glCanvas && !this.glBoard && !this.glFailed) {
+      try { this.glBoard = GLBoard.create(this.glCanvas); } catch (err) { console.warn('WebGL board:', err); this.glBoard = null; }
+      if (!this.glBoard) this.glFailed = true;
+      else this.glBoard.onLost = () => { this.glFailed = true; this.syncGl(); this.invalidate(); }; // (the 2D code takes over; the canvas of a lost context cannot be reused)
+    }
+    if (this.glCanvas) this.glCanvas.style.display = this.glBoard && this._renderer !== 'canvas' && !this.glBoard.lost ? '' : 'none';
+  }
+
+  // Is the board to draw this frame? 'auto' picks it for the stages where the 2D code gets expensive: 3 or more panes on a screen above 1440p.
+  glWanted(w, h, lanePanes) {
+    if (!this.glBoard || this.glBoard.lost || this._renderer === 'canvas' || !this.bgCanvas) return false;
+    if (this._renderer === 'webgl') return true;
+    return lanePanes >= 3 && w * h * renderDpr() ** 2 >= 2560 * 1440 * 0.9;
+  }
+
   setNoteStyle(style) {
     this.noteStyle = style === 'rect' ? 'rect' : 'round';
     this.invalidate();
@@ -373,6 +409,7 @@ export class Highway {
       return { chart, label: label ?? '', icon: icon ?? 'music', key: key ?? label ?? '', maxLength: longestNote(chart.notes), vRange: null }; // the vocal range is re-fitted per chart
     });
     this.chart = this.panes.find((p) => p.chart)?.chart ?? null;
+    this.glBoard?.dropAll(); // (the buffers of the old charts: the new ones are made when they are first drawn)
     for (const k of Object.keys(this)) { // release the offscreen layers of panes that are gone
       if (k.startsWith('layer:') && !this.panes.some((p) => `layer:${p.key}` === k)) delete this[k];
     }
@@ -520,6 +557,7 @@ export class Highway {
         this.vizFrame = this.vizCanvas;
       }
       times.forEach((t, i) => {
+        this.glDraw = i === times.length - 1; // (the WebGL board has no running average: it draws the last sample)
         this.g = side; // every method draws on this.g
         side.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.draw(t, w, h);
@@ -534,6 +572,7 @@ export class Highway {
       throw err;
     } finally {
       this.g = main;
+      this.glDraw = true;
       this.vizFrame = null;
     }
   }
@@ -552,6 +591,12 @@ export class Highway {
     this.sheets = [];
     this.dividers = [];
     this.paneRects.length = 0; // (the rectangle objects are reused from frame to frame, see drawPane)
+    let lanePanes = 0;
+    for (let i = 0; i < this.panes.length; i++) if (this.panes[i].chart?.mode === 'lanes') lanePanes++;
+    this.glActive = this.glWanted(w, h, Math.min(lanePanes, Math.max(1, Math.floor(w / this.paneMin))));
+    if (this.glActive) this.glBoard.begin(w, h, this.canvas.width / w, `${this.noteBase}`); // (clears the board's canvas: the panes it draws are painted below)
+    else if (this.glBoard && this.glWas) this.glBoard.begin(w, h, 1), this.glBoard.dropAll(); // (switched to the 2D code: blank canvas, buffers freed)
+    this.glWas = this.glActive;
     if (!this.panes.length) return; // the page shows its own welcome / loading overlay
     let vocal = null; // the first vocal chart, and the other charts in order (loops over scratch arrays: find/filter/slice/map made new ones per frame)
     const lanes = this.laneScratch;
@@ -760,6 +805,8 @@ export class Highway {
       if (pane.chart.mode === 'vocals') {
         if (this.vocalView === 'karaoke') this.renderKaraoke(t, pw, ph, pane);
         else this.renderVocals(t, pw, ph);
+      } else if (this.glActive && !glUnsupported(this, pane.chart)) { // the WebGL board paints this pane under the canvas (the dividers, countdown and tags stay here)
+        this.glPane(pane, t, x, y, pw, ph);
       } else { // the fade at the edges erases the board (it never paints a colour over what is behind: the stage colour or a visualizer)
         const main = g;
         const dpr = this.canvas.width / (this.canvas.clientWidth || 1);
@@ -792,6 +839,18 @@ export class Highway {
       this.neck = savedNeck;
       g.restore();
     }
+  }
+
+  // A lane pane painted by the WebGL board: the settings of this pane in the board's terms (see GLBoard.drawPane). The caller has set view, noteStyle and neck for the pane.
+  glPane(pane, t, x, y, pw, ph) {
+    if (!this.glDraw) return; // (a motion blur: only its last sample is drawn)
+    const windowSec = lookahead3D(this.neck, ph);
+    const o = this.glOpts;
+    o.neck = this.neck; o.perspective = this.perspective; o.curve = this.curve; o.noteSize = this.noteSize; o.sustainWidth = this.sustainWidth; o.kickBar = this.kickBar;
+    o.hitLine = this.hitLine; o.laneStripes = this.laneStripes; o.trackOpacity = this.trackOpacity; o.boardK = this.restBoard(t, windowSec); o.heldMotion = this.heldMotion;
+    o.leftHanded = !!this.paneOpt(pane.key, 'leftHanded'); o.windowSec = windowSec; o.starPowerBand = this.starPowerBand; o.soloBand = this.soloBand; o.fillBand = this.fillBand;
+    o.breBand = this.breBand; o.bandBorders = this.bandBorders; o.beatStyle = this.beatStyles['3d'];
+    this.glBoard.drawPane(pane.chart, t, { x, y, w: pw, h: ph }, o);
   }
 
   // The wait countdown: while the chart has nothing to play for `countdownMin` (9 s) or more, the seconds until its next note, in a ring that

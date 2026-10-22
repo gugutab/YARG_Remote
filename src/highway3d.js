@@ -538,6 +538,9 @@ function headExtentY(style, rx, lw) {
   return (style === 'tri' ? NOTE_TRI_H : 1) * HEAD_TILT + 0.21 + 0.5 / rx + lw / rx;
 }
 
+// Seconds from the hit line to the far edge: neck speed shortens or stretches the visible time; a taller window shows more of it (fixed pixel speed). The WebGL board uses it too.
+export const lookahead3D = (neck, h) => (DEPTH_SEC / neck) * laneLookFactor(h);
+
 export function renderLanes3D(hw, t, w, h) {
   const g = hw.g;
   const chart = hw.chart;
@@ -553,7 +556,7 @@ export function renderLanes3D(hw, t, w, h) {
   // resize. The pads are cut by the pane's bottom edge a little, as the road fades out there.
   const hitY = h * HIT_Y;
   const cx = w / 2;
-  const windowSec = (DEPTH_SEC / hw.neck) * laneLookFactor(h); // neck speed shortens or stretches the visible time; a taller window shows more of it (fixed pixel speed)
+  const windowSec = lookahead3D(hw.neck, h);
   const proj = projection3D(h, hitY, hw.perspective, hw.curve); // (settings highway.perspective and highway.curve)
   PK = proj.k;
   PVY = proj.vy; // vanishing point, above the canvas

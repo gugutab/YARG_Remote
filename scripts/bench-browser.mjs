@@ -1,7 +1,7 @@
 // Frame-time benchmark of the stage in a real browser (Firefox by default, Chromium to compare), through Playwright.
 //   node scripts/bench-browser.mjs [--browser firefox|chromium] [--view 3d|2d] [--seconds 6] [--runs 3]
 //        [--song "Folder/Artist - Title"] [--instrument drums-five:expert] [--at 70] [--throttle 4] [--viewport 2560x1440] [--settings '{"perf.fpsCap":"60"}']
-//        [--url http://localhost:8091/] [--headless] [--no-place] [--executable <path to firefox.exe>] [--playwright <dir of playwright-core>] [--snippet]
+//        [--url http://localhost:8091/] [--renderer canvas|webgl|auto] [--headless] [--no-place] [--executable <path to firefox.exe>] [--playwright <dir of playwright-core>] [--snippet]
 // A visible window is put at the top left (0,0: the primary monitor on Windows), raised, and kept from being throttled as "covered" (see placeWindow): a window under
 // another one, even a translucent one, can be slowed down by the browser and skew the numbers. --no-place leaves the windows where the system puts them.
 // It opens the app in a fresh context (muted, onboarding off), starts the song at --at seconds, wraps requestAnimationFrame to time the
@@ -41,7 +41,7 @@ if (!pw) { console.error('playwright-core not found: pass --playwright <dir> or 
 const kind = args.browser || 'firefox';
 const seconds = Number(args.seconds || 6), runs = Number(args.runs || 3), at = Number(args.at ?? 70), throttle = Number(args.throttle || 1);
 const view = args.view || '3d';
-const base = (args.url || 'http://localhost:8091/').replace(/\/?$/, '/');
+const base = (args.url || 'http://localhost:8091/').replace(/\/?$/, '/') + (args.renderer ? `?renderer=${args.renderer}` : ''); // (--renderer canvas|webgl|auto: the stage's renderer, highway.renderer)
 const song = args.song || 'Guitar Hero 5 DLC/Lynyrd Skynyrd - Free Bird';
 const instrument = args.instrument || 'drums-five:expert';
 const url = `${base}#/song/${encodeURIComponent(song)}/play?i=${instrument}&t=${at}`;

@@ -72,6 +72,8 @@ const highway = new Highway(els.highway);
 let frameSleep = 0; // the timer while the frame loop ticks slowly (paused and idle, see `idleDeep`); 0 while it runs on requestAnimationFrame
 { const invalidate = highway.invalidate; highway.invalidate = function () { invalidate.call(this); wakeLoop(); }; } // (any change to the picture wakes a sleeping loop)
 highway.setBackgroundCanvas(document.getElementById('bgCanvas'));
+highway.setGlCanvas(document.getElementById('highwayGl'));
+{ const r = new URLSearchParams(location.search).get('renderer'); if (r === 'webgl' || r === 'auto' || r === 'canvas') highway.renderer = r; } // (until the setting exists: ?renderer=webgl|auto|canvas)
 const perf = new PerfMeter();
 let perfMode = 'off'; // the perf.overlay setting, kept here so the frame loop does not read the prefs every frame
 const perfOverlay = createPerfOverlay({

@@ -743,7 +743,9 @@ const strip = (s) => sampleDesign([30, YT], [[XI + s, YT], [31.6 + s, 46], [30.8
 // The tap / ghost dark centre: between two coloured strips of width `s`.
 const centre = (s) => sampleDesign([XI + s, YT], [[31.6 + s, 46], [30.8 + s, 50, 30.6 + s, 55, 31.2 + s, 60], [35 + s, 89], [185 - s, 89], [188.8 - s, 60], [189.4 - s, 55, 189.2 - s, 50, 188.4 - s, 46], [181 - s, 16]]);
 // Recomputes the cut-dependent polygons for a cut fraction (0 .. YNOTE_CUT_MAX) and drops the gradients that depend on the top row.
+export let ynoteVersion = 0; // counts the rebuilds: the WebGL board draws its note sprites again when it changes
 export function rebuildYNote(cut = YNOTE_CUT) {
+  ynoteVersion++;
   const c = Math.min(YNOTE_CUT_MAX, Math.max(0, Number(cut) || 0));
   const CUT_D = 73 * c;
   YT = 16 + CUT_D;
