@@ -752,8 +752,8 @@ export function rebuildYNote(cut = YNOTE_CUT) {
   YN_HOPO_STRIP = strip(30); // design units (0.3 of the half width, as before)
   YN_TAP_CENTRE = centre(17);
   { // a rounded bar along the top of the coloured part, between the caps (the accent's darker, the ghost's lighter one)
-    const bx0 = XI + 7, bx1 = 220 - XI - 7, by0 = YT + 5, bh = Math.max(8, (89 - YT) * 0.3), r = bh / 2, kc = 0.5523 * r; // (kc: the cubic's handle for a quarter circle)
-    YN_TOP_BAR = sampleDesign([bx0 + r, by0], [[bx1 - r, by0], [bx1 - r + kc, by0, bx1, by0 + r - kc, bx1, by0 + r], [bx1, by0 + r + kc, bx1 - r + kc, by0 + bh, bx1 - r, by0 + bh], [bx0 + r, by0 + bh], [bx0 + r - kc, by0 + bh, bx0, by0 + r + kc, bx0, by0 + r], [bx0, by0 + r - kc, bx0 + r - kc, by0, bx0 + r, by0]]);
+    const bx0 = XI + 7, bx1 = 220 - XI - 7, by0 = YT + 5, bh = Math.max(8, (89 - YT) * 0.3), r = Math.min(2.2, bh * 0.22), kc = 0.5523 * r; // (r: small corners; kc: the cubic's handle for a quarter circle)
+    YN_TOP_BAR = sampleDesign([bx0 + r, by0], [[bx1 - r, by0], [bx1 - r + kc, by0, bx1, by0 + r - kc, bx1, by0 + r], [bx1, by0 + bh - r], [bx1, by0 + bh - r + kc, bx1 - r + kc, by0 + bh, bx1 - r, by0 + bh], [bx0 + r, by0 + bh], [bx0 + r - kc, by0 + bh, bx0, by0 + bh - r + kc, bx0, by0 + bh - r], [bx0, by0 + r], [bx0, by0 + r - kc, bx0 + r - kc, by0, bx0 + r, by0]]);
   }
   // The cap's shading follows its ridge, which is (nearly) a straight slanted line in three stretches: [top row, bottom row, ridge x at the top, at the bottom]
   // (design units). Each slab of the cap is filled with the cap profile sheared along its stretch; a slab reaches 0.6 units into the next one, which is drawn
@@ -859,6 +859,17 @@ const bodyGradients = new Map();
 function shadeColor(color, f) {
   const c = color[0] === '#' ? [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16)) : color.slice(color.indexOf('(') + 1, -1).split(',').map(Number);
   return `rgb(${c.map((v) => Math.round(f >= 0 ? v * f : v + (255 - v) * -f)).join(',')})`;
+}
+// The same colour in a stronger tone (the accent mark: fully saturated and a little deeper) or a weaker one (the ghost mark: faded towards a pastel), through HSL, so
+// neither is a mix with black or white.
+function toneColor(color, strong) {
+  const c = (color[0] === '#' ? [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16)) : color.slice(color.indexOf('(') + 1, -1).split(',').map(Number)).map((v) => v / 255);
+  const mx = Math.max(...c), mn = Math.min(...c), d = mx - mn;
+  let l = (mx + mn) / 2, sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  let h = d === 0 ? 0 : mx === c[0] ? ((c[1] - c[2]) / d + 6) % 6 : mx === c[1] ? (c[2] - c[0]) / d + 2 : (c[0] - c[1]) / d + 4;
+  if (strong) { sat = 1; l *= 0.8; } else { sat *= 0.4; l += (1 - l) * 0.35; }
+  const f = (n) => { const k = (n + h * 2) % 12; return l - sat * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1)); }; // (h is in sixths of the circle, the formula wants twelfths)
+  return `rgb(${[f(0), f(8), f(4)].map((v) => Math.round(v * 255)).join(',')})`;
 }
 function bodyGradient(g, color) {
   let gr = bodyGradients.get(color);
@@ -1089,7 +1100,7 @@ function drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side) 
     g.beginPath();
     if (n.hopo || n.tap) { traceYN(g, YN_HOPO_STRIP, 1, k, side); traceYN(g, YN_HOPO_STRIP, -1, k, side); }
     else traceYN(g, YN_TOP_BAR, 1, k, side);
-    g.fillStyle = bodyGradient(g, n.tap ? '#1b1c1f' : n.hopo ? '#f4f4f4' : shadeColor(bodyColor, n.ghost ? -0.4 : 0.62));
+    g.fillStyle = bodyGradient(g, n.tap ? '#1b1c1f' : n.hopo ? '#f4f4f4' : toneColor(bodyColor, !n.ghost));
     g.fill();
     g.beginPath();
     traceYN(g, YN_BODY, 1, k, side);
