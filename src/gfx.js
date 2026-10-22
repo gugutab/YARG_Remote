@@ -664,8 +664,8 @@ const YN_HW = 99.2;
 const YN_HH = 38;
 const YN_BASE_V = 35; // design row 89 (the body's bottom): the base below it is stretched or squashed by `side`
 // How tall the base under the note is drawn, relative to the design: the 2D view looks from above (less of the front face), the 3D one from a lower angle.
-export const YNOTE_SIDE_2D = 0.6;
-export const YNOTE_SIDE_3D = 1.6;
+export const YNOTE_SIDE_2D = 0.55;
+export const YNOTE_SIDE_3D = 1.45;
 function sampleDesign(start, segs, steps = 8) {
   const out = [start[0] - YN_CX, start[1] - YN_CY];
   let px = start[0];
@@ -1096,8 +1096,8 @@ function drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side) 
   g.fill();
   g.fillStyle = S.baseEnds[goldIndex(n.sp)];
   g.fill();
-  // the body (a HOPO: white strips beside the caps; a tap: the HOPO's look with black strips; an accent: a rounded bar along the top of the coloured part in a darker shade
-  // of the note's colour; a ghost: the same bar, lighter), then its darker ends over all of it
+  // the body (a HOPO: white strips beside the caps; a tap: the HOPO's look with black strips; an accent: a bar along the top of the coloured part in a weaker (paler) tone
+  // of the note's colour; a ghost: the same bar in a stronger tone), then its darker ends over all of it
   g.beginPath();
   traceYN(g, YN_BODY, 1, k, side);
   g.fillStyle = bodyGradient(g, bodyColor);
@@ -1116,7 +1116,7 @@ function drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side) 
     g.beginPath();
     traceYN(g, YN_BODY, 1, k, side);
     g.clip();
-    g.fillStyle = bodyGradient(g, toneColor(n.sp ? laneColor : bodyColor, !n.ghost));
+    g.fillStyle = bodyGradient(g, toneColor(n.sp ? laneColor : bodyColor, !!n.ghost)); // (the ghost's bar is the stronger tone, the accent's the weaker one)
     for (const { alpha, poly } of YN_TOP_BAR) {
       g.beginPath();
       traceYN(g, poly, 1, k, side);
