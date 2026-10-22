@@ -89,7 +89,7 @@ function renderBackground(t) {
   if (driver.prepare(w, h, t, STAGE_RGB, 1)) (vizPorts[id] ??= PORTS[id](bgGl)).draw(driver.state, driver.data, w, h, vizScale);
 }
 
-// The optional effects of the board (?fx=taper,fog,... lists the ones that start on; no ?fx: all of them), one checkbox each.
+// The optional effects of the board (?fx=taper,fog,... lists the ones that start on; no ?fx: the checkboxes' own state, all on but the relief road), one checkbox each.
 const FX = {};
 for (const box of document.querySelectorAll('[data-fx]')) {
   if (params.get('fx') !== null) box.checked = params.get('fx').split(',').includes(box.dataset.fx);

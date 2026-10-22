@@ -55,7 +55,7 @@ export function glUnsupported(hw, chart) {
 
 // ---- shaders ------------------------------------------------------------------------------------------------------------------------------------------------------
 
-const UNIFORMS = `uniform vec2 u_res; uniform float u_hit, u_vy, u_k, u_c, u_cx, u_laneW, u_half, u_t, u_win, u_flip, u_headR, u_end, u_fh, u_padB, u_board, u_taper, u_fog, u_relief, u_flow;`;
+const UNIFORMS = `uniform vec2 u_res; uniform float u_hit, u_vy, u_k, u_c, u_cx, u_laneW, u_half, u_t, u_win, u_flip, u_headR, u_end, u_fh, u_padB, u_board, u_taper, u_fog, u_relief;`;
 const COMMON = `#version 300 es
 precision highp float;
 ${UNIFORMS}
@@ -141,9 +141,7 @@ void main() {
   float sc = scaleAt(d), sRef = scaleAt(dBot);
   float S = sin(6.2831853 * ((d - dBot) * u_win / 0.45 - u_t / 0.6));
   float hp = u_headR * 0.38 * u_tailW * (1.0 + 0.04 * amt) * u_mult * (0.3 + 0.7 * pow(sc / sRef, 3.0)) * u_laneW * sc * (1.0 + 0.26 * amt * u_waveMul * S);
-  vec2 c = project(a_t.z + 0.5 - u_half, d); // (the effect "fluid": the tail snakes sideways like a current, more while it is held)
-  c.x += u_flow * (0.15 + 0.85 * amt) * hp * 0.55 * sin(d * u_win * 17.0 - u_t * 6.5 + a_t.z * 2.0) * sin(d * u_win * 6.0 + u_t * 2.3);
-  vec2 pos = vec2(c.x + side * hp, c.y); float lat = side;
+  vec2 c = project(a_t.z + 0.5 - u_half, d); vec2 pos = vec2(c.x + side * hp, c.y); float lat = side;
   if (isTip) {
     float ty = hp * 1.1; float hh = hp; float dy = 0.0;
     if (tip) { bool r0 = ((id - nb) >> 1) == 0; hh = r0 ? 0.7 * hp : 0.0; dy = r0 ? -0.7 * ty : -ty; }
@@ -157,7 +155,6 @@ void main() {
 }`, `${FS_HEAD}in vec4 v_col; in float v_ahead, v_l, v_hp, v_pxs, v_left, v_y, v_d; uniform vec4 u_pass; out vec4 o;
 void main() {
   float a = v_col.a * edgeFade(v_y);
-  if (u_pass.w < 0.5) a *= 1.0 + u_flow * 0.5 * sin(v_ahead * 21.0 - u_t * 9.0 + v_l * 1.5); // (energy running up the tail)
   if (u_pass.w > 0.5) { // the chevrons: Vs pointing away from the hit line, one every FLOW_SPACING seconds, running up the tail (FLOW_PERIOD)
     float ph = fract(u_t / 0.1);
     float cn = ceil(v_ahead / 0.18 - ph);
@@ -655,7 +652,7 @@ export class GLBoard {
   shared(pr, t, v) {
     const gl = this.gl, u = pr.u;
     if (u.u_res) gl.uniform2f(u.u_res, v.res[0], v.res[1]);
-    const vals = { u_hit: v.hit, u_vy: v.vy, u_k: v.k, u_c: v.c, u_cx: v.cx, u_laneW: v.laneW, u_half: v.half, u_t: t, u_win: v.win, u_flip: v.flip, u_headR: v.headR, u_end: v.end, u_fh: v.fh, u_padB: v.padB, u_board: v.board, u_tailW: v.tailW, u_bar: v.bar, u_taper: v.taper, u_fog: v.fog, u_relief: v.relief, u_flow: v.flow };
+    const vals = { u_hit: v.hit, u_vy: v.vy, u_k: v.k, u_c: v.c, u_cx: v.cx, u_laneW: v.laneW, u_half: v.half, u_t: t, u_win: v.win, u_flip: v.flip, u_headR: v.headR, u_end: v.end, u_fh: v.fh, u_padB: v.padB, u_board: v.board, u_tailW: v.tailW, u_bar: v.bar, u_taper: v.taper, u_fog: v.fog, u_relief: v.relief };
     for (const n in vals) if (u[n]) gl.uniform1f(u[n], vals[n]);
   }
 
@@ -703,10 +700,10 @@ export class GLBoard {
     const headR = HEAD_R * o.noteSize;
     const padRy = laneW * headR * 1.05 * 0.55;
     const padB = hit + padRy;
-    const fx = o.fx || {}; // the optional effects (taper, fog, relief, particles, fluid): each is on or off
+    const fx = o.fx || {}; // the optional effects (taper, fog, relief, particles): each is on or off
     const v = {
       res: [w, h], hit, vy: proj.vy, k: proj.k, c: proj.c, cx: w / 2, laneW, half: lanes / 2, win: o.windowSec, flip: o.leftHanded ? -1 : 1, headR,
-      taper: fx.taper ? 1 : 0, fog: fx.fog ? 1 : 0, relief: fx.relief ? 1 : 0, flow: fx.fluid ? 1 : 0,
+      taper: fx.taper ? 1 : 0, fog: fx.fog ? 1 : 0, relief: fx.relief ? 1 : 0,
       end: proj.end, fh: h * 0.26, padB: h - padB > 2 ? padB : h * 4, board: o.boardK, tailW: o.sustainWidth, bar: BAR_DEPTH * o.kickBar,
     };
     const win = v.win;
