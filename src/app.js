@@ -4,6 +4,7 @@ import { DIFFICULTIES, EXTENDED_DRUM_LANES, instrumentOptions, availableDifficul
 import { MultiTrackPlayer } from './player.js';
 import { Metronome } from './metronome.js';
 import { Highway } from './highway.js';
+import { setWebgl3d } from './glnotes.js';
 import { rebuildYNote, setFast3dNotes, noteCutFraction, adaptBlurSamples, BLUR_MAX_SAMPLES } from './gfx.js';
 import { countdownColors, vocalColors } from './uicolors.js';
 import { createErrorGate } from './errorgate.js';
@@ -3851,6 +3852,7 @@ const EFFECTS = {
   'playback.keepAwake': () => syncPlayButton(),
   'highway.leftHanded': (v) => { highway.leftHanded = !!v; },
   'highway.fast3dNotes': (v) => { setFast3dNotes(v); highway.invalidate(); },
+  'highway.webgl3d': (v) => { setWebgl3d(v); highway.invalidate(); },
   'highway.lyricSize': (v) => { highway.lyricScale = v / 100; },
   'highway.lyricOutline': (v) => { highway.lyricOutline = !!v; },
   'highway.countdownMin': (v) => { highway.countdownMin = Number(v) || 9; },

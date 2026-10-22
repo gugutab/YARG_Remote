@@ -4,8 +4,9 @@
 import {
   NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, sprite3D, noteSpritePx, NOTE_RECT_W, NOTE_RECT_H, NOTE_TRI_W, NOTE_TRI_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
   ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, setDesaturated, isDesaturated, dcol, desaturate, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, ROLL_COLUMN_ALPHA, ROLL_LEAD_SEC, HIT_LINE_COLOR, HIT_LINE_BORDER, HIT_LINE_BORDER_SOFT, drawHitBurst, drawBarBurst, BURST_SEC, BAR_BURST_SEC, BURST_LOOP_SEC, BURST_VANISH_SEC, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
-  laneLookFactor
+  laneLookFactor, headPages, HEAD_PAGES_MAX
 } from './gfx.js';
+import { beginHeads, endHeads, flushHeads } from './glnotes.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the flat view shows 2.5)
 const FAR_SCALE = 0.3; // size of things at the far edge relative to the hit line
@@ -743,6 +744,7 @@ export function renderLanes3D(hw, t, w, h) {
 
 
   // heads, far to near so closer ones cover farther ones
+  beginHeads(g, headPages, HEAD_PAGES_MAX); // (setting highway.webgl3d: the cached heads are batched for the GPU; flushHeads() before anything drawn directly keeps the order)
   for (let i = end - 1; i >= from; i--) {
     const n = notes[i];
     setDesaturated(hw.disabledNote(n)); // disabled notes lose their colour
@@ -762,6 +764,7 @@ export function renderLanes3D(hw, t, w, h) {
     const rx = laneW * headR * noteScale(n) * p * (hw.hitAnimation === 'burst' ? 1 - 0.5 * kx : 1 + 0.4 * kx) * (1 + (pulse - 1) * amt); // (the burst makes the note shrink into the hit line instead of swelling)
     const ry = rx * HEAD_TILT;
     if (amt > 0) { // a soft halo while the note is held
+      flushHeads();
       g.globalCompositeOperation = 'lighter';
       g.save();
       g.translate(x, y);
@@ -777,13 +780,14 @@ export function renderLanes3D(hw, t, w, h) {
     if (faced) { // the rectangular style: the vector note after the design, with its base in perspective (no separate thickness edge)
       drawYNote(g, x, y, rx * NOTE_RECT_W, ry * NOTE_RECT_H, n, colors[n.lane], body, TAPER_GAIN / (y - vy), YNOTE_SIDE_3D * hw.noteBase, kx === 0 && amt === 0); // (a held or exiting note changes tint and size every frame: drawn directly)
       if (n.accent) {
+        flushHeads();
         g.beginPath();
         noteShape(g, x, y, rx, ry, 'ynote', y - vy);
         g.lineWidth = ACCENT_OUTLINE_WIDTH * p;
         g.strokeStyle = darken(colors[n.lane], ACCENT_OUTLINE_DARKEN);
         g.stroke();
       }
-      if (n.activation && hw.fillActivation) drawActivationMark(g, x, y, rx * NOTE_RECT_W, ry * NOTE_RECT_H, p, t);
+      if (n.activation && hw.fillActivation) { flushHeads(); drawActivationMark(g, x, y, rx * NOTE_RECT_W, ry * NOTE_RECT_H, p, t); }
       continue;
     }
     const lw = n.accent ? ACCENT_OUTLINE_WIDTH * p : Math.max(1, 1.5 * p);
@@ -792,6 +796,7 @@ export function renderLanes3D(hw, t, w, h) {
       if (!(kx === 0 && amt === 0 && g.filter === 'none' && g.globalCompositeOperation === 'source-over'
         && sprite3D(g, x, y, rx, noteSpritePx(), `disc|${body}|${colors[n.lane]}|${n.sp ? 1 : 0}${n.accent ? 1 : 0}${n.ghost ? 1 : 0}|${Math.round((lw * 100) / rx)}|${Math.round((dist * 100) / rx)}`,
           1 + (TAPER_GAIN * 0.9 * rx) / dist + lw / rx, HEAD_TILT + 0.3 + lw / rx, (sg) => drawHead3D(sg, 0, 0, rx, ry, -dist, n, colors, body, lw, true, 'round')))) {
+        flushHeads();
         drawHead3D(g, x, y, rx, ry, vy, n, colors, body, lw, true, 'round');
       }
     } else {
@@ -803,15 +808,19 @@ export function renderLanes3D(hw, t, w, h) {
       if (kx === 0 && amt === 0 && g.filter === 'none' && g.globalCompositeOperation === 'source-over'
         && sprite3D(g, x, y, rx, noteSpritePx(), `head|${style}|${body}|${colors[n.lane]}|${n.tap && !n.sp ? 1 : 0}${n.accent ? 1 : 0}${dot ? 1 : 0}|${Math.round((lw * 100) / rx)}|${Math.round((dist * 100) / rx)}`,
           headExtentX(style, rx, dist, lw), headExtentY(style, rx, lw), (sg) => { drawHead3D(sg, 0, 0, rx, ry, -dist, n, colors, body, lw, false, style); if (dot) hopoDot(sg, 0, 0, rx, ry, hw.noteStyle, dist, 0); })) {
+        if ((n.hopo && !dot) || (n.activation && hw.fillActivation)) flushHeads();
         if (n.hopo && !dot) hopoDot(g, x, y, rx, ry, hw.noteStyle, dist, 0);
         if (n.activation && hw.fillActivation) drawActivationMark(g, x, y, rx, ry, p, t);
         continue;
       }
+      flushHeads();
       drawHead3D(g, x, y, rx, ry, vy, n, colors, body, lw, false, style);
     }
+    if (n.hopo || (n.activation && hw.fillActivation)) flushHeads();
     if (n.hopo) hopoDot(g, x, y, rx, ry, hw.noteStyle, y - vy, kx);
     if (n.activation && hw.fillActivation) drawActivationMark(g, x, y, rx, ry, p, t);
   }
+  endHeads();
   g.globalAlpha = 1;
   setDesaturated(false);
   if (hw.hitLine) { // a fixed bar across the road at the hit line, drawn over the notes and the tails (they pass underneath), as thick as the pedal / open bars, in the colour of each lane (it lights when a note is hit), with a fixed border at each end; the pads are not drawn

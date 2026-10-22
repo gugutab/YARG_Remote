@@ -2,6 +2,7 @@
 // The lane, kick, open and tap colours below are YARG's defaults; the renderers draw with NOTE_PALETTE (src/palette.js, setting
 // highway.palette), read at draw time, which holds these same colours unless another palette is chosen.
 export { NOTE_PALETTE } from './palette.js';
+import { pushHead, flushHeads } from './glnotes.js';
 export const GUITAR_LANE_COLORS = ['#79d304', '#ff1d23', '#ffe900', '#00bfff', '#ff8400']; // YARG.Core ColorProfile.Defaults.cs
 export const KICK_COLOR = '#ff8400'; // YARG's 4-lane kick (the 5-lane one is KICK_COLOR_5)
 export const KICK_COLOR_5 = '#e63fff'; // YARG's 5-lane kick (purple)
@@ -885,6 +886,7 @@ export function setFast3dNotes(on) { fast3d = !!on; }
 export function drawYNote(g, x, y, hw, hh, n, laneColor, bodyColor, taper = 0, side = 1, cacheable = false) {
   if (cacheable && g.filter === 'none' && g.globalCompositeOperation === 'source-over' && typeof g.getTransform === 'function'
     && (taper === 0 ? !desat && g.globalAlpha === 1 && ynSprite(g, x, y, hw, hh, n, laneColor, bodyColor, side) : ynSprite3D(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side, noteSpritePx()))) return;
+  flushHeads(); // (heads batched for the GPU lie under this one: composite them first)
   drawYNoteDirect(g, x, y, hw, hh, n, laneColor, bodyColor, taper, side);
 }
 
@@ -945,11 +947,13 @@ export function sprite3D(g, x, y, r, maxPx, key, ex, ey, draw) {
     sg.setTransform(m.a * f, 0, 0, m.d * f, sx + X, sy + Y);
     draw(sg);
     sg.restore();
+    page.ver++;
     sp = { page, sx, sy, X, Y };
     page.keys.push(fullKey);
     yn3Sprites.set(fullKey, sp);
   }
   sp.page.used = ++yn3Use;
+  if (pushHead(g, yn3Pages.indexOf(sp.page), sp.sx, sp.sy, 2 * sp.X, 2 * sp.Y, m.a * x + m.e - sp.X / f, m.d * y + m.f - sp.Y / f, (2 * sp.X) / f, (2 * sp.Y) / f, g.globalAlpha)) return true; // (highway.webgl3d: instanced, see glnotes.js)
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.drawImage(sp.page.canvas, sp.sx, sp.sy, 2 * sp.X, 2 * sp.Y, m.a * x + m.e - sp.X / f, m.d * y + m.f - sp.Y / f, (2 * sp.X) / f, (2 * sp.Y) / f);
   g.setTransform(m);
@@ -964,7 +968,7 @@ function yn3Alloc(w, h) {
   if (!p || p.y + h > YN3_PAGE) {
     if (yn3Pages.length < YN3_PAGES) {
       const canvas = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(YN3_PAGE, YN3_PAGE) : Object.assign(document.createElement('canvas'), { width: YN3_PAGE, height: YN3_PAGE });
-      p = { canvas, g: canvas.getContext('2d'), x: 0, y: 0, rowH: 0, used: 0, keys: [] };
+      p = { canvas, g: canvas.getContext('2d'), x: 0, y: 0, rowH: 0, used: 0, keys: [], ver: 0 };
       yn3Pages.push(p);
     } else {
       p = yn3Pages.reduce((a, b) => (b.used < a.used ? b : a));
@@ -976,11 +980,16 @@ function yn3Alloc(w, h) {
   return p;
 }
 function yn3Empty(p) {
+  flushHeads(); // (heads queued for the GPU may point into this page)
   for (const k of p.keys) yn3Sprites.delete(k);
   p.keys.length = 0;
   p.x = p.y = p.rowH = 0;
   p.g.clearRect(0, 0, YN3_PAGE, YN3_PAGE);
+  p.ver++;
 }
+// For glnotes.js: the atlas pages (indexed as pushHead's page numbers) and how many there can be.
+export const headPages = () => yn3Pages;
+export const HEAD_PAGES_MAX = YN3_PAGES;
 
 // Sprites of flat notes. A note is ~13 gradient fills and ~10 polygons; in 2D every note of one kind in one lane has the same size, so it is drawn once into a
 // small canvas, at the same device-pixel fraction (quantised to 1/YN_SPRITE_Q px) as on screen, and copied at a whole-pixel offset (no resampling). Only
