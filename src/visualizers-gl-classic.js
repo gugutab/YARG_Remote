@@ -4,6 +4,7 @@
 // each ring, the aurora is an instanced strip per ribbon strand with the three widths as three passes, and the stars are instanced quads placed by the vertex shader.
 import { melodyAt, layerGain, layerColor, tint, ringsAt, hash01 } from './visualizers.js';
 import { TAU, fract, clamp, mixRgb, n255, HEAD, VS_FULL, FS_HEAD, program } from './visualizers-gl-core.js';
+import { createCalmAudio } from './visualizers-gl-common.js';
 
 // ---- Beat rings -----------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -36,12 +37,14 @@ void main() {
 }`;
 
 export function ringsPort(gl) {
+  const calm = createCalmAudio();
   const pr = program(gl, 'rings', VS_FULL, RINGS_FS);
   const alive = [];
   const ring = new Float32Array(MAX_RINGS * 4), rcol = new Float32Array(MAX_RINGS * 3), orb = new Float32Array(12), ocol = new Float32Array(9);
   return {
     draw(s, data, w, h, sc) {
       const pal = data.palette;
+      const au = calm.read(s.audio, s.clock);
       const cx = w / 2, cy = h / 2;
       const maxR = Math.hypot(w, h) * 0.55;
       const life = Math.min(4, 14 * s.beat.interval);
@@ -54,22 +57,22 @@ export function ringsPort(gl) {
         const { index: i, age, measure } = rings[r];
         const k = 1 - age / life;
         const col = n255(measure ? pal.va : pal.v[((i % 3) + 3) % 3]);
-        const rad = (12 + age * speed) * (measure ? 1 + 0.05 * bar : 1);
-        const a = Math.min(1, k ** 1.2 * (measure ? 1.1 : 0.9));
-        ring.set([rad, (measure ? 7 : 2.6) * (0.5 + k) * unit * (1 + 0.6 * s.audio.kick * k * k), (measure ? 30 : 14) * (0.4 + k) * unit * (1 + 0.4 * s.audio.bass), Math.min(1, a * (1 + 0.25 * s.audio.level))], r * 4);
+        const rad = 12 + age * speed;
+        const born = Math.min(1, age / 0.35), a = Math.min(1, k ** 1.2 * (measure ? 1.1 : 0.9)) * born * born * (3 - 2 * born); // (a ring fades in over 0.35 s: no flash at the beat)
+        ring.set([rad, (measure ? 7 : 2.6) * (0.5 + k) * unit, (measure ? 30 : 14) * (0.4 + k) * unit * (1 + 0.3 * au.bass), Math.min(1, a * (1 + 0.15 * au.level))], r * 4);
         rcol.set(col, r * 3);
       }
       const orbits = [[0.17, s.beat.phase, pal.v[0]], [0.27, ((((s.beat.index % 2) + 2) % 2) + s.beat.phase) / 2, pal.v[1]], [0.38, s.beat.measurePhase, pal.va]];
       orbits.forEach(([size, frac, col], o) => {
-        orb.set([Math.min(w, h) * size, -Math.PI / 2 + frac * TAU, (1 - frac) ** 6, 0], o * 4);
+        orb.set([Math.min(w, h) * size, -Math.PI / 2 + frac * TAU, 0, 0], o * 4); // (the marker's flash at the beat is off)
         ocol.set(n255(col), o * 3);
       });
       gl.useProgram(pr.p);
       const u = pr.u;
       gl.uniform2f(u.u_res, w, h); gl.uniform1f(u.u_sc, sc); gl.uniform1f(u.u_unit, unit); gl.uniform2f(u.u_c, cx, cy); gl.uniform1i(u.u_n, n);
       gl.uniform4fv(u.u_ring, ring); gl.uniform3fv(u.u_rcol, rcol); gl.uniform4fv(u.u_orb, orb); gl.uniform3fv(u.u_ocol, ocol);
-      gl.uniform2f(u.u_perc, s.perc, 30 + (1 - s.perc) * maxR * 0.35);
-      gl.uniform3fv(u.u_corecol, n255(pal.va)); gl.uniform2f(u.u_core, 0.22 + 0.3 * bar + 0.2 * s.hit + 0.25 * s.audio.bass + 0.3 * s.audio.kick, Math.min(w, h) * (0.2 + 0.03 * bar + 0.03 * s.audio.kick));
+      gl.uniform2f(u.u_perc, 0, 30); // (no white ring on a percussion hit)
+      gl.uniform3fv(u.u_corecol, n255(pal.va)); gl.uniform2f(u.u_core, 0.22 + 0.2 * au.bass, Math.min(w, h) * 0.2);
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     },
@@ -96,6 +99,7 @@ const SKY_FS = `${FS_HEAD}uniform vec4 u_top; uniform vec4 u_bot;
 void main() { vec4 c = mix(u_top, u_bot, v_p.y / u_res.y); o = vec4(c.rgb * c.a, c.a); }`;
 
 export function auroraPort(gl) {
+  const calm = createCalmAudio();
   const sky = program(gl, 'sky', VS_FULL, SKY_FS);
   const rib = program(gl, 'aurora', AURORA_VS, AURORA_FS);
   const mel = Array.from({ length: 8 }, () => ({ pitch: 0.5, energy: 0 }));
@@ -104,6 +108,7 @@ export function auroraPort(gl) {
   const inst = new Float32Array(24 * 16);
   return {
     draw(s, data, w, h, sc) {
+      const au = calm.read(s.audio, s.clock);
       const song = data;
       const pal = song.palette;
       const layers = song.layers?.length ? song.layers : [0, 1, 2].map((k) => ({ kind: '', events: song.events, shown: true, fallback: k }));
@@ -117,9 +122,9 @@ export function auroraPort(gl) {
         const col = mixRgb(tint(kindColor, 0.1), [255, 200, 120], 0.15 * s.sp).map(Math.round);
         const e = m.energy;
         const y0 = h * (0.86 - 0.72 * m.pitch) + Math.sin(s.bt * 0.17 + li * 1.9) * h * 0.05;
-        const heard = 1 + 0.35 * s.audio.bass + 0.2 * s.audio.mid; // what the speakers play makes every ribbon a little taller and wider
+        const heard = 1 + 0.3 * au.bass + 0.15 * au.mid; // what the speakers play makes every ribbon a little taller and wider
         const amp = h * (0.055 + 0.14 * e) * (0.8 + 0.4 * s.density) * (0.8 + 0.25 * s.tempo) * heard;
-        const thick = h * (0.016 + 0.04 * e) * (1 + 0.25 * s.audio.bass + 0.3 * s.audio.kick);
+        const thick = h * (0.016 + 0.04 * e) * (1 + 0.2 * au.bass);
         const ph = li * 2.3 + (song.seed % 7);
         const f1 = 0.0042 + li * 0.0006, f2 = f1 * 2.6, f3 = f1 * 4.3;
         const v1 = (0.7 + li * 0.15) * (li % 2 ? -1 : 1), v2 = 0.5 + li * 0.1, v3 = -0.9 - li * 0.08;
@@ -182,6 +187,7 @@ void main() {
   o = acc;
 }`;
 
+  const calm = createCalmAudio();
 export function warpPort(gl) {
   const stars = program(gl, 'warp', WARP_VS, WARP_FS);
   const glow = program(gl, 'glow', VS_FULL, GLOW_FS);
@@ -201,6 +207,7 @@ export function warpPort(gl) {
   const gc = new Float32Array(32), gsArr = new Float32Array(16);
   return {
     draw(s, data, w, h, sc) {
+      const au = calm.read(s.audio, s.clock);
       const pal = data.palette;
       const layers = data.layers ?? [];
       const L = Math.min(layers.length, mel.length);
@@ -213,7 +220,7 @@ export function warpPort(gl) {
       const cy = h / 2 + Math.cos(s.bt * 0.09) * h * 0.03 + (total > 0 ? (lean / total) * Math.min(1, total) * h * 0.14 : 0);
       const R = Math.hypot(w, h) * 0.53;
       const busy = L ? Math.min(1, total / 2) : s.density;
-      const streak = (0.015 + 0.06 * Math.max(s.density, busy) + 0.04 * s.sp + 0.05 * s.audio.bass + 0.06 * s.audio.kick) * (0.75 + 0.35 * s.tempo);
+      const streak = (0.015 + 0.06 * Math.max(s.density, busy) + 0.04 * s.sp + 0.04 * au.bass) * (0.75 + 0.35 * s.tempo);
       const hot = [170, 225, 255];
       const travel = s.travel * 0.1 + s.bt * 0.04;
       const groups = L || 2;

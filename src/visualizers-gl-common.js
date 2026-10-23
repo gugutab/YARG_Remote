@@ -23,8 +23,26 @@ float maxc(vec3 c) { return max(c.r, max(c.g, c.b)); }
 void addLight(inout vec4 acc, vec3 c, float a) { acc.rgb = min(acc.rgb + c * a, vec3(1.0)); acc.a = clamp(max(acc.a, maxc(c) * a), 0.0, 1.0); } // (an additive light: 'lighter' of the 2D code)
 `;
 
+// A calm view of the sound for the visualizers that must not flash: the level, bass, mid and treble low-passed over about `tau` seconds (so they follow the loudness of a passage,
+// never a single hit) and no kick / flux at all. read(audio, clock) -> the same shape as `s.audio`.
+export function createCalmAudio(tau = 0.8) {
+  const o = { on: false, level: 0, bass: 0, mid: 0, treble: 0, kick: 0, flux: 0, bands: null };
+  let last = null;
+  return {
+    read(a, clock) {
+      const dt = last === null ? 1 : Math.min(0.25, Math.max(0, clock - last));
+      last = clock;
+      const k = 1 - Math.exp(-dt / tau);
+      o.on = a.on; o.bands = a.bands;
+      o.level += (a.level - o.level) * k; o.bass += (a.bass - o.bass) * k; o.mid += (a.mid - o.mid) * k; o.treble += (a.treble - o.treble) * k;
+      return o;
+    },
+  };
+}
+
 // The shared uniforms and the spectrum texture of one port (one WebGL context, one program at a time).
-export function stageCommon(gl) {
+export function stageCommon(gl, { calm = false } = {}) {
+  const calmAudio = calm ? createCalmAudio() : null;
   const mel = Array.from({ length: MAX_LAYERS }, () => ({ pitch: 0.5, energy: 0 }));
   const pal = new Float32Array(12), lay = new Float32Array(MAX_LAYERS * 4), shown = new Float32Array(MAX_LAYERS), raw = new Float32Array(MAX_LAYERS * 3), au = new Float32Array(4);
   const bytes = new Uint8Array(BANDS);
@@ -54,7 +72,7 @@ export function stageCommon(gl) {
         shown[i] = layer && layer.shown === false ? 0 : 1;
         lay.set([...n255(mixRgb(tint(base, 0.1), [255, 200, 120], 0.15 * s.sp)), layer && layer.shown === false ? 0.15 * m.energy : layer ? m.energy : 0.3 + 0.5 * s.density], i * 4);
       }
-      const a = s.audio;
+      const a = calmAudio ? calmAudio.read(s.audio, s.clock) : s.audio;
       for (let i = 0; i < BANDS; i++) bytes[i] = Math.min(255, Math.round(a.bands[i] * 255));
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -75,9 +93,9 @@ export function stageCommon(gl) {
 }
 
 // A port made of one full-screen shader: `body` is its main(); `extra(pr, s, data, w, h, sc, common)` sets the uniforms of its own before the draw.
-export function fullScreenPort(gl, id, body, { decl = '', extra = null } = {}) {
+export function fullScreenPort(gl, id, body, { decl = '', extra = null, calm = false } = {}) {
   const pr = program(gl, id, VS_FULL, `${STAGE_FS}${decl}\n${body}`);
-  const common = stageCommon(gl);
+  const common = stageCommon(gl, { calm });
   return {
     draw(s, data, w, h, sc) {
       common.set(pr, s, data, w, h, sc);

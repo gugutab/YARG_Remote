@@ -8,6 +8,9 @@ import { melodyAt, layerGain, layerColor, tint, beamAngle, sectionValue } from '
 import { clamp, mixRgb, n255 } from './visualizers-gl-core.js';
 import { MAX_LAYERS, fullScreenPort } from './visualizers-gl-common.js';
 
+// The visualizers that must never flash (no kick, no beat pulse, no hit flash; the sound only moves them slowly): their ports are made with { calm: true }.
+const CALM = { calm: true };
+
 const BODIES = {
   // metaballs drifting in the palette's colours; each instrument's blob swells with its melody, every blob with the beat and the bass, and quivers with its own slice of the spectrum
   lava: `void main() {
@@ -17,14 +20,14 @@ const BODIES = {
     float fi = float(i);
     vec2 pos = vec2(sin(u_bt * (0.16 + 0.021 * fi) + fi * 2.1) * 0.62, cos(u_bt * (0.12 + 0.017 * fi) + fi * 1.3 + sin(u_bt * 0.05 + fi)) * 0.38);
     float en = layerEn(i), sa = spec(fi / 9.0);
-    float r = 0.085 + 0.05 * sin(u_bt * 0.3 + fi) + 0.11 * en + 0.035 * beatPulse() + 0.03 * u_sp + 0.07 * u_au.y + 0.05 * u_kick.x + 0.06 * sa;
+    float r = 0.085 + 0.05 * sin(u_bt * 0.3 + fi) + 0.11 * en + 0.03 * u_sp + 0.07 * u_au.y + 0.05 * sa;
     vec2 d = uv - pos; float f = r * r / max(dot(d, d), 1e-4);
     vec3 c = (i % 3 == 0) ? layerCol(i) : palAt(fi * 0.21 + u_bt * 0.01);
     field += f; col += f * c;
   }
   col /= max(field, 1e-3);
   float iso = smoothstep(0.97, 1.03, field), rim = smoothstep(0.55, 0.97, field) * (1.0 - iso) * 0.6;
-  vec3 body = col * (0.85 + 0.55 * smoothstep(1.0, 3.0, field) + 0.25 * u_kick.x) + 0.12 * pow(smoothstep(1.0, 1.6, field), 2.0);
+  vec3 body = col * (0.85 + 0.55 * smoothstep(1.0, 3.0, field)) + 0.12 * pow(smoothstep(1.0, 1.6, field), 2.0);
   float a = iso * 0.88 + rim * 0.3;
   o = vec4(mix(col, body, iso) * a, a);
 }`,
@@ -40,7 +43,7 @@ const BODIES = {
   float rid = pow(1.0 - abs(2.0 * w - 1.0), 2.2);
   vec3 col = palAt(w * 1.3 + r * 0.5 + u_mph * 0.4 + u_bt * 0.01);
   col = col * (0.45 + 1.1 * rid) + vec3(1.0) * 0.18 * pow(rid, 4.0);
-  float pulse = 0.8 + 0.45 * beatPulse() + 0.3 * u_sp + 0.35 * u_kick.x + 0.2 * u_au.w;
+  float pulse = 0.9 + 0.3 * u_sp + 0.2 * u_au.w;
   float vig = smoothstep(1.3, 0.1, r);
   float a2 = clamp((0.45 + 0.55 * rid) * vig, 0.0, 0.95);
   vec4 acc = vec4(col * pulse * a2, a2);
@@ -64,7 +67,7 @@ const BODIES = {
   vec3 tint = vec3(0.0); float tw = 0.0;
   for (int i = 0; i < ${MAX_LAYERS}; i++) { if (i >= u_nl) break; tint += u_lay[i].rgb * u_lay[i].a; tw += u_lay[i].a; }
   col = mix(col, tint / max(tw, 1e-3), clamp(0.12 + 0.5 * tw / float(max(u_nl, 1)), 0.0, 0.55));
-  col *= 0.75 + 0.5 * f + 0.35 * u_sp + 0.15 * beatPulse() + 0.4 * u_kick.x + 0.25 * u_au.w * f;
+  col *= 0.8 + 0.5 * f + 0.35 * u_sp + 0.25 * u_au.w * f;
   float a = clamp(0.2 + 0.55 * f + 0.15 * u_dens + 0.12 * u_au.x, 0.0, 0.88);
   o = vec4(col * a, a);
 }`,
@@ -77,15 +80,15 @@ const BODIES = {
   float dust = fbm(vec2(cos(a + spin * 3.0), sin(a + spin * 3.0)) * 2.2 + r * 3.0);
   float disc = pow(arm, 2.5 + 2.0 * (1.0 - u_dens)) * exp(-r * 2.4) * (0.55 + 0.9 * dust) * (0.85 + 0.45 * u_au.x);
   vec3 armCol = palAt(r * 1.4 + 0.1 + 0.2 * dust);
-  float core = exp(-r * r * 22.0) * (0.55 + 0.8 * u_hit + 0.4 * u_sp + 0.25 * beatPulse() + 0.7 * u_au.y + 0.6 * u_kick.x);
+  float core = exp(-r * r * 22.0) * (0.6 + 0.4 * u_sp + 0.6 * u_au.y);
   vec3 col = armCol * disc * 1.6 + u_pal[3] * core * 1.4;
   vec2 sp = uv * 36.0 + vec2(cos(spin), sin(spin)) * 3.0; vec2 cid = floor(sp);
-  float star = step(0.985, h21(cid)) * smoothstep(0.35, 0.0, length(fract(sp) - 0.5)) * (0.6 + (0.4 + 0.5 * u_au.w) * sin(u_bt * 2.0 + h21(cid + 3.0) * 50.0));
+  float star = step(0.985, h21(cid)) * smoothstep(0.35, 0.0, length(fract(sp) - 0.5)) * (0.75 + (0.15 + 0.25 * u_au.w) * sin(u_bt * 0.5 + h21(cid + 3.0) * 50.0));
   vec3 starCol = mix(vec3(1.0), palAt(h21(cid + 9.0)), 0.4);
   col += starCol * star * 0.9;
   float ang01 = abs(fract(a / TAU + 0.5) * 2.0 - 1.0); // 0..1 round the halo, mirrored: the spectrum
   float tick = spec(ang01), r0 = 0.4;
-  float halo = smoothstep(0.004, 0.0, abs(r - r0)) * 0.25 + smoothstep(0.0, 0.006, r - r0) * smoothstep(r0 + 0.02 + tick * 0.14, r0, r) * 0.55 * smoothstep(0.012, 0.06, tick);
+  float halo = smoothstep(0.004, 0.0, abs(r - r0)) * 0.1 + smoothstep(0.0, 0.006, r - r0) * smoothstep(r0 + 0.02 + tick * 0.14, r0, r) * 0.22 * smoothstep(0.012, 0.06, tick);
   col += mix(palAt(ang01), vec3(1.0), 0.3) * halo * clamp(u_au.x * 3.0, 0.0, 1.0);
   float al = clamp(maxc(col) * 0.9, 0.0, 0.92);
   o = vec4(min(col, vec3(al)), al);
@@ -247,10 +250,10 @@ function tunnelPort(gl) {
 }
 
 export const STAGE_PORTS = {
-  lava: (gl) => fullScreenPort(gl, 'lava', BODIES.lava),
-  kaleido: (gl) => fullScreenPort(gl, 'kaleido', BODIES.kaleido),
-  smoke: (gl) => fullScreenPort(gl, 'smoke', BODIES.smoke),
-  galaxy: (gl) => fullScreenPort(gl, 'galaxy', BODIES.galaxy),
+  lava: (gl) => fullScreenPort(gl, 'lava', BODIES.lava, CALM),
+  kaleido: (gl) => fullScreenPort(gl, 'kaleido', BODIES.kaleido, CALM),
+  smoke: (gl) => fullScreenPort(gl, 'smoke', BODIES.smoke, CALM),
+  galaxy: (gl) => fullScreenPort(gl, 'galaxy', BODIES.galaxy, CALM),
   synthwave: (gl) => fullScreenPort(gl, 'synthwave', BODIES.synthwave),
   spotlights: spotlightsPort,
   tunnel: tunnelPort,
