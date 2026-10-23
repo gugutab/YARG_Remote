@@ -102,43 +102,68 @@ const PROGRAMS = {
   // x, y, w, h | rgba: the base, the beat lines, the hit line
   flat: [VS('vec4(a0.x, a0.y, a0.x + a0.z, a0.y + a0.w)'), FS('', 'void main() { o = vec4(v_a1.rgb * v_a1.a, v_a1.a); }')],
 
-  // a pitch bar: x1, x2, y, half | r, g, b, flags (1 talkie, 2 star power) | passed rgb. A rounded bar, or a dashed box for a talkie; the part past the hit line has the passed colour;
-  // star power: a gold line just inside the edge and a soft gold glow outside it.
+  // a pitch bar: x1, x2, y, half | r, g, b, flags (1 talkie, 2 star power) | passed rgb. A rounded bar, or a dashed box for a talkie. Drawn in three passes over all the bars and ribbons
+  // of a voice (u_pass): 0 the glow of the star power notes (gold, outside the outline, gone once the note is past the hit line), 1 the outline (the shape grown by a little:
+  // gold for star power, a faint dark line for the others; being under the fills it shows only on the outer edge of a note and its ribbons, never at a joint), 2 the fill (the
+  // part past the hit line is the note's colour veiled in the passed colour, so the colour it had still shows).
   bars: [VS('vec4(a0.x - 12.0, a0.z - a0.w - 12.0, a0.y + 12.0, a0.z + a0.w + 12.0)'), FS(
-    'float sdRR(vec2 p, vec2 hs, float r) { vec2 q = abs(p) - hs + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }',
+    'uniform float u_pass;\nfloat sdRR(vec2 p, vec2 hs, float r) { vec2 q = abs(p) - hs + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }',
     `void main() {
   float x1 = v_a0.x, x2 = v_a0.y, y = v_a0.z, hf = v_a0.w;
   vec2 hs = vec2((x2 - x1) * 0.5, hf);
   int fl = int(v_a1.w + 0.5); bool tk = (fl & 1) != 0; bool sp = (fl & 2) != 0;
   float d = sdRR(v_p - vec2((x1 + x2) * 0.5, y), hs, tk ? 0.0 : min(hf, hs.x));
-  vec3 col = v_p.x < u_hitx ? v_a2.rgb : v_a1.rgb;
-  float inside = cover(d), a = inside, ring = 0.0;
-  if (tk) { // a free note: a faint fill and a dashed border 2 px wide, just inside
+  vec3 col = mix(v_a1.rgb, v_a2.rgb, v_p.x < u_hitx ? 0.55 : 0.0);
+  if (tk) { // a free note: a faint fill and a dashed border 2 px wide, just inside (only in the fill pass)
+    if (u_pass < 1.5) { o = vec4(0.0); return; }
+    float inside = cover(d);
     float dash = step(fract((v_p.x + v_p.y) / 7.0), 4.0 / 7.0);
     float edge = (1.0 - smoothstep(0.5, 1.5, abs(d + 1.0))) * dash;
-    a = max(0.35 * inside, edge);
-    ring = sp ? edge : 0.0;
-  } else if (sp) ring = inside * smoothstep(-3.4, -2.4, d); // (a gold line 2.5 px wide inside the edge)
-  col = mix(col, GOLD, ring);
-  float glow = sp ? (1.0 - inside) * 0.55 * exp(-max(d, 0.0) / 4.5) * (1.0 - smoothstep(4.0, 11.0, max(d, 0.0))) : 0.0; // (gone before the quad's edge)
-  float al = a + glow * (1.0 - a);
-  o = vec4(col * a + GOLD * glow * (1.0 - a), al);
+    float a = max(0.35 * inside, edge);
+    col = mix(col, GOLD, sp ? edge : 0.0);
+    o = vec4(col * a, a);
+    return;
+  }
+  float ow = sp ? 2.5 : 1.0;
+  if (u_pass < 0.5) {
+    float out_ = max(d - ow, 0.0);
+    float g = sp ? (1.0 - cover(d - ow)) * 0.3 * exp(-out_ / 3.0) * (1.0 - smoothstep(3.0, 8.0, out_)) * smoothstep(u_hitx - 14.0, u_hitx + 2.0, v_p.x) : 0.0;
+    o = vec4(GOLD * g, g);
+    return;
+  }
+  if (u_pass < 1.5) {
+    float a = cover(d - ow) * (sp ? 1.0 : 0.38);
+    o = vec4((sp ? GOLD : vec3(0.0)) * a, a);
+    return;
+  }
+  float a = cover(d);
+  o = vec4(col * a, a);
 }`)],
 
-  // the ribbon of a pitch slide: xs, xe, ya, y | r, g, b, half | passed rgb, star power. The pitch glides in a smooth S from (xs, ya) to (xe, y).
-  ribbons: [VS('vec4(a0.x, min(a0.z, a0.w) - a1.w - 12.0, a0.y, max(a0.z, a0.w) + a1.w + 12.0)'), FS('',
+  // the ribbon of a pitch slide: xs, xe, ya, y | r, g, b, half | passed rgb, star power. The pitch glides in a smooth S from (xs, ya) to (xe, y). The same three passes as the bars.
+  ribbons: [VS('vec4(a0.x, min(a0.z, a0.w) - a1.w - 12.0, a0.y, max(a0.z, a0.w) + a1.w + 12.0)'), FS('uniform float u_pass;',
     `void main() {
   float xs = v_a0.x, xe = v_a0.y, ya = v_a0.z, y = v_a0.w, hf = v_a1.w;
   float u = clamp((v_p.x - xs) / max(xe - xs, 1.0), 0.0, 1.0);
   float yc = mix(ya, y, u * u * (3.0 - 2.0 * u));
   float d = abs(v_p.y - yc) - hf;
   float mask = smoothstep(xs - 0.5, xs + 0.5, v_p.x) * (1.0 - smoothstep(xe - 0.5, xe + 0.5, v_p.x));
-  vec3 col = v_p.x < u_hitx ? v_a2.rgb : v_a1.rgb;
-  float inside = cover(d) * mask, sp = v_a2.w;
-  float ring = sp * inside * smoothstep(-3.4, -2.4, d);
-  col = mix(col, GOLD, ring);
-  float glow = sp * (1.0 - cover(d)) * 0.55 * exp(-max(d, 0.0) / 4.5) * (1.0 - smoothstep(4.0, 11.0, max(d, 0.0))) * mask;
-  o = vec4(col * inside + GOLD * glow * (1.0 - inside), inside + glow * (1.0 - inside));
+  bool sp = v_a2.w > 0.5;
+  vec3 col = mix(v_a1.rgb, v_a2.rgb, v_p.x < u_hitx ? 0.55 : 0.0);
+  float ow = sp ? 2.5 : 1.0;
+  if (u_pass < 0.5) {
+    float out_ = max(d - ow, 0.0);
+    float g = sp ? (1.0 - cover(d - ow)) * 0.3 * exp(-out_ / 3.0) * (1.0 - smoothstep(3.0, 8.0, out_)) * smoothstep(u_hitx - 14.0, u_hitx + 2.0, v_p.x) * mask : 0.0;
+    o = vec4(GOLD * g, g);
+    return;
+  }
+  if (u_pass < 1.5) {
+    float a = cover(d - ow) * mask * (sp ? 1.0 : 0.38);
+    o = vec4((sp ? GOLD : vec3(0.0)) * a, a);
+    return;
+  }
+  float a = cover(d) * mask;
+  o = vec4(col * a, a);
 }`)],
 
   // a percussion hit: x, y, r, past | k, alpha, pop, lit. The ball (swelling on the beat), and for the first PERC_HOLD seconds a glow, two rings going out and eight spokes.
@@ -176,35 +201,41 @@ const PROGRAMS = {
   o = acc * alpha;
 }`)],
 
-  // the voice at the hit line: y, R, env, age | r, g, b, star power | seed. Calm, never a flash: a soft halo and a warm core that follow the pitch, a stretch of the hit line that
-  // lights up, a ring that blooms outwards when a note starts, and a few embers that drift up and back from the hit. Gold for star power.
-  glow: [VS('vec4(u_hitx - a0.y * 7.0, a0.x - a0.y * 4.2, u_hitx + a0.y * 3.2, a0.x + a0.y * 4.2)'), FS('',
+  // the voice at the hit line: y, R, env, age | r, g, b, star power | seed. Calm and continuous, never a flash, and kept to the left of the hit line (the side the note has
+  // already passed): a soft half halo and a warm core on the voice's line, the stretch of the hit line that lights up, two gentle ripples that keep going outwards for as long
+  // as the note is sung, and a few embers that drift up and back. Gold for star power.
+  glow: [VS('vec4(u_hitx - a0.y * 6.5, a0.x - a0.y * 4.0, u_hitx + a0.y * 1.3, a0.x + a0.y * 4.0)'), FS('',
     `void main() {
-  float y = v_a0.x, R = v_a0.y, env = v_a0.z, age = v_a0.w;
+  float y = v_a0.x, R = v_a0.y, env = v_a0.z;
   vec3 tone = v_a1.w > 0.5 ? GOLD : v_a1.rgb;
   float seed = v_a2.x;
   vec2 d = v_p - vec2(u_hitx, y);
   float r = length(d);
-  float cut = 1.0 - smoothstep(R * 1.9, R * 4.0, r); // (everything fades out before the quad's edge: no straight sides)
-  float halo = exp(-pow(r / (R * 2.7), 2.0)) * 0.34 * env * cut;
-  float core = exp(-pow(r / (R * 0.9), 2.0)) * 0.62 * env;
-  float line = exp(-d.x * d.x / 7.0) * exp(-pow(d.y / (R * 3.3), 2.0)) * 0.75 * env * (1.0 - smoothstep(R * 2.4, R * 4.1, abs(d.y)));
-  float ra = clamp(age / 0.6, 0.0, 1.0), re = 1.0 - (1.0 - ra) * (1.0 - ra);
-  float ringR = R * (0.7 + 3.0 * re), ringW = mix(3.2, 0.9, ra);
-  float ring = (1.0 - ra) * (1.0 - smoothstep(0.0, 1.0, abs(r - ringR) / ringW)) * 0.8 * min(1.0, env * 3.0) * (1.0 - smoothstep(R * 3.2, R * 4.1, r));
+  float side = 1.0 - smoothstep(0.0, R * 0.55, d.x - 1.5); // nothing on the right of the line: it ends just after it
+  float cut = 1.0 - smoothstep(R * 1.7, R * 3.8, r);
+  float halo = exp(-pow(r / (R * 2.3), 2.0)) * 0.3 * env * cut * side;
+  float core = exp(-pow(r / (R * 0.85), 2.0)) * 0.55 * env * side;
+  float line = exp(-d.x * d.x / 7.0) * exp(-pow(d.y / (R * 2.8), 2.0)) * 0.7 * env * (1.0 - smoothstep(R * 2.2, R * 3.8, abs(d.y)));
+  float rip = 0.0;
+  for (int i = 0; i < 2; i++) { // two ripples, half a period apart: one is always going, so the motion never starts or stops
+    float ph = fract(u_t * 0.8 + float(i) * 0.5 + seed * 0.07);
+    float rr = R * (0.45 + 2.2 * ph), w = 2.2 * (1.0 - ph) + 0.7;
+    rip += (1.0 - ph) * (1.0 - ph) * (1.0 - smoothstep(0.0, 1.0, abs(r - rr) / w)) * smoothstep(0.0, 0.12, ph);
+  }
+  rip *= 0.5 * env * side;
   float em = 0.0;
   for (int i = 0; i < 12; i++) {
     float fi = float(i);
     float h1 = fract(sin(fi * 12.9898 + seed * 3.7) * 43758.5453), h2 = fract(sin(fi * 78.233 + seed * 1.3) * 12345.678);
     float ph = fract(u_t * (0.3 + 0.22 * h1) + h2);
-    vec2 pc = vec2(u_hitx - ph * R * (2.6 + 3.6 * h1), y - ph * R * (0.6 + 2.2 * h2) + sin(ph * 6.2832 * (1.0 + h1) + fi) * R * 0.25);
+    vec2 pc = vec2(u_hitx - ph * R * (2.2 + 3.2 * h1), y - ph * R * (0.5 + 2.0 * h2) + sin(ph * 6.2832 * (1.0 + h1) + fi) * R * 0.22);
     float sz = R * (0.17 + 0.12 * h2) * (1.0 - 0.7 * ph);
     vec2 q = v_p - pc;
     em += exp(-dot(q, q) / (sz * sz)) * (1.0 - ph) * (1.0 - ph) * smoothstep(0.0, 0.12, ph);
   }
   em *= 0.8 * env;
   vec3 hot = mix(tone, vec3(1.0), 0.55);
-  vec3 light = tone * (halo + ring) + hot * (core + line * 0.8 + em);
+  vec3 light = tone * (halo + rip) + hot * (core + line * 0.8 + em);
   o = vec4(light, clamp(max(light.r, max(light.g, light.b)) * 0.9, 0.0, 1.0));
 }`)],
 };
@@ -273,9 +304,15 @@ export class GLVocals {
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     this.w = rect.w; this.h = rect.h; this.hitX = frame.hitX; this.t = frame.t;
     this.pass('flat', frame.flat);
-    for (let i = 0; i < frame.used; i++) {
-      this.pass('ribbons', frame.groups[i].ribbons);
-      this.pass('bars', frame.groups[i].bars);
+    for (let i = 0; i < frame.used; i++) { // per voice: the glow, then the outline, then the fill, of all its ribbons and bars
+      const grp = frame.groups[i];
+      for (let ps = 0; ps < 3; ps++) {
+        const setPass = (pr) => gl.uniform1f(pr.u.u_pass, ps);
+        if (ps === 0) { gl.blendEquation(gl.MAX); gl.blendFunc(gl.ONE, gl.ONE); } // (the glows of neighbouring shapes take the strongest, they do not add up at a joint)
+        this.pass('ribbons', grp.ribbons, setPass);
+        this.pass('bars', grp.bars, setPass);
+        if (ps === 0) { gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); }
+      }
     }
     const pc = frame.percColors;
     if (pc) this.pass('perc', frame.perc, (pr) => { for (const k of ['glow', 'ring', 'ball', 'lit', 'dark']) gl.uniform3fv(pr.u[`u_p${k}`], rgbOf(pc[k])); });

@@ -2008,13 +2008,16 @@ export class Highway {
     if (g.roundRect) g.roundRect(x1, y - half, bw, half * 2, Math.min(half, bw / 2));
     else g.rect(x1, y - half, bw, half * 2);
     g.fill();
+    g.save();
     if (n.sp) { // a star power note: a gold outline
-      g.save();
       g.strokeStyle = VOCAL_SP_GOLD;
       g.lineWidth = 2.5;
-      g.stroke();
-      g.restore();
+    } else { // the others: a very faint dark one
+      g.strokeStyle = 'rgba(0,0,0,0.38)';
+      g.lineWidth = 1;
     }
+    g.stroke();
+    g.restore();
   }
 
   // Does the board draw the vocal notes this frame? (the page's WebGL board is in use, it can draw them, and the pane's place is known)
@@ -2072,6 +2075,7 @@ export class Highway {
         g.beginPath();
         g.rect(-1e4, -1e4, hitX + 1e4, 2e4);
         g.clip();
+        g.globalAlpha *= 0.55; // a veil over the colour it had, not an opaque light colour
         this.vocalShape(n, prev, x1, bw, y, half, colors[0]);
         g.restore();
       }
@@ -2138,12 +2142,13 @@ export class Highway {
     st.t = t;
     this.vocGlowState.set(notes, st);
     y = st.y;
-    const R = Math.max(9, half * 1.7) * (0.3 + 0.7 * env); // scales in and out with the fade
+    const R = Math.max(7, half * 1.25) * (0.3 + 0.7 * env); // scales in and out with the fade (a smaller glow than it was: it stays close to the hit line)
     return { y, R, env, age: t - n.time, sp: !!n.sp, seed: n.time % 97 };
   }
 
-  // The hit area while the voice is at the line (2D drawing; the board draws the same in vocals-gl.js). Calm, never a flash: a soft halo and a warm core on the line of the voice,
-  // a ring that blooms outwards when a note starts, and a few embers that drift up and back from the hit; gold for a star power note.
+  // The hit area while the voice is at the line (2D drawing; the board draws the same in vocals-gl.js). Calm and continuous, never a flash, and kept to the left of the hit line (the
+  // side the note has already passed): a soft half halo and a warm core on the line of the voice, the stretch of the hit line that lights up, two gentle ripples that keep going
+  // outwards for as long as the note is sung, and a few embers that drift up and back; gold for a star power note.
   vocalHitGlow(notes, t, half, color, hitX) {
     const p = this.vocalGlowParams(notes, t, half, hitX);
     if (!p) return;
@@ -2151,6 +2156,9 @@ export class Highway {
     const tone = p.sp ? VOCAL_SP_GOLD : color;
     const hot = tintWhite(tone, 0.55);
     g.save();
+    g.beginPath();
+    g.rect(hitX - p.R * 8, p.y - p.R * 4.5, p.R * 8 + 1.5, p.R * 9); // nothing on the right of the line
+    g.clip();
     g.globalCompositeOperation = 'lighter';
     const disc = (r, stops) => {
       const gr = g.createRadialGradient(hitX, p.y, 0, hitX, p.y, r);
@@ -2160,20 +2168,20 @@ export class Highway {
       g.arc(hitX, p.y, r, 0, Math.PI * 2);
       g.fill();
     };
-    disc(p.R * 2.7, [[0, tone, 0.4 * p.env], [0.5, tone, 0.16 * p.env], [1, tone, 0]]);
-    disc(p.R * 1.1, [[0, hot, 0.7 * p.env], [1, hot, 0]]);
-    const lg = g.createLinearGradient(0, p.y - p.R * 3.3, 0, p.y + p.R * 3.3); // the stretch of the hit line that lights up
+    disc(p.R * 2.3, [[0, tone, 0.3 * p.env], [0.5, tone, 0.12 * p.env], [1, tone, 0]]);
+    disc(p.R * 0.95, [[0, hot, 0.6 * p.env], [1, hot, 0]]);
+    const lg = g.createLinearGradient(0, p.y - p.R * 2.8, 0, p.y + p.R * 2.8); // the stretch of the hit line that lights up
     lg.addColorStop(0, withAlpha(hot, 0));
-    lg.addColorStop(0.5, withAlpha(hot, 0.55 * p.env));
+    lg.addColorStop(0.5, withAlpha(hot, 0.5 * p.env));
     lg.addColorStop(1, withAlpha(hot, 0));
     g.fillStyle = lg;
-    g.fillRect(hitX - 2, p.y - p.R * 3.3, 3, p.R * 6.6);
-    const ra = Math.min(1, p.age / 0.6);
-    if (ra < 1) { // the ring that blooms when a note starts
+    g.fillRect(hitX - 2, p.y - p.R * 2.8, 3, p.R * 5.6);
+    for (let i = 0; i < 2; i++) { // two ripples half a period apart
+      const ph = (t * 0.8 + i * 0.5 + p.seed * 0.07) % 1;
       g.beginPath();
-      g.arc(hitX, p.y, p.R * (0.7 + 3 * (1 - (1 - ra) * (1 - ra))), 0, Math.PI * 2);
-      g.lineWidth = 3.2 * (1 - ra) + 0.9;
-      g.strokeStyle = withAlpha(tone, 0.8 * (1 - ra) * Math.min(1, p.env * 3));
+      g.arc(hitX, p.y, p.R * (0.45 + 2.2 * ph), 0, Math.PI * 2);
+      g.lineWidth = 2.2 * (1 - ph) + 0.7;
+      g.strokeStyle = withAlpha(tone, 0.5 * p.env * (1 - ph) * (1 - ph) * Math.min(1, ph / 0.12));
       g.stroke();
     }
     const hsh = (a, b) => { const v = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return v - Math.floor(v); };
@@ -2181,8 +2189,8 @@ export class Highway {
     for (let k = 0; k < 8; k++) { // embers
       const h1 = hsh(k, p.seed * 3.7), h2 = hsh(k * 2.3, p.seed * 1.3);
       const ph = (t * (0.3 + 0.22 * h1) + h2) % 1;
-      const x = hitX - ph * p.R * (2.6 + 3.6 * h1);
-      const y = p.y - ph * p.R * (0.6 + 2.2 * h2) + Math.sin(ph * 6.2832 * (1 + h1) + k) * p.R * 0.25;
+      const x = hitX - ph * p.R * (2.2 + 3.2 * h1);
+      const y = p.y - ph * p.R * (0.5 + 2 * h2) + Math.sin(ph * 6.2832 * (1 + h1) + k) * p.R * 0.22;
       g.globalAlpha = 0.8 * p.env * (1 - ph) * (1 - ph) * Math.min(1, ph / 0.12);
       g.beginPath();
       g.arc(x, y, Math.max(1, p.R * (0.17 + 0.12 * h2) * (1 - 0.7 * ph)), 0, Math.PI * 2);
