@@ -287,7 +287,122 @@ function warpPort(gl) {
   };
 }
 
-export const PORTS = { rings: ringsPort, aurora: auroraPort, warp: warpPort };
+// ---- Four full-screen fields: Lava lamp, Kaleidoscope, Smoke, Galaxy --------------------------------------------------------------------------------------------------
+// They share one setup: the motion clock (s.bt: the beat count, faster in a fast part), the beat's phase, the density, star power, the hit level, the palette of the cover and
+// one colour and one energy per instrument (the melody of each: melodyAt, as Aurora and Warp), and differ in the shader only. A pixel is computed from its own position, nothing is stored.
+
+const FIELD_FS = `${FS_HEAD}
+uniform float u_bt, u_dens, u_sp, u_hit, u_ph, u_mph; uniform vec3 u_pal[4]; uniform vec4 u_lay[8]; uniform int u_nl;
+float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
+float fbm(vec2 p) { float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++) { s += a * vn(p); p = p * 2.03 + 17.0; a *= 0.5; } return s; }
+vec3 palAt(float k) { k = fract(k) * 3.0; int i = int(floor(k)); float f = fract(k); vec3 a = u_pal[i % 3], b = u_pal[(i + 1) % 3]; return mix(a, b, f * f * (3.0 - 2.0 * f)); } // (the palette as a closed ramp)
+vec3 layerCol(int i) { return u_lay[i % u_nl].rgb; }
+float layerEn(int i) { return u_lay[i % u_nl].a; }
+float beatPulse() { return pow(1.0 - u_ph, 3.0); }
+`;
+const FIELD_BODIES = {
+  // metaballs drifting in the palette's colours; each instrument's blob swells with its melody and every blob with the beat
+  lava: `void main() {
+  vec2 uv = (v_p - 0.5 * u_res) / min(u_res.x, u_res.y);
+  float field = 0.0; vec3 col = vec3(0.0);
+  for (int i = 0; i < 9; i++) {
+    float fi = float(i);
+    vec2 pos = vec2(sin(u_bt * (0.16 + 0.021 * fi) + fi * 2.1) * 0.62, cos(u_bt * (0.12 + 0.017 * fi) + fi * 1.3 + sin(u_bt * 0.05 + fi)) * 0.38);
+    float en = layerEn(i);
+    float r = 0.085 + 0.05 * sin(u_bt * 0.3 + fi) + 0.11 * en + 0.035 * beatPulse() + 0.03 * u_sp;
+    vec2 d = uv - pos; float f = r * r / max(dot(d, d), 1e-4);
+    vec3 c = (i % 3 == 0) ? layerCol(i) : palAt(fi * 0.21 + u_bt * 0.01);
+    field += f; col += f * c;
+  }
+  col /= max(field, 1e-3);
+  float iso = smoothstep(0.97, 1.03, field), rim = smoothstep(0.55, 0.97, field) * (1.0 - iso) * 0.6;
+  vec3 body = col * (0.85 + 0.55 * smoothstep(1.0, 3.0, field)) + 0.12 * pow(smoothstep(1.0, 1.6, field), 2.0); // (brighter in the middle of a blob, where they merge)
+  float a = iso * 0.88 + rim * 0.3;
+  o = vec4(mix(col, body, iso) * a, a);
+}`,
+  // a mirrored wedge of warped noise in the palette, turning with the tempo and breathing with the beat; more folds when the part is busy
+  kaleido: `void main() {
+  vec2 uv = (v_p - 0.5 * u_res) / min(u_res.x, u_res.y);
+  float r = length(uv), a = atan(uv.y, uv.x);
+  float n = 6.0 + floor(u_dens * 4.0) * 2.0;
+  float seg = TAU / n;
+  a = mod(a + u_bt * 0.04, seg); a = abs(a - 0.5 * seg);
+  vec2 p = r * vec2(cos(a), sin(a)) * 3.2 + vec2(u_bt * 0.12, 0.0);
+  float w = fbm(p + 1.6 * fbm(p * 1.7 + u_bt * 0.08));
+  float rid = pow(1.0 - abs(2.0 * w - 1.0), 2.2); // (ridges: thin bright veins in the folds)
+  vec3 col = palAt(w * 1.3 + r * 0.5 + u_mph * 0.4 + u_bt * 0.01);
+  col = col * (0.45 + 1.1 * rid) + vec3(1.0) * 0.18 * pow(rid, 4.0);
+  float pulse = 0.8 + 0.45 * beatPulse() + 0.3 * u_sp;
+  float vig = smoothstep(1.3, 0.1, r);
+  float a2 = clamp((0.45 + 0.55 * rid) * vig, 0.0, 0.95);
+  o = vec4(col * pulse * a2, a2);
+}`,
+  // flowing smoke: noise warped by noise, in the palette with a tint of the instruments that play; star power lights it
+  smoke: `void main() {
+  vec2 uv = v_p / u_res * vec2(u_res.x / u_res.y, 1.0) * 2.2;
+  float t = u_bt * 0.06;
+  vec2 q = vec2(fbm(uv + t), fbm(uv + vec2(5.2, 1.3) + t * 1.1));
+  vec2 r = vec2(fbm(uv + 4.0 * q + vec2(1.7, 9.2) + t * 1.3), fbm(uv + 4.0 * q + vec2(8.3, 2.8) + t * 1.2));
+  float f = fbm(uv + 4.0 * r);
+  vec3 col = mix(u_pal[0], u_pal[1], clamp(f * f * 4.0, 0.0, 1.0));
+  col = mix(col, u_pal[2], clamp(length(q) * 0.9, 0.0, 1.0));
+  vec3 tint = vec3(0.0); float tw = 0.0;
+  for (int i = 0; i < 8; i++) { if (i >= u_nl) break; tint += u_lay[i].rgb * u_lay[i].a; tw += u_lay[i].a; }
+  col = mix(col, tint / max(tw, 1e-3), clamp(0.12 + 0.5 * tw / float(max(u_nl, 1)), 0.0, 0.55));
+  col *= 0.75 + 0.5 * f + 0.35 * u_sp + 0.15 * beatPulse();
+  float a = clamp(0.2 + 0.55 * f + 0.15 * u_dens, 0.0, 0.85);
+  o = vec4(col * a, a);
+}`,
+  // a spiral galaxy turning with the music: arms of the palette, a core that flares on the hits, a field of twinkling stars
+  galaxy: `void main() {
+  vec2 uv = (v_p - 0.5 * u_res) / min(u_res.x, u_res.y);
+  float r = length(uv), a = atan(uv.y, uv.x);
+  float spin = u_bt * 0.05;
+  float arm = 0.5 + 0.5 * sin(2.0 * (a - 2.2 * log(r + 0.03) * 1.6 + spin * 6.2831853));
+  float dust = fbm(vec2(cos(a + spin * 3.0), sin(a + spin * 3.0)) * 2.2 + r * 3.0);
+  float disc = pow(arm, 2.5 + 2.0 * (1.0 - u_dens)) * exp(-r * 2.4) * (0.55 + 0.9 * dust);
+  vec3 armCol = palAt(r * 1.4 + 0.1 + 0.2 * dust);
+  float core = exp(-r * r * 22.0) * (0.55 + 0.8 * u_hit + 0.4 * u_sp + 0.25 * beatPulse());
+  vec3 col = armCol * disc * 1.6 + u_pal[3] * core * 1.4;
+  vec2 sp = uv * 36.0 + vec2(cos(spin), sin(spin)) * 3.0; vec2 cid = floor(sp);
+  float star = step(0.985, h21(cid)) * smoothstep(0.35, 0.0, length(fract(sp) - 0.5)) * (0.6 + 0.4 * sin(u_bt * 2.0 + h21(cid + 3.0) * 50.0));
+  vec3 starCol = mix(vec3(1.0), palAt(h21(cid + 9.0)), 0.4);
+  col += starCol * star * 0.9;
+  float al = clamp(disc * 1.2 + core + star * 0.8, 0.0, 0.92);
+  o = vec4(col, al);
+}`,
+};
+const MAX_LAYERS = 8;
+function fieldPort(gl, id) {
+  const pr = program(gl, id, VS_FULL, `${FIELD_FS}\n${FIELD_BODIES[id]}`);
+  const mel = Array.from({ length: MAX_LAYERS }, () => ({ pitch: 0.5, energy: 0 }));
+  const pal = new Float32Array(12), lay = new Float32Array(MAX_LAYERS * 4);
+  return {
+    draw(s, data, w, h, sc) {
+      const p = data.palette;
+      [p.v[0], p.v[1], p.v[2], p.va].forEach((c, i) => pal.set(n255(c), i * 3));
+      const layers = data.layers ?? [];
+      const L = Math.max(1, Math.min(layers.length, MAX_LAYERS));
+      for (let i = 0; i < L; i++) {
+        const layer = layers[i];
+        const m = layer ? melodyAt(layer.events, s.t, layerGain(layer.kind), mel[i]) : mel[i];
+        const base = layer ? layerColor(layer.kind, i, p) : p.v[i % p.v.length];
+        lay.set([...n255(mixRgb(tint(base, 0.1), [255, 200, 120], 0.15 * s.sp)), layer && layer.shown === false ? 0.15 * m.energy : layer ? m.energy : 0.3 + 0.5 * s.density], i * 4);
+      }
+      gl.useProgram(pr.p);
+      const u = pr.u;
+      gl.uniform2f(u.u_res, w, h); gl.uniform1f(u.u_sc, sc);
+      gl.uniform1f(u.u_bt, s.bt); gl.uniform1f(u.u_dens, s.density); gl.uniform1f(u.u_sp, s.sp); gl.uniform1f(u.u_hit, s.hit);
+      gl.uniform1f(u.u_ph, s.beat.phase); gl.uniform1f(u.u_mph, s.beat.measurePhase);
+      gl.uniform3fv(u.u_pal, pal); gl.uniform4fv(u.u_lay, lay); gl.uniform1i(u.u_nl, L);
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    },
+  };
+}
+
+export const PORTS = { rings: ringsPort, aurora: auroraPort, warp: warpPort, lava: (gl) => fieldPort(gl, 'lava'), kaleido: (gl) => fieldPort(gl, 'kaleido'), smoke: (gl) => fieldPort(gl, 'smoke'), galaxy: (gl) => fieldPort(gl, 'galaxy') };
 
 // ---- The page's background layer ------------------------------------------------------------------------------------------------------------------------------
 

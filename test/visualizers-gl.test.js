@@ -2,14 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { usesVizGl, createVizGl, PORTS } from '../src/visualizers-gl.js';
 
-test('usesVizGl: only the three ported visualizers, and never with the canvas renderer', () => {
-  for (const id of ['rings', 'aurora', 'warp']) {
+test('usesVizGl: only the ported and the WebGL-only visualizers, and never with the canvas renderer', () => {
+  for (const id of ['rings', 'aurora', 'warp', 'lava', 'kaleido', 'smoke', 'galaxy']) {
     assert.equal(usesVizGl('auto', id), true, `${id} auto`);
     assert.equal(usesVizGl('webgl', id), true, `${id} webgl`);
     assert.equal(usesVizGl('canvas', id), false, `${id} canvas`);
   }
   for (const id of ['none', 'cover', 'synthwave', 'equalizer', 'embers', 'radial', 'spotlights', 'tunnel', 'toString', undefined]) assert.equal(usesVizGl('webgl', id), false, String(id));
-  assert.deepEqual(Object.keys(PORTS).sort(), ['aurora', 'rings', 'warp']);
+  assert.deepEqual(Object.keys(PORTS).sort(), ['aurora', 'galaxy', 'kaleido', 'lava', 'rings', 'smoke', 'warp']);
 });
 
 test('createVizGl: without WebGL 2 it never wants the visualizer (the 2D path stays)', () => {

@@ -1324,6 +1324,26 @@ const tunnelViz = (ctx) => ({
 
 // ---------- Registry ----------
 
+// The 2D stand-in of the visualizers that exist on WebGL only (Lava lamp, Kaleidoscope, Smoke, Galaxy: src/visualizers-gl.js): a soft gradient of the cover's colours that pulses with the beat,
+// for the pages where WebGL 2 is missing or perf.renderer is 'canvas'.
+const softViz = (ctx) => ({
+  draw(g, s) {
+    const { w, h } = s;
+    const pal = ctx.song.palette;
+    const gr = g.createLinearGradient(0, 0, w, h);
+    gr.addColorStop(0, rgba(pal.v[0], 0.28));
+    gr.addColorStop(1, rgba(pal.v[2], 0.28));
+    g.fillStyle = gr;
+    g.fillRect(0, 0, w, h);
+    const pulse = (1 - s.beat.phase) ** 3;
+    const rg = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.min(w, h) * 0.6);
+    rg.addColorStop(0, rgba(pal.va, 0.16 + 0.2 * pulse));
+    rg.addColorStop(1, rgba(pal.va, 0));
+    g.fillStyle = rg;
+    g.fillRect(0, 0, w, h);
+  },
+});
+
 export const VISUALIZERS = [
   { id: 'none', label: 'None', hint: 'Plain background', swatch: 'transparent', create: null },
   { id: 'cover', label: 'Album art', hint: 'The cover, waving softly like cloth', swatch: 'linear-gradient(135deg,#6b5b95,#d9822b)', create: coverViz, opaque: true },
@@ -1335,6 +1355,10 @@ export const VISUALIZERS = [
   { id: 'embers', label: 'Embers', hint: 'Sparks rising with the energy', swatch: 'radial-gradient(circle at 50% 80%,#ffb347,#8b1e1e 55%,#1a0a0a)', create: embersViz },
   { id: 'radial', label: 'Radial spectrum', hint: 'A ring of bars around a spinning record', swatch: 'radial-gradient(circle,#222 0 22%,#f6c344 24% 30%,#222 32% 40%,#ff6b9d 42% 62%,#14142a 64%)', create: radialViz },
   { id: 'spotlights', label: 'Spotlights', hint: 'Stage lights sweeping with the tempo', swatch: 'conic-gradient(from 160deg at 50% 0,#0a0a1a 0 4%,#ffd36b 10%,#0a0a1a 18% 30%,#7fd1ff 36%,#0a0a1a 44% 56%,#ff7aa8 62%,#0a0a1a 70%)', create: spotViz, maxScale: 0.5 },
+  { id: 'lava', label: 'Lava lamp', hint: 'Blobs of the cover colours that swell with the notes and merge', swatch: 'radial-gradient(circle at 30% 40%,#ff7a59 0 18%,transparent 19%),radial-gradient(circle at 62% 58%,#ffb347 0 22%,transparent 23%),radial-gradient(circle at 48% 25%,#c25bff 0 14%,transparent 15%),#1a0f24', create: softViz },
+  { id: 'kaleido', label: 'Kaleidoscope', hint: 'Mirrored folds of colour, turning with the tempo', swatch: 'conic-gradient(from 0deg,#ff5fa2,#7fd1ff,#ffd23f,#ff5fa2,#7fd1ff,#ffd23f,#ff5fa2)', create: softViz, maxScale: 0.6 },
+  { id: 'smoke', label: 'Smoke', hint: 'Flowing smoke tinted by the instruments that play', swatch: 'radial-gradient(circle at 35% 60%,#6a4fc2,transparent 55%),radial-gradient(circle at 70% 35%,#0f9b8e,transparent 55%),#0d1117', create: softViz, maxScale: 0.6 },
+  { id: 'galaxy', label: 'Galaxy', hint: 'A spiral galaxy that turns with the music and flares on the hits', swatch: 'radial-gradient(circle,#fff6d8 0 6%,#f6c344 12%,#7a3fc9 40%,#0a0a1e 70%)', create: softViz },
   { id: 'tunnel', label: 'Tunnel', hint: 'Rounded rings rushing towards you', swatch: 'repeating-radial-gradient(circle,#0b0b1e 0 3px,#6be0d0 3px 5px,#0b0b1e 5px 9px,#c06bff 9px 11px)', create: tunnelViz },
 ];
 
