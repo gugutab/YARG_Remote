@@ -360,16 +360,16 @@ void main() {
     vec3 ink = vec3(0.025, 0.03, 0.07);
     float hard = toon ? step(0.975, dot(N, H)) : pow(max(dot(N, H), 0.0), 48.0) * 0.7;
     if (v_role < 0.5 || v_role > 3.5) { // the shell: steel (a gold bezel on an accent)
-      vec3 base = v_role > 3.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.66, 0.70, 0.80);
+      vec3 base = v_role > 6.5 ? vec3(0.30, 0.32, 0.37) : v_role > 3.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.74, 0.76, 0.80); // (the cups light grey, the base dark grey, a gold cup on an accent)
       c = base * tone + vec3(0.55) * hard;
       c = mix(c, v_lane * 0.5 * tone, 0.1); // (a hint of the lane's colour on the metal)
       if (toon) { if (rim > 0.82) c = ink; } else c *= mix(0.55, 1.0, smoothstep(0.0, 0.5, 1.0 - rim));
-      if (gloss) { vec3 mb = v_role > 3.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.66, 0.70, 0.80); c = mb * (0.25 + 0.3 * tone) + env * mb * (0.45 + 0.9 * fres) + vec3(1.0) * box * 0.9; } // polished metal: the studio tinted by the metal
+      if (gloss) { vec3 mb = v_role > 6.5 ? vec3(0.30, 0.32, 0.37) : v_role > 3.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.74, 0.76, 0.80); c = mb * (0.25 + 0.3 * tone) + env * mb * (0.45 + 0.9 * fres) + vec3(1.0) * box * 0.9; } // polished metal: the studio tinted by the metal
     } else if (v_role < 1.5) { // the gem: lit from inside, from a hot core to a darker edge
       float cv = max(dot(N, Vc), 0.0);
       float u = v_uv.x < 0.0 ? max(sqrt(max(1.0 - cv * cv, 0.0)), smoothstep(0.86, 1.0, abs(v_uv.y))) : v_uv.x; // (the glass tube: by how its surface faces the camera, darker at the caps)
-      if (toon) c = u < 0.4 ? mix(v_lane, vec3(1.0), 0.75) : u < 0.74 ? v_lane * 1.1 : u < 0.93 ? v_lane * 0.66 : ink;
-      else c = mix(v_lane * 0.55, mix(v_lane, vec3(1.0), 0.8), pow(1.0 - smoothstep(0.0, 1.0, u), 1.1)) * (1.0 - 0.4 * smoothstep(0.9, 1.0, u));
+      if (toon) c = u < 0.55 ? mix(v_lane, vec3(1.0), 0.1) : u < 0.86 ? v_lane * 0.92 : u < 0.96 ? v_lane * 0.6 : ink;
+      else c = mix(v_lane * 0.72, mix(v_lane, vec3(1.0), 0.22), pow(1.0 - smoothstep(0.0, 1.0, u), 0.8)) * (1.0 - 0.35 * smoothstep(0.9, 1.0, u));
       if (v_uv.x < -1.5) { float core = toon ? step(u, 0.3) : 1.0 - smoothstep(0.12, 0.38, u); c = mix(c, v_uv.x < -2.5 ? ink : vec3(1.0), core); } // the core of a HOPO (white) or a tap (dark)
       if (gloss) { // glass: the light inside, a bright edge where it turns away, the studio reflected on it
         c = mix(v_lane * 0.6, mix(v_lane, vec3(1.0), 0.75), pow(1.0 - smoothstep(0.0, 1.0, u), 1.2)) * (1.0 - 0.3 * smoothstep(0.9, 1.0, u));
@@ -491,13 +491,22 @@ function tubeMesh(half, variant) {
   const V = (p, n, u, v, r) => ({ p, n, u, v, r });
   const tris = []; // [vertex, vertex, vertex]
   const capRole = variant === 'a' ? 4 : 0, vcode = variant === 'h' ? -2 : variant === 't' ? -3 : -1; // (the glass is role 1; uv.x < 0 marks the tube and says which kind)
-  const bz = 0.8, zc = 1.9, rc = 1.55, ri = 1.45, rt = 1.4, Dout = 1.0, Din = 0.8, N = 28, M = 6, tubeHalf = half + 0.1;
+  const bz = 0.7, zc = 1.8, rc = 1.55, ri = 1.45, rt = 1.3, Dout = 1.0, Din = 0.8, N = 28, M = 6, tubeHalf = half + 0.1;
   const quadV = (a, b, c, d) => { tris.push([a, b, c], [a, c, d]); };
   // the tube (a full cylinder: it is cut below)
   for (let i = 0; i < N; i++) {
     const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) / N) * Math.PI * 2;
     const v = (a, x) => V([x, rt * Math.cos(a), zc + rt * Math.sin(a)], [0, Math.cos(a), Math.sin(a)], vcode, x / tubeHalf, 1);
     quadV(v(a0, -tubeHalf), v(a1, -tubeHalf), v(a1, tubeHalf), v(a0, tubeHalf));
+  }
+  // two thin rails of dark metal along the tube, on its two visible edges (the far-up one and the near-down one, seen from the camera): the frame around the glass
+  for (const th of [Math.PI - 0.58, -0.58]) {
+    const cy = rt * Math.cos(th), cz = zc + rt * Math.sin(th), rr = 0.24;
+    for (let i = 0; i < 12; i++) {
+      const a0 = (i / 12) * Math.PI * 2, a1 = ((i + 1) / 12) * Math.PI * 2;
+      const v = (a, x) => V([x, cy + rr * Math.cos(a), cz + rr * Math.sin(a)], [0, Math.cos(a), Math.sin(a)], 1, 0, 7);
+      quadV(v(a0, -tubeHalf), v(a1, -tubeHalf), v(a1, tubeHalf), v(a0, tubeHalf));
+    }
   }
   // the cups, one at each end
   for (const sg of [-1, 1]) {
@@ -543,8 +552,8 @@ function tubeMesh(half, variant) {
     for (let k = 1; k + 1 < out.length; k++) cut.push([out[0], out[k], out[k + 1]]);
   }
   // the base: a slab from the outer tip of one cup to the outer tip of the other, deeper than the pill (no bottom face)
-  const W = half + Dout, by = 1.5;
-  const flat = (a, b, c, d, n) => quadV(V(a, n, 1, 0, 0), V(b, n, 1, 0, 0), V(c, n, 1, 0, 0), V(d, n, 1, 0, 0));
+  const W = half + Dout, by = 1.25;
+  const flat = (a, b, c, d, n) => quadV(V(a, n, 1, 0, 7), V(b, n, 1, 0, 7), V(c, n, 1, 0, 7), V(d, n, 1, 0, 7)); // (role 7: the base, a darker metal than the cups)
   const base = [];
   { const keep = tris.length; flat([-W, -by, bz], [W, -by, bz], [W, by, bz], [-W, by, bz], [0, 0, 1]);
     flat([-W, by, 0], [W, by, 0], [W, by, bz], [-W, by, bz], [0, 1, 0]);
