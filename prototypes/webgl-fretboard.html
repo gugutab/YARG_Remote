@@ -22,7 +22,7 @@
 </style>
 </head>
 <body>
-<div id="stage"><canvas id="bg"></canvas><canvas id="gl"></canvas></div>
+<div id="stage"><canvas id="bg"></canvas><canvas id="bg2d"></canvas><canvas id="gl"></canvas></div>
 <div id="hud">loading…</div>
 <div id="msg">Pick a notes.mid (any Rock Band / YARG chart) or use the synthetic notes. No audio: this is only the drawing.</div>
 <div id="bar">
@@ -35,7 +35,7 @@
   <label>difficulty <select id="diff"></select></label>
   <label>synthetic <input id="synth" type="number" min="0" max="400" step="10" value="0" style="width:64px" title="notes per second, 0 = off"> /s</label>
   <label>neck <input id="neck" type="range" min="0.5" max="2" step="0.05" value="1"></label>
-  <label>background <select id="viz"><option value="none">none</option><option value="rings">Beat rings</option><option value="aurora">Aurora</option><option value="warp">Warp</option></select></label>
+  <label>background <select id="viz"></select></label>
   <span class="fx" title="effects: each one on or off">effects:
     <label><input type="checkbox" data-fx="solid" checked> 3D notes <select id="model" title="the model of the notes"><option value="yarg">YARG's models</option><option value="own">our own</option></select></label>
     <label>shading <select id="shade" title="how the notes are lit"><option value="cel">cel</option><option value="smooth">smooth</option><option value="glossy">glossy</option></select></label>

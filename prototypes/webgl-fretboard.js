@@ -9,9 +9,9 @@
 // out, a background visualizer (?viz=rings|aurora|warp), a benchmark (?bench=6) and a song picker. The drawing itself lives in src/highway-gl.js.
 import { parseMidi } from '../src/midi.js';
 import { buildChart, instrumentOptions, DIFFICULTIES } from '../src/chart.js';
-import { GLBoard, METAL_STYLES, GLASS_STYLES, CYMBAL_STYLES } from '../src/highway-gl.js';
+import { GLBoard, METAL_STYLES, GLASS_STYLES, CYMBAL_STYLES, loadNoteModels } from '../src/highway-gl.js';
 import { NOTE_PALETTE, laneLookFactor } from '../src/gfx.js';
-import { createDriver } from '../src/visualizers.js';
+import { createDriver, VISUALIZERS } from '../src/visualizers.js';
 import { PORTS } from '../src/visualizers-gl.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the app's DEPTH_SEC)
@@ -61,14 +61,8 @@ const canvas = $('gl');
 const board = GLBoard.create(canvas);
 if (!board) { $('hud').textContent = 'WebGL 2 is not available in this browser.'; throw new Error('no WebGL 2'); }
 const gl = board.gl;
-// The 3D note models of YARG (prototypes/yarg-notes: notes.json from scripts/pack-note-meshes.mjs and the two textures; see NOTICE.md): loaded in the background, the checkbox "3D notes" shows them once they are there.
-(async () => {
-  try {
-    const img = (name) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = `yarg-notes/${name}.png`; });
-    const [meshes, NormalNote, CymbalNote, NormalNoteShine, CymbalNoteShine] = await Promise.all([fetch('yarg-notes/notes.json').then((r) => r.json()), img('NormalNote'), img('CymbalNote'), img('NormalNoteShine'), img('CymbalNoteShine')]);
-    board.setMeshes(meshes, { NormalNote, CymbalNote, NormalNoteShine, CymbalNoteShine });
-  } catch (e) { console.warn('3D note models not loaded:', e); }
-})();
+// The 3D note models of YARG (vendor/yarg-notes, see NOTICE.md there): loaded in the background, the checkbox "3D notes" shows them once they are there.
+loadNoteModels(board).catch((e) => console.warn('3D note models not loaded:', e));
 const timerExt = gl.getExtension('EXT_disjoint_timer_query_webgl2');
 const BEATS = ['rgba(255,255,255,0.5)', 'rgba(255,255,255,0.3)', 'rgba(255,255,255,0.15)']; // (the app's normal beat lines)
 const curve = Number(params.get('curve') ?? 0.4);
@@ -82,9 +76,22 @@ const STAGE_RGB = '11, 14, 22';
 const KIND = (label) => (label.startsWith('drums') ? 'drum' : label.startsWith('vocals') ? 'mic' : label.split(/[ (]/)[0]);
 const driver = createDriver({ getSource: () => ({ key: panes.map((p) => p.label).join('|'), song: { title: 'prototype', artist: '' }, charts: panes.map((p) => p.chart), kinds: panes.map((p) => KIND(p.label)), shown: panes.map(() => true) }) });
 const vizPorts = {};
+// Every visualizer of the app: the ones with a WebGL port on `bg`, the others (2D code) on `bg2d`.
+$('viz').innerHTML = '<option value="none">none</option>' + VISUALIZERS.map((v) => `<option value="${v.id}">${v.label}${PORTS[v.id] ? ' (GL)' : ''}</option>`).join('');
+const bg2d = $('bg2d');
 function renderBackground(t) {
   const id = $('viz').value;
-  if (id === 'none' || !bgGl || !panes.length) { bgCanvas.style.display = 'none'; return; }
+  const gpu = !!PORTS[id];
+  bg2d.style.display = id !== 'none' && !gpu && panes.length ? '' : 'none';
+  if (id !== 'none' && !gpu && panes.length) {
+    const w = bg2d.clientWidth, h = bg2d.clientHeight;
+    const W = Math.max(2, Math.round(w * vizScale)), H = Math.max(2, Math.round(h * vizScale));
+    if (bg2d.width !== W || bg2d.height !== H) { bg2d.width = W; bg2d.height = H; }
+    const g = bg2d.getContext('2d');
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H); g.setTransform(vizScale, 0, 0, vizScale, 0, 0);
+    driver.select(id); driver.draw(g, w, h, t, STAGE_RGB);
+  }
+  if (id === 'none' || !gpu || !bgGl || !panes.length) { bgCanvas.style.display = 'none'; return; }
   bgCanvas.style.display = '';
   const w = bgCanvas.clientWidth, h = bgCanvas.clientHeight;
   const W = Math.max(2, Math.round(w * vizScale)), H = Math.max(2, Math.round(h * vizScale));

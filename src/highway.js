@@ -71,7 +71,7 @@ import {
 } from './gfx.js';
 export { firstVisibleIndex } from './gfx.js';
 import { renderLanes3D, lookahead3D } from './highway3d.js';
-import { GLBoard, glUnsupported } from './highway-gl.js';
+import { GLBoard, glUnsupported, loadNoteModels } from './highway-gl.js';
 import { buildKaraokeLines, karaokeAt, syllableProgress } from './karaoke.js';
 import { countdownColors, vocalColors, mixHex } from './uicolors.js';
 import { waitCountdowns, countdownAt, countdownAlpha, measureStarts, measuresLeft, COUNTDOWN_HIDE_SEC, MIN_COUNTDOWN_SEC } from './countdown.js';
@@ -235,6 +235,12 @@ export class Highway {
     this.glActive = false; // this frame's panes may be drawn by the board
     this.glBlur = -1; // the index of the motion blur sample being drawn (the board averages them in a framebuffer, see GLBoard.begin), -1 outside a blur
     this.glOpts = {};
+    // The 3D notes of the board (setting highway.notes3d: 'off', 'yarg' = YARG's own models, 'own' = our lamp) and how they look (highway.noteMetal / noteGlass / cymbalTop: indices of
+    // the style lists of highway-gl.js, noteGlow: 0..2, noteSparks / noteFog: the optional effects). They need the board, so they are ignored with perf.renderer 'canvas'.
+    this._notes3d = 'off';
+    this.noteLook = { metal: 0, glass: 4, cymbal: 5, glow: 0.7, sparks: true, fog: true };
+    this.glModels = 'none'; // the YARG models: 'none', 'loading', 'ready', 'failed'
+    this.glFx = {};
     this._beatLines = 'normal'; // highway.beatLines
     this.beatStyles = { '2d': beatLineStyles('normal', '2d'), '3d': beatLineStyles('normal', '3d') };
     this._laneStripes = true; // the alternate lane tint (highway.laneStripes)
@@ -330,6 +336,16 @@ export class Highway {
     this.syncGl();
   }
 
+  get notes3d() { return this._notes3d; }
+  set notes3d(v) { this._notes3d = v; this.loadModels(); this.invalidate(); }
+
+  // Fetches YARG's note models once the board exists and they are asked for; until they are there the notes are the usual sprites.
+  loadModels() {
+    if (this._notes3d !== 'yarg' || !this.glBoard || this.glModels !== 'none') return;
+    this.glModels = 'loading';
+    loadNoteModels(this.glBoard).then(() => { this.glModels = 'ready'; this.invalidate(); }).catch((err) => { this.glModels = 'failed'; console.warn('3D note models:', err); });
+  }
+
   get renderer() { return this._renderer; }
   set renderer(v) { this._renderer = v; this.syncGl(); this.invalidate(); }
 
@@ -340,12 +356,13 @@ export class Highway {
       else this.glBoard.onLost = () => { this.glFailed = true; this.syncGl(); this.invalidate(); }; // (the 2D code takes over; the canvas of a lost context cannot be reused)
     }
     if (this.glCanvas) this.glCanvas.style.display = this.glBoard && this._renderer !== 'canvas' && !this.glBoard.lost ? '' : 'none';
+    this.loadModels();
   }
 
   // Is the board to draw this frame? 'auto' picks it for the stages where the 2D code gets expensive: 3 or more panes on a screen above 1440p.
   glWanted(w, h, lanePanes) {
     if (!this.glBoard || this.glBoard.lost || this._renderer === 'canvas' || !this.bgCanvas) return false;
-    if (this._renderer === 'webgl') return true;
+    if (this._renderer === 'webgl' || this._notes3d !== 'off') return true; // (the 3D notes exist on the board only)
     return lanePanes >= 3 && w * h * renderDpr() ** 2 >= 2560 * 1440 * 0.9;
   }
 
@@ -869,6 +886,10 @@ export class Highway {
     o.hitLine = this.hitLine; o.laneStripes = this.laneStripes; o.trackOpacity = this.trackOpacity; o.boardK = this.restBoard(t, windowSec); o.heldMotion = this.heldMotion; o.fillActivation = this.fillActivation; o.litLag = this.litLag; o.padFill = this.padFill; o.padRing = this.padRing;
     o.leftHanded = !!this.paneOpt(pane.key, 'leftHanded'); o.windowSec = windowSec; o.starPowerBand = this.starPowerBand; o.soloBand = this.soloBand; o.fillBand = this.fillBand;
     o.breBand = this.breBand; o.bandBorders = this.bandBorders; o.beatStyle = this.beatStyles['3d'];
+    const fx = this.glFx, look = this.noteLook;
+    fx.solid = this._notes3d === 'own' ? 'own' : this._notes3d === 'yarg' && this.glModels === 'ready' ? 'yarg' : false;
+    fx.metal = look.metal; fx.glass = look.glass; fx.cymbal = look.cymbal; fx.glow = look.glow; fx.particles = look.sparks; fx.fog = look.fog; fx.shade = 'cel';
+    o.fx = fx;
     this.glBoard.drawPane(pane.chart, t, { x, y, w: pw, h: ph }, o);
   }
 

@@ -822,6 +822,16 @@ function tubeMesh(half, variant) {
   return { pos, nrm, uv, role, size };
 }
 
+// Loads the 3D note models of YARG (vendor/yarg-notes: notes.json, packed by scripts/pack-note-meshes.mjs, and the textures; LGPL-3.0, see NOTICE.md there) into a board.
+export async function loadNoteModels(board, base = new URL('../vendor/yarg-notes/', import.meta.url)) {
+  const img = (name) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = new URL(`${name}.png`, base).href; });
+  const [meshes, NormalNote, CymbalNote, NormalNoteShine, CymbalNoteShine] = await Promise.all([
+    fetch(new URL('notes.json', base)).then((r) => { if (!r.ok) throw new Error(`notes.json: ${r.status}`); return r.json(); }),
+    img('NormalNote'), img('CymbalNote'), img('NormalNoteShine'), img('CymbalNoteShine'),
+  ]);
+  board.setMeshes(meshes, { NormalNote, CymbalNote, NormalNoteShine, CymbalNoteShine });
+}
+
 // ---- the board ------------------------------------------------------------------------------------------------------------------------------------------------------
 
 export class GLBoard {
