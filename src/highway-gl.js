@@ -322,8 +322,7 @@ void main() {
   float dep = d - m_pos.y * u_msz.y * sh; // (the model's +y points at the player)
   float hgt = (m_pos.z - u_mbase) * u_msz.z * sh * hs;
   vec2 px = project(x, dep) - vec2(0.0, hgt * u_laneW * scaleAt(dep));
-  if (m_role > 4.5) px += vec2(m_uv.x, -m_uv.y * pow(scaleAt(dep), 0.9)) * m_nrm.x * u_msz.x * sh * hs * u_laneW * scaleAt(dep); // (a lid: a disc that faces the camera, round on the screen at the hit line, flatter in the distance like the rest)
-  vec4 clip = clipPos(px); clip.z = clamp(dep * 1.7 - 0.1 - hgt * 0.3 - (m_role > 4.5 ? 0.05 : 0.0), -0.99, 0.99); // (nearer and higher wins the depth test; a lid is in front of its tube)
+  vec4 clip = clipPos(px); clip.z = clamp(dep * 1.7 - 0.1 - hgt * 0.3, -0.99, 0.99); // (nearer and higher wins the depth test)
   gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clip; v_y = px.y; v_d = d;
   v_uv = m_uv; v_n = vec3(m_nrm.x, -m_nrm.y, m_nrm.z); v_lane = s1.rgb; v_role = m_role;
   v_a = clamp((1.0 - d) / 0.14, 0.0, 1.0) * u_malpha;
@@ -338,32 +337,21 @@ void main() {
   vec3 N = normalize(v_n); vec3 L = normalize(vec3(-0.25, -0.5, 0.85)); vec3 H = normalize(L + normalize(vec3(0.0, -0.55, 0.83)));
   float lam = max(dot(N, L), 0.0); float sp = pow(max(dot(N, H), 0.0), 36.0);
   vec3 c;
-  if (u_mcel > 0.5) { // our own look: toon (u_mtoon 1: hard tones of light, a hard highlight, ink lines, the colour in bands) or smooth (0: the same shapes, soft gradients)
+  if (u_mcel > 0.5) { // our own look: toon (u_mtoon 1: three tones of light, a hard highlight, an ink line on the silhouettes, the middle a lit gem in bands of colour) or smooth (0: the same shapes, soft gradients)
     bool toon = u_mtoon > 0.5;
-    vec3 Vv = normalize(vec3(0.0, -0.55, 0.83)); vec3 ink = vec3(0.025, 0.03, 0.07);
-    vec3 steel = vec3(0.66, 0.70, 0.80), gold = vec3(1.0, 0.78, 0.28);
     float dl = dot(N, L);
-    if (v_role > 4.5) { // a lid: a raised rim, a recessed plate and a hub, in steel (gold on an accent), lit from the upper left
-      vec3 base = v_role > 5.5 ? gold : steel;
-      vec2 q = v_uv; float r = length(q);
-      float t = 0.5 + 0.5 * dot(q / max(r, 0.001), normalize(vec2(-0.55, 0.8)));
-      float tone = toon ? (t > 0.66 ? 1.0 : t > 0.34 ? 0.68 : 0.42) : 0.42 + 0.58 * t;
-      if (r > 0.95) c = toon ? ink : base * 0.35;
-      else if (r > 0.8) c = base * tone; // the raised rim
-      else if (r > 0.76) c = toon ? ink : base * 0.5; // the step down
-      else if (r > 0.45) c = base * (toon ? 0.6 : 0.5 + 0.2 * t); // the recessed plate
-      else if (r > 0.4) c = toon ? ink : base * 0.5; // the hub's edge
-      else c = base * (toon ? tone : 0.55 + 0.5 * t) + vec3(0.55) * (toon ? step(0.82, t) : pow(t, 6.0) * 0.6); // the hub
-      c = mix(c, v_lane * 0.5, 0.06);
-    } else if (v_role < 0.5 || v_role > 3.5) { // the base: steel
-      float tone = toon ? (dl > 0.5 ? 1.0 : dl > 0.05 ? 0.66 : 0.38) : 0.35 + 0.65 * smoothstep(-0.1, 0.9, dl);
-      float rim = 1.0 - max(dot(N, Vv), 0.0);
-      c = steel * tone + vec3(0.55) * (toon ? step(0.975, dot(N, H)) : pow(max(dot(N, H), 0.0), 48.0) * 0.7);
+    float tone = toon ? (dl > 0.5 ? 1.0 : dl > 0.05 ? 0.66 : 0.38) : 0.35 + 0.65 * smoothstep(-0.1, 0.9, dl);
+    float rim = 1.0 - max(dot(N, normalize(vec3(0.0, -0.55, 0.83))), 0.0);
+    vec3 ink = vec3(0.025, 0.03, 0.07);
+    float hard = toon ? step(0.975, dot(N, H)) : pow(max(dot(N, H), 0.0), 48.0) * 0.7;
+    if (v_role < 0.5 || v_role > 3.5) { // the shell: steel (a gold bezel on an accent)
+      vec3 base = v_role > 3.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.66, 0.70, 0.80);
+      c = base * tone + vec3(0.55) * hard;
       c = mix(c, v_lane * 0.5 * tone, 0.1); // (a hint of the lane's colour on the metal)
       if (toon) { if (rim > 0.82) c = ink; } else c *= mix(0.55, 1.0, smoothstep(0.0, 0.5, 1.0 - rim));
-    } else if (v_role < 1.5) { // the glass (the tube; the dome of a cymbal): lit from inside, from a hot core to a darker edge
-      float cv = max(dot(N, Vv), 0.0);
-      float u = v_uv.x < 0.0 ? max(sqrt(max(1.0 - cv * cv, 0.0)), smoothstep(0.86, 1.0, abs(v_uv.y))) : v_uv.x; // (the tube: by how its surface faces the camera, darker at the lids)
+    } else if (v_role < 1.5) { // the gem: lit from inside, from a hot core to a darker edge
+      float cv = max(dot(N, normalize(vec3(0.0, -0.55, 0.83))), 0.0);
+      float u = v_uv.x < 0.0 ? max(sqrt(max(1.0 - cv * cv, 0.0)), smoothstep(0.86, 1.0, abs(v_uv.y))) : v_uv.x; // (the glass tube: by how its surface faces the camera, darker at the caps)
       if (toon) c = u < 0.4 ? mix(v_lane, vec3(1.0), 0.75) : u < 0.74 ? v_lane * 1.1 : u < 0.93 ? v_lane * 0.66 : ink;
       else c = mix(v_lane * 0.55, mix(v_lane, vec3(1.0), 0.8), pow(1.0 - smoothstep(0.0, 1.0, u), 1.1)) * (1.0 - 0.4 * smoothstep(0.9, 1.0, u));
       if (v_uv.x < -1.5) { float core = toon ? step(u, 0.3) : 1.0 - smoothstep(0.12, 0.38, u); c = mix(c, v_uv.x < -2.5 ? ink : vec3(1.0), core); } // the core of a HOPO (white) or a tap (dark)
@@ -474,37 +462,46 @@ function pillMesh(L, variant, flat = 1) {
   return { pos, nrm, uv, role, size: half };
 }
 
-// The note as a lamp: a metal base from one side to the other, a round lid at each end (like the lid of a pot: a raised rim, a recessed plate, a hub) and, between the lids, a glass tube
-// with a coloured light inside, at the lids' height. The tube lies along x (the width of the note), its cross-section round in the y-z plane. The lids are discs that always face the
-// camera: their vertices all sit at the lid's centre (m_pos) and the vertex shader spreads them on the screen by m_uv (their local x / up, -1..1) times the radius in m_nrm.x, so they
-// are round whatever the angle (flatter in the distance, like the rest). `half` is the half length of the tube; variant 'h' (HOPO: a white core in the glass), 't' (tap: a dark core) and
-// 'a' (accent: gold lids). The tube's vertices carry uv.x = -1 / -2 / -3 (the shader shades it by how it faces the camera; -2 a HOPO, -3 a tap) and uv.y = how far along it they are
-// (-1 at one lid, 0 in the middle, 1 at the other, where the glass darkens).
+// The note as a lamp: a small metal base, a round metal cap at each end and, held between the caps, a glass tube with a coloured light inside. The tube lies along x (the width
+// of the note), its cross-section round in the y-z plane; each cap is a short cylinder, wider than the tube, with a raised hub. `half` is the half length of the tube; variant 'h' (HOPO:
+// a white core in the glass), 't' (tap: a dark core) and 'a' (accent: gold caps). The tube's vertices carry uv.x = -1 / -2 / -3 (the shader shades it by how it faces the camera; -2 a HOPO, -3 a tap) and uv.y = how
+// far along it they are (-1 at one cap, 0 in the middle, 1 at the other, where the glass darkens).
 function tubeMesh(half, variant) {
   const pos = [], nrm = [], uv = [], role = [];
   const push = (p, n, u, v, r) => { pos.push(...p); nrm.push(...n); uv.push(u, v); role.push(r); };
-  const quad = (a, b, c, d, n, r) => { for (const p of [a, b, c, a, c, d]) push(p, n, 1, 0, r); };
-  const vcode = variant === 'h' ? -2 : variant === 't' ? -3 : -1; // (the glass is role 1; uv.x < 0 marks the tube and says which kind)
-  const rc = 1.25, rt = 0.8, bz = 0.3, zc = bz + rc, N = 28, W = half + rc;
-  // the base: a slab from the outer edge of one lid to the outer edge of the other (no bottom face)
-  { const by = 0.5;
-    quad([-W, -by, bz], [W, -by, bz], [W, by, bz], [-W, by, bz], [0, 0, 1], 0);
-    quad([-W, by, 0], [W, by, 0], [W, by, bz], [-W, by, bz], [0, 1, 0], 0);
-    quad([-W, -by, 0], [W, -by, 0], [W, -by, bz], [-W, -by, bz], [0, -1, 0], 0);
-    quad([W, -by, 0], [W, by, 0], [W, by, bz], [W, -by, bz], [1, 0, 0], 0);
-    quad([-W, -by, 0], [-W, by, 0], [-W, by, bz], [-W, -by, bz], [-1, 0, 0], 0); }
+  const quad = (a, b, c, d, n, r, ua = 1, va = 0) => { for (const p of [a, b, c, a, c, d]) push(p, n, ua, va, r); };
+  const capRole = variant === 'a' ? 4 : 0, vcode = variant === 'h' ? -2 : variant === 't' ? -3 : -1; // (the glass is role 1; uv.x < 0 marks the tube and says which kind)
+  const zc = 1.5, rt = 1.05, rc = 1.45, capT = 0.6, N = 28;
+  // the base: a small slab under the tube (no bottom face)
+  { const bx = half + capT, by = 0.9, bz = 0.5; // (a base from the outer face of one cap to the outer face of the other)
+    quad([-bx, -by, bz], [bx, -by, bz], [bx, by, bz], [-bx, by, bz], [0, 0, 1], 0);
+    quad([-bx, by, 0], [bx, by, 0], [bx, by, bz], [-bx, by, bz], [0, 1, 0], 0);
+    quad([-bx, -by, 0], [bx, -by, 0], [bx, -by, bz], [-bx, -by, bz], [0, -1, 0], 0);
+    quad([bx, -by, 0], [bx, by, 0], [bx, by, bz], [bx, -by, bz], [1, 0, 0], 0);
+    quad([-bx, -by, 0], [-bx, by, 0], [-bx, by, bz], [-bx, -by, bz], [-1, 0, 0], 0); }
   // the tube
   for (let i = 0; i < N; i++) {
     const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) / N) * Math.PI * 2;
     const p = (a, x) => [x, rt * Math.cos(a), zc + rt * Math.sin(a)];
     const n = (a) => [0, Math.cos(a), Math.sin(a)];
-    for (const [a, x] of [[a0, -half], [a1, -half], [a0, half], [a1, -half], [a1, half], [a0, half]]) push(p(a, x), n(a), vcode, x / half, 1);
+    for (const [a, x, s] of [[a0, -half, 1], [a1, -half, 1], [a0, half, 1], [a1, -half, 1], [a1, half, 1], [a0, half, 1]]) push(p(a, x), n(a), vcode, x / half, 1);
+    void 0;
   }
-  // the lids: a fan of triangles per lid, all at the lid's centre; role 5 (steel) or 6 (gold)
+  // the caps: a cylinder (its wall), the outer disc and a raised hub on it, one at each end
   for (const sg of [-1, 1]) {
+    const x0 = sg * half, x1 = sg * (half + capT), x2 = sg * (half + capT + 0.14);
     for (let i = 0; i < N; i++) {
       const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) / N) * Math.PI * 2;
-      for (const [r, a] of [[0, 0], [1, a0], [1, a1]]) push([sg * half, 0, zc], [rc, 0, 0], r * Math.cos(a), r * Math.sin(a), variant === 'a' ? 6 : 5);
+      const wall = (a, x) => [x, rc * Math.cos(a), zc + rc * Math.sin(a)];
+      const nw = (a) => [0, Math.cos(a), Math.sin(a)];
+      for (const [a, x] of [[a0, x0], [a1, x0], [a0, x1], [a1, x0], [a1, x1], [a0, x1]]) push(wall(a, x), nw(a), 1, 0, capRole);
+      for (const a of [a0, a1]) void a;
+      const ring = (a, r, x) => [x, r * Math.cos(a), zc + r * Math.sin(a)];
+      const face = [sg, 0, 0];
+      for (const [a, r] of [[a0, rc], [a1, rc], [a0, 0.6], [a1, rc], [a1, 0.6], [a0, 0.6]]) push(ring(a, r, x1), face, 1, 0, capRole);
+      const hubWall = (a, x) => [x, 0.6 * Math.cos(a), zc + 0.6 * Math.sin(a)];
+      for (const [a, x] of [[a0, x1], [a1, x1], [a0, x2], [a1, x1], [a1, x2], [a0, x2]]) push(hubWall(a, x), nw(a), 1, 0, capRole);
+      for (const [a, r] of [[a0, 0.6], [a1, 0.6], [a0, 0], [a1, 0.6], [a1, 0], [a0, 0]]) push(ring(a, r, x2), face, 1, 0, capRole);
     }
   }
   const size = [0, 0, 0];
@@ -643,13 +640,13 @@ export class GLBoard {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     this.ownMeshes = {};
-    const kinds = { n: [2.0, 'n', 1], h: [1.2, 'h', 1], t: [1.2, 't', 1], a: [2.0, 'a', 1], g: [2.0, 'n', 1], c: [0, 'c', 0.3], ca: [0, 'ca', 0.3], cg: [0, 'c', 0.3] };
+    const kinds = { n: [2.2, 'n', 1], h: [1.45, 'h', 1], t: [1.45, 't', 1], a: [2.2, 'a', 1], g: [2.2, 'n', 1], c: [0, 'c', 0.3], ca: [0, 'ca', 0.3], cg: [0, 'c', 0.3] };
     for (const [kind, [L, variant, flat]] of Object.entries(kinds)) {
       const m = kind[0] === 'c' ? pillMesh(L, variant, flat) : tubeMesh(L, variant); // (the notes are lamps, the cymbals round dishes)
       const n = m.role.length;
       const data = new Float32Array(n * 9);
       for (let i = 0; i < n; i++) data.set([m.pos[i * 3], m.pos[i * 3 + 1], m.pos[i * 3 + 2], m.nrm[i * 3], m.nrm[i * 3 + 1], m.nrm[i * 3 + 2], m.uv[i * 2], m.uv[i * 2 + 1], m.role[i]], i * 9);
-      const half = kind[0] === 'c' ? 0.44 : 0.435 / (L + 1.25); // (a note's half width, lids included, is 0.435 lanes, a cymbal's radius 0.44)
+      const half = kind[0] === 'c' ? 0.44 : 0.435 / 2.8; // (a note's half width, caps included, is 0.435 lanes, a cymbal's radius 0.44)
       this.ownMeshes[kind] = { buf: this.buffer(data), count: n, tex, shine: tex, cel: true, cym: kind[0] === 'c', msz: [half, half * 0.053, half * (kind[0] === 'c' ? 0.8 : 1.0)], base: 0, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1 };
     }
   }
