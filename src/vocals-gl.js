@@ -155,6 +155,17 @@ const PROGRAMS = {
     return;
   }
   float a = cover(d);
+  // inside the note, in the part that has passed the hit line while the voice is on it: a voice meter, thin light bars that jump up and down, strongest next to the line and
+  // fading away behind it (the same as in a talkie box)
+  float behind = u_hitx - v_p.x;
+  float live = step(x1, u_hitx) * (1.0 - smoothstep(x2, x2 + 24.0, u_hitx));
+  float on = live * smoothstep(-1.0, 3.0, behind) * (1.0 - smoothstep(60.0, 150.0, behind));
+  float fx = (v_p.x - x1) / 5.0;
+  float k = floor(fx);
+  float barX = step(0.15, fract(fx)) * (1.0 - step(0.85, fract(fx)));
+  float bh = (0.25 + 0.75 * abs(sin(k * 1.9 + u_t * 7.0) * sin(k * 0.71 - u_t * 3.7 + 1.3))) * hf * 0.85;
+  float meter = barX * cover(abs(v_p.y - y) - bh) * on * a;
+  col = mix(col, mix(sp ? GOLD : v_a1.rgb, vec3(1.0), 0.6), meter * 0.85);
   o = vec4(col * a, a);
 }`)],
 
