@@ -747,3 +747,4 @@ Only checked by synthetic test, headless run or code reading:
 - Pitched vocal notes get the same voice meter as the talkie boxes inside the part that has passed the hit line (bars shader in vocals-gl.js, 2D fallback in `vocalNotes`), on top of the glow, embers and sparks; gone shortly after the note ends.
 - The voice meter inside pitched notes appears at the hit line and fades out within ~60 px behind it (was 150 px).
 - The voice meter (pitched notes and talkie boxes) appears at the hit line and fades out about 120 px behind it (the 60 px of the last change was too short to see).
+- Talkie passing effect (GL `talk` program): the soft halo that trailed left of the hit line is gone; the lit stretch of the line, the sweeping point, the sparks and the voice meter stay (the 2D version never had the halo).

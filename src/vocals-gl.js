@@ -243,7 +243,6 @@ const PROGRAMS = {
   float side = 1.0 - smoothstep(0.0, 8.0, dx - 1.5);
   float inY = smoothstep(top - 3.0, top + 3.0, v_p.y) * (1.0 - smoothstep(bot - 3.0, bot + 3.0, v_p.y));
   float line = exp(-dx * dx / 10.0) * inY * env;
-  float halo = exp(-pow(dx / (H * 0.35 + 14.0), 2.0)) * inY * 0.16 * env * side;
   float sy = cy + sin(u_t * 4.2 + seed) * H * 0.42;
   vec2 sd = v_p - vec2(u_hitx, sy);
   float scan = (exp(-dot(sd, sd) / 36.0) + 0.55 * exp(-dx * dx / 16.0) * exp(-pow((v_p.y - sy) / (H * 0.1 + 4.0), 2.0))) * env;
@@ -265,7 +264,7 @@ const PROGRAMS = {
   }
   spk *= inY * env * side;
   vec3 hot = mix(tone, vec3(1.0), 0.45);
-  vec3 light = tone * halo + hot * (line * 0.9 + scan * 1.0) + mix(tone, vec3(1.0), 0.7) * spk * 1.3;
+  vec3 light = hot * (line * 0.9 + scan * 1.0) + mix(tone, vec3(1.0), 0.7) * spk * 1.3;
   o = vec4(light, clamp(max(light.r, max(light.g, light.b)) * 0.9, 0.0, 1.0));
 }`)],
 
