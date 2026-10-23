@@ -471,7 +471,7 @@ function tubeMesh(half, variant) {
   const push = (p, n, u, v, r) => { pos.push(...p); nrm.push(...n); uv.push(u, v); role.push(r); };
   const quad = (a, b, c, d, n, r, ua = 1, va = 0) => { for (const p of [a, b, c, a, c, d]) push(p, n, ua, va, r); };
   const capRole = variant === 'a' ? 4 : 0, vcode = variant === 'h' ? -2 : variant === 't' ? -3 : -1; // (the glass is role 1; uv.x < 0 marks the tube and says which kind)
-  const zc = 1.5, rt = 1.05, rc = 1.45, capT = 0.6, N = 28;
+  const zc = 1.5, rt = 1.4, rc = 1.45, capT = 0.6, N = 28;
   // the base: a small slab under the tube (no bottom face)
   { const bx = half + capT, by = 0.9, bz = 0.5; // (a base from the outer face of one cap to the outer face of the other)
     quad([-bx, -by, bz], [bx, -by, bz], [bx, by, bz], [-bx, by, bz], [0, 0, 1], 0);
