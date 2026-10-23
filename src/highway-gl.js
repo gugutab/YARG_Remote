@@ -1396,7 +1396,7 @@ export class GLBoard {
       gl.uniform1f(pr.u.u_gain, fx.glow);
       for (const [kind, sol] of Object.entries(d.solid)) {
         const mesh = models[kind];
-        if (!mesh) continue;
+        if (!mesh || kind[0] === 'c') continue; // (no glow on the cymbals)
         const sFrom = lowerBound(sol.times, t - 0.12), sTo = lowerBound(sol.times, t + win);
         if (sTo <= sFrom) continue;
         const first = sol.count - sTo;
