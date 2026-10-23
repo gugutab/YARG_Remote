@@ -26,14 +26,16 @@ void addLight(inout vec4 acc, vec3 c, float a) { acc.rgb = min(acc.rgb + c * a, 
 // A calm view of the sound for the visualizers that must not flash: the level, bass, mid and treble low-passed over about `tau` seconds (so they follow the loudness of a passage,
 // never a single hit) and no kick / flux at all. read(audio, clock) -> the same shape as `s.audio`.
 export function createCalmAudio(tau = 0.8) {
-  const o = { on: false, level: 0, bass: 0, mid: 0, treble: 0, kick: 0, flux: 0, bands: null };
+  const o = { on: false, level: 0, bass: 0, mid: 0, treble: 0, kick: 0, flux: 0, bands: new Float32Array(BANDS) }; // (the bands are low-passed too, over a quarter of tau: no spiky spectrum)
   let last = null;
   return {
     read(a, clock) {
       const dt = last === null ? 1 : Math.min(0.25, Math.max(0, clock - last));
       last = clock;
       const k = 1 - Math.exp(-dt / tau);
-      o.on = a.on; o.bands = a.bands;
+      o.on = a.on;
+      const kb = 1 - Math.exp(-dt / (tau * 0.3));
+      for (let i = 0; i < BANDS; i++) o.bands[i] += (a.bands[i] - o.bands[i]) * kb;
       o.level += (a.level - o.level) * k; o.bass += (a.bass - o.bass) * k; o.mid += (a.mid - o.mid) * k; o.treble += (a.treble - o.treble) * k;
       return o;
     },

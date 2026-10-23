@@ -35,17 +35,17 @@ const BODIES = {
   kaleido: `void main() {
   vec2 uv = (v_p - 0.5 * u_res) / min(u_res.x, u_res.y);
   float r = length(uv), a = atan(uv.y, uv.x);
-  float n = 6.0 + floor(u_dens * 4.0) * 2.0;
+  float n = 8.0; // (a fixed number of folds: it used to change with the density, and the whole picture jumped when it did)
   float seg = TAU / n;
   a = mod(a + u_bt * 0.04, seg); a = abs(a - 0.5 * seg);
   vec2 p = r * vec2(cos(a), sin(a)) * 3.2 + vec2(u_bt * 0.12, 0.0);
   float w = fbm(p + 1.6 * fbm(p * 1.7 + u_bt * 0.08));
-  float rid = pow(1.0 - abs(2.0 * w - 1.0), 2.2);
-  vec3 col = palAt(w * 1.3 + r * 0.5 + u_mph * 0.4 + u_bt * 0.01);
-  col = col * (0.45 + 1.1 * rid) + vec3(1.0) * 0.18 * pow(rid, 4.0);
+  float rid = pow(1.0 - abs(2.0 * w - 1.0), 1.5); // (softer veins)
+  vec3 col = palAt(w * 0.9 + r * 0.35 + u_bt * 0.006); // (only continuous terms: the bar's phase used here wrapped every bar and the colours jumped)
+  col = col * (0.62 + 0.7 * rid) + vec3(1.0) * 0.1 * pow(rid, 3.0);
   float pulse = 0.9 + 0.3 * u_sp + 0.2 * u_au.w;
   float vig = smoothstep(1.3, 0.1, r);
-  float a2 = clamp((0.45 + 0.55 * rid) * vig, 0.0, 0.95);
+  float a2 = clamp((0.55 + 0.4 * rid) * vig, 0.0, 0.95);
   vec4 acc = vec4(col * pulse * a2, a2);
   float af = a / (0.5 * seg); // 0..1 across the half fold: the spectrum, low to high
   float bh = 0.1 + 0.34 * spec(af) * 1.2;
