@@ -835,15 +835,16 @@ export class Highway {
     this.neck = this.paneOpt(pane.key, 'neck');
     t -= this.paneOpt(pane.key, 'delay'); // this window's own chart delay
     try {
-      this.chart = pane.chart;
+      const vchart = this.viewChart(pane);
+      this.chart = vchart;
       this.curPane = pane;
       this.maxLength = pane.maxLength;
       this.vRange = pane.vRange;
       if (pane.chart.mode === 'vocals') {
         if (this.vocalView === 'karaoke') this.renderKaraoke(t, pw, ph, pane);
         else this.renderVocals(t, pw, ph);
-      } else if (this.glActive && !glUnsupported(this, pane.chart)) { // the WebGL board paints this pane under the canvas (the dividers, countdown and tags stay here)
-        this.glPane(pane, t, x, y, pw, ph);
+      } else if (this.glActive && !glUnsupported(this, vchart)) { // the WebGL board paints this pane under the canvas (the dividers, countdown and tags stay here)
+        this.glPane(pane, vchart, t, x, y, pw, ph);
       } else { // the fade at the edges erases the board (it never paints a colour over what is behind: the stage colour or a visualizer)
         const main = g;
         const dpr = this.canvas.width / (this.canvas.clientWidth || 1);
@@ -879,7 +880,25 @@ export class Highway {
   }
 
   // A lane pane painted by the WebGL board: the settings of this pane in the board's terms (see GLBoard.drawPane). The caller has set view, noteStyle and neck for the pane.
-  glPane(pane, t, x, y, pw, ph) {
+  // The chart a pane draws: while a rewound stretch is replayed (replayWindow) the notes of that stretch are left out, as in YARG (the notes already missed vanish, NoteElement.OnRewind), so
+  // the board draws the same pane as ever (no 2D fallback, no flat grey notes) and no hit effect fires for them. The copy shares everything but the notes; the board's buffers of it are freed
+  // when the replay ends.
+  viewChart(pane) {
+    const rw = this.replayWindow, chart = pane.chart;
+    if (rw === null || chart.mode !== 'lanes') {
+      if (pane.replayChart) { this.glBoard?.release(pane.replayChart); pane.replayChart = null; pane.replayKey = ''; }
+      return chart;
+    }
+    const key = `${rw.from}|${rw.to}`;
+    if (pane.replayKey !== key || !pane.replayChart) {
+      if (pane.replayChart) this.glBoard?.release(pane.replayChart);
+      pane.replayChart = { ...chart, notes: chart.notes.filter((n) => n.time < rw.from || n.time > rw.to) };
+      pane.replayKey = key;
+    }
+    return pane.replayChart;
+  }
+
+  glPane(pane, chart, t, x, y, pw, ph) {
     const windowSec = lookahead3D(this.neck, ph);
     const o = this.glOpts;
     o.neck = this.neck; o.perspective = this.perspective; o.curve = this.curve; o.noteSize = this.noteSize; o.sustainWidth = this.sustainWidth; o.kickBar = this.kickBar;
@@ -890,7 +909,7 @@ export class Highway {
     fx.solid = this._notes3d === 'own' ? 'own' : this._notes3d === 'yarg' && this.glModels === 'ready' ? 'yarg' : false;
     fx.metal = look.metal; fx.glass = look.glass; fx.cymbal = look.cymbal; fx.glow = look.glow; fx.particles = look.sparks; fx.fog = look.fog; fx.shade = 'cel';
     o.fx = fx;
-    this.glBoard.drawPane(pane.chart, t, { x, y, w: pw, h: ph }, o);
+    this.glBoard.drawPane(chart, t, { x, y, w: pw, h: ph }, o);
   }
 
   // The wait countdown: while the chart has nothing to play for `countdownMin` (9 s) or more, the seconds until its next note, in a ring that

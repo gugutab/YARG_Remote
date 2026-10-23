@@ -55,7 +55,7 @@ export function glUnsupported(hw, chart) {
   if (hw.noteStyle !== 'rect') return 'noteStyle';
   if (hw.hitAnimation !== 'burst') return 'hitAnimation';
   if (hw.tailStyle !== 'flow') return 'tailStyle';
-  if (hw.loopEnd !== null || hw.replayWindow !== null) return 'loop';
+  if (hw.loopEnd !== null) return 'loop'; // (the replayed stretch after a rewind is no case: its notes are left out of the chart the board gets, see Highway.viewChart)
   return null;
 }
 
