@@ -427,7 +427,7 @@ void main() {
   // along the lane, its depth along the road (in depth units) and its height lifted on the screen by the perspective scale at its depth, so the model gets a true perspective.
   // Lit by a fixed light above and in front: a texture of the model gives the metal its brushed look, the lane's colour tints the middle. Instances (time, lane, length, 0) + (r, g, b, 0).
   solid: [`${COMMON}in vec3 m_pos; in vec3 m_nrm; in vec2 m_uv; in float m_role; in vec4 s0; in vec4 s1; uniform vec3 u_msz; uniform float u_mbase, u_malpha;
-out vec2 v_uv; out vec3 v_n, v_lane, v_mp; out float v_role, v_y, v_d, v_a;
+out vec2 v_uv; out vec3 v_n, v_lane, v_mp; out float v_role, v_y, v_d, v_a, v_sp;
 void main() {
   float past = u_t - (s0.x + s0.z); float kx = clamp(past / 0.1, 0.0, 1.0); float sh = 1.0 - 0.5 * kx;
   bool gone = past > 0.1 || (s0.z > 0.0 && u_t >= s0.x);
@@ -440,9 +440,9 @@ void main() {
   vec2 px = project(x, dep) - vec2(0.0, hgt * u_laneW * scaleAt(dep));
   vec4 clip = clipPos(px); clip.z = clamp(dep * 1.7 - 0.1 - hgt * 0.3, -0.99, 0.99); // (nearer and higher wins the depth test)
   gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clip; v_y = px.y; v_d = d;
-  v_uv = m_uv; v_n = vec3(m_nrm.x, -m_nrm.y, m_nrm.z); v_lane = s1.rgb; v_role = m_role; v_mp = m_pos;
+  v_uv = m_uv; v_n = vec3(m_nrm.x, -m_nrm.y, m_nrm.z); v_lane = s1.rgb; v_role = m_role; v_mp = m_pos; v_sp = s1.w;
   v_a = clamp((1.0 - d) / 0.14, 0.0, 1.0) * u_malpha;
-}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane, v_mp; in float v_role, v_y, v_d, v_a; uniform float u_mcel, u_mtoon, u_mcym, u_mmetal, u_mglass, u_mcymst; out vec4 o;
+}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane, v_mp; in float v_role, v_y, v_d, v_a, v_sp; uniform float u_mcel, u_mtoon, u_mcym, u_mmetal, u_mglass, u_mcymst; out vec4 o;
 // The middle of a note (YARG's RectangularNote shader graph, material NoteMiddle): the base map times a darkness mask that drifts with time (a soft cloud: gradient noise,
 // scale -2.8 / speed 0.4 / tiling 1.1 x 1.3 in the material; here a value noise of two octaves), times the lane's colour, over which the shine map is laid with the opacity
 // shine amount x its alpha (0.1); a small emission of the colour (0.1). The metal is the base map under the light, smoothness 0.5.
@@ -513,8 +513,9 @@ void main() {
     vec3 Tb = capFace > 0.5 ? normalize(vec3(0.0, v_mp.z, v_mp.y) + vec3(0.0, 0.0001, 0.0)) : vec3(1.0, 0.0, 0.0);
     float aniso = pow(sqrt(max(1.0 - pow(dot(Tb, H), 2.0), 0.0)), 14.0) * max(dot(N, L) * 0.7 + 0.3, 0.0);
     vec3 tint; float refl, spec, sexp, brush, lift;
-    metalStyle(u_mmetal, tint, refl, spec, sexp, brush, lift);
-    if (u_mmetal > 14.5) tint = mix(tint, v_lane * 1.15, 0.7); // (anodized aluminium: tinted by the lane)
+    float mk = v_sp > 0.5 ? 3.0 : u_mmetal; // (star power: the frame turns to satin gold)
+    metalStyle(mk, tint, refl, spec, sexp, brush, lift);
+    if (mk > 14.5) tint = mix(tint, v_lane * 1.15, 0.7); // (anodized aluminium: tinted by the lane)
     float baked = mix(g, 1.0, lift);
     vec3 Rm = reflect(-Vc, N);
     float sky = smoothstep(-0.3, 0.8, Rm.z);
@@ -1035,7 +1036,7 @@ export class GLBoard {
       if (bar) { barHits.push(n.time, 0, 0, 0, ...hexRgb(barColor), n.time); return; }
       const rgb = hexRgb(noteColor({ lane: n.lane, sp: sp[i] }, colors)); // (a star power note's tail and burst take its tinted colour)
       const cym = n.cymbal ? 1 : 0;
-      (solids[cym ? (n.accent ? 'ca' : n.ghost ? 'cg' : 'c') : n.tap ? 't' : n.hopo ? 'h' : n.accent ? 'a' : n.ghost ? 'g' : 'n'] ??= []).push({ time: n.time, row: [n.time, n.lane, n.length > 0 ? n.length : 0, 0, ...rgb, 0] });
+      (solids[cym ? (n.accent ? 'ca' : n.ghost ? 'cg' : 'c') : n.tap ? 't' : n.hopo ? 'h' : n.accent ? 'a' : n.ghost ? 'g' : 'n'] ??= []).push({ time: n.time, row: [n.time, n.lane, n.length > 0 ? n.length : 0, 0, ...rgb, sp[i] ? 1 : 0] });
       if (n.length > 0) { tails.push({ t0: n.time, t1: n.time + n.length, lane: n.lane, rgb }); helds.push(n.time, n.lane, n.time + n.length, cym, ...rgb, 1); }
       else hits.push(n.time, n.lane, n.time, cym, ...rgb, 0);
     });

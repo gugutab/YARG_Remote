@@ -238,7 +238,7 @@ export class Highway {
     // The 3D notes of the board (setting highway.notes3d: 'off', 'yarg' = YARG's own models, 'own' = our lamp) and how they look (highway.noteMetal / noteGlass / cymbalTop: indices of
     // the style lists of highway-gl.js, noteGlow: 0..2, noteSparks / noteFog: the optional effects). They need the board, so they are ignored with perf.renderer 'canvas'.
     this._notes3d = 'off';
-    this.noteLook = { metal: 0, glass: 4, cymbal: 5, glow: 0.7, sparks: true, fog: true };
+    this.noteLook = { metal: 0, glass: 4, cymbal: 5, glow: 0.4, sparks: true, fog: true };
     this.glModels = 'none'; // the YARG models: 'none', 'loading', 'ready', 'failed'
     this.glFx = {};
     this._beatLines = 'normal'; // highway.beatLines
