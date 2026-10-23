@@ -111,7 +111,9 @@ if (params.get('glow')) $('glow').value = params.get('glow');
 $('metal').innerHTML = METAL_STYLES.map((n, i) => `<option value="${i}">${i}: ${n}</option>`).join('');
 $('glass').innerHTML = GLASS_STYLES.map((n, i) => `<option value="${i}">${i}: ${n}</option>`).join('');
 if (params.get('metal')) $('metal').value = params.get('metal');
-if (params.get('glass')) $('glass').value = params.get('glass');
+$('metal').value = params.get('metal') ?? '0'; // (the notes: satin stainless steel and candy gel by default; ?metal=3 is the satin gold)
+$('glass').value = params.get('glass') ?? '4';
+if (params.get('cymbal')) $('cymbal').value = params.get('cymbal');
 if (params.get('side')) $('side').value = params.get('side');
 
 function render(t) {
@@ -125,7 +127,7 @@ function render(t) {
     board.drawPane(p.chart, t, { x: i * pw, y: 0, w, h: H }, {
       neck: Number($('neck').value), perspective: Number($('persp').value), curve, noteSize: 1, sustainWidth: 1, kickBar: 1, hitLine: params.get('hitline') !== '0', laneStripes: true,
       trackOpacity: 0.75, boardK: 1, leftHanded: params.get('lefty') === '1', heldMotion: true, starPowerBand: true, soloBand: true, fillBand: true, breBand: 'pulse', bandBorders: true,
-      side: Number($('side').value), fx: { ...FX, solid: FX.solid ? $('model').value : false, shade: $('shade').value, glow: Number($('glow').value), metal: Number($('metal').value), glass: Number($('glass').value) }, beatStyle: BEATS, windowSec: (DEPTH_SEC / Number($('neck').value)) * laneLookFactor(H),
+      side: Number($('side').value), fx: { ...FX, solid: FX.solid ? $('model').value : false, shade: $('shade').value, glow: Number($('glow').value), metal: Number($('metal').value), glass: Number($('glass').value), cymbal: Number($('cymbal').value) }, beatStyle: BEATS, windowSec: (DEPTH_SEC / Number($('neck').value)) * laneLookFactor(H),
     });
   });
 }

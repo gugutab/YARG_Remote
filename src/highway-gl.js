@@ -441,7 +441,7 @@ void main() {
   gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clip; v_y = px.y; v_d = d;
   v_uv = m_uv; v_n = vec3(m_nrm.x, -m_nrm.y, m_nrm.z); v_lane = s1.rgb; v_role = m_role; v_mp = m_pos;
   v_a = clamp((1.0 - d) / 0.14, 0.0, 1.0) * u_malpha;
-}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane, v_mp; in float v_role, v_y, v_d, v_a; uniform float u_mcel, u_mtoon, u_mcym, u_mmetal, u_mglass; out vec4 o;
+}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane, v_mp; in float v_role, v_y, v_d, v_a; uniform float u_mcel, u_mtoon, u_mcym, u_mmetal, u_mglass, u_mcymst; out vec4 o;
 // The middle of a note (YARG's RectangularNote shader graph, material NoteMiddle): the base map times a darkness mask that drifts with time (a soft cloud: gradient noise,
 // scale -2.8 / speed 0.4 / tiling 1.1 x 1.3 in the material; here a value noise of two octaves), times the lane's colour, over which the shine map is laid with the opacity
 // shine amount x its alpha (0.1); a small emission of the colour (0.1). The metal is the base map under the light, smoothness 0.5.
@@ -523,7 +523,19 @@ void main() {
     float face = clamp(dot(N, Vc), 0.0, 1.0);
     float core = pow(face, 2.2);
     float gv = u_mglass;
-    if (gv < 0.5) { // lamp: a saturated light, hottest where we look straight into it, gathering at the edge, with the cloud and the shine map's streak on it
+    if (u_mcym > 0.5 && u_mcymst > 0.5) { // a cymbal's coloured top as drum-cymbal metal tinted by the lane's colour: concentric lathe grooves, an anisotropic sheen that runs round them, a hard studio reflected on it
+      float r = length(v_mp.xy), ang = atan(v_mp.y, v_mp.x);
+      float lathe = 0.6 * vnoise(vec2(r * 55.0, ang * 1.5)) + 0.4 * vnoise(vec2(r * 140.0, ang * 3.0));
+      vec3 Tc = normalize(vec3(-v_mp.y, -v_mp.x, 0.0) + vec3(0.0001)); // (the direction of the grooves, round the cymbal, in the world)
+      float an = pow(sqrt(max(1.0 - pow(dot(Tc, H), 2.0), 0.0)), 22.0) * max(dot(N, L) * 0.7 + 0.3, 0.0);
+      vec3 tint = mix(v_lane, vec3(1.0), 0.18);
+      vec3 Rm = reflect(-Vc, N); float sky = smoothstep(-0.2, 0.9, Rm.z);
+      vec3 env = mix(vec3(0.06, 0.07, 0.10), vec3(1.0), pow(sky, 1.4)) + vec3(0.8) * pow(max(dot(Rm, normalize(L + vec3(0.0, 0.0, 0.3))), 0.0), 16.0);
+      vec3 body = tint * (0.35 + 0.65 * (0.5 + 0.5 * lam)) * (0.85 + 0.3 * lathe);
+      c = mix(body, env * tint * 1.25, 0.55);
+      c += vec3(1.0) * (an * 0.5 * (0.6 + 0.8 * lathe) + sp * 0.5);
+      c += v_lane * 0.2 * pow(1.0 - face, 2.0);
+    } else if (gv < 0.5) { // lamp: a saturated light, hottest where we look straight into it, gathering at the edge, with the cloud and the shine map's streak on it
       vec3 lamp = v_lane * (0.62 + 0.9 * core);
       lamp = mix(lamp, vec3(1.0), 0.3 * core * core);
       lamp *= mix(0.72, 1.0, (u_mcym > 0.5 ? 1.0 : g) * cloud);
@@ -1363,7 +1375,7 @@ export class GLBoard {
         const first = sol.count - sTo;
         gl.bindTexture(gl.TEXTURE_2D, mesh.tex);
         gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, mesh.shine); gl.activeTexture(gl.TEXTURE1);
-        gl.uniform1f(pr.u.u_mcel, mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mcym, mesh.cym && !mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mmetal, fx.metal || 0); gl.uniform1f(pr.u.u_mglass, fx.glass || 0); gl.uniform1f(pr.u.u_mtoon, fx.shade === 'glossy' ? 2 : fx.shade === 'smooth' || fx.cel === false ? 0 : 1);
+        gl.uniform1f(pr.u.u_mcel, mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mcym, mesh.cym && !mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mmetal, fx.metal || 0); gl.uniform1f(pr.u.u_mglass, fx.glass || 0); gl.uniform1f(pr.u.u_mcymst, fx.cymbal || 0); gl.uniform1f(pr.u.u_mtoon, fx.shade === 'glossy' ? 2 : fx.shade === 'smooth' || fx.cel === false ? 0 : 1);
         gl.uniform2f(pr.u.u_mnoise, mesh.cym ? 0.62 : 1.0, 0.7); // (the middle's noise speed: the note 0.4, the cymbal 0.25, relative to the note; its minimum darkness)
         gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, mesh.alpha);
         this.vao(d, `solid_${kind}`, () => {
