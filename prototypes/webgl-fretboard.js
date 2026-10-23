@@ -61,6 +61,14 @@ const canvas = $('gl');
 const board = GLBoard.create(canvas);
 if (!board) { $('hud').textContent = 'WebGL 2 is not available in this browser.'; throw new Error('no WebGL 2'); }
 const gl = board.gl;
+// The 3D note models of YARG (prototypes/yarg-notes: notes.json from scripts/pack-note-meshes.mjs and the two textures; see NOTICE.md): loaded in the background, the checkbox "3D notes" shows them once they are there.
+(async () => {
+  try {
+    const img = (name) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = `yarg-notes/${name}.png`; });
+    const [meshes, NormalNote, CymbalNote] = await Promise.all([fetch('yarg-notes/notes.json').then((r) => r.json()), img('NormalNote'), img('CymbalNote')]);
+    board.setMeshes(meshes, { NormalNote, CymbalNote });
+  } catch (e) { console.warn('3D note models not loaded:', e); }
+})();
 const timerExt = gl.getExtension('EXT_disjoint_timer_query_webgl2');
 const BEATS = ['rgba(255,255,255,0.5)', 'rgba(255,255,255,0.3)', 'rgba(255,255,255,0.15)']; // (the app's normal beat lines)
 const curve = Number(params.get('curve') ?? 0.4);

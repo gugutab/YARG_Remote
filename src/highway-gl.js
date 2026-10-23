@@ -306,70 +306,38 @@ void main() {
   }
   o = vec4(sum * edgeFade(v_y), 0.0);
 }`],
-  // the effect "solid": the note as a pill lying flat on the road: a capsule of gold metal (the wall all around it and a bezel on top) with a glass dome in the middle,
-  // lit from inside in the lane's colour (a bright core fading to a dark edge, a streak of reflected light, a thin rim light). Each corner of the block is projected like
-  // the road (the height lifts it on the screen by the perspective scale at its depth), so its far edge is narrower than its near edge. Two quads per note (the top and the
-  // front wall; the capsule's ends are round, so there is no side face: the wall is shaded as a cylinder). Instances (time, lane, length, flags) + (r, g, b, 0); flags: 1 HOPO,
-  // 2 tap, 4 accent, 8 ghost. The sprite of the same note is hidden (u_solid in the notes program).
-  solid: [`${COMMON}in vec4 s0; in vec4 s1; out vec4 v_col; out vec3 v_lane; out vec2 v_uv, v_px; out float v_q, v_y, v_d, v_f;
+  // the effect "solid": the notes as YARG's own 3D models (Assets/Art/Meshes/Gameplay/Notes/Rectangular of YARC-Official/YARG, LGPL-3.0, converted by
+  // scripts/pack-note-meshes.mjs: a note is a metal frame with a coloured glass middle, a HOPO a smaller one with a white inner ring, a tap one with a dark one...). One mesh per
+  // kind of note, drawn instanced (one instance per note, `divisor` 1) with the depth buffer on, so the faces hide one another. Each vertex is placed like the road: its width
+  // along the lane, its depth along the road (in depth units) and its height lifted on the screen by the perspective scale at its depth, so the model gets a true perspective.
+  // Lit by a fixed light above and in front: a texture of the model gives the metal its brushed look, the lane's colour tints the middle. Instances (time, lane, length, 0) + (r, g, b, 0).
+  solid: [`${COMMON}in vec3 m_pos; in vec3 m_nrm; in vec2 m_uv; in float m_role; in vec4 s0; in vec4 s1; uniform vec3 u_msz; uniform float u_mbase, u_malpha;
+out vec2 v_uv; out vec3 v_n, v_lane; out float v_role, v_y, v_d, v_a;
 void main() {
-  int q = gl_VertexID / 6; int k = gl_VertexID - q * 6;
-  vec2 uv = vec2((k == 1 || k == 3 || k == 4) ? 1.0 : 0.0, (k == 2 || k == 4 || k == 5) ? 1.0 : 0.0);
-  float f = s0.w; bool hopo = mod(f, 2.0) >= 1.0, tap = mod(floor(f / 2.0), 2.0) >= 1.0, accent = mod(floor(f / 4.0), 2.0) >= 1.0, ghost = mod(floor(f / 8.0), 2.0) >= 1.0;
   float past = u_t - (s0.x + s0.z); float kx = clamp(past / 0.1, 0.0, 1.0); float sh = 1.0 - 0.5 * kx;
-  bool gone = past > 0.1 || (s0.z > 0.0 && u_t >= s0.x) || q > 1;
+  bool gone = past > 0.1 || (s0.z > 0.0 && u_t >= s0.x);
   float d = clamp((s0.x - u_t) / u_win, 0.0, 1.0);
   float hs = u_headR / ${HEAD_R.toFixed(2)};
-  float hw = 0.435 * hs * ((hopo || tap) ? 0.72 : 1.0) * sh, hh = (hopo ? 0.17 : 0.13) * hs * sh, dd = 0.0085 * (hopo ? 1.1 : 1.0) * sh;
-  float lx = s0.y + 0.5 - u_half;
-  float x, dep, hgt;
-  if (q == 0) { x = lx + (uv.x * 2.0 - 1.0) * hw; dep = d + dd - uv.y * 2.0 * dd; hgt = hh; } // the top
-  else { x = lx + (uv.x * 2.0 - 1.0) * hw; dep = d - dd; hgt = (1.0 - uv.y) * hh; } // the front wall
-  float sc = scaleAt(dep);
-  vec2 px = project(x, dep) - vec2(0.0, hgt * u_laneW * sc);
-  gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(px); v_y = px.y; v_d = d;
-  v_px = vec2(2.0 * hw * u_laneW * sc, q == 0 ? max(1.0, (u_hit - u_vy) * u_k * sc * sc * 2.0 * dd) : max(1.0, hh * u_laneW * sc)); // the quad's size in px
-  float far = clamp((1.0 - d) / 0.14, 0.0, 1.0);
-  v_col = vec4(1.0, 1.0, 1.0, far * (ghost ? 0.5 : 1.0)); v_lane = s1.rgb; v_uv = uv; v_q = float(q); v_f = f + (accent ? 0.0 : 0.0);
-}`, `${FS_HEAD}in vec4 v_col; in vec3 v_lane; in vec2 v_uv, v_px; in float v_q, v_y, v_d, v_f; out vec4 o;
-const vec3 GOLD = vec3(0.93, 0.74, 0.30);
-float sdCapsule(vec2 p, float L, float r) { vec2 q = vec2(max(abs(p.x) - L, 0.0), p.y); return length(q) - r; }
+  float x = s0.y + 0.5 - u_half + m_pos.x * u_msz.x * sh * hs;
+  float dep = d - m_pos.y * u_msz.y * sh; // (the model's +y points at the player)
+  float hgt = (m_pos.z - u_mbase) * u_msz.z * sh * hs;
+  vec2 px = project(x, dep) - vec2(0.0, hgt * u_laneW * scaleAt(dep));
+  vec4 clip = clipPos(px); clip.z = clamp(dep * 1.7 - 0.1 - hgt * 0.3, -0.99, 0.99); // (nearer and higher wins the depth test)
+  gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clip; v_y = px.y; v_d = d;
+  v_uv = m_uv; v_n = vec3(m_nrm.x, -m_nrm.y, m_nrm.z); v_lane = s1.rgb; v_role = m_role;
+  v_a = clamp((1.0 - d) / 0.14, 0.0, 1.0) * u_malpha;
+}`, `${FS_HEAD}uniform sampler2D u_mtex; in vec2 v_uv; in vec3 v_n, v_lane; in float v_role, v_y, v_d, v_a; out vec4 o;
 void main() {
-  float hopo = mod(v_f, 2.0) >= 1.0 ? 1.0 : 0.0, tap = mod(floor(v_f / 2.0), 2.0) >= 1.0 ? 1.0 : 0.0, accent = mod(floor(v_f / 4.0), 2.0) >= 1.0 ? 1.0 : 0.0;
-  vec3 col = v_lane; vec3 c; float alpha = 1.0;
-  if (v_q < 0.5) { // the top: the gold bezel and the glass dome of the capsule
-    float ar = v_px.x / v_px.y; vec2 p = (v_uv - 0.5) * vec2(ar, 1.0); // in units of the capsule's thickness
-    float L = max(0.0, ar * 0.5 - 0.5);
-    float dist = sdCapsule(p, L, 0.5);
-    float aa = 1.0 / v_px.y;
-    alpha = 1.0 - smoothstep(-aa, aa, dist);
-    float bw = 0.15 + 0.05 * accent; // the bezel's width
-    float rr = -dist - bw; // inside the glass: the distance from its edge
-    float metal = 0.62 + 0.55 * (0.5 - p.y * 0.9) + 0.18 * sin(p.x * 11.0 + p.y * 3.0); // a brushed gold bezel, lit from the near side
-    vec3 bez = GOLD * metal; bez += vec3(0.4) * (1.0 - smoothstep(0.0, 0.035, -dist)); // the bright outer edge
-    bez = mix(bez, col, 0.06);
-    float t = clamp(rr / (0.5 - bw), 0.0, 1.0);
-    float along = 1.0 - pow(clamp(abs(p.x) / (L + 0.45), 0.0, 1.0), 2.5);
-    float core = pow(t, 0.6) * (0.35 + 0.65 * along); // the light inside: strongest in the middle of the dome
-    vec3 glass = mix(col * 0.22, mix(col, vec3(1.0), 0.4) * 1.55, core);
-    glass += vec3(0.55) * (1.0 - smoothstep(0.0, 0.05, abs(p.y + 0.12))) * smoothstep(L * 0.95 + 0.3, L * 0.3, abs(p.x)) * t; // the streak of reflected light
-    glass += col * 0.5 * (1.0 - smoothstep(0.0, 0.05, rr)) * step(0.0, rr); // the rim light where the glass meets the metal
-    if (hopo > 0.5) glass = mix(glass, vec3(1.0), 0.85 * (1.0 - smoothstep(0.08, 0.15, length(p * vec2(0.7, 1.0))))); // a pearl in the middle
-    if (tap > 0.5) glass = mix(glass, vec3(0.02), 0.85 * (1.0 - smoothstep(0.1, 0.16, abs(p.x))) * t); // a dark stripe across
-    c = rr > 0.0 ? glass : bez;
-    if (accent > 0.5 && rr <= 0.0) c += vec3(0.2);
-  } else { // the front wall: gold, shaded as the side of a cylinder (darker towards the ends), lit at the top edge and darker at the base
-    float cyl = 0.55 + 0.45 * (1.0 - pow(abs(v_uv.x * 2.0 - 1.0), 2.2));
-    float vert = mix(1.12, 0.42, v_uv.y);
-    c = GOLD * cyl * vert;
-    c += vec3(0.35) * (1.0 - smoothstep(0.0, 0.1, v_uv.y)) * cyl; // the edge where the top meets the wall
-    c = mix(c, col, 0.16 * (1.0 - v_uv.y)); // the dome's light spills on the metal
-    vec2 pp = (v_uv - 0.5) * v_px; float r = min(v_px.y * 0.5, 9.0);
-    vec2 qq = abs(pp) - (v_px * 0.5 - r); float sdf = length(max(qq, 0.0)) + min(max(qq.x, qq.y), 0.0) - r;
-    alpha = v_uv.y < 0.5 ? 1.0 : 1.0 - smoothstep(-0.7, 0.7, sdf); // (the lower corners are rounded)
-  }
+  float g = texture(u_mtex, v_uv).r;
+  vec3 N = normalize(v_n); vec3 L = normalize(vec3(-0.25, -0.5, 0.85)); vec3 H = normalize(L + normalize(vec3(0.0, -0.55, 0.83)));
+  float lam = max(dot(N, L), 0.0); float sp = pow(max(dot(N, H), 0.0), 36.0);
+  vec3 c;
+  if (v_role < 0.5) c = vec3(g) * (0.42 + 0.8 * lam) + vec3(0.9) * sp * 0.55; // the metal
+  else if (v_role < 1.5) c = v_lane * (0.28 + 0.95 * g) * (0.55 + 0.6 * lam) + v_lane * 0.32 + vec3(1.0) * sp * 0.45; // the coloured glass, a little lit from inside
+  else if (v_role < 2.5) c = mix(vec3(1.0), v_lane, 0.12) * (0.68 + 0.32 * lam); // the white of a HOPO
+  else c = vec3(0.04) * (0.6 + 0.8 * lam) + vec3(1.0) * sp * 0.3; // the dark of a tap
   c = mix(c, vec3(0.10, 0.14, 0.24), u_fog * 0.5 * smoothstep(0.1, 1.0, v_d)); // (the fog of the other effect, when it is on)
-  float a = alpha * v_col.a * edgeFade(v_y);
+  float a = v_a * edgeFade(v_y);
   o = vec4(c * a, a);
 }`],
 
@@ -503,6 +471,36 @@ export class GLBoard {
     this.atlas.dirty = false;
   }
 
+  // The models of the notes: `meshes` is the JSON of scripts/pack-note-meshes.mjs, `images` the textures by name ({ NormalNote, CymbalNote }: images or canvases). Until they are set the
+  // effect "solid" draws nothing (the sprites stay).
+  setMeshes(meshes, images) {
+    const gl = this.gl;
+    this.meshes = {};
+    const texs = {};
+    for (const [name, img] of Object.entries(images)) {
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      texs[name] = tex;
+    }
+    for (const [kind, m] of Object.entries(meshes)) {
+      const n = m.role.length;
+      const data = new Float32Array(n * 9);
+      for (let i = 0; i < n; i++) data.set([m.pos[i * 3], m.pos[i * 3 + 1], m.pos[i * 3 + 2], m.nrm[i * 3], m.nrm[i * 3 + 1], m.nrm[i * 3 + 2], m.uv[i * 2], m.uv[i * 2 + 1], m.role[i]], i * 9);
+      const cym = kind[0] === 'c';
+      const half = cym ? 0.44 / m.size[0] : 0.435 / 3.85; // (a note's half width is 0.435 lanes, a cymbal's radius 0.44; the HOPO and tap models are narrower on their own)
+      let minZ = Infinity;
+      for (let i = 0; i < n; i++) minZ = Math.min(minZ, m.pos[i * 3 + 2]);
+      this.meshes[kind] = { buf: this.buffer(data), count: n, tex: texs[m.tex], msz: [half, half * 0.053, half * 0.8], base: minZ, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1 };
+    }
+  }
+
   buffer(data) { const gl = this.gl, b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); return b; }
 
   // ---- a chart's buffers
@@ -545,7 +543,7 @@ export class GLBoard {
     });
     const inst = []; // stride 12, in time order; reversed below (far notes are drawn before near ones)
     const times = [], lanesOf = [];
-    const tails = [], hits = [], helds = [], barHits = [], solids = [];
+    const tails = [], hits = [], helds = [], barHits = [], solids = {}; // (solids: per kind of model, the rows of its instances)
     src.forEach((n, i) => {
       const bar = n.open || n.lane < 0;
       const dk = bar && n.doubleKick ? 2 : 1;
@@ -559,7 +557,7 @@ export class GLBoard {
       if (bar) { barHits.push(n.time, 0, 0, 0, ...hexRgb(barColor), n.time); return; }
       const rgb = hexRgb(noteColor({ lane: n.lane, sp: sp[i] }, colors)); // (a star power note's tail and burst take its tinted colour)
       const cym = n.cymbal ? 1 : 0;
-      if (!cym) solids.push({ time: n.time, row: [n.time, n.lane, n.length > 0 ? n.length : 0, (n.hopo ? 1 : 0) + (n.tap ? 2 : 0) + (n.accent ? 4 : 0) + (n.ghost ? 8 : 0), ...rgb, 0] });
+      (solids[cym ? (n.accent ? 'ca' : n.ghost ? 'cg' : 'c') : n.tap ? 't' : n.hopo ? 'h' : n.accent ? 'a' : n.ghost ? 'g' : 'n'] ??= []).push({ time: n.time, row: [n.time, n.lane, n.length > 0 ? n.length : 0, 0, ...rgb, 0] });
       if (n.length > 0) { tails.push({ t0: n.time, t1: n.time + n.length, lane: n.lane, rgb }); helds.push(n.time, n.lane, n.time + n.length, cym, ...rgb, 1); }
       else hits.push(n.time, n.lane, n.time, cym, ...rgb, 0);
     });
@@ -573,8 +571,12 @@ export class GLBoard {
     let maxLen = 0;
     for (const t of tails) maxLen = Math.max(maxLen, t.t1 - t.t0);
     const list = (arr, stride) => ({ buf: this.buffer(f32(arr)), count: arr.length / stride, times: Float32Array.from({ length: arr.length / stride }, (_, i) => arr[i * stride]), maxLen });
-    const solidData = new Float32Array(solids.length * 8);
-    solids.forEach((e, i) => solidData.set(e.row, (solids.length - 1 - i) * 8)); // (latest first, like the sprites)
+    const solid = {};
+    for (const [kind, list] of Object.entries(solids)) {
+      const data = new Float32Array(list.length * 8);
+      list.forEach((e, i) => data.set(e.row, (list.length - 1 - i) * 8)); // (latest first, like the sprites)
+      solid[kind] = { buf: this.buffer(data), count: list.length, times: Float32Array.from(list, (e) => e.time) };
+    }
     const heldB = list(helds, 8);
     heldB.maxLen = maxLen;
     const beatKinds = (chart.beats || []).map((b) => [b.time, b.measure ? 2 : b.strong ? 1 : 0]).flat();
@@ -587,7 +589,7 @@ export class GLBoard {
       tails: { buf: this.buffer(tailData), count: tails.length, starts: Float32Array.from(tails, (t) => t.t0), ends: Float32Array.from(tails, (t) => t.t1), lane: Float32Array.from(tails, (t) => t.lane), maxLen },
       hitB: list(hits, 8),
       heldB,
-      solid: { buf: this.buffer(solidData), count: solids.length, times: Float32Array.from(solids, (e) => e.time) },
+      solid,
       barB: list(barHits, 8),
       beats: { buf: this.buffer(f32(beatKinds)), times: Float32Array.from(chart.beats || [], (b) => b.time) },
       pads: { buf: this.buffer(f32(pads)), count: lanes },
@@ -652,7 +654,8 @@ export class GLBoard {
 
   freeData(d) {
     const gl = this.gl;
-    for (const k of ['notes', 'tails', 'hitB', 'heldB', 'barB', 'solid', 'beats', 'pads']) gl.deleteBuffer(d[k].buf);
+    for (const k of ['notes', 'tails', 'hitB', 'heldB', 'barB', 'beats', 'pads']) gl.deleteBuffer(d[k].buf);
+    for (const k of Object.keys(d.solid)) gl.deleteBuffer(d.solid[k].buf);
     if (d.bands) gl.deleteBuffer(d.bands.buf);
     for (const v of Object.values(d.vaos)) gl.deleteVertexArray(v);
   }
@@ -850,7 +853,7 @@ export class GLBoard {
     use('notes');
     gl.uniform1i(pr.u.u_tex, 0); gl.uniform1f(pr.u.u_atlas, ATLAS);
     gl.uniform1f(pr.u.u_pad, 0);
-    gl.uniform1f(pr.u.u_solid, fx.solid ? 1 : 0);
+    gl.uniform1f(pr.u.u_solid, fx.solid && this.meshes ? 1 : 0);
     const notes = d.notes;
     const nFrom = lowerBound(notes.times, t - 0.12), nTo = lowerBound(notes.times, t + win);
     if (nTo > nFrom) {
@@ -859,15 +862,30 @@ export class GLBoard {
       this.inst(gl.TRIANGLE_STRIP, 0, 4, nTo - nFrom);
     }
     const drawn = Math.max(0, nTo - nFrom);
-    if (fx.solid) { // the blocks of the notes that are not cymbals, far ones first
-      const sol = d.solid;
-      const sFrom = lowerBound(sol.times, t - 0.12), sTo = lowerBound(sol.times, t + win);
-      if (sTo > sFrom) {
-        use('solid');
+    if (fx.solid && this.meshes) { // the models of the notes, with the depth buffer (cleared inside this pane's scissor)
+      gl.clear(gl.DEPTH_BUFFER_BIT);
+      gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
+      use('solid');
+      gl.activeTexture(gl.TEXTURE1);
+      gl.uniform1i(pr.u.u_mtex, 1);
+      for (const [kind, sol] of Object.entries(d.solid)) {
+        const mesh = this.meshes[kind];
+        if (!mesh) continue;
+        const sFrom = lowerBound(sol.times, t - 0.12), sTo = lowerBound(sol.times, t + win);
+        if (sTo <= sFrom) continue;
         const first = sol.count - sTo;
-        this.vao(d, 'solid', () => { gl.bindBuffer(gl.ARRAY_BUFFER, sol.buf); this.attrib(pr, 's0', 4, 32, first * 32, 1); this.attrib(pr, 's1', 4, 32, first * 32 + 16, 1); });
-        this.inst(gl.TRIANGLES, 0, 12, sTo - sFrom);
+        gl.bindTexture(gl.TEXTURE_2D, mesh.tex);
+        gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, mesh.alpha);
+        this.vao(d, `solid_${kind}`, () => {
+          gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
+          this.attrib(pr, 'm_pos', 3, 36, 0, 0); this.attrib(pr, 'm_nrm', 3, 36, 12, 0); this.attrib(pr, 'm_uv', 2, 36, 24, 0); this.attrib(pr, 'm_role', 1, 36, 32, 0);
+          gl.bindBuffer(gl.ARRAY_BUFFER, sol.buf);
+          this.attrib(pr, 's0', 4, 32, first * 32, 1); this.attrib(pr, 's1', 4, 32, first * 32 + 16, 1);
+        });
+        this.inst(gl.TRIANGLES, 0, mesh.count, sTo - sFrom);
       }
+      gl.disable(gl.DEPTH_TEST);
+      gl.activeTexture(gl.TEXTURE0);
     }
 
     // the hit line bar over the notes and tails: a segment per lane (whiter while it is hit) and a border at each end (the open note / pedal colour when the chart has them)
