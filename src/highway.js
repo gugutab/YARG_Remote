@@ -233,7 +233,7 @@ export class Highway {
     this.glBoard = null;
     this.glFailed = false;
     this.glActive = false; // this frame's panes may be drawn by the board
-    this.glDraw = true; // false for the first samples of a motion blur: the board draws only the last one
+    this.glBlur = -1; // the index of the motion blur sample being drawn (the board averages them in a framebuffer, see GLBoard.begin), -1 outside a blur
     this.glOpts = {};
     this._beatLines = 'normal'; // highway.beatLines
     this.beatStyles = { '2d': beatLineStyles('normal', '2d'), '3d': beatLineStyles('normal', '3d') };
@@ -557,10 +557,11 @@ export class Highway {
         this.vizFrame = this.vizCanvas;
       }
       times.forEach((t, i) => {
-        this.glDraw = i === times.length - 1; // (the WebGL board has no running average: it draws the last sample)
+        this.glBlur = i;
         this.g = side; // every method draws on this.g
         side.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.draw(t, w, h);
+        if (this.glActive) this.glBoard.end(); // (adds the board's sample to its canvas, weight 1 / (i + 1))
         main.save();
         main.setTransform(1, 0, 0, 1, 0, 0);
         main.globalAlpha = 1 / (i + 1); // a running average of the samples
@@ -572,7 +573,7 @@ export class Highway {
       throw err;
     } finally {
       this.g = main;
-      this.glDraw = true;
+      this.glBlur = -1;
       this.vizFrame = null;
     }
   }
@@ -594,7 +595,7 @@ export class Highway {
     let lanePanes = 0;
     for (let i = 0; i < this.panes.length; i++) if (this.panes[i].chart?.mode === 'lanes') lanePanes++;
     this.glActive = this.glWanted(w, h, Math.min(lanePanes, Math.max(1, Math.floor(w / this.paneMin))));
-    if (this.glActive) this.glBoard.begin(w, h, this.canvas.width / w, `${this.noteBase}`); // (clears the board's canvas: the panes it draws are painted below)
+    if (this.glActive) this.glBoard.begin(w, h, this.canvas.width / w, `${this.noteBase}`, this.glBlur); // (clears the board's canvas: the panes it draws are painted below)
     else if (this.glBoard && this.glWas) this.glBoard.begin(w, h, 1), this.glBoard.dropAll(); // (switched to the 2D code: blank canvas, buffers freed)
     if (this.glBoard && this.glWas !== this.glActive) this.glCanvas.style.display = this.glActive ? '' : 'none'; // (a board that is not drawing this frame costs no compositing)
     this.glWas = this.glActive;
@@ -844,11 +845,10 @@ export class Highway {
 
   // A lane pane painted by the WebGL board: the settings of this pane in the board's terms (see GLBoard.drawPane). The caller has set view, noteStyle and neck for the pane.
   glPane(pane, t, x, y, pw, ph) {
-    if (!this.glDraw) return; // (a motion blur: only its last sample is drawn)
     const windowSec = lookahead3D(this.neck, ph);
     const o = this.glOpts;
     o.neck = this.neck; o.perspective = this.perspective; o.curve = this.curve; o.noteSize = this.noteSize; o.sustainWidth = this.sustainWidth; o.kickBar = this.kickBar;
-    o.hitLine = this.hitLine; o.laneStripes = this.laneStripes; o.trackOpacity = this.trackOpacity; o.boardK = this.restBoard(t, windowSec); o.heldMotion = this.heldMotion;
+    o.hitLine = this.hitLine; o.laneStripes = this.laneStripes; o.trackOpacity = this.trackOpacity; o.boardK = this.restBoard(t, windowSec); o.heldMotion = this.heldMotion; o.fillActivation = this.fillActivation; o.litLag = this.litLag; o.padFill = this.padFill; o.padRing = this.padRing;
     o.leftHanded = !!this.paneOpt(pane.key, 'leftHanded'); o.windowSec = windowSec; o.starPowerBand = this.starPowerBand; o.soloBand = this.soloBand; o.fillBand = this.fillBand;
     o.breBand = this.breBand; o.bandBorders = this.bandBorders; o.beatStyle = this.beatStyles['3d'];
     this.glBoard.drawPane(pane.chart, t, { x, y, w: pw, h: ph }, o);
