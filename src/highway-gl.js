@@ -55,12 +55,22 @@ export function glUnsupported(hw, chart) {
 
 // ---- shaders ------------------------------------------------------------------------------------------------------------------------------------------------------
 
-const UNIFORMS = `uniform vec2 u_res; uniform float u_hit, u_vy, u_k, u_c, u_cx, u_laneW, u_half, u_t, u_win, u_flip, u_headR, u_end, u_fh, u_padB, u_board, u_taper, u_fog, u_relief;`;
+const UNIFORMS = `uniform vec2 u_res; uniform float u_hit, u_vy, u_k, u_c, u_cx, u_laneW, u_half, u_t, u_win, u_flip, u_headR, u_end, u_fh, u_padB, u_board, u_taper, u_fog, u_relief, u_side, u_sx0, u_sy0, u_span;`;
 const COMMON = `#version 300 es
 precision highp float;
 ${UNIFORMS}
-float scaleAt(float d) { return 1.0 / (1.0 + u_k * d); }
-vec2 project(float lx, float d) { float p = scaleAt(d); return vec2(u_cx + lx * u_flip * u_laneW * p, u_vy + (u_hit - u_vy) * p + (d > 0.0 ? u_c * d * d : 0.0)); }
+// u_side: 0 the usual view from behind the hit line (a perspective), 1 a view from the side (an elevation without perspective: the depth runs along the screen, to the right, from the
+// hit line at u_sx0; the height is up; the lanes, which would lie on one another, are spread a little up the screen), in between a morph of the two.
+float scaleAt(float d) { return mix(1.0 / (1.0 + u_k * d), 1.0, u_side); }
+vec2 project(float lx, float d) {
+  float p = 1.0 / (1.0 + u_k * d);
+  vec2 top = vec2(u_cx + lx * u_flip * u_laneW * p, u_vy + (u_hit - u_vy) * p + (d > 0.0 ? u_c * d * d : 0.0));
+  vec2 side = vec2(u_sx0 + d * u_span + lx * u_flip * u_laneW * 0.12, u_sy0 - lx * u_flip * u_laneW * 0.3);
+  return mix(top, side, u_side);
+}
+// the directions of the width of a strip (a tail, a band) and of its length towards the far end, on the screen
+vec2 stripSide() { return mix(vec2(1.0, 0.0), vec2(0.0, 1.0), u_side); }
+vec2 stripFar() { return mix(vec2(0.0, -1.0), vec2(1.0, 0.0), u_side); }
 vec4 clipPos(vec2 px) { return vec4(px.x / u_res.x * 2.0 - 1.0, 1.0 - px.y / u_res.y * 2.0, 0.0, 1.0); }
 `;
 // The fade of the pane's edges, as the app erases them from its layer: the far edge eases out over 26% of the height (smootherstep, from y = c), the bottom edge dissolves
@@ -69,9 +79,9 @@ const FS_HEAD = `#version 300 es
 precision highp float;
 ${UNIFORMS}
 float sm5(float u) { u = clamp(u, 0.0, 1.0); return u * u * u * (u * (u * 6.0 - 15.0) + 10.0); }
-float topFade(float y) { return sm5((y - u_c) / u_fh); }
+float topFade(float y) { return u_fh < 0.0 ? 1.0 : sm5((y - u_c) / u_fh); } // (u_fh < 0: no fade, the side view)
 float edgeFade(float y) {
-  float top = sm5((y - u_c) / u_fh);
+  float top = u_fh < 0.0 ? 1.0 : sm5((y - u_c) / u_fh);
   float b = clamp((y - u_padB) / max(1.0, u_res.y - u_padB), 0.0, 1.0);
   float er = b < 0.3 ? mix(0.0, 0.2, b / 0.3) : b < 0.6 ? mix(0.2, 0.6, (b - 0.3) / 0.3) : b < 0.85 ? mix(0.6, 0.92, (b - 0.6) / 0.25) : mix(0.92, 1.0, (b - 0.85) / 0.15);
   return top * (1.0 - er);
@@ -106,7 +116,7 @@ void main() {
   int kind = int(a_b.y); float d = clamp((a_b.x - u_t) / u_win, 0.0, 1.0); float p = scaleAt(d);
   float th = (kind == 2 ? 3.0 : kind == 1 ? 2.0 : 1.0) * p;
   vec2 l = project(-u_half, d), r = project(u_half, d);
-  vec2 px = vec2(mix(l.x, r.x, c.x), l.y + (c.y - 0.5) * th);
+  vec2 px = mix(l, r, c.x) + (c.y - 0.5) * th * vec2(u_side, 1.0 - u_side);
   gl_Position = a_b.x < u_t ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(px); v_y = px.y;
   vec4 col = u_bc[kind]; v_col = vec4(col.rgb, col.a * u_board);
 }`, FS_COLOR],
@@ -117,7 +127,7 @@ void main() {
   float dn = clamp((a_t.x - u_t) / u_win, ${ROAD_NEAR.toFixed(2)}, u_end), df = clamp((a_t.y - u_t) / u_win, ${ROAD_NEAR.toFixed(2)}, u_end);
   float d = mix(dn, df, u);
   vec2 c = project(a_t.z, d); float w = u_laneW * a_t.w * scaleAt(d);
-  vec2 px = vec2(c.x + side * w, c.y); gl_Position = (df <= dn) ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(px); v_y = px.y;
+  vec2 px = c + stripSide() * (side * w); gl_Position = (df <= dn) ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(px); v_y = px.y;
   v_col = vec4(a_col.rgb, a_col.a * u_mul[int(a_x.x)] * u_board);
 }`, FS_COLOR],
   // sustains, in the app's "flow" style: a strip of segments from the head to the end, tapered (TAIL_TAPER_POWER 3, never thinner than 0.3), swelling in waves while held
@@ -141,17 +151,17 @@ void main() {
   float sc = scaleAt(d), sRef = scaleAt(dBot);
   float S = sin(6.2831853 * ((d - dBot) * u_win / 0.45 - u_t / 0.6));
   float hp = u_headR * 0.38 * u_tailW * (1.0 + 0.04 * amt) * u_mult * (0.3 + 0.7 * pow(sc / sRef, 3.0)) * u_laneW * sc * (1.0 + 0.26 * amt * u_waveMul * S);
-  vec2 c = project(a_t.z + 0.5 - u_half, d); vec2 pos = vec2(c.x + side * hp, c.y); float lat = side;
+  vec2 c = project(a_t.z + 0.5 - u_half, d); vec2 pos = c + stripSide() * (side * hp); float lat = side;
   if (isTip) {
     float ty = hp * 1.1; float hh = hp; float dy = 0.0;
     if (tip) { bool r0 = ((id - nb) >> 1) == 0; hh = r0 ? 0.7 * hp : 0.0; dy = r0 ? -0.7 * ty : -ty; }
-    pos = vec2(c.x + side * hh, c.y + dy); lat = side * (hp > 0.0 ? hh / hp : 0.0);
+    pos = c + stripSide() * (side * hh) - stripFar() * dy; lat = side * (hp > 0.0 ? hh / hp : 0.0);
   }
   gl_Position = dead ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(pos); v_y = pos.y;
   float alpha = u_pass.x < 0.0 ? 0.6 + 0.3 * amt : u_pass.x;
   vec3 tcol = mix(a_col.rgb, vec3(1.0), u_pass.y); tcol = mix(tcol, vec3(0.10, 0.14, 0.24), u_fog * 0.55 * d * d);
   v_col = vec4(tcol, alpha * (u_pass.z > 0.5 ? amt : 1.0)); v_d = d;
-  v_ahead = d * u_win; v_l = lat; v_hp = hp; v_pxs = (u_hit - u_vy) * u_k * sc * sc / u_win; v_left = t1 - u_t;
+  v_ahead = d * u_win; v_l = lat; v_hp = hp; v_pxs = mix((u_hit - u_vy) * u_k * sc * sc, u_span, u_side) / u_win; v_left = t1 - u_t;
 }`, `${FS_HEAD}in vec4 v_col; in float v_ahead, v_l, v_hp, v_pxs, v_left, v_y, v_d; uniform vec4 u_pass; out vec4 o;
 void main() {
   float a = v_col.a * edgeFade(v_y);
@@ -319,7 +329,8 @@ void main() {
   float d = clamp((s0.x - u_t) / u_win, 0.0, 1.0);
   float hs = u_headR / ${HEAD_R.toFixed(2)};
   float x = s0.y + 0.5 - u_half + m_pos.x * u_msz.x * sh * hs;
-  float dep = d - m_pos.y * u_msz.y * sh; // (the model's +y points at the player)
+  float ky = mix(1.0, (u_laneW * u_msz.z) / max(u_span * u_msz.y, 1.0), u_side); // (in the side view a unit of depth is as long on the screen as a unit of height)
+  float dep = d - m_pos.y * u_msz.y * ky * sh; // (the model's +y points at the player)
   float hgt = (m_pos.z - u_mbase) * u_msz.z * sh * hs;
   vec2 px = project(x, dep) - vec2(0.0, hgt * u_laneW * scaleAt(dep));
   vec4 clip = clipPos(px); clip.z = clamp(dep * 1.7 - 0.1 - hgt * 0.3, -0.99, 0.99); // (nearer and higher wins the depth test)
@@ -334,14 +345,15 @@ float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hash2(i), hash2(i + vec2(1.0, 0.0)), f.x), mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), f.x), f.y); }
 void main() {
   float g = texture(u_mtex, v_uv).r;
-  vec3 N = normalize(v_n); vec3 L = normalize(vec3(-0.25, -0.5, 0.85)); vec3 H = normalize(L + normalize(vec3(0.0, -0.55, 0.83)));
+  vec3 Vc = normalize(mix(vec3(0.0, -0.55, 0.83), vec3(-0.95, 0.0, 0.3), u_side)); // (the direction to the camera: above and in front, or from the side of the lane 0 in the side view)
+  vec3 N = normalize(v_n); vec3 L = normalize(mix(vec3(-0.25, -0.5, 0.85), vec3(-0.75, -0.2, 0.65), u_side)); vec3 H = normalize(L + Vc);
   float lam = max(dot(N, L), 0.0); float sp = pow(max(dot(N, H), 0.0), 36.0);
   vec3 c;
   if (u_mcel > 0.5) { // our own look: toon (u_mtoon 1: three tones of light, a hard highlight, an ink line on the silhouettes, the middle a lit gem in bands of colour) or smooth (0: the same shapes, soft gradients)
     bool toon = u_mtoon > 0.5;
     float dl = dot(N, L);
     float tone = toon ? (dl > 0.5 ? 1.0 : dl > 0.05 ? 0.66 : 0.38) : 0.35 + 0.65 * smoothstep(-0.1, 0.9, dl);
-    float rim = 1.0 - max(dot(N, normalize(vec3(0.0, -0.55, 0.83))), 0.0);
+    float rim = 1.0 - max(dot(N, Vc), 0.0);
     vec3 ink = vec3(0.025, 0.03, 0.07);
     float hard = toon ? step(0.975, dot(N, H)) : pow(max(dot(N, H), 0.0), 48.0) * 0.7;
     if (v_role < 0.5 || v_role > 3.5) { // the shell: steel (a gold bezel on an accent)
@@ -350,7 +362,7 @@ void main() {
       c = mix(c, v_lane * 0.5 * tone, 0.1); // (a hint of the lane's colour on the metal)
       if (toon) { if (rim > 0.82) c = ink; } else c *= mix(0.55, 1.0, smoothstep(0.0, 0.5, 1.0 - rim));
     } else if (v_role < 1.5) { // the gem: lit from inside, from a hot core to a darker edge
-      float cv = max(dot(N, normalize(vec3(0.0, -0.55, 0.83))), 0.0);
+      float cv = max(dot(N, Vc), 0.0);
       float u = v_uv.x < 0.0 ? max(sqrt(max(1.0 - cv * cv, 0.0)), smoothstep(0.86, 1.0, abs(v_uv.y))) : v_uv.x; // (the glass tube: by how its surface faces the camera, darker at the caps)
       if (toon) c = u < 0.4 ? mix(v_lane, vec3(1.0), 0.75) : u < 0.74 ? v_lane * 1.1 : u < 0.93 ? v_lane * 0.66 : ink;
       else c = mix(v_lane * 0.55, mix(v_lane, vec3(1.0), 0.8), pow(1.0 - smoothstep(0.0, 1.0, u), 1.1)) * (1.0 - 0.4 * smoothstep(0.9, 1.0, u));
@@ -378,7 +390,7 @@ void main() {
 
   // the effect "particles": sparks thrown up by every hit and embers rising from a held note, 24 per event, their paths computed in the vertex shader from the event's time
   // (a hash gives each its direction, speed and life; gravity pulls them back): nothing is stored per particle. Instances = events with a divisor of 24; additive.
-  sparks: [`${COMMON}in vec4 b0; in vec4 b1; uniform float u_span; out vec2 v_p; out float v_k, v_y, v_r; out vec3 v_col;
+  sparks: [`${COMMON}in vec4 b0; in vec4 b1; uniform float u_spread; out vec2 v_p; out float v_k, v_y, v_r; out vec3 v_col;
 float hash(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
 void main() {
   vec2 c = vec2(float(gl_VertexID & 1), float((gl_VertexID >> 1) & 1));
@@ -387,12 +399,12 @@ void main() {
   float r1 = hash(seed), r2 = hash(seed + 1.3), r3 = hash(seed + 2.9);
   float life = 0.45 + 0.6 * r3;
   float past = u_t - b0.x, age, alive;
-  if (b1.w < 0.5 || u_span > 0.5) { age = past; alive = (past >= 0.0 && past < life) ? 1.0 : 0.0; } // a hit (a bar or a note)
+  if (b1.w < 0.5 || u_spread > 0.5) { age = past; alive = (past >= 0.0 && past < life) ? 1.0 : 0.0; } // a hit (a bar or a note)
   else { age = mod(past + r1 * life, life); alive = (past >= 0.0 && past <= b0.z - b0.x + 0.05 && fi < 12.0) ? 1.0 : 0.0; } // embers while held
   float k = age / life;
-  vec2 origin = u_span > 0.5 ? project(0.0, 0.0) + vec2((r2 - 0.5) * 2.0 * u_half * u_laneW * 0.95, 0.0) : project(b0.y + 0.5 - u_half, 0.0) + vec2((r2 - 0.5) * u_laneW * 0.45, 0.0);
-  float ang = -1.5707963 + (r1 - 0.5) * (u_span > 0.5 ? 0.9 : 2.2);
-  float speed = u_laneW * (u_span > 0.5 ? 1.3 : 2.4) * (0.45 + r2);
+  vec2 origin = u_spread > 0.5 ? project(0.0, 0.0) + vec2((r2 - 0.5) * 2.0 * u_half * u_laneW * 0.95, 0.0) : project(b0.y + 0.5 - u_half, 0.0) + vec2((r2 - 0.5) * u_laneW * 0.45, 0.0);
+  float ang = -1.5707963 + (r1 - 0.5) * (u_spread > 0.5 ? 0.9 : 2.2);
+  float speed = u_laneW * (u_spread > 0.5 ? 1.3 : 2.4) * (0.45 + r2);
   vec2 p = origin + vec2(cos(ang), sin(ang) * 0.85) * speed * age + vec2(0.0, u_laneW * 3.2 * age * age);
   float r = max(1.2, u_laneW * (0.02 + 0.03 * r3) * (1.0 - 0.6 * k)); // radius in px
   vec2 px = p + (c - 0.5) * 2.0 * r * 1.6;
@@ -876,7 +888,7 @@ export class GLBoard {
   shared(pr, t, v) {
     const gl = this.gl, u = pr.u;
     if (u.u_res) gl.uniform2f(u.u_res, v.res[0], v.res[1]);
-    const vals = { u_hit: v.hit, u_vy: v.vy, u_k: v.k, u_c: v.c, u_cx: v.cx, u_laneW: v.laneW, u_half: v.half, u_t: t, u_win: v.win, u_flip: v.flip, u_headR: v.headR, u_end: v.end, u_fh: v.fh, u_padB: v.padB, u_board: v.board, u_tailW: v.tailW, u_bar: v.bar, u_taper: v.taper, u_fog: v.fog, u_relief: v.relief };
+    const vals = { u_side: v.side, u_sx0: v.sx0, u_sy0: v.sy0, u_span: v.span, u_hit: v.hit, u_vy: v.vy, u_k: v.k, u_c: v.c, u_cx: v.cx, u_laneW: v.laneW, u_half: v.half, u_t: t, u_win: v.win, u_flip: v.flip, u_headR: v.headR, u_end: v.end, u_fh: v.fh, u_padB: v.padB, u_board: v.board, u_tailW: v.tailW, u_bar: v.bar, u_taper: v.taper, u_fog: v.fog, u_relief: v.relief };
     for (const n in vals) if (u[n]) gl.uniform1f(u[n], vals[n]);
   }
 
@@ -927,10 +939,13 @@ export class GLBoard {
     const fx = o.fx || {}; // the optional effects (taper, fog, relief, particles, solid): each is on or off; solid is 'own' (our pill models) or 'yarg' (YARG's, once setMeshes has them)
     if (fx.solid === 'own' && !this.ownMeshes) this.buildOwnMeshes();
     const models = fx.solid === 'own' ? this.ownMeshes : fx.solid ? this.meshes : null;
+    const side = Math.max(0, Math.min(1, o.side || 0));
+    const sx0 = w * 0.16;
     const v = {
+      side, sx0, sy0: h * 0.6, span: (w - sx0) * 0.95 * 3, // (the side view shows a third of the window: a note is as thick as it is tall, so a whole window would crowd them)
       res: [w, h], hit, vy: proj.vy, k: proj.k, c: proj.c, cx: w / 2, laneW, half: lanes / 2, win: o.windowSec, flip: o.leftHanded ? -1 : 1, headR,
       taper: fx.taper ? 1 : 0, fog: fx.fog ? 1 : 0, relief: fx.relief ? 1 : 0,
-      end: proj.end, fh: h * 0.26, padB: h - padB > 2 ? padB : h * 4, board: o.boardK, tailW: o.sustainWidth, bar: BAR_DEPTH * o.kickBar,
+      end: proj.end, fh: side > 0.5 ? -1 : h * 0.26, padB: h - padB > 2 && side < 0.5 ? padB : h * 4, board: o.boardK, tailW: o.sustainWidth, bar: BAR_DEPTH * o.kickBar,
     };
     const win = v.win;
     const barFlash = this.flashes(d, t, o);
@@ -1076,7 +1091,7 @@ export class GLBoard {
       use('sparks');
       const sparks = (list, from, to, vaoName, span) => {
         if (to <= from) return;
-        gl.uniform1f(pr.u.u_span, span);
+        gl.uniform1f(pr.u.u_spread, span);
         this.vao(d, vaoName, () => { gl.bindBuffer(gl.ARRAY_BUFFER, list.buf); this.attrib(pr, 'b0', 4, 32, from * 32, 24); this.attrib(pr, 'b1', 4, 32, from * 32 + 16, 24); });
         this.inst(gl.TRIANGLE_STRIP, 0, 4, 24 * (to - from));
       };
