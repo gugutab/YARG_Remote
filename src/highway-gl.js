@@ -382,17 +382,20 @@ void main() {
     else c = mix(ink, v_lane * 0.35, step(0.55, v_uv.x)); // the dark core of a tap (dome)
     c = min(c, vec3(1.0));
   }
-  else if (v_role < 0.5) { // the metal, brushed: fine lines along the metal (straight across the note on the flat parts, round on the faces of the caps), a stretched highlight (an anisotropic one: it runs across the lines) and the base map's baked shading under the light
-    float capFace = step(0.6, abs(N.x)); // (the faces of the caps, turned along x)
+  else if (v_role < 0.5) { // the metal: satin stainless steel, a light silver a little matte: the base map's baked shading kept for the form but with its darks lifted, a blurred studio reflected on it, a broad soft highlight and brushing so fine it only breathes on the surface
+    float capFace = step(0.6, abs(N.x));
     float rr = length(v_mp.yz), ang = atan(v_mp.y, v_mp.z);
-    float lines = capFace > 0.5 ? vnoise(vec2(rr * 26.0, ang * 1.5)) : vnoise(vec2((v_mp.y + v_mp.z) * 24.0, v_mp.x * 0.9)); // (fast across the lines, slow along them)
-    lines = 0.6 * lines + 0.4 * (capFace > 0.5 ? vnoise(vec2(rr * 70.0, ang * 3.0)) : vnoise(vec2((v_mp.y + v_mp.z) * 70.0, v_mp.x * 2.0)));
-    vec3 Tb = capFace > 0.5 ? normalize(vec3(0.0, v_mp.z, v_mp.y) + vec3(0.0, 0.0001, 0.0)) : vec3(1.0, 0.0, 0.0); // the direction of the lines, in the world
-    float aniso = pow(sqrt(max(1.0 - pow(dot(Tb, H), 2.0), 0.0)), 28.0) * max(dot(N, L) * 0.7 + 0.3, 0.0);
-    float shade = 0.4 + 0.85 * lam;
-    c = vec3(g) * (0.78 + 0.5 * (lines - 0.5)) * shade; // the baked shading, scratched by the brushing
-    c += vec3(0.95, 0.97, 1.0) * aniso * (0.35 + 0.35 * lines); // the stretched highlight, broken by the lines
-    c = mix(c, vec3(dot(c, vec3(0.33))), 0.35) * vec3(0.98, 1.0, 1.04); // (a touch cooler and less coloured)
+    float lines = capFace > 0.5 ? vnoise(vec2(rr * 40.0, ang * 2.0)) : vnoise(vec2((v_mp.y + v_mp.z) * 40.0, v_mp.x * 1.5)); // (fast across the lines, slow along them)
+    vec3 Tb = capFace > 0.5 ? normalize(vec3(0.0, v_mp.z, v_mp.y) + vec3(0.0, 0.0001, 0.0)) : vec3(1.0, 0.0, 0.0);
+    float aniso = pow(sqrt(max(1.0 - pow(dot(Tb, H), 2.0), 0.0)), 14.0) * max(dot(N, L) * 0.7 + 0.3, 0.0);
+    vec3 silver = vec3(0.80, 0.82, 0.85);
+    float baked = mix(g, 1.0, 0.45);
+    vec3 Rm = reflect(-Vc, N);
+    vec3 env = mix(vec3(0.30, 0.32, 0.36), vec3(0.95, 0.97, 1.0), smoothstep(-0.3, 0.8, Rm.z)); // (a blurred studio: a bright sky, a grey floor)
+    c = silver * baked * (0.5 + 0.55 * lam);
+    c = mix(c, env * silver, 0.28); // the satin reflection
+    c += vec3(1.0) * (pow(max(dot(N, H), 0.0), 10.0) * 0.22 + aniso * 0.12); // a broad soft highlight, a faint sheen across the brushing
+    c *= 1.0 + 0.07 * (lines - 0.5);
   }
   else if (v_role < 1.5) { // the glass, lit from inside: a saturated light, hottest where we look straight into it, gathering at the edge, with the drifting cloud and the shine streak on it
     vec2 q = v_uv * vec2(1.1, 1.3) * 7.0 + vec2(u_t * 0.4, u_t * 0.25) * u_mnoise.x;
