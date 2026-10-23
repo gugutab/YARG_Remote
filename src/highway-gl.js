@@ -326,7 +326,7 @@ void main() {
   gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clip; v_y = px.y; v_d = d;
   v_uv = m_uv; v_n = vec3(m_nrm.x, -m_nrm.y, m_nrm.z); v_lane = s1.rgb; v_role = m_role;
   v_a = clamp((1.0 - d) / 0.14, 0.0, 1.0) * u_malpha;
-}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane; in float v_role, v_y, v_d, v_a; out vec4 o;
+}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane; in float v_role, v_y, v_d, v_a; uniform float u_mcel; out vec4 o;
 // The middle of a note (YARG's RectangularNote shader graph, material NoteMiddle): the base map times a darkness mask that drifts with time (a soft cloud: gradient noise,
 // scale -2.8 / speed 0.4 / tiling 1.1 x 1.3 in the material; here a value noise of two octaves), times the lane's colour, over which the shine map is laid with the opacity
 // shine amount x its alpha (0.1); a small emission of the colour (0.1). The metal is the base map under the light, smoothness 0.5.
@@ -337,7 +337,25 @@ void main() {
   vec3 N = normalize(v_n); vec3 L = normalize(vec3(-0.25, -0.5, 0.85)); vec3 H = normalize(L + normalize(vec3(0.0, -0.55, 0.83)));
   float lam = max(dot(N, L), 0.0); float sp = pow(max(dot(N, H), 0.0), 36.0);
   vec3 c;
-  if (v_role < 0.5) c = vec3(g) * (0.4 + 0.85 * lam) + vec3(1.0) * sp * 0.22; // the metal: the base map under the light, a mild highlight (smoothness 0.5, specular 0.2)
+  if (u_mcel > 0.5) { // our own cel-shaded look: three tones of light, a hard highlight, an ink line on the silhouettes, the middle a lit gem in bands of colour
+    float tone = dot(N, L) > 0.5 ? 1.0 : dot(N, L) > 0.05 ? 0.66 : 0.38;
+    float rim = 1.0 - max(dot(N, normalize(vec3(0.0, -0.55, 0.83))), 0.0);
+    vec3 ink = vec3(0.025, 0.03, 0.07);
+    float hard = step(0.9, dot(N, H));
+    if (v_role < 0.5 || v_role > 3.5) { // the shell: steel (a gold bezel on an accent)
+      vec3 base = v_role > 3.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.66, 0.70, 0.80);
+      c = base * tone + vec3(0.55) * hard;
+      c = mix(c, v_lane * 0.5 * tone, 0.1); // (a hint of the lane's colour on the metal)
+      if (rim > 0.82) c = ink;
+    } else if (v_role < 1.5) { // the gem: lit from inside, in bands from a hot core to a darker edge
+      float u = v_uv.x;
+      c = u < 0.4 ? mix(v_lane, vec3(1.0), 0.75) : u < 0.74 ? v_lane * 1.1 : u < 0.93 ? v_lane * 0.66 : ink;
+      c += vec3(0.7) * step(0.93, dot(N, normalize(L + vec3(-0.25, 0.1, 0.0)))) * (u > 0.3 ? 1.0 : 0.0); // the hard glint
+    } else if (v_role < 2.5) c = vec3(1.0); // the white core of a HOPO
+    else c = mix(ink, v_lane * 0.35, step(0.55, v_uv.x)); // the dark core of a tap
+    c = min(c, vec3(1.0));
+  }
+  else if (v_role < 0.5) c = vec3(g) * (0.4 + 0.85 * lam) + vec3(1.0) * sp * 0.22; // the metal: the base map under the light, a mild highlight (smoothness 0.5, specular 0.2)
   else if (v_role < 1.5) { // the coloured middle
     vec2 q = v_uv * vec2(1.1, 1.3) * 7.0 + vec2(u_t * 0.4, u_t * 0.25) * u_mnoise.x;
     float mask = mix(u_mnoise.y, 1.0, 0.65 * vnoise(q) + 0.35 * vnoise(q * 2.3 + 11.0));
@@ -390,6 +408,54 @@ const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255
 const smooth = (x) => x * x * (3 - 2 * x);
 const sortedBy = (list, key) => [...list].sort((a, b) => a[key] - b[key]);
 
+
+// ---- our own note model: a pill ---------------------------------------------------------------------------------------------------------------------------------
+
+// A stadium (a capsule: two half circles joined by straight sides) swept by a profile: the outline at an offset `o` from the segment [-L, L] of the x axis is a stadium of
+// radius o, so a profile of (offset, height) pairs describes the whole note: a flat base slab, the wall of the body, a bevelled shoulder, a flat bezel, and a dome in the middle.
+// Returns the mesh in the format of setMeshes: per triangle corner positions (x along the note, y depth, z up) / normals / uv (x: 0 at the middle of the dome to 1 at its edge)
+// / role (0 shell, 1 gem, 2 pearl, 3 dark, 4 trim) and the half extents. `variant`: 'n' note, 'h' HOPO (a white core), 't' tap (a dark core), 'a' accent (a gold bezel), 'c' a cymbal.
+function pillMesh(L, variant, flat = 1) {
+  const gold = variant === 'a' || variant === 'ca';
+  const P = [ // [offset, height, role]: from the outside of the base, up and inwards
+    [1.18, 0, 0], [1.18, 0.3, 0], [1.0, 0.3, 0], [1.0, 0.75, 0], [0.99, 0.88, 0], [0.95, 0.98, 0], [0.88, 1.04, 0],
+    [0.8, 1.04, gold ? 4 : 0], [0.78, 0.96, 0],
+    [0.78, 0.96, 1], [0.74, 1.06, 1], [0.64, 1.2, 1], [0.5, 1.34, 1], [0.3, 1.46, 1], [0, 1.52, 1],
+  ].map(([o, h, r]) => [o, h <= 0.3 ? h : 0.3 + (h - 0.3) * flat, r]);
+  const core = variant === 'h' ? 2 : variant === 't' ? 3 : 0;
+  const N = 18; // samples on each half circle
+  const ring = []; // [x, y, nx, ny] of the unit outline: the point at offset 1 and the direction away from the segment
+  for (let k = 0; k <= N; k++) { const a = -Math.PI / 2 + (k / N) * Math.PI; ring.push([L, 0, Math.cos(a), Math.sin(a)]); }
+  for (let k = 0; k <= N; k++) { const a = Math.PI / 2 + (k / N) * Math.PI; ring.push([-L, 0, Math.cos(a), Math.sin(a)]); }
+  const pos = [], nrm = [], uv = [], role = [];
+  const corner = (seg, rj, ro, h, o, u, r) => { // one vertex of segment `seg` at ring point rj
+    const [cx, cy, dx, dy] = ring[rj];
+    pos.push(cx + dx * o, cy + dy * o, h);
+    const nr = seg.nr, nu = seg.nu;
+    nrm.push(dx * nr, dy * nr, nu);
+    uv.push(u, 0);
+    role.push(r);
+    void ro;
+  };
+  for (let i = 0; i + 1 < P.length; i++) {
+    const [o0, h0, r0] = P[i], [o1, h1] = P[i + 1];
+    const dO = o1 - o0, dH = h1 - h0, len = Math.hypot(dO, dH);
+    if (len < 1e-6) continue;
+    const seg = { nr: dH / len, nu: -dO / len };
+    const dome = r0 === 1;
+    const rr = dome && o1 < 0.3 && core ? core : r0; // the inner part of the dome is the white / dark core of a HOPO / tap
+    const u0 = dome ? o0 / 0.78 : 1, u1 = dome ? o1 / 0.78 : 1;
+    for (let j = 0; j < ring.length; j++) {
+      const k = (j + 1) % ring.length;
+      const tri = [[j, o0, h0, u0], [k, o0, h0, u0], [j, o1, h1, u1], [k, o0, h0, u0], [k, o1, h1, u1], [j, o1, h1, u1]];
+      for (const [rj, o, h, u] of tri) corner(seg, rj, 0, h, o, u, rr);
+    }
+  }
+  const half = [0, 0, 0];
+  for (let i = 0; i < pos.length; i += 3) for (let a = 0; a < 3; a++) half[a] = Math.max(half[a], Math.abs(pos[i + a]));
+  return { pos, nrm, uv, role, size: half };
+}
+
 // ---- the board ------------------------------------------------------------------------------------------------------------------------------------------------------
 
 export class GLBoard {
@@ -415,6 +481,7 @@ export class GLBoard {
     this.progs = {};
     for (const name of Object.keys(PROGRAMS)) this.progs[name] = this.compile(name);
     this.resetAtlas();
+    this.ownMeshes = null; // our own pill models (built the first time the effect asks for them)
   }
 
   compile(name) {
@@ -509,6 +576,25 @@ export class GLBoard {
       let minZ = Infinity;
       for (let i = 0; i < n; i++) minZ = Math.min(minZ, m.pos[i * 3 + 2]);
       this.meshes[kind] = { buf: this.buffer(data), count: n, tex: texs[m.tex], shine: texs[`${m.tex}Shine`] ?? texs[m.tex], cym, msz: [half, half * 0.053, half * 0.8], base: minZ, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1 };
+    }
+  }
+
+  // Our own pill models (pillMesh), one per kind of note, with the same shape of data as the YARG ones: built the first time the effect "solid" asks for them (opts.fx.solid = 'own').
+  buildOwnMeshes() {
+    const gl = this.gl;
+    const tex = gl.createTexture(); // (a 1 x 1 white texture for the sampler the cel shading does not use)
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    this.ownMeshes = {};
+    const kinds = { n: [2.9, 'n', 1], h: [1.9, 'h', 1], t: [1.9, 't', 1], a: [2.9, 'a', 1], g: [2.9, 'n', 1], c: [0, 'c', 0.3], ca: [0, 'ca', 0.3], cg: [0, 'c', 0.3] };
+    for (const [kind, [L, variant, flat]] of Object.entries(kinds)) {
+      const m = pillMesh(L, variant, flat);
+      const n = m.role.length;
+      const data = new Float32Array(n * 9);
+      for (let i = 0; i < n; i++) data.set([m.pos[i * 3], m.pos[i * 3 + 1], m.pos[i * 3 + 2], m.nrm[i * 3], m.nrm[i * 3 + 1], m.nrm[i * 3 + 2], m.uv[i * 2], m.uv[i * 2 + 1], m.role[i]], i * 9);
+      const half = kind[0] === 'c' ? 0.44 : 0.435 / 3.9; // (a note's half width is 0.435 lanes, a cymbal's radius 0.44)
+      this.ownMeshes[kind] = { buf: this.buffer(data), count: n, tex, shine: tex, cel: true, cym: kind[0] === 'c', msz: [half, half * 0.053, half * 0.8], base: 0, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1 };
     }
   }
 
@@ -785,7 +871,9 @@ export class GLBoard {
     const headR = HEAD_R * o.noteSize;
     const padRy = laneW * headR * 1.05 * 0.55;
     const padB = hit + padRy;
-    const fx = o.fx || {}; // the optional effects (taper, fog, relief, particles, solid): each is on or off
+    const fx = o.fx || {}; // the optional effects (taper, fog, relief, particles, solid): each is on or off; solid is 'own' (our pill models) or 'yarg' (YARG's, once setMeshes has them)
+    if (fx.solid === 'own' && !this.ownMeshes) this.buildOwnMeshes();
+    const models = fx.solid === 'own' ? this.ownMeshes : fx.solid ? this.meshes : null;
     const v = {
       res: [w, h], hit, vy: proj.vy, k: proj.k, c: proj.c, cx: w / 2, laneW, half: lanes / 2, win: o.windowSec, flip: o.leftHanded ? -1 : 1, headR,
       taper: fx.taper ? 1 : 0, fog: fx.fog ? 1 : 0, relief: fx.relief ? 1 : 0,
@@ -864,7 +952,7 @@ export class GLBoard {
     use('notes');
     gl.uniform1i(pr.u.u_tex, 0); gl.uniform1f(pr.u.u_atlas, ATLAS);
     gl.uniform1f(pr.u.u_pad, 0);
-    gl.uniform1f(pr.u.u_solid, fx.solid && this.meshes ? 1 : 0);
+    gl.uniform1f(pr.u.u_solid, fx.solid && models ? 1 : 0);
     const notes = d.notes;
     const nFrom = lowerBound(notes.times, t - 0.12), nTo = lowerBound(notes.times, t + win);
     if (nTo > nFrom) {
@@ -873,20 +961,21 @@ export class GLBoard {
       this.inst(gl.TRIANGLE_STRIP, 0, 4, nTo - nFrom);
     }
     const drawn = Math.max(0, nTo - nFrom);
-    if (fx.solid && this.meshes) { // the models of the notes, with the depth buffer (cleared inside this pane's scissor)
+    if (fx.solid && models) { // the models of the notes, with the depth buffer (cleared inside this pane's scissor)
       gl.clear(gl.DEPTH_BUFFER_BIT);
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
       use('solid');
       gl.activeTexture(gl.TEXTURE1);
       gl.uniform1i(pr.u.u_mtex, 1); gl.uniform1i(pr.u.u_mshine, 2);
       for (const [kind, sol] of Object.entries(d.solid)) {
-        const mesh = this.meshes[kind];
+        const mesh = models[kind];
         if (!mesh) continue;
         const sFrom = lowerBound(sol.times, t - 0.12), sTo = lowerBound(sol.times, t + win);
         if (sTo <= sFrom) continue;
         const first = sol.count - sTo;
         gl.bindTexture(gl.TEXTURE_2D, mesh.tex);
         gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, mesh.shine); gl.activeTexture(gl.TEXTURE1);
+        gl.uniform1f(pr.u.u_mcel, mesh.cel ? 1 : 0);
         gl.uniform2f(pr.u.u_mnoise, mesh.cym ? 0.62 : 1.0, 0.55); // (the middle's noise speed: the note 0.4, the cymbal 0.25, relative to the note; its minimum darkness)
         gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, mesh.alpha);
         this.vao(d, `solid_${kind}`, () => {

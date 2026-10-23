@@ -105,6 +105,8 @@ for (const box of document.querySelectorAll('[data-fx]')) {
   box.addEventListener('change', () => { FX[box.dataset.fx] = box.checked; });
 }
 
+if (params.get('model')) $('model').value = params.get('model');
+
 function render(t) {
   renderBackground(t);
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -116,7 +118,7 @@ function render(t) {
     board.drawPane(p.chart, t, { x: i * pw, y: 0, w, h: H }, {
       neck: Number($('neck').value), perspective: Number($('persp').value), curve, noteSize: 1, sustainWidth: 1, kickBar: 1, hitLine: params.get('hitline') !== '0', laneStripes: true,
       trackOpacity: 0.75, boardK: 1, leftHanded: params.get('lefty') === '1', heldMotion: true, starPowerBand: true, soloBand: true, fillBand: true, breBand: 'pulse', bandBorders: true,
-      fx: FX, beatStyle: BEATS, windowSec: (DEPTH_SEC / Number($('neck').value)) * laneLookFactor(H),
+      fx: { ...FX, solid: FX.solid ? $('model').value : false }, beatStyle: BEATS, windowSec: (DEPTH_SEC / Number($('neck').value)) * laneLookFactor(H),
     });
   });
 }
