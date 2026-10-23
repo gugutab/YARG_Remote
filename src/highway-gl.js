@@ -322,7 +322,7 @@ void main() {
   // along the lane, its depth along the road (in depth units) and its height lifted on the screen by the perspective scale at its depth, so the model gets a true perspective.
   // Lit by a fixed light above and in front: a texture of the model gives the metal its brushed look, the lane's colour tints the middle. Instances (time, lane, length, 0) + (r, g, b, 0).
   solid: [`${COMMON}in vec3 m_pos; in vec3 m_nrm; in vec2 m_uv; in float m_role; in vec4 s0; in vec4 s1; uniform vec3 u_msz; uniform float u_mbase, u_malpha;
-out vec2 v_uv; out vec3 v_n, v_lane; out float v_role, v_y, v_d, v_a;
+out vec2 v_uv; out vec3 v_n, v_lane, v_mp; out float v_role, v_y, v_d, v_a;
 void main() {
   float past = u_t - (s0.x + s0.z); float kx = clamp(past / 0.1, 0.0, 1.0); float sh = 1.0 - 0.5 * kx;
   bool gone = past > 0.1 || (s0.z > 0.0 && u_t >= s0.x);
@@ -335,9 +335,9 @@ void main() {
   vec2 px = project(x, dep) - vec2(0.0, hgt * u_laneW * scaleAt(dep));
   vec4 clip = clipPos(px); clip.z = clamp(dep * 1.7 - 0.1 - hgt * 0.3, -0.99, 0.99); // (nearer and higher wins the depth test)
   gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clip; v_y = px.y; v_d = d;
-  v_uv = m_uv; v_n = vec3(m_nrm.x, -m_nrm.y, m_nrm.z); v_lane = s1.rgb; v_role = m_role;
+  v_uv = m_uv; v_n = vec3(m_nrm.x, -m_nrm.y, m_nrm.z); v_lane = s1.rgb; v_role = m_role; v_mp = m_pos;
   v_a = clamp((1.0 - d) / 0.14, 0.0, 1.0) * u_malpha;
-}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane; in float v_role, v_y, v_d, v_a; uniform float u_mcel, u_mtoon; out vec4 o;
+}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane, v_mp; in float v_role, v_y, v_d, v_a; uniform float u_mcel, u_mtoon; out vec4 o;
 // The middle of a note (YARG's RectangularNote shader graph, material NoteMiddle): the base map times a darkness mask that drifts with time (a soft cloud: gradient noise,
 // scale -2.8 / speed 0.4 / tiling 1.1 x 1.3 in the material; here a value noise of two octaves), times the lane's colour, over which the shine map is laid with the opacity
 // shine amount x its alpha (0.1); a small emission of the colour (0.1). The metal is the base map under the light, smoothness 0.5.
@@ -382,7 +382,18 @@ void main() {
     else c = mix(ink, v_lane * 0.35, step(0.55, v_uv.x)); // the dark core of a tap (dome)
     c = min(c, vec3(1.0));
   }
-  else if (v_role < 0.5) c = vec3(g) * (0.4 + 0.85 * lam) + vec3(1.0) * sp * 0.22; // the metal: the base map under the light, a mild highlight (smoothness 0.5, specular 0.2)
+  else if (v_role < 0.5) { // the metal, brushed: fine lines along the metal (straight across the note on the flat parts, round on the faces of the caps), a stretched highlight (an anisotropic one: it runs across the lines) and the base map's baked shading under the light
+    float capFace = step(0.6, abs(N.x)); // (the faces of the caps, turned along x)
+    float rr = length(v_mp.yz), ang = atan(v_mp.y, v_mp.z);
+    float lines = capFace > 0.5 ? vnoise(vec2(rr * 26.0, ang * 1.5)) : vnoise(vec2((v_mp.y + v_mp.z) * 24.0, v_mp.x * 0.9)); // (fast across the lines, slow along them)
+    lines = 0.6 * lines + 0.4 * (capFace > 0.5 ? vnoise(vec2(rr * 70.0, ang * 3.0)) : vnoise(vec2((v_mp.y + v_mp.z) * 70.0, v_mp.x * 2.0)));
+    vec3 Tb = capFace > 0.5 ? normalize(vec3(0.0, v_mp.z, v_mp.y) + vec3(0.0, 0.0001, 0.0)) : vec3(1.0, 0.0, 0.0); // the direction of the lines, in the world
+    float aniso = pow(sqrt(max(1.0 - pow(dot(Tb, H), 2.0), 0.0)), 28.0) * max(dot(N, L) * 0.7 + 0.3, 0.0);
+    float shade = 0.4 + 0.85 * lam;
+    c = vec3(g) * (0.78 + 0.5 * (lines - 0.5)) * shade; // the baked shading, scratched by the brushing
+    c += vec3(0.95, 0.97, 1.0) * aniso * (0.35 + 0.35 * lines); // the stretched highlight, broken by the lines
+    c = mix(c, vec3(dot(c, vec3(0.33))), 0.35) * vec3(0.98, 1.0, 1.04); // (a touch cooler and less coloured)
+  }
   else if (v_role < 1.5) { // the glass, lit from inside: a saturated light, hottest where we look straight into it, gathering at the edge, with the drifting cloud and the shine streak on it
     vec2 q = v_uv * vec2(1.1, 1.3) * 7.0 + vec2(u_t * 0.4, u_t * 0.25) * u_mnoise.x;
     float cloud = mix(u_mnoise.y, 1.0, 0.65 * vnoise(q) + 0.35 * vnoise(q * 2.3 + 11.0)); // (the darkness mask of the material, here only a gentle modulation)
