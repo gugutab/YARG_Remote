@@ -326,14 +326,25 @@ void main() {
   gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clip; v_y = px.y; v_d = d;
   v_uv = m_uv; v_n = vec3(m_nrm.x, -m_nrm.y, m_nrm.z); v_lane = s1.rgb; v_role = m_role;
   v_a = clamp((1.0 - d) / 0.14, 0.0, 1.0) * u_malpha;
-}`, `${FS_HEAD}uniform sampler2D u_mtex; in vec2 v_uv; in vec3 v_n, v_lane; in float v_role, v_y, v_d, v_a; out vec4 o;
+}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane; in float v_role, v_y, v_d, v_a; out vec4 o;
+// The middle of a note (YARG's RectangularNote shader graph, material NoteMiddle): the base map times a darkness mask that drifts with time (a soft cloud: gradient noise,
+// scale -2.8 / speed 0.4 / tiling 1.1 x 1.3 in the material; here a value noise of two octaves), times the lane's colour, over which the shine map is laid with the opacity
+// shine amount x its alpha (0.1); a small emission of the colour (0.1). The metal is the base map under the light, smoothness 0.5.
+float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hash2(i), hash2(i + vec2(1.0, 0.0)), f.x), mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), f.x), f.y); }
 void main() {
   float g = texture(u_mtex, v_uv).r;
   vec3 N = normalize(v_n); vec3 L = normalize(vec3(-0.25, -0.5, 0.85)); vec3 H = normalize(L + normalize(vec3(0.0, -0.55, 0.83)));
   float lam = max(dot(N, L), 0.0); float sp = pow(max(dot(N, H), 0.0), 36.0);
   vec3 c;
-  if (v_role < 0.5) c = vec3(g) * (0.42 + 0.8 * lam) + vec3(0.9) * sp * 0.55; // the metal
-  else if (v_role < 1.5) c = v_lane * (0.28 + 0.95 * g) * (0.55 + 0.6 * lam) + v_lane * 0.32 + vec3(1.0) * sp * 0.45; // the coloured glass, a little lit from inside
+  if (v_role < 0.5) c = vec3(g) * (0.4 + 0.85 * lam) + vec3(1.0) * sp * 0.22; // the metal: the base map under the light, a mild highlight (smoothness 0.5, specular 0.2)
+  else if (v_role < 1.5) { // the coloured middle
+    vec2 q = v_uv * vec2(1.1, 1.3) * 7.0 + vec2(u_t * 0.4, u_t * 0.25) * u_mnoise.x;
+    float mask = mix(u_mnoise.y, 1.0, 0.65 * vnoise(q) + 0.35 * vnoise(q * 2.3 + 11.0));
+    vec3 base = vec3(g * mask) * v_lane;
+    base = mix(base, vec3(1.0), 0.35 * texture(u_mshine, v_uv).a); // the streak of the shine map
+    c = base * (0.45 + 0.75 * lam) + v_lane * 0.12 + vec3(1.0) * sp * 0.18;
+  }
   else if (v_role < 2.5) c = mix(vec3(1.0), v_lane, 0.12) * (0.68 + 0.32 * lam); // the white of a HOPO
   else c = vec3(0.04) * (0.6 + 0.8 * lam) + vec3(1.0) * sp * 0.3; // the dark of a tap
   c = mix(c, vec3(0.10, 0.14, 0.24), u_fog * 0.5 * smoothstep(0.1, 1.0, v_d)); // (the fog of the other effect, when it is on)
@@ -497,7 +508,7 @@ export class GLBoard {
       const half = cym ? 0.44 / m.size[0] : 0.435 / 3.85; // (a note's half width is 0.435 lanes, a cymbal's radius 0.44; the HOPO and tap models are narrower on their own)
       let minZ = Infinity;
       for (let i = 0; i < n; i++) minZ = Math.min(minZ, m.pos[i * 3 + 2]);
-      this.meshes[kind] = { buf: this.buffer(data), count: n, tex: texs[m.tex], msz: [half, half * 0.053, half * 0.8], base: minZ, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1 };
+      this.meshes[kind] = { buf: this.buffer(data), count: n, tex: texs[m.tex], shine: texs[`${m.tex}Shine`] ?? texs[m.tex], cym, msz: [half, half * 0.053, half * 0.8], base: minZ, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1 };
     }
   }
 
@@ -867,7 +878,7 @@ export class GLBoard {
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
       use('solid');
       gl.activeTexture(gl.TEXTURE1);
-      gl.uniform1i(pr.u.u_mtex, 1);
+      gl.uniform1i(pr.u.u_mtex, 1); gl.uniform1i(pr.u.u_mshine, 2);
       for (const [kind, sol] of Object.entries(d.solid)) {
         const mesh = this.meshes[kind];
         if (!mesh) continue;
@@ -875,6 +886,8 @@ export class GLBoard {
         if (sTo <= sFrom) continue;
         const first = sol.count - sTo;
         gl.bindTexture(gl.TEXTURE_2D, mesh.tex);
+        gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, mesh.shine); gl.activeTexture(gl.TEXTURE1);
+        gl.uniform2f(pr.u.u_mnoise, mesh.cym ? 0.62 : 1.0, 0.55); // (the middle's noise speed: the note 0.4, the cymbal 0.25, relative to the note; its minimum darkness)
         gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, mesh.alpha);
         this.vao(d, `solid_${kind}`, () => {
           gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);

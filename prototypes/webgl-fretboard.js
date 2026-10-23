@@ -65,8 +65,8 @@ const gl = board.gl;
 (async () => {
   try {
     const img = (name) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = `yarg-notes/${name}.png`; });
-    const [meshes, NormalNote, CymbalNote] = await Promise.all([fetch('yarg-notes/notes.json').then((r) => r.json()), img('NormalNote'), img('CymbalNote')]);
-    board.setMeshes(meshes, { NormalNote, CymbalNote });
+    const [meshes, NormalNote, CymbalNote, NormalNoteShine, CymbalNoteShine] = await Promise.all([fetch('yarg-notes/notes.json').then((r) => r.json()), img('NormalNote'), img('CymbalNote'), img('NormalNoteShine'), img('CymbalNoteShine')]);
+    board.setMeshes(meshes, { NormalNote, CymbalNote, NormalNoteShine, CymbalNoteShine });
   } catch (e) { console.warn('3D note models not loaded:', e); }
 })();
 const timerExt = gl.getExtension('EXT_disjoint_timer_query_webgl2');
