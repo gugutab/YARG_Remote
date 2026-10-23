@@ -41,6 +41,32 @@ export function shiftHue(hex, deg) {
   return toHex(f(h + 120) * 255, f(h) * 255, f(h - 120) * 255);
 }
 
+// A colour of the same family as `hex` turned by `deg` degrees on the wheel and kept vivid: saturation 0.55-0.85 and lightness 0.52-0.66, so a harmony voice never comes out muddy or
+// neon whatever the theme, and a grey theme (no hue to turn) gets a calm blue as the starting hue.
+export function vividHue(hex, deg) {
+  const [r, g, b] = parse(hex).map((v) => v / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let l = (max + min) / 2;
+  const d = max - min;
+  let s = d === 0 ? 0 : l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = d === 0 ? 215 : max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  if (d !== 0) h *= 60;
+  if (s < 0.12) s = 0.6;
+  h = (((h + deg) % 360) + 360) % 360;
+  s = Math.min(0.85, Math.max(0.55, s));
+  l = Math.min(0.66, Math.max(0.52, l));
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const f = (t) => {
+    const k = (t + 360) % 360;
+    if (k < 60) return p + ((q - p) * k) / 60;
+    if (k < 180) return q;
+    if (k < 240) return p + ((q - p) * (240 - k)) / 60;
+    return p;
+  };
+  return toHex(f(h + 120) * 255, f(h) * 255, f(h - 120) * 255);
+}
+
 const CLASSIC_COUNTDOWN = {
   ring: '#6cb6ff', urgent: '#13f0a6', text: '#ffffff', urgentText: '#13f0a6', fill: '#080b10', fillAlpha: 0.72,
   track: '#ffffff', trackAlpha: 0.14, dimRing: '#7d8590', dimText: '#8b949e',
@@ -78,7 +104,7 @@ export function vocalColors(mode, custom, theme) {
   return {
     lead: accent,
     leadLit: light,
-    harmony: { 1: shiftHue(accent, 40), 2: shiftHue(accent, -40), 3: mixHex(shiftHue(accent, 80), '#ffffff', 0.3) },
+    harmony: { 1: vividHue(accent, 150), 2: vividHue(accent, 62), 3: vividHue(accent, -62) }, // (the second and third voices sit 62 degrees either side of the lead on the wheel: easy to tell apart)
     lyrics: [LYRIC_BASE, light, LYRIC_DIM],
     lyrics2: [LYRIC2_BASE(accent), mixHex(accent, DARK_THEME.text, 0.25), LYRIC2_DIM],
     present: light,

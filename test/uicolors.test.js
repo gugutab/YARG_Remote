@@ -44,3 +44,19 @@ test('the unsung lyric colours stay the Dark theme ones, the sung colour follows
   assert.equal(b.present, b.lyrics[1]);
   assert.notEqual(a.lead, b.lead); // the notes follow the theme
 });
+
+test('vividHue / theme harmony colours: vivid, well apart from the lead and from each other, also for a grey theme', async () => {
+  const { vividHue } = await import('../src/uicolors.js');
+  const hue = (hex) => { const n = parseInt(hex.slice(1), 16); const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => v / 255); const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; if (!d) return -1; const h = mx === r ? ((g - b) / d + (g < b ? 6 : 0)) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return h * 60; };
+  const sat = (hex) => { const n = parseInt(hex.slice(1), 16); const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => v / 255); const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2; return mx === mn ? 0 : l > 0.5 ? (mx - mn) / (2 - mx - mn) : (mx - mn) / (mx + mn); };
+  const gap = (a, b) => { const d = Math.abs(a - b) % 360; return Math.min(d, 360 - d); };
+  for (const accent of ['#5b8def', '#e5534b', '#3fb950', '#d9a21b', '#8b949e']) {
+    const v = vocalColors('theme', '', { accent, text: '#e6edf3', muted: '#8b949e', panel: '#161b22' });
+    assert.equal(v.lead, accent);
+    const [h2, h3] = [hue(v.harmony[2]), hue(v.harmony[3])];
+    assert.ok(gap(h2, h3) > 100, `${accent}: the two harmony voices are far apart (${h2.toFixed(0)} / ${h3.toFixed(0)})`);
+    if (hue(accent) >= 0) for (const h of [h2, h3]) assert.ok(gap(h, hue(accent)) > 40, `${accent}: apart from the lead`);
+    for (const p of [1, 2, 3]) assert.ok(sat(v.harmony[p]) >= 0.5, `${accent}: part ${p} is vivid`);
+  }
+  assert.equal(vividHue('#5b8def', 0).length, 7);
+});

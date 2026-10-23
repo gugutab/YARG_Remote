@@ -124,7 +124,7 @@ const PROGRAMS = {
     o = vec4(col * a, a);
     return;
   }
-  float ow = sp ? 2.5 : 1.0;
+  float ow = sp ? 2.5 : 1.7;
   if (u_pass < 0.5) {
     float out_ = max(d - ow, 0.0);
     float g = sp ? (1.0 - cover(d - ow)) * 0.3 * exp(-out_ / 3.0) * (1.0 - smoothstep(3.0, 8.0, out_)) * smoothstep(u_hitx - 14.0, u_hitx + 2.0, v_p.x) : 0.0;
@@ -132,7 +132,7 @@ const PROGRAMS = {
     return;
   }
   if (u_pass < 1.5) {
-    float a = cover(d - ow) * (sp ? 1.0 : 0.38);
+    float a = cover(d - ow) * (sp ? 1.0 : 0.6);
     o = vec4((sp ? GOLD : vec3(0.0)) * a, a);
     return;
   }
@@ -150,7 +150,7 @@ const PROGRAMS = {
   float mask = smoothstep(xs - 0.5, xs + 0.5, v_p.x) * (1.0 - smoothstep(xe - 0.5, xe + 0.5, v_p.x));
   bool sp = v_a2.w > 0.5;
   vec3 col = mix(v_a1.rgb, v_a2.rgb, v_p.x < u_hitx ? 0.55 : 0.0);
-  float ow = sp ? 2.5 : 1.0;
+  float ow = sp ? 2.5 : 1.7;
   if (u_pass < 0.5) {
     float out_ = max(d - ow, 0.0);
     float g = sp ? (1.0 - cover(d - ow)) * 0.3 * exp(-out_ / 3.0) * (1.0 - smoothstep(3.0, 8.0, out_)) * smoothstep(u_hitx - 14.0, u_hitx + 2.0, v_p.x) * mask : 0.0;
@@ -158,7 +158,7 @@ const PROGRAMS = {
     return;
   }
   if (u_pass < 1.5) {
-    float a = cover(d - ow) * mask * (sp ? 1.0 : 0.38);
+    float a = cover(d - ow) * mask * (sp ? 1.0 : 0.6);
     o = vec4((sp ? GOLD : vec3(0.0)) * a, a);
     return;
   }
@@ -204,23 +204,25 @@ const PROGRAMS = {
   // the voice at the hit line: y, R, env, age | r, g, b, star power | seed. Calm and continuous, never a flash, and kept to the left of the hit line (the side the note has
   // already passed): a soft half halo and a warm core on the voice's line, the stretch of the hit line that lights up, two gentle ripples that keep going outwards for as long
   // as the note is sung, and a few embers that drift up and back. Gold for star power.
-  glow: [VS('vec4(u_hitx - a0.y * 6.5, a0.x - a0.y * 4.0, u_hitx + a0.y * 1.3, a0.x + a0.y * 4.0)'), FS('',
+  glow: [VS('vec4(u_hitx - a0.y * 13.0, a0.x - a0.y * 4.4, u_hitx + a0.y * 1.5, a0.x + a0.y * 4.4)'), FS('const float SX = 2.2; // the animation is stretched along the line of the notes: this much wider than tall',
     `void main() {
   float y = v_a0.x, R = v_a0.y, env = v_a0.z;
   vec3 tone = v_a1.w > 0.5 ? GOLD : v_a1.rgb;
   float seed = v_a2.x;
   vec2 d = v_p - vec2(u_hitx, y);
   float r = length(d);
+  vec2 e = vec2(d.x / SX, d.y);
+  float re = length(e);
   float side = 1.0 - smoothstep(0.0, R * 0.55, d.x - 1.5); // nothing on the right of the line: it ends just after it
-  float cut = 1.0 - smoothstep(R * 1.7, R * 3.8, r);
-  float halo = exp(-pow(r / (R * 2.3), 2.0)) * 0.3 * env * cut * side;
-  float core = exp(-pow(r / (R * 0.85), 2.0)) * 0.55 * env * side;
+  float cut = 1.0 - smoothstep(R * 1.7, R * 3.8, re);
+  float halo = exp(-pow(re / (R * 2.3), 2.0)) * 0.32 * env * cut * side;
+  float core = exp(-pow(re / (R * 0.9), 2.0)) * 0.55 * env * side;
   float line = exp(-d.x * d.x / 7.0) * exp(-pow(d.y / (R * 2.8), 2.0)) * 0.7 * env * (1.0 - smoothstep(R * 2.2, R * 3.8, abs(d.y)));
   float rip = 0.0;
   for (int i = 0; i < 2; i++) { // two ripples, half a period apart: one is always going, so the motion never starts or stops
     float ph = fract(u_t * 0.8 + float(i) * 0.5 + seed * 0.07);
     float rr = R * (0.45 + 2.2 * ph), w = 2.2 * (1.0 - ph) + 0.7;
-    rip += (1.0 - ph) * (1.0 - ph) * (1.0 - smoothstep(0.0, 1.0, abs(r - rr) / w)) * smoothstep(0.0, 0.12, ph);
+    rip += (1.0 - ph) * (1.0 - ph) * (1.0 - smoothstep(0.0, 1.0, abs(re - rr) / w)) * smoothstep(0.0, 0.12, ph);
   }
   rip *= 0.5 * env * side;
   float em = 0.0;
@@ -228,7 +230,7 @@ const PROGRAMS = {
     float fi = float(i);
     float h1 = fract(sin(fi * 12.9898 + seed * 3.7) * 43758.5453), h2 = fract(sin(fi * 78.233 + seed * 1.3) * 12345.678);
     float ph = fract(u_t * (0.3 + 0.22 * h1) + h2);
-    vec2 pc = vec2(u_hitx - ph * R * (2.2 + 3.2 * h1), y - ph * R * (0.5 + 2.0 * h2) + sin(ph * 6.2832 * (1.0 + h1) + fi) * R * 0.22);
+    vec2 pc = vec2(u_hitx - ph * R * SX * (2.2 + 3.2 * h1), y - ph * R * (0.5 + 2.0 * h2) + sin(ph * 6.2832 * (1.0 + h1) + fi) * R * 0.22);
     float sz = R * (0.17 + 0.12 * h2) * (1.0 - 0.7 * ph);
     vec2 q = v_p - pc;
     em += exp(-dot(q, q) / (sz * sz)) * (1.0 - ph) * (1.0 - ph) * smoothstep(0.0, 0.12, ph);

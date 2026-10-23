@@ -2013,8 +2013,8 @@ export class Highway {
       g.strokeStyle = VOCAL_SP_GOLD;
       g.lineWidth = 2.5;
     } else { // the others: a very faint dark one
-      g.strokeStyle = 'rgba(0,0,0,0.38)';
-      g.lineWidth = 1;
+      g.strokeStyle = 'rgba(0,0,0,0.6)';
+      g.lineWidth = 2;
     }
     g.stroke();
     g.restore();
@@ -2142,7 +2142,7 @@ export class Highway {
     st.t = t;
     this.vocGlowState.set(notes, st);
     y = st.y;
-    const R = Math.max(7, half * 1.25) * (0.3 + 0.7 * env); // scales in and out with the fade (a smaller glow than it was: it stays close to the hit line)
+    const R = Math.max(9, half * 1.5) * (0.3 + 0.7 * env); // scales in and out with the fade
     return { y, R, env, age: t - n.time, sp: !!n.sp, seed: n.time % 97 };
   }
 
@@ -2157,29 +2157,32 @@ export class Highway {
     const hot = tintWhite(tone, 0.55);
     g.save();
     g.beginPath();
-    g.rect(hitX - p.R * 8, p.y - p.R * 4.5, p.R * 8 + 1.5, p.R * 9); // nothing on the right of the line
+    g.rect(hitX - p.R * 14, p.y - p.R * 4.5, p.R * 14 + 1.5, p.R * 9); // nothing on the right of the line
     g.clip();
     g.globalCompositeOperation = 'lighter';
+    const SX = 2.2; // the animation is stretched along the line of the notes: this much wider than tall
+    g.translate(hitX, p.y);
+    g.scale(SX, 1);
     const disc = (r, stops) => {
-      const gr = g.createRadialGradient(hitX, p.y, 0, hitX, p.y, r);
+      const gr = g.createRadialGradient(0, 0, 0, 0, 0, r);
       for (const [pos, c, a] of stops) gr.addColorStop(pos, withAlpha(c, a));
       g.fillStyle = gr;
       g.beginPath();
-      g.arc(hitX, p.y, r, 0, Math.PI * 2);
+      g.arc(0, 0, r, 0, Math.PI * 2);
       g.fill();
     };
     disc(p.R * 2.3, [[0, tone, 0.3 * p.env], [0.5, tone, 0.12 * p.env], [1, tone, 0]]);
     disc(p.R * 0.95, [[0, hot, 0.6 * p.env], [1, hot, 0]]);
-    const lg = g.createLinearGradient(0, p.y - p.R * 2.8, 0, p.y + p.R * 2.8); // the stretch of the hit line that lights up
+    const lg = g.createLinearGradient(0, -p.R * 2.8, 0, p.R * 2.8); // the stretch of the hit line that lights up
     lg.addColorStop(0, withAlpha(hot, 0));
     lg.addColorStop(0.5, withAlpha(hot, 0.5 * p.env));
     lg.addColorStop(1, withAlpha(hot, 0));
     g.fillStyle = lg;
-    g.fillRect(hitX - 2, p.y - p.R * 2.8, 3, p.R * 5.6);
+    g.fillRect(-2 / SX, -p.R * 2.8, 3 / SX, p.R * 5.6);
     for (let i = 0; i < 2; i++) { // two ripples half a period apart
       const ph = (t * 0.8 + i * 0.5 + p.seed * 0.07) % 1;
       g.beginPath();
-      g.arc(hitX, p.y, p.R * (0.45 + 2.2 * ph), 0, Math.PI * 2);
+      g.arc(0, 0, p.R * (0.45 + 2.2 * ph), 0, Math.PI * 2);
       g.lineWidth = 2.2 * (1 - ph) + 0.7;
       g.strokeStyle = withAlpha(tone, 0.5 * p.env * (1 - ph) * (1 - ph) * Math.min(1, ph / 0.12));
       g.stroke();
@@ -2189,11 +2192,12 @@ export class Highway {
     for (let k = 0; k < 8; k++) { // embers
       const h1 = hsh(k, p.seed * 3.7), h2 = hsh(k * 2.3, p.seed * 1.3);
       const ph = (t * (0.3 + 0.22 * h1) + h2) % 1;
-      const x = hitX - ph * p.R * (2.2 + 3.2 * h1);
-      const y = p.y - ph * p.R * (0.5 + 2 * h2) + Math.sin(ph * 6.2832 * (1 + h1) + k) * p.R * 0.22;
+      const x = -ph * p.R * (2.2 + 3.2 * h1);
+      const y = -ph * p.R * (0.5 + 2 * h2) + Math.sin(ph * 6.2832 * (1 + h1) + k) * p.R * 0.22;
       g.globalAlpha = 0.8 * p.env * (1 - ph) * (1 - ph) * Math.min(1, ph / 0.12);
       g.beginPath();
-      g.arc(x, y, Math.max(1, p.R * (0.17 + 0.12 * h2) * (1 - 0.7 * ph)), 0, Math.PI * 2);
+      const er = Math.max(1, p.R * (0.17 + 0.12 * h2) * (1 - 0.7 * ph));
+      g.ellipse(x, y, er / SX, er, 0, 0, Math.PI * 2); // (a circle: the context is stretched by SX)
       g.fill();
     }
     g.restore();
