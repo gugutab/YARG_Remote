@@ -517,6 +517,28 @@ void main() {
   o = vec4(c * a, a);
 }`],
 
+  // the effect "glow": a soft halo of the lane's colour around the lit glass of every note with a model (and its spill on the road), added to the picture: a quad per note (the
+  // instances of the solid models), a falloff computed per pixel. u_gsz = (half width in lanes, half height in lanes, the height of the glass above the road in lanes, 0)
+  glow: [`${COMMON}in vec4 s0; in vec4 s1; uniform vec4 u_gsz; out vec2 v_p; out vec3 v_col; out float v_k, v_y;
+void main() {
+  vec2 c = vec2(float(gl_VertexID & 1), float((gl_VertexID >> 1) & 1));
+  float past = u_t - (s0.x + s0.z); float kx = clamp(past / 0.1, 0.0, 1.0); float sh = 1.0 - 0.5 * kx;
+  bool gone = past > 0.1 || (s0.z > 0.0 && u_t >= s0.x);
+  float d = clamp((s0.x - u_t) / u_win, 0.0, 1.0); float sc = scaleAt(d);
+  vec2 centre = project(s0.y + 0.5 - u_half, d) - vec2(0.0, u_gsz.z * u_laneW * sc * (u_headR / ${HEAD_R.toFixed(2)}));
+  vec2 hs = vec2(u_gsz.x, u_gsz.y) * u_laneW * sc * (u_headR / ${HEAD_R.toFixed(2)}) * sh * 2.1; // (the halo reaches well past the glass)
+  vec2 px = centre + (c - 0.5) * 2.0 * hs;
+  gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(px);
+  v_p = (c - 0.5) * 2.0; v_col = s1.rgb; v_y = px.y; v_k = clamp((1.0 - d) / 0.14, 0.0, 1.0) * (1.0 - kx);
+}`, `${FS_HEAD}uniform float u_gain; in vec2 v_p; in vec3 v_col; in float v_k, v_y; out vec4 o;
+void main() {
+  float r = length(v_p * vec2(1.0, 1.15));
+  float g = exp(-r * r * 4.2) * (1.0 - smoothstep(0.8, 1.0, r)); // (a bright core that falls off smoothly, gone at the quad's edge)
+  float pulse = 0.88 + 0.12 * sin(u_t * 4.0 + v_col.r * 6.0); // (it breathes a little)
+  vec3 col = v_col * 1.35 + vec3(0.08);
+  o = vec4(col * g * 0.6 * u_gain * pulse * v_k * edgeFade(v_y), 0.0);
+}`],
+
   // the effect "particles": sparks thrown up by every hit and embers rising from a held note, 24 per event, their paths computed in the vertex shader from the event's time
   // (a hash gives each its direction, speed and life; gravity pulls them back): nothing is stored per particle. Instances = events with a divisor of 24; additive.
   sparks: [`${COMMON}in vec4 b0; in vec4 b1; uniform float u_spread; out vec2 v_p; out float v_k, v_y, v_r; out vec3 v_col;
@@ -817,7 +839,7 @@ export class GLBoard {
       const half = cym ? 0.44 / m.size[0] : 0.435 / 3.85; // (a note's half width is 0.435 lanes, a cymbal's radius 0.44; the HOPO and tap models are narrower on their own)
       let minZ = Infinity;
       for (let i = 0; i < n; i++) minZ = Math.min(minZ, m.pos[i * 3 + 2]);
-      this.meshes[kind] = { buf: this.buffer(data), count: n, tex: texs[m.tex], shine: texs[`${m.tex}Shine`] ?? texs[m.tex], cym, msz: [half, half * 0.053, cym && noteHeight ? (noteHeight * CYMBAL_HEIGHT) / zSpan(m) : half * 0.8], base: minZ, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1 }; // (a cymbal is flatter than a note)
+      this.meshes[kind] = { buf: this.buffer(data), count: n, tex: texs[m.tex], shine: texs[`${m.tex}Shine`] ?? texs[m.tex], cym, msz: [half, half * 0.053, cym && noteHeight ? (noteHeight * CYMBAL_HEIGHT) / zSpan(m) : half * 0.8], base: minZ, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1, glow: cym ? [0.5, 0.34, noteHeight * CYMBAL_HEIGHT * 0.6] : [0.5, 0.26, noteHeight * 0.45] }; // (a cymbal is flatter than a note; glow: the halo's half width, half height and the height of the glass, in lanes)
     }
   }
 
@@ -836,7 +858,7 @@ export class GLBoard {
       const data = new Float32Array(n * 9);
       for (let i = 0; i < n; i++) data.set([m.pos[i * 3], m.pos[i * 3 + 1], m.pos[i * 3 + 2], m.nrm[i * 3], m.nrm[i * 3 + 1], m.nrm[i * 3 + 2], m.uv[i * 2], m.uv[i * 2 + 1], m.role[i]], i * 9);
       const half = kind[0] === 'c' ? 0.44 : 0.435 / (L + 1.0); // (a note's half width, the cups included, is 0.435 lanes, a cymbal's radius 0.44)
-      this.ownMeshes[kind] = { buf: this.buffer(data), count: n, tex, shine: tex, cel: true, cym: kind[0] === 'c', msz: [half, half * 0.053, half * (kind[0] === 'c' ? 0.8 : 1.0)], base: 0, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1 };
+      this.ownMeshes[kind] = { buf: this.buffer(data), count: n, tex, shine: tex, cel: true, cym: kind[0] === 'c', msz: [half, half * 0.053, half * (kind[0] === 'c' ? 0.8 : 1.0)], base: 0, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1, glow: kind[0] === 'c' ? [0.5, 0.34, 0.06] : [0.5, 0.26, 0.12] };
     }
   }
 
@@ -1302,6 +1324,23 @@ export class GLBoard {
       }
       gl.disable(gl.DEPTH_TEST);
       gl.activeTexture(gl.TEXTURE0);
+    }
+
+    if (fx.solid && models && fx.glow > 0) { // the glow of the lit glass: a halo of the lane's colour round each note with a model, added
+      gl.blendFunc(gl.ONE, gl.ONE);
+      use('glow');
+      gl.uniform1f(pr.u.u_gain, fx.glow);
+      for (const [kind, sol] of Object.entries(d.solid)) {
+        const mesh = models[kind];
+        if (!mesh) continue;
+        const sFrom = lowerBound(sol.times, t - 0.12), sTo = lowerBound(sol.times, t + win);
+        if (sTo <= sFrom) continue;
+        const first = sol.count - sTo;
+        gl.uniform4f(pr.u.u_gsz, mesh.glow[0], mesh.glow[1], mesh.glow[2], 0);
+        this.vao(d, `glow_${kind}`, () => { gl.bindBuffer(gl.ARRAY_BUFFER, sol.buf); this.attrib(pr, 's0', 4, 32, first * 32, 1); this.attrib(pr, 's1', 4, 32, first * 32 + 16, 1); });
+        this.inst(gl.TRIANGLE_STRIP, 0, 4, sTo - sFrom);
+      }
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     }
 
     // the fill activation marks, over the heads (under the hit line bar, as in the 2D code)
