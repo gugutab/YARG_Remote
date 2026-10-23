@@ -341,15 +341,17 @@ void main() {
     float tone = dot(N, L) > 0.5 ? 1.0 : dot(N, L) > 0.05 ? 0.66 : 0.38;
     float rim = 1.0 - max(dot(N, normalize(vec3(0.0, -0.55, 0.83))), 0.0);
     vec3 ink = vec3(0.025, 0.03, 0.07);
-    float hard = step(0.9, dot(N, H));
+    float hard = step(0.975, dot(N, H));
     if (v_role < 0.5 || v_role > 3.5) { // the shell: steel (a gold bezel on an accent)
       vec3 base = v_role > 3.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.66, 0.70, 0.80);
       c = base * tone + vec3(0.55) * hard;
       c = mix(c, v_lane * 0.5 * tone, 0.1); // (a hint of the lane's colour on the metal)
       if (rim > 0.82) c = ink;
     } else if (v_role < 1.5) { // the gem: lit from inside, in bands from a hot core to a darker edge
-      float u = v_uv.x;
+      float cv = max(dot(N, normalize(vec3(0.0, -0.55, 0.83))), 0.0);
+      float u = v_uv.x < 0.0 ? max(sqrt(max(1.0 - cv * cv, 0.0)), smoothstep(0.86, 1.0, abs(v_uv.y))) : v_uv.x; // (the glass tube: by how its surface faces the camera, darker at the caps)
       c = u < 0.4 ? mix(v_lane, vec3(1.0), 0.75) : u < 0.74 ? v_lane * 1.1 : u < 0.93 ? v_lane * 0.66 : ink;
+      if (v_uv.x < -1.5 && u < 0.3) c = v_uv.x < -2.5 ? ink : vec3(1.0); // the core of a HOPO (white) or a tap (dark)
       c += vec3(0.7) * step(0.93, dot(N, normalize(L + vec3(-0.25, 0.1, 0.0)))) * (u > 0.3 ? 1.0 : 0.0); // the hard glint
     } else if (v_role < 2.5) c = vec3(1.0); // the white core of a HOPO
     else c = mix(ink, v_lane * 0.35, step(0.55, v_uv.x)); // the dark core of a tap
@@ -454,6 +456,53 @@ function pillMesh(L, variant, flat = 1) {
   const half = [0, 0, 0];
   for (let i = 0; i < pos.length; i += 3) for (let a = 0; a < 3; a++) half[a] = Math.max(half[a], Math.abs(pos[i + a]));
   return { pos, nrm, uv, role, size: half };
+}
+
+// The note as a lamp: a small metal base, a round metal cap at each end and, held between the caps, a glass tube with a coloured light inside. The tube lies along x (the width
+// of the note), its cross-section round in the y-z plane; each cap is a short cylinder, wider than the tube, with a raised hub. `half` is the half length of the tube; variant 'h' (HOPO:
+// a white core in the glass), 't' (tap: a dark core) and 'a' (accent: gold caps). The tube's vertices carry uv.x = -1 / -2 / -3 (the shader shades it by how it faces the camera; -2 a HOPO, -3 a tap) and uv.y = how
+// far along it they are (-1 at one cap, 0 in the middle, 1 at the other, where the glass darkens).
+function tubeMesh(half, variant) {
+  const pos = [], nrm = [], uv = [], role = [];
+  const push = (p, n, u, v, r) => { pos.push(...p); nrm.push(...n); uv.push(u, v); role.push(r); };
+  const quad = (a, b, c, d, n, r, ua = 1, va = 0) => { for (const p of [a, b, c, a, c, d]) push(p, n, ua, va, r); };
+  const capRole = variant === 'a' ? 4 : 0, vcode = variant === 'h' ? -2 : variant === 't' ? -3 : -1; // (the glass is role 1; uv.x < 0 marks the tube and says which kind)
+  const zc = 1.5, rt = 1.05, rc = 1.45, capT = 0.6, N = 28;
+  // the base: a small slab under the tube (no bottom face)
+  { const bx = Math.min(half * 0.75, 1.7), by = 0.9, bz = 0.5;
+    quad([-bx, -by, bz], [bx, -by, bz], [bx, by, bz], [-bx, by, bz], [0, 0, 1], 0);
+    quad([-bx, by, 0], [bx, by, 0], [bx, by, bz], [-bx, by, bz], [0, 1, 0], 0);
+    quad([-bx, -by, 0], [bx, -by, 0], [bx, -by, bz], [-bx, -by, bz], [0, -1, 0], 0);
+    quad([bx, -by, 0], [bx, by, 0], [bx, by, bz], [bx, -by, bz], [1, 0, 0], 0);
+    quad([-bx, -by, 0], [-bx, by, 0], [-bx, by, bz], [-bx, -by, bz], [-1, 0, 0], 0); }
+  // the tube
+  for (let i = 0; i < N; i++) {
+    const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) / N) * Math.PI * 2;
+    const p = (a, x) => [x, rt * Math.cos(a), zc + rt * Math.sin(a)];
+    const n = (a) => [0, Math.cos(a), Math.sin(a)];
+    for (const [a, x, s] of [[a0, -half, 1], [a1, -half, 1], [a0, half, 1], [a1, -half, 1], [a1, half, 1], [a0, half, 1]]) push(p(a, x), n(a), vcode, x / half, 1);
+    void 0;
+  }
+  // the caps: a cylinder (its wall), the outer disc and a raised hub on it, one at each end
+  for (const sg of [-1, 1]) {
+    const x0 = sg * half, x1 = sg * (half + capT), x2 = sg * (half + capT + 0.14);
+    for (let i = 0; i < N; i++) {
+      const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) / N) * Math.PI * 2;
+      const wall = (a, x) => [x, rc * Math.cos(a), zc + rc * Math.sin(a)];
+      const nw = (a) => [0, Math.cos(a), Math.sin(a)];
+      for (const [a, x] of [[a0, x0], [a1, x0], [a0, x1], [a1, x0], [a1, x1], [a0, x1]]) push(wall(a, x), nw(a), 1, 0, capRole);
+      for (const a of [a0, a1]) void a;
+      const ring = (a, r, x) => [x, r * Math.cos(a), zc + r * Math.sin(a)];
+      const face = [sg, 0, 0];
+      for (const [a, r] of [[a0, rc], [a1, rc], [a0, 0.6], [a1, rc], [a1, 0.6], [a0, 0.6]]) push(ring(a, r, x1), face, 1, 0, capRole);
+      const hubWall = (a, x) => [x, 0.6 * Math.cos(a), zc + 0.6 * Math.sin(a)];
+      for (const [a, x] of [[a0, x1], [a1, x1], [a0, x2], [a1, x1], [a1, x2], [a0, x2]]) push(hubWall(a, x), nw(a), 1, 0, capRole);
+      for (const [a, r] of [[a0, 0.6], [a1, 0.6], [a0, 0], [a1, 0.6], [a1, 0], [a0, 0]]) push(ring(a, r, x2), face, 1, 0, capRole);
+    }
+  }
+  const size = [0, 0, 0];
+  for (let i = 0; i < pos.length; i += 3) for (let a = 0; a < 3; a++) size[a] = Math.max(size[a], Math.abs(pos[i + a]));
+  return { pos, nrm, uv, role, size };
 }
 
 // ---- the board ------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -587,14 +636,14 @@ export class GLBoard {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     this.ownMeshes = {};
-    const kinds = { n: [2.9, 'n', 1], h: [1.9, 'h', 1], t: [1.9, 't', 1], a: [2.9, 'a', 1], g: [2.9, 'n', 1], c: [0, 'c', 0.3], ca: [0, 'ca', 0.3], cg: [0, 'c', 0.3] };
+    const kinds = { n: [2.2, 'n', 1], h: [1.45, 'h', 1], t: [1.45, 't', 1], a: [2.2, 'a', 1], g: [2.2, 'n', 1], c: [0, 'c', 0.3], ca: [0, 'ca', 0.3], cg: [0, 'c', 0.3] };
     for (const [kind, [L, variant, flat]] of Object.entries(kinds)) {
-      const m = pillMesh(L, variant, flat);
+      const m = kind[0] === 'c' ? pillMesh(L, variant, flat) : tubeMesh(L, variant); // (the notes are lamps, the cymbals round dishes)
       const n = m.role.length;
       const data = new Float32Array(n * 9);
       for (let i = 0; i < n; i++) data.set([m.pos[i * 3], m.pos[i * 3 + 1], m.pos[i * 3 + 2], m.nrm[i * 3], m.nrm[i * 3 + 1], m.nrm[i * 3 + 2], m.uv[i * 2], m.uv[i * 2 + 1], m.role[i]], i * 9);
-      const half = kind[0] === 'c' ? 0.44 : 0.435 / 3.9; // (a note's half width is 0.435 lanes, a cymbal's radius 0.44)
-      this.ownMeshes[kind] = { buf: this.buffer(data), count: n, tex, shine: tex, cel: true, cym: kind[0] === 'c', msz: [half, half * 0.053, half * 0.8], base: 0, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1 };
+      const half = kind[0] === 'c' ? 0.44 : 0.435 / 2.8; // (a note's half width, caps included, is 0.435 lanes, a cymbal's radius 0.44)
+      this.ownMeshes[kind] = { buf: this.buffer(data), count: n, tex, shine: tex, cel: true, cym: kind[0] === 'c', msz: [half, half * 0.053, half * (kind[0] === 'c' ? 0.8 : 1.0)], base: 0, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1 };
     }
   }
 
