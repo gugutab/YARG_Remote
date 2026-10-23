@@ -21,14 +21,18 @@ class Rec {
 }
 
 const rgbCache = new Map();
-// '#rrggbb' (or '#rgb') -> [r, g, b] in 0..1 (white for anything else)
+// '#rrggbb', '#rgb' or 'rgb(r,g,b)' -> [r, g, b] in 0..1 (white for anything else)
 export function rgbOf(hex) {
   let c = rgbCache.get(hex);
   if (c) return c;
-  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex);
-  let h = m ? m[1] : 'ffffff';
-  if (h.length === 3) h = [...h].map((x) => x + x).join('');
-  c = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+  const rgb = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i.exec(hex); // (gfx.js darken() / withAlpha() give 'rgb(r,g,b)' strings)
+  if (rgb) c = [+rgb[1] / 255, +rgb[2] / 255, +rgb[3] / 255];
+  else {
+    const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex);
+    let h = m ? m[1] : 'ffffff';
+    if (h.length === 3) h = [...h].map((x) => x + x).join('');
+    c = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+  }
   if (rgbCache.size > 256) rgbCache.clear();
   rgbCache.set(hex, c);
   return c;
@@ -113,7 +117,7 @@ const PROGRAMS = {
   vec2 hs = vec2((x2 - x1) * 0.5, hf);
   int fl = int(v_a1.w + 0.5); bool tk = (fl & 1) != 0; bool sp = (fl & 2) != 0;
   float d = sdRR(v_p - vec2((x1 + x2) * 0.5, y), hs, tk ? 0.0 : min(hf, hs.x));
-  vec3 col = mix(v_a1.rgb, v_a2.rgb, v_p.x < u_hitx ? 0.55 : 0.0);
+  vec3 col = mix(v_a1.rgb, v_a2.rgb, v_p.x < u_hitx ? 0.8 : 0.0); // (past the hit line: the colour veiled in the dark passed colour)
   if (tk) { // a free note: a faint fill and a dashed border 2 px wide, just inside (only in the fill pass)
     if (u_pass < 1.5) { o = vec4(0.0); return; }
     float inside = cover(d);
@@ -149,7 +153,7 @@ const PROGRAMS = {
   float d = abs(v_p.y - yc) - hf;
   float mask = smoothstep(xs - 0.5, xs + 0.5, v_p.x) * (1.0 - smoothstep(xe - 0.5, xe + 0.5, v_p.x));
   bool sp = v_a2.w > 0.5;
-  vec3 col = mix(v_a1.rgb, v_a2.rgb, v_p.x < u_hitx ? 0.55 : 0.0);
+  vec3 col = mix(v_a1.rgb, v_a2.rgb, v_p.x < u_hitx ? 0.8 : 0.0); // (past the hit line: the colour veiled in the dark passed colour)
   float ow = sp ? 2.5 : 1.7;
   if (u_pass < 0.5) {
     float out_ = max(d - ow, 0.0);

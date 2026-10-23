@@ -1863,7 +1863,7 @@ export class Highway {
       if (gv) this.vocalNotesGl(frame, harmony.notes, t, ahead, behind, harmHalf, this.harmonyColors(harmony.part, base), hitX);
       else this.vocalNotes(harmony.notes, t, ahead, behind, harmHalf, this.harmonyColors(harmony.part, base), hitX); // the part past the hit line is lit, like the lead's
     }
-    const leadColors = (this.leadColors ??= [tintWhite(this.vocColors.lead, 0.6), this.vocColors.lead]);
+    const leadColors = (this.leadColors ??= [darken(this.vocColors.lead, 0.35), this.vocColors.lead]);
     if (gv) this.vocalNotesGl(frame, chart.notes, t, ahead, behind, leadHalf, leadColors, hitX);
     else this.vocalNotes(chart.notes, t, ahead, behind, leadHalf, leadColors, hitX); // lit: a lighter shade of the note's own colour
 
@@ -2075,7 +2075,7 @@ export class Highway {
         g.beginPath();
         g.rect(-1e4, -1e4, hitX + 1e4, 2e4);
         g.clip();
-        g.globalAlpha *= 0.55; // a veil over the colour it had, not an opaque light colour
+        g.globalAlpha *= 0.8; // a dark veil over the colour it had (the note keeps its hue), not an opaque colour
         this.vocalShape(n, prev, x1, bw, y, half, colors[0]);
         g.restore();
       }
@@ -2221,7 +2221,7 @@ export class Highway {
   // Lowest and highest pitched note of the whole chart (and its harmonies), cached per chart.
   harmonyColors(part, base) {
     const cache = (this.harmonyColorCache ??= {});
-    return (cache[part] ??= [tintWhite(base, 0.7), base]);
+    return (cache[part] ??= [darken(base, 0.35), base]);
   }
 
   vocalFullRange() {

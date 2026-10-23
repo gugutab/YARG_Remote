@@ -44,3 +44,12 @@ test('syllableProgress fills each syllable between its start and end', () => {
   assert.deepEqual(syllableProgress(line, 1.5), [0.5, 0]);
   assert.deepEqual(syllableProgress(line, 3), [1, 1]);
 });
+
+test('rgbOf (vocals-gl.js): hex and rgb() colour strings, white for anything else', async () => {
+  const { rgbOf } = await import('../src/vocals-gl.js');
+  assert.deepEqual(rgbOf('#ff8000').map((v) => +v.toFixed(3)), [1, 0.502, 0]);
+  assert.deepEqual(rgbOf('#f80').map((v) => +v.toFixed(3)), [1, 0.533, 0]);
+  assert.deepEqual(rgbOf('rgb(51,102,255)').map((v) => +v.toFixed(3)), [0.2, 0.4, 1]);
+  assert.deepEqual(rgbOf('rgba(0,0,0,0.5)'), [0, 0, 0]);
+  assert.deepEqual(rgbOf('nonsense'), [1, 1, 1]);
+});
