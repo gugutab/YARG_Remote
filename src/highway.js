@@ -238,6 +238,7 @@ export class Highway {
     // The 3D notes of the board (setting highway.notes3d: 'off', 'yarg' = YARG's own models, 'own' = our lamp) and how they look (highway.noteMetal / noteGlass / cymbalTop: indices of
     // the style lists of highway-gl.js, noteGlow: 0..2, noteSparks / noteFog: the optional effects). They need the board, so they are ignored with perf.renderer 'canvas'.
     this._notes3d = 'off';
+    this.glSupersample = 'auto'; // setting perf.glSupersample: the board draws at 2x the canvas resolution ('auto': on screens under 1.5 device pixels per CSS pixel, where a note has few pixels and its edges crawl), the browser scales it down
     this.noteLook = { metal: 0, glass: 4, cymbal: 5, glow: 0.4, sparks: true, fog: true };
     this.glModels = 'none'; // the YARG models: 'none', 'loading', 'ready', 'failed'
     this.glFx = {};
@@ -335,6 +336,9 @@ export class Highway {
     this.glCanvas = canvas;
     this.syncGl();
   }
+
+  // The board's supersampling factor on a canvas of `dpr` device pixels per CSS pixel (see glSupersample).
+  glScale(dpr) { return this.glSupersample === '2x' ? 2 : this.glSupersample === 'off' ? 1 : dpr < 1.5 ? 2 : 1; }
 
   get notes3d() { return this._notes3d; }
   set notes3d(v) { this._notes3d = v; this.loadModels(); this.invalidate(); }
@@ -630,7 +634,7 @@ export class Highway {
     let lanePanes = 0;
     for (let i = 0; i < this.panes.length; i++) if (this.panes[i].chart?.mode === 'lanes') lanePanes++;
     this.glActive = this.glWanted(w, h, Math.min(lanePanes, Math.max(1, Math.floor(w / this.paneMin))));
-    if (this.glActive) this.glBoard.begin(w, h, this.canvas.width / w, `${this.noteBase}`, this.glBlur); // (clears the board's canvas: the panes it draws are painted below)
+    if (this.glActive) this.glBoard.begin(w, h, (this.canvas.width / w) * this.glScale(this.canvas.width / w), `${this.noteBase}`, this.glBlur); // (clears the board's canvas: the panes it draws are painted below)
     else if (this.glBoard && this.glWas) this.glBoard.begin(w, h, 1), this.glBoard.dropAll(); // (switched to the 2D code: blank canvas, buffers freed)
     if (this.glBoard && this.glWas !== this.glActive) this.glCanvas.style.display = this.glActive ? '' : 'none'; // (a board that is not drawing this frame costs no compositing)
     this.glWas = this.glActive;

@@ -3819,6 +3819,7 @@ const EFFECTS = {
   'perf.economy': (v) => { economyOn = !!v; applyQuality(); },
   'perf.renderScale': () => applyQuality(),
   'perf.renderer': (v) => { highway.renderer = urlRenderer ?? v; },
+  'perf.glSupersample': (v) => { highway.glSupersample = v; highway.invalidate(); },
   'perf.adaptive': (v) => { adaptiveOn = !!v; adaptive.reset(); applyQuality(); },
   'details.chips': applyDetails, 'details.cover': applyDetails, 'details.quote': applyDetails, 'details.sections': applyDetails,
   'details.layout': applyDetails, 'details.stemNames': applyDetails, 'details.maxWidth': applyDetails, 'details.compact': applyDetails,

@@ -540,7 +540,9 @@ void main() {
     float gv = u_mglass;
     if (u_mcym > 0.5 && u_mcymst > 0.5) { // a cymbal's coloured top as drum-cymbal metal tinted by the lane's colour: concentric lathe grooves, an anisotropic sheen that runs round them, a hard studio reflected on it
       float r = length(v_mp.xy), ang = atan(v_mp.y, v_mp.x);
-      float lathe = 0.6 * vnoise(vec2(r * 55.0, ang * 1.5)) + 0.4 * vnoise(vec2(r * 140.0, ang * 3.0));
+      // (each octave of the grooves fades out where a pixel covers more than about one of its cells: a far or moving cymbal does not crawl with fine rings)
+      float fw1 = fwidth(r * 55.0), fw2 = fwidth(r * 140.0);
+      float lathe = 0.5 + 0.6 * (vnoise(vec2(r * 55.0, ang * 1.5)) - 0.5) * (1.0 - smoothstep(0.3, 0.9, fw1)) + 0.4 * (vnoise(vec2(r * 140.0, ang * 3.0)) - 0.5) * (1.0 - smoothstep(0.3, 0.9, fw2));
       vec3 Tc = normalize(vec3(-v_mp.y, -v_mp.x, 0.0) + vec3(0.0001)); // (the direction of the grooves, round the cymbal, in the world)
       float an = pow(sqrt(max(1.0 - pow(dot(Tc, H), 2.0), 0.0)), 22.0) * max(dot(N, L) * 0.7 + 0.3, 0.0);
       float cs = u_mcymst; // 1 reflective metal, 2 brass, 3 chrome mirror, 4 hammered, 5 anodized, 6 pearl metal
