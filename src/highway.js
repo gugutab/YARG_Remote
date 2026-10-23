@@ -1974,17 +1974,15 @@ export class Highway {
     g.strokeStyle = color;
     if (n.talkie) {
       g.save();
-      g.globalAlpha *= 0.3 + 0.1 * Math.sin(VOC_T * 2.4 + x1 * 0.05); // (the fill breathes)
+      g.globalAlpha *= 0.35;
       const ty = VOC_TOP + 10; // a little room above the box
       g.fillRect(x1, ty, bw, VOC_BOTTOM - ty); // a free note fills the chart area above the lyrics
       g.restore();
       g.setLineDash([4, 3]);
-      g.lineDashOffset = -VOC_T * 6.3; // (the dashes march along the border)
       g.lineWidth = 2;
       if (n.sp) g.strokeStyle = VOCAL_SP_GOLD; // (a star power note: a gold outline)
       g.strokeRect(x1, ty, bw, VOC_BOTTOM - ty);
       g.setLineDash([]);
-      g.lineDashOffset = 0;
       return;
     }
     if (n.slide && prev && !prev.talkie) { // continues the previous note: a smooth ribbon from its end to this note's start
@@ -2022,6 +2020,14 @@ export class Highway {
     g.restore();
   }
 
+  // How strong the passing effect of a talkie box is, 0..1: a very quick fade in as the box reaches the hit line, full while it is over it, then a short hold and a fade out.
+  talkieEnv(n, t) {
+    const after = t - n.end;
+    if (n.time > t + 0.04 || after >= 0.6) return 0;
+    const attack = Math.max(0, Math.min(1, (t - n.time + 0.02) / 0.04));
+    return after <= 0.15 ? attack : attack * Math.max(0, 1 - (after - 0.15) / 0.45);
+  }
+
   // Does the board draw the vocal notes this frame? (the page's WebGL board is in use, it can draw them, and the pane's place is known)
   glVocalsOn() {
     return this.glActive && !!this.glBoard && !this.glBoard.lost && !this.glBoard.vocalsFailed && this.curRect !== null;
@@ -2043,6 +2049,8 @@ export class Highway {
       if (n.talkie) {
         const ty = VOC_TOP + 10; // a free note fills the chart area above the lyrics
         frame.bar(grp, x1, x2, (ty + VOC_BOTTOM) / 2, (VOC_BOTTOM - ty) / 2, idle, passed, true, n.sp);
+        const env = this.talkieEnv(n, t);
+        if (env > 0.004) frame.talkie(ty, VOC_BOTTOM, env, t - n.time, idle, n.sp, n.time % 97);
         continue;
       }
       const y = vocY(n.pitch);
@@ -2054,6 +2062,47 @@ export class Highway {
     }
     const gp = this.vocalGlowParams(notes, t, half, hitX);
     if (gp) frame.glow(gp.y, gp.R, gp.env, gp.age, idle, gp.sp, gp.seed);
+  }
+
+  // The effect of a talkie box passing the hit line (2D drawing; the board draws the same in vocals-gl.js): its stretch of the hit line lights up, two walls of light slide back from it,
+  // a soft halo and a few embers across the height of the box; gold for a star power note.
+  talkieHit2d(n, t, color, hitX) {
+    const env = this.talkieEnv(n, t);
+    if (env <= 0.004) return;
+    const g = this.g;
+    const top = VOC_TOP + 10, bot = VOC_BOTTOM, H = Math.max(8, bot - top);
+    const tone = n.sp ? VOCAL_SP_GOLD : color;
+    const hot = tintWhite(tone, 0.4);
+    g.save();
+    g.beginPath();
+    g.rect(hitX - H - 120, top - 12, H + 120 + 1.5, H + 24); // nothing on the right of the line
+    g.clip();
+    g.globalCompositeOperation = 'lighter';
+    const hg = g.createLinearGradient(hitX - (H * 0.45 + 20), 0, hitX, 0); // the halo
+    hg.addColorStop(0, withAlpha(tone, 0));
+    hg.addColorStop(1, withAlpha(tone, 0.28 * env));
+    g.fillStyle = hg;
+    g.fillRect(hitX - (H * 0.45 + 20), top, H * 0.45 + 20, H);
+    g.fillStyle = withAlpha(hot, 0.9 * env); // the stretch of the hit line
+    g.fillRect(hitX - 1.5, top, 3, H);
+    for (let i = 0; i < 2; i++) { // two walls of light sliding back
+      const ph = (t * 0.8 + i * 0.5 + (n.time % 97) * 0.07) % 1;
+      g.fillStyle = withAlpha(tone, 0.5 * env * (1 - ph) * (1 - ph) * Math.min(1, ph / 0.12));
+      const w = 2 + 5 * ph;
+      g.fillRect(hitX - ph * (H * 0.9 + 30) - w, top, w * 2, H);
+    }
+    const hsh = (a, b) => { const v = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return v - Math.floor(v); };
+    g.fillStyle = tone;
+    const seed = n.time % 97;
+    for (let k = 0; k < 10; k++) { // embers
+      const h1 = hsh(k, seed * 3.7), h2 = hsh(k * 2.3, seed * 1.3);
+      const ph = (t * (0.3 + 0.22 * h1) + h2) % 1;
+      g.globalAlpha = env * (1 - ph) * (1 - ph) * Math.min(1, ph / 0.12);
+      g.beginPath();
+      g.arc(hitX - ph * (H * 0.5 + 30) * (0.5 + h1), top + 4 + (H - 8) * ((h2 * 7 + seed) % 1) - ph * H * 0.25, Math.max(1, (4 + 3 * h2) * (1 - 0.7 * ph)), 0, Math.PI * 2);
+      g.fill();
+    }
+    g.restore();
   }
 
   // Notes of a vocal part: rounded pitched bars, a ribbon joining a pitch slide to the note before it (same colour as the
@@ -2072,6 +2121,7 @@ export class Highway {
       const bw = x2 - x1;
       const y = vocY(n.pitch);
       this.vocalShape(n, prev, x1, bw, y, half, colors ? colors[1] : keep);
+      if (n.talkie && colors) this.talkieHit2d(n, t, colors[1], hitX); // (the effect of the box passing the hit line)
       if (colors && (joined ? vocX(prev.end) : x1) < hitX) { // (the ribbon of a continuation starts at the previous note's end) // only the part that has crossed the hit line changes colour
         g.save();
         g.beginPath();
