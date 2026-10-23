@@ -114,7 +114,7 @@ if (params.get('metal')) $('metal').value = params.get('metal');
 $('metal').value = params.get('metal') ?? '0'; // (the notes: satin stainless steel and candy gel by default; ?metal=3 is the satin gold)
 $('glass').value = params.get('glass') ?? '4';
 $('cymbal').innerHTML = CYMBAL_STYLES.map((n, i) => `<option value="${i}">${i}: ${n}</option>`).join('');
-$('cymbal').value = params.get('cymbal') ?? '1';
+$('cymbal').value = params.get('cymbal') ?? '5'; // (anodized by default)
 if (params.get('side')) $('side').value = params.get('side');
 
 function render(t) {
