@@ -839,7 +839,7 @@ export class GLBoard {
       const half = cym ? 0.44 / m.size[0] : 0.435 / 3.85; // (a note's half width is 0.435 lanes, a cymbal's radius 0.44; the HOPO and tap models are narrower on their own)
       let minZ = Infinity;
       for (let i = 0; i < n; i++) minZ = Math.min(minZ, m.pos[i * 3 + 2]);
-      this.meshes[kind] = { buf: this.buffer(data), count: n, tex: texs[m.tex], shine: texs[`${m.tex}Shine`] ?? texs[m.tex], cym, msz: [half, half * 0.053, cym && noteHeight ? (noteHeight * CYMBAL_HEIGHT) / zSpan(m) : half * 0.8], base: minZ, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1, glow: cym ? [0.5, 0.34, noteHeight * CYMBAL_HEIGHT * 0.6] : [0.5, 0.26, noteHeight * 0.45] }; // (a cymbal is flatter than a note; glow: the halo's half width, half height and the height of the glass, in lanes)
+      this.meshes[kind] = { buf: this.buffer(data), count: n, tex: texs[m.tex], shine: texs[`${m.tex}Shine`] ?? texs[m.tex], cym, msz: [half, half * 0.053, cym && noteHeight ? (noteHeight * CYMBAL_HEIGHT) / zSpan(m) : half * 0.8], base: minZ, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1, glow: cym ? [0.3, 0.34, noteHeight * CYMBAL_HEIGHT * 0.6] : [0.27, 0.26, noteHeight * 0.45] }; // (a cymbal is flatter than a note; glow: the halo's half width, half height and the height of the glass, in lanes)
     }
   }
 
@@ -858,7 +858,7 @@ export class GLBoard {
       const data = new Float32Array(n * 9);
       for (let i = 0; i < n; i++) data.set([m.pos[i * 3], m.pos[i * 3 + 1], m.pos[i * 3 + 2], m.nrm[i * 3], m.nrm[i * 3 + 1], m.nrm[i * 3 + 2], m.uv[i * 2], m.uv[i * 2 + 1], m.role[i]], i * 9);
       const half = kind[0] === 'c' ? 0.44 : 0.435 / (L + 1.0); // (a note's half width, the cups included, is 0.435 lanes, a cymbal's radius 0.44)
-      this.ownMeshes[kind] = { buf: this.buffer(data), count: n, tex, shine: tex, cel: true, cym: kind[0] === 'c', msz: [half, half * 0.053, half * (kind[0] === 'c' ? 0.8 : 1.0)], base: 0, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1, glow: kind[0] === 'c' ? [0.5, 0.34, 0.06] : [0.5, 0.26, 0.12] };
+      this.ownMeshes[kind] = { buf: this.buffer(data), count: n, tex, shine: tex, cel: true, cym: kind[0] === 'c', msz: [half, half * 0.053, half * (kind[0] === 'c' ? 0.8 : 1.0)], base: 0, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1, glow: kind[0] === 'c' ? [0.3, 0.34, 0.06] : [0.27, 0.26, 0.12] };
     }
   }
 
