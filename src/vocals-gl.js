@@ -156,10 +156,10 @@ const PROGRAMS = {
   }
   float a = cover(d);
   // inside the note, in the part that has passed the hit line while the voice is on it: a voice meter, thin light bars that jump up and down, strongest next to the line and
-  // fading away behind it (the same as in a talkie box)
+  // fading out within ~60 px behind it
   float behind = u_hitx - v_p.x;
   float live = step(x1, u_hitx) * (1.0 - smoothstep(x2, x2 + 24.0, u_hitx));
-  float on = live * smoothstep(-1.0, 3.0, behind) * (1.0 - smoothstep(60.0, 150.0, behind));
+  float on = live * smoothstep(-1.0, 4.0, behind) * (1.0 - smoothstep(4.0, 60.0, behind)); // (appears at the line and fades out within a short distance)
   float fx = (v_p.x - x1) / 5.0;
   float k = floor(fx);
   float barX = step(0.15, fract(fx)) * (1.0 - step(0.85, fract(fx)));
