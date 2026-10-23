@@ -48,6 +48,7 @@ import { createThumbs, renderCoverThumb } from './thumbs.js';
 import { snapPoints, snapTime, clampLoop, currentSectionRange, sectionRange, loopForSection, shouldWrap, MIN_LOOP } from './looprange.js';
 import { trainerConfig, startTrainer, nextTrainerState, trainerStatus, stepNote } from './trainer.js';
 import { VISUALIZERS, showsStage, createDriver as createVisualizerDriver } from './visualizers.js';
+import { createVizGl } from './visualizers-gl.js';
 import { paintRange, installRangeUi } from './range-ui.js';
 import { canSkipDraw as idleCanSkip, IDLE_AFTER_MS, IDLE_REFRESH_MS } from './idle.js';
 
@@ -72,6 +73,7 @@ const highway = new Highway(els.highway);
 let frameSleep = 0; // the timer while the frame loop ticks slowly (paused and idle, see `idleDeep`); 0 while it runs on requestAnimationFrame
 { const invalidate = highway.invalidate; highway.invalidate = function () { invalidate.call(this); wakeLoop(); }; } // (any change to the picture wakes a sleeping loop)
 highway.setBackgroundCanvas(document.getElementById('bgCanvas'));
+const bgCanvasGl = document.getElementById('bgCanvasGl');
 highway.setGlCanvas(document.getElementById('highwayGl'));
 const urlRenderer = (() => { const r = new URLSearchParams(location.search).get('renderer'); return r === 'webgl' || r === 'auto' || r === 'canvas' ? r : null; })(); // (?renderer=webgl|auto|canvas overrides the setting perf.renderer: for tests and benchmarks)
 const perf = new PerfMeter();
@@ -3216,6 +3218,7 @@ const vizDriver = createVisualizerDriver({
     return vizSrc;
   },
 });
+highway.setVizGl(createVizGl({ canvas: bgCanvasGl, driver: vizDriver })); // (Beat rings, Aurora and Warp on WebGL unless perf.renderer is canvas)
 highway.vizScale = () => vizDriver.scale * (shownViz === 'cover' ? 1 : qfx.vizFactor); // the background canvas resolution follows the visualizer quality (and the adaptive quality)
 let vizFps = 60; // how often the background is redrawn (the setting; Infinity = every screen frame)
 highway.vizFps = () => vizFps;

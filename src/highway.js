@@ -503,14 +503,31 @@ export class Highway {
     if (canvas?.parentElement) canvas.parentElement.style.background = this.bg;
   }
 
+  // The WebGL twin of the background canvas (src/visualizers-gl.js, createVizGl): Beat rings, Aurora and Warp are drawn on it instead of the 2D one, unless the renderer is 'canvas'.
+  setVizGl(layer) {
+    this.vizGl = layer;
+    this.invalidate();
+  }
+
   drawBackground(t) {
-    const c = this.bgCanvas;
-    if (!c) return;
+    const bg = this.bgCanvas;
+    if (!bg) return;
+    const gv = this.visualizer && this.panes.length && this.vizGl?.wants(this._renderer) ? this.vizGl : null; // (null: the 2D path)
+    const c = gv ? gv.canvas : bg;
+    let swapped = false;
+    if ((gv !== null) !== !!this.vizGlOn) { // switching canvases: the one that goes idle is cleared and hidden
+      this.vizGlOn = gv !== null;
+      swapped = true;
+      if (gv) { bg.width = 1; bg.height = 1; } else this.vizGl?.clear();
+      bg.hidden = !!gv;
+      if (this.vizGl) this.vizGl.canvas.hidden = !gv;
+    }
     const sc = this.visualizer ? this.vizScale() : 1; // the background is drawn at a fraction of the resolution and stretched by the compositor: far fewer pixels to fill
     const dpr = renderDpr() * sc;
-    const w = c.clientWidth;
-    const h = c.clientHeight;
-    const resized = c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr);
+    const box = bg.parentElement; // (both canvases fill it; the idle one is display:none and has no size of its own)
+    const w = box.clientWidth;
+    const h = box.clientHeight;
+    const resized = swapped || c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr);
     if (resized) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
     else if (this.visualizer) { // a frame-rate cap: between two redraws the canvas keeps its picture (the drawing is a function of the song time, so skipping is safe)
       const fps = this.vizFps();
@@ -521,6 +538,7 @@ export class Highway {
         this.bgNext = Math.max(this.bgNext + gap, now - gap); // (drift-corrected: 60 on a 144 Hz screen still averages 60)
       }
     }
+    if (gv) { gv.draw(w, h, t, this.bgRgb); return; }
     const vg = c.getContext('2d');
     vg.setTransform(dpr, 0, 0, dpr, 0, 0);
     vg.clearRect(0, 0, w, h);

@@ -12,7 +12,7 @@ import { buildChart, instrumentOptions, DIFFICULTIES } from '../src/chart.js';
 import { GLBoard } from '../src/highway-gl.js';
 import { NOTE_PALETTE, laneLookFactor } from '../src/gfx.js';
 import { createDriver } from '../src/visualizers.js';
-import { PORTS } from './webgl-viz-ports.js';
+import { PORTS } from '../src/visualizers-gl.js';
 
 const DEPTH_SEC = 3.2; // seconds between the hit line and the far edge at neck speed 1 (the app's DEPTH_SEC)
 const params = new URLSearchParams(location.search);
@@ -73,7 +73,7 @@ const timerExt = gl.getExtension('EXT_disjoint_timer_query_webgl2');
 const BEATS = ['rgba(255,255,255,0.5)', 'rgba(255,255,255,0.3)', 'rgba(255,255,255,0.15)']; // (the app's normal beat lines)
 const curve = Number(params.get('curve') ?? 0.4);
 
-// The background: one of the WebGL visualizer ports (webgl-viz-ports.js) on a canvas under the fretboards, fed by the charts on screen (?viz=rings|aurora|warp,
+// The background: one of the WebGL visualizer ports (src/visualizers-gl.js) on a canvas under the fretboards, fed by the charts on screen (?viz=rings|aurora|warp,
 // ?vizscale=0.6: the fraction of the resolution it is drawn at, as in the app).
 const bgCanvas = $('bg');
 const bgGl = bgCanvas.getContext('webgl2', { antialias: false, alpha: true, premultipliedAlpha: true });
