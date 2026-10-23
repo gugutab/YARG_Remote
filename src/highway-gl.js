@@ -350,7 +350,10 @@ void main() {
   float lam = max(dot(N, L), 0.0); float sp = pow(max(dot(N, H), 0.0), 36.0);
   vec3 c;
   if (u_mcel > 0.5) { // our own look: toon (u_mtoon 1: three tones of light, a hard highlight, an ink line on the silhouettes, the middle a lit gem in bands of colour) or smooth (0: the same shapes, soft gradients)
-    bool toon = u_mtoon > 0.5;
+    bool toon = u_mtoon > 0.5 && u_mtoon < 1.5, gloss = u_mtoon > 1.5; // (u_mtoon: 0 smooth, 1 toon, 2 glossy)
+    vec3 Rf = reflect(-Vc, N); // (the glossy look reflects a studio: a bright sky above, a dark floor, a soft box)
+    vec3 env = mix(vec3(0.10, 0.12, 0.18), vec3(0.88, 0.94, 1.0), smoothstep(-0.25, 0.65, Rf.z)); float fres = pow(1.0 - max(dot(N, Vc), 0.0), 3.0);
+    float box = pow(max(dot(Rf, normalize(L + vec3(0.0, 0.0, 0.35))), 0.0), 36.0);
     float dl = dot(N, L);
     float tone = toon ? (dl > 0.5 ? 1.0 : dl > 0.05 ? 0.66 : 0.38) : 0.35 + 0.65 * smoothstep(-0.1, 0.9, dl);
     float rim = 1.0 - max(dot(N, Vc), 0.0);
@@ -361,14 +364,20 @@ void main() {
       c = base * tone + vec3(0.55) * hard;
       c = mix(c, v_lane * 0.5 * tone, 0.1); // (a hint of the lane's colour on the metal)
       if (toon) { if (rim > 0.82) c = ink; } else c *= mix(0.55, 1.0, smoothstep(0.0, 0.5, 1.0 - rim));
+      if (gloss) { vec3 mb = v_role > 3.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.66, 0.70, 0.80); c = mb * (0.25 + 0.3 * tone) + env * mb * (0.45 + 0.9 * fres) + vec3(1.0) * box * 0.9; } // polished metal: the studio tinted by the metal
     } else if (v_role < 1.5) { // the gem: lit from inside, from a hot core to a darker edge
       float cv = max(dot(N, Vc), 0.0);
       float u = v_uv.x < 0.0 ? max(sqrt(max(1.0 - cv * cv, 0.0)), smoothstep(0.86, 1.0, abs(v_uv.y))) : v_uv.x; // (the glass tube: by how its surface faces the camera, darker at the caps)
       if (toon) c = u < 0.4 ? mix(v_lane, vec3(1.0), 0.75) : u < 0.74 ? v_lane * 1.1 : u < 0.93 ? v_lane * 0.66 : ink;
       else c = mix(v_lane * 0.55, mix(v_lane, vec3(1.0), 0.8), pow(1.0 - smoothstep(0.0, 1.0, u), 1.1)) * (1.0 - 0.4 * smoothstep(0.9, 1.0, u));
       if (v_uv.x < -1.5) { float core = toon ? step(u, 0.3) : 1.0 - smoothstep(0.12, 0.38, u); c = mix(c, v_uv.x < -2.5 ? ink : vec3(1.0), core); } // the core of a HOPO (white) or a tap (dark)
+      if (gloss) { // glass: the light inside, a bright edge where it turns away, the studio reflected on it
+        c = mix(v_lane * 0.6, mix(v_lane, vec3(1.0), 0.75), pow(1.0 - smoothstep(0.0, 1.0, u), 1.2)) * (1.0 - 0.3 * smoothstep(0.9, 1.0, u));
+        if (v_uv.x < -1.5) { float core = 1.0 - smoothstep(0.12, 0.38, u); c = mix(c, v_uv.x < -2.5 ? ink : vec3(1.0), core); }
+        c += env * (0.12 + 0.75 * fres) + vec3(1.0) * box * 0.95;
+      }
       float glint = dot(N, normalize(L + vec3(-0.25, 0.1, 0.0)));
-      c += vec3(0.7) * (toon ? step(0.93, glint) * (u > 0.3 ? 1.0 : 0.0) : pow(max(glint, 0.0), 60.0) * 0.8); // the glint
+      if (!gloss) c += vec3(0.7) * (toon ? step(0.93, glint) * (u > 0.3 ? 1.0 : 0.0) : pow(max(glint, 0.0), 60.0) * 0.8); // the glint
     } else if (v_role < 2.5) c = vec3(1.0); // the white core of a HOPO (dome)
     else c = mix(ink, v_lane * 0.35, step(0.55, v_uv.x)); // the dark core of a tap (dome)
     c = min(c, vec3(1.0));
@@ -474,48 +483,77 @@ function pillMesh(L, variant, flat = 1) {
   return { pos, nrm, uv, role, size: half };
 }
 
-// The note as a lamp: a small metal base, a round metal cap at each end and, held between the caps, a glass tube with a coloured light inside. The tube lies along x (the width
-// of the note), its cross-section round in the y-z plane; each cap is a short cylinder, wider than the tube, with a raised hub. `half` is the half length of the tube; variant 'h' (HOPO:
-// a white core in the glass), 't' (tap: a dark core) and 'a' (accent: gold caps). The tube's vertices carry uv.x = -1 / -2 / -3 (the shader shades it by how it faces the camera; -2 a HOPO, -3 a tap) and uv.y = how
-// far along it they are (-1 at one cap, 0 in the middle, 1 at the other, where the glass darkens).
+// The note as a lamp: a metal base from one cup to the other, a metal cup at each end whose mouth opens inwards (a concave dish: the outside of each is a dome, the inside a bowl) and, held
+// in the two mouths, a glass tube lit from inside. The tube and the cups are round, cut flat at the top of the base (a pill with a flat bottom). The tube lies along x (the width of the
+// note). `half` is the half length of the tube; variant 'h' (HOPO: a white core in the glass), 't' (tap: a dark core) and 'a' (accent: gold cups). The tube's vertices carry
+// uv.x = -1 / -2 / -3 (the shader shades it by how it faces the camera; -2 a HOPO, -3 a tap) and uv.y = how far along it they are (-1 at one cup, 0 in the middle, 1 at the other).
 function tubeMesh(half, variant) {
-  const pos = [], nrm = [], uv = [], role = [];
-  const push = (p, n, u, v, r) => { pos.push(...p); nrm.push(...n); uv.push(u, v); role.push(r); };
-  const quad = (a, b, c, d, n, r, ua = 1, va = 0) => { for (const p of [a, b, c, a, c, d]) push(p, n, ua, va, r); };
+  const V = (p, n, u, v, r) => ({ p, n, u, v, r });
+  const tris = []; // [vertex, vertex, vertex]
   const capRole = variant === 'a' ? 4 : 0, vcode = variant === 'h' ? -2 : variant === 't' ? -3 : -1; // (the glass is role 1; uv.x < 0 marks the tube and says which kind)
-  const zc = 1.5, rt = 1.4, rc = 1.45, capT = 0.6, N = 28;
-  // the base: a small slab under the tube (no bottom face)
-  { const bx = half + capT, by = 0.9, bz = 0.5; // (a base from the outer face of one cap to the outer face of the other)
-    quad([-bx, -by, bz], [bx, -by, bz], [bx, by, bz], [-bx, by, bz], [0, 0, 1], 0);
-    quad([-bx, by, 0], [bx, by, 0], [bx, by, bz], [-bx, by, bz], [0, 1, 0], 0);
-    quad([-bx, -by, 0], [bx, -by, 0], [bx, -by, bz], [-bx, -by, bz], [0, -1, 0], 0);
-    quad([bx, -by, 0], [bx, by, 0], [bx, by, bz], [bx, -by, bz], [1, 0, 0], 0);
-    quad([-bx, -by, 0], [-bx, by, 0], [-bx, by, bz], [-bx, -by, bz], [-1, 0, 0], 0); }
-  // the tube
+  const bz = 0.8, zc = 1.9, rc = 1.55, ri = 1.45, rt = 1.4, Dout = 1.0, Din = 0.8, N = 28, M = 6, tubeHalf = half + 0.1;
+  const quadV = (a, b, c, d) => { tris.push([a, b, c], [a, c, d]); };
+  // the tube (a full cylinder: it is cut below)
   for (let i = 0; i < N; i++) {
     const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) / N) * Math.PI * 2;
-    const p = (a, x) => [x, rt * Math.cos(a), zc + rt * Math.sin(a)];
-    const n = (a) => [0, Math.cos(a), Math.sin(a)];
-    for (const [a, x, s] of [[a0, -half, 1], [a1, -half, 1], [a0, half, 1], [a1, -half, 1], [a1, half, 1], [a0, half, 1]]) push(p(a, x), n(a), vcode, x / half, 1);
-    void 0;
+    const v = (a, x) => V([x, rt * Math.cos(a), zc + rt * Math.sin(a)], [0, Math.cos(a), Math.sin(a)], vcode, x / tubeHalf, 1);
+    quadV(v(a0, -tubeHalf), v(a1, -tubeHalf), v(a1, tubeHalf), v(a0, tubeHalf));
   }
-  // the caps: a cylinder (its wall), the outer disc and a raised hub on it, one at each end
+  // the cups, one at each end
   for (const sg of [-1, 1]) {
-    const x0 = sg * half, x1 = sg * (half + capT), x2 = sg * (half + capT + 0.14);
-    for (let i = 0; i < N; i++) {
+    const x0 = sg * half;
+    const dish = (rad, depth, inward) => { // a paraboloid x = x0 + sg * depth * (1 - (rho / rad)^2), outside (convex) or inside (concave: the normals point to the mouth)
+      for (let k = 0; k < M; k++) {
+        const r0 = rad * (1 - k / M), r1 = rad * (1 - (k + 1) / M);
+        const x = (rho) => x0 + sg * depth * (1 - (rho / rad) ** 2);
+        const slope = (rho) => (-2 * depth * rho) / (rad * rad); // dx/drho / sg
+        for (let i = 0; i < N; i++) {
+          const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) / N) * Math.PI * 2;
+          const v = (rho, a) => {
+            const c = Math.cos(a), sn = Math.sin(a), f = slope(rho);
+            const n = inward ? [-sg, f * c, f * sn] : [sg, -f * c, -f * sn]; // (the outside faces out and away from the axis; the inside faces the mouth and the axis)
+            const len = Math.hypot(...n);
+            return V([x(rho), rho * c, zc + rho * sn], n.map((q) => q / len), 1, 0, inward ? 0 : capRole);
+          };
+          quadV(v(r0, a0), v(r0, a1), v(r1, a1), v(r1, a0));
+        }
+      }
+    };
+    dish(rc, Dout, false); // the outside: a dome
+    dish(ri, Din, true); // the inside: a bowl, opening towards the tube
+    for (let i = 0; i < N; i++) { // the lip: a ring between the bowl and the dome, facing the tube
       const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) / N) * Math.PI * 2;
-      const wall = (a, x) => [x, rc * Math.cos(a), zc + rc * Math.sin(a)];
-      const nw = (a) => [0, Math.cos(a), Math.sin(a)];
-      for (const [a, x] of [[a0, x0], [a1, x0], [a0, x1], [a1, x0], [a1, x1], [a0, x1]]) push(wall(a, x), nw(a), 1, 0, capRole);
-      for (const a of [a0, a1]) void a;
-      const ring = (a, r, x) => [x, r * Math.cos(a), zc + r * Math.sin(a)];
-      const face = [sg, 0, 0];
-      for (const [a, r] of [[a0, rc], [a1, rc], [a0, 0.6], [a1, rc], [a1, 0.6], [a0, 0.6]]) push(ring(a, r, x1), face, 1, 0, capRole);
-      const hubWall = (a, x) => [x, 0.6 * Math.cos(a), zc + 0.6 * Math.sin(a)];
-      for (const [a, x] of [[a0, x1], [a1, x1], [a0, x2], [a1, x1], [a1, x2], [a0, x2]]) push(hubWall(a, x), nw(a), 1, 0, capRole);
-      for (const [a, r] of [[a0, 0.6], [a1, 0.6], [a0, 0], [a1, 0.6], [a1, 0], [a0, 0]]) push(ring(a, r, x2), face, 1, 0, capRole);
+      const v = (rho, a) => V([x0, rho * Math.cos(a), zc + rho * Math.sin(a)], [-sg, 0, 0], 1, 0, capRole);
+      quadV(v(rc, a0), v(rc, a1), v(ri, a1), v(ri, a0));
     }
   }
+  // cut everything flat at the top of the base
+  const lerp = (a, b, t) => {
+    const n = a.n.map((q, i) => q + (b.n[i] - q) * t), len = Math.hypot(...n) || 1;
+    return V(a.p.map((q, i) => q + (b.p[i] - q) * t), n.map((q) => q / len), a.u + (b.u - a.u) * t, a.v + (b.v - a.v) * t, a.r);
+  };
+  const cut = [];
+  for (const tri of tris) {
+    const out = [];
+    for (let i = 0; i < 3; i++) {
+      const a = tri[i], b = tri[(i + 1) % 3], ina = a.p[2] >= bz, inb = b.p[2] >= bz;
+      if (ina) out.push(a);
+      if (ina !== inb) out.push(lerp(a, b, (bz - a.p[2]) / (b.p[2] - a.p[2])));
+    }
+    for (let k = 1; k + 1 < out.length; k++) cut.push([out[0], out[k], out[k + 1]]);
+  }
+  // the base: a slab from the outer tip of one cup to the outer tip of the other, deeper than the pill (no bottom face)
+  const W = half + Dout, by = 1.5;
+  const flat = (a, b, c, d, n) => quadV(V(a, n, 1, 0, 0), V(b, n, 1, 0, 0), V(c, n, 1, 0, 0), V(d, n, 1, 0, 0));
+  const base = [];
+  { const keep = tris.length; flat([-W, -by, bz], [W, -by, bz], [W, by, bz], [-W, by, bz], [0, 0, 1]);
+    flat([-W, by, 0], [W, by, 0], [W, by, bz], [-W, by, bz], [0, 1, 0]);
+    flat([-W, -by, 0], [W, -by, 0], [W, -by, bz], [-W, -by, bz], [0, -1, 0]);
+    flat([W, -by, 0], [W, by, 0], [W, by, bz], [W, -by, bz], [1, 0, 0]);
+    flat([-W, -by, 0], [-W, by, 0], [-W, by, bz], [-W, -by, bz], [-1, 0, 0]);
+    base.push(...tris.slice(keep)); }
+  const pos = [], nrm = [], uv = [], role = [];
+  for (const tri of [...cut, ...base]) for (const v of tri) { pos.push(...v.p); nrm.push(...v.n); uv.push(v.u, v.v); role.push(v.r); }
   const size = [0, 0, 0];
   for (let i = 0; i < pos.length; i += 3) for (let a = 0; a < 3; a++) size[a] = Math.max(size[a], Math.abs(pos[i + a]));
   return { pos, nrm, uv, role, size };
@@ -658,7 +696,7 @@ export class GLBoard {
       const n = m.role.length;
       const data = new Float32Array(n * 9);
       for (let i = 0; i < n; i++) data.set([m.pos[i * 3], m.pos[i * 3 + 1], m.pos[i * 3 + 2], m.nrm[i * 3], m.nrm[i * 3 + 1], m.nrm[i * 3 + 2], m.uv[i * 2], m.uv[i * 2 + 1], m.role[i]], i * 9);
-      const half = kind[0] === 'c' ? 0.44 : 0.435 / 2.8; // (a note's half width, caps included, is 0.435 lanes, a cymbal's radius 0.44)
+      const half = kind[0] === 'c' ? 0.44 : 0.435 / (L + 1.0); // (a note's half width, the cups included, is 0.435 lanes, a cymbal's radius 0.44)
       this.ownMeshes[kind] = { buf: this.buffer(data), count: n, tex, shine: tex, cel: true, cym: kind[0] === 'c', msz: [half, half * 0.053, half * (kind[0] === 'c' ? 0.8 : 1.0)], base: 0, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1 };
     }
   }
@@ -1043,7 +1081,7 @@ export class GLBoard {
         const first = sol.count - sTo;
         gl.bindTexture(gl.TEXTURE_2D, mesh.tex);
         gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, mesh.shine); gl.activeTexture(gl.TEXTURE1);
-        gl.uniform1f(pr.u.u_mcel, mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mtoon, fx.cel === false ? 0 : 1);
+        gl.uniform1f(pr.u.u_mcel, mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mtoon, fx.shade === 'glossy' ? 2 : fx.shade === 'smooth' || fx.cel === false ? 0 : 1);
         gl.uniform2f(pr.u.u_mnoise, mesh.cym ? 0.62 : 1.0, 0.55); // (the middle's noise speed: the note 0.4, the cymbal 0.25, relative to the note; its minimum darkness)
         gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, mesh.alpha);
         this.vao(d, `solid_${kind}`, () => {
