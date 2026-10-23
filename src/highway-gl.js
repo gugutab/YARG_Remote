@@ -187,7 +187,7 @@ void main() {
   float dr = (a0.x - u_t) / u_win; float d = u_pad > 0.5 ? 0.0 : clamp(dr, 0.0, 1.0) + (bar ? a2.w * u_bar : 0.0);
   vec2 centre = project(a0.y + 0.5 - u_half, d);
   float past = u_t - (a0.x + a2.x); float kx = clamp(past / 0.1, 0.0, 1.0); float e = easeOut(kx);
-  bool gone = u_pad < 0.5 && (past > 0.1 || (a2.x > 0.0 && u_t >= a0.x) || (u_solid > 0.5 && !bar && a2.w < 0.5)); // (a solid note has its own block; a2.w is 1 for a cymbal)
+  bool gone = u_pad < 0.5 && (past > 0.1 || (a2.x > 0.0 && u_t >= a0.x) || (u_solid > 0.5 && !bar)); // (a note with a model has no sprite, cymbals included)
   float sc = scaleAt(d); vec2 size;
   if (bar) size = vec2(a2.z * u_laneW * sc / 0.955, max(2.0, (u_hit - u_vy) * u_k * sc * sc * u_bar * (1.0 - 0.55 * e)) * ${(CELL_H / 28).toFixed(3)});
   else size = (a1.xy - a0.zw) * u_atlas * (u_laneW * u_headR * sc / ${REF_RX.toFixed(1)}) * a1.zw * (u_pad > 0.5 ? 1.0 : 1.0 - 0.5 * kx);
@@ -337,7 +337,7 @@ void main() {
   gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clip; v_y = px.y; v_d = d;
   v_uv = m_uv; v_n = vec3(m_nrm.x, -m_nrm.y, m_nrm.z); v_lane = s1.rgb; v_role = m_role; v_mp = m_pos;
   v_a = clamp((1.0 - d) / 0.14, 0.0, 1.0) * u_malpha;
-}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane, v_mp; in float v_role, v_y, v_d, v_a; uniform float u_mcel, u_mtoon; out vec4 o;
+}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane, v_mp; in float v_role, v_y, v_d, v_a; uniform float u_mcel, u_mtoon, u_mcym; out vec4 o;
 // The middle of a note (YARG's RectangularNote shader graph, material NoteMiddle): the base map times a darkness mask that drifts with time (a soft cloud: gradient noise,
 // scale -2.8 / speed 0.4 / tiling 1.1 x 1.3 in the material; here a value noise of two octaves), times the lane's colour, over which the shine map is laid with the opacity
 // shine amount x its alpha (0.1); a small emission of the colour (0.1). The metal is the base map under the light, smoothness 0.5.
@@ -404,9 +404,9 @@ void main() {
     float core = pow(face, 2.2);
     vec3 lamp = v_lane * (0.62 + 0.9 * core); // the colour at full strength, brighter in the middle
     lamp = mix(lamp, vec3(1.0), 0.3 * core * core); // a hot centre
-    lamp *= mix(0.72, 1.0, g * cloud); // the base map's darker rim and the cloud
+    lamp *= mix(0.72, 1.0, (u_mcym > 0.5 ? 1.0 : g) * cloud); // the base map's darker rim and the cloud (a cymbal's own map is not used: it washed the glass out; it has the note's glass)
     lamp += v_lane * 0.55 * pow(1.0 - face, 2.5); // light gathering at the edge of the glass
-    lamp = mix(lamp, vec3(1.0), 0.5 * texture(u_mshine, v_uv).a); // the shine map's streak
+    lamp = mix(lamp, vec3(1.0), (u_mcym > 0.5 ? 0.0 : 0.5) * texture(u_mshine, v_uv).a); // the shine map's streak (not on a cymbal: its own streak whitened the whole top)
     c = lamp + vec3(1.0) * sp * 0.45; // (self-lit: the scene's light only adds a highlight)
   }
   else if (v_role < 2.5) c = mix(vec3(1.0), v_lane, 0.12) * (0.68 + 0.32 * lam); // the white of a HOPO
@@ -706,7 +706,7 @@ export class GLBoard {
       const half = cym ? 0.44 / m.size[0] : 0.435 / 3.85; // (a note's half width is 0.435 lanes, a cymbal's radius 0.44; the HOPO and tap models are narrower on their own)
       let minZ = Infinity;
       for (let i = 0; i < n; i++) minZ = Math.min(minZ, m.pos[i * 3 + 2]);
-      this.meshes[kind] = { buf: this.buffer(data), count: n, tex: texs[m.tex], shine: texs[`${m.tex}Shine`] ?? texs[m.tex], cym, msz: [half, half * 0.053, half * 0.8], base: minZ, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1 };
+      this.meshes[kind] = { buf: this.buffer(data), count: n, tex: texs[m.tex], shine: texs[`${m.tex}Shine`] ?? texs[m.tex], cym, msz: [half, half * 0.053, half * (cym ? 0.5 : 0.8)], base: minZ, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1 }; // (a cymbal is flatter than a note)
     }
   }
 
@@ -1109,7 +1109,7 @@ export class GLBoard {
         const first = sol.count - sTo;
         gl.bindTexture(gl.TEXTURE_2D, mesh.tex);
         gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, mesh.shine); gl.activeTexture(gl.TEXTURE1);
-        gl.uniform1f(pr.u.u_mcel, mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mtoon, fx.shade === 'glossy' ? 2 : fx.shade === 'smooth' || fx.cel === false ? 0 : 1);
+        gl.uniform1f(pr.u.u_mcel, mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mcym, mesh.cym && !mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mtoon, fx.shade === 'glossy' ? 2 : fx.shade === 'smooth' || fx.cel === false ? 0 : 1);
         gl.uniform2f(pr.u.u_mnoise, mesh.cym ? 0.62 : 1.0, 0.7); // (the middle's noise speed: the note 0.4, the cymbal 0.25, relative to the note; its minimum darkness)
         gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, mesh.alpha);
         this.vao(d, `solid_${kind}`, () => {
