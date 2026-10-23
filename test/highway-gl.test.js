@@ -17,7 +17,7 @@ test('glUnsupported: every setting the board does not draw sends the pane to the
   assert.equal(glUnsupported(hw({ hitAnimation: 'classic' }), { mode: 'lanes' }), 'hitAnimation');
   assert.equal(glUnsupported(hw({ tailStyle: 'classic' }), { mode: 'lanes' }), 'tailStyle');
   assert.equal(glUnsupported(hw({ loopEnd: 30 }), { mode: 'lanes' }), 'loop'); // (the loop and replay dimming is drawn per note by the 2D code)
-  assert.equal(glUnsupported(hw({ replayWindow: { from: 1, to: 2 } }), { mode: 'lanes' }), 'loop');
+  assert.equal(glUnsupported(hw({ replayWindow: { from: 1, to: 2 } }), { mode: 'lanes' }), null); // (the replayed stretch is left out of the chart instead, Highway.viewChart)
 });
 
 test('lookahead3D: neck speed shortens the window and a taller pane shows more of it', () => {
