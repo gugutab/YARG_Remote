@@ -61,7 +61,7 @@ export function glUnsupported(hw, chart) {
 
 // ---- shaders ------------------------------------------------------------------------------------------------------------------------------------------------------
 
-const UNIFORMS = `uniform vec2 u_res; uniform float u_hit, u_vy, u_k, u_c, u_cx, u_laneW, u_half, u_t, u_win, u_flip, u_headR, u_end, u_fh, u_padB, u_board, u_taper, u_fog, u_relief, u_side, u_sx0, u_sy0, u_span, u_lit, u_held;`;
+const UNIFORMS = `uniform vec2 u_res; uniform float u_hit, u_vy, u_k, u_c, u_cx, u_laneW, u_half, u_t, u_win, u_flip, u_headR, u_end, u_fh, u_padB, u_board, u_taper, u_fog, u_relief, u_side, u_sx0, u_sy0, u_span, u_lit, u_held, u_ky;`;
 const COMMON = `#version 300 es
 precision highp float;
 ${UNIFORMS}
@@ -434,8 +434,9 @@ void main() {
   float d = clamp((s0.x - u_t) / u_win, 0.0, 1.0);
   float hs = u_headR / ${HEAD_R.toFixed(2)};
   float x = s0.y + 0.5 - u_half + m_pos.x * u_msz.x * sh * hs;
-  float ky = mix(1.0, (u_laneW * u_msz.z) / max(u_span * u_msz.y, 1.0), u_side); // (in the side view a unit of depth is as long on the screen as a unit of height)
+  float ky = mix(u_ky, (u_laneW * u_msz.z) / max(u_span * u_msz.y, 1.0), u_side); // (in the side view a unit of depth is as long on the screen as a unit of height; in the usual view u_ky keeps its thickness in proportion to its width, see drawPane)
   float dep = d - m_pos.y * u_msz.y * ky * sh; // (the model's +y points at the player)
+  dep = max(dep, -0.3 / u_k); // (its near edge stays short of the vanishing point behind the hit line, where the perspective blows up)
   float hgt = (m_pos.z - u_mbase) * u_msz.z * sh * hs;
   vec2 px = project(x, dep) - vec2(0.0, hgt * u_laneW * scaleAt(dep));
   vec4 clip = clipPos(px); clip.z = clamp(dep * 1.7 - 0.1 - hgt * 0.3, -0.99, 0.99); // (nearer and higher wins the depth test)
@@ -1253,7 +1254,7 @@ export class GLBoard {
   shared(pr, t, v) {
     const gl = this.gl, u = pr.u;
     if (u.u_res) gl.uniform2f(u.u_res, v.res[0], v.res[1]);
-    const vals = { u_side: v.side, u_sx0: v.sx0, u_sy0: v.sy0, u_span: v.span, u_hit: v.hit, u_vy: v.vy, u_k: v.k, u_c: v.c, u_cx: v.cx, u_laneW: v.laneW, u_half: v.half, u_t: t, u_win: v.win, u_flip: v.flip, u_headR: v.headR, u_end: v.end, u_fh: v.fh, u_padB: v.padB, u_board: v.board, u_lit: v.lit, u_held: v.held, u_tailW: v.tailW, u_bar: v.bar, u_taper: v.taper, u_fog: v.fog, u_relief: v.relief };
+    const vals = { u_side: v.side, u_sx0: v.sx0, u_sy0: v.sy0, u_span: v.span, u_hit: v.hit, u_vy: v.vy, u_k: v.k, u_c: v.c, u_cx: v.cx, u_laneW: v.laneW, u_half: v.half, u_t: t, u_win: v.win, u_flip: v.flip, u_headR: v.headR, u_end: v.end, u_fh: v.fh, u_padB: v.padB, u_board: v.board, u_lit: v.lit, u_held: v.held, u_tailW: v.tailW, u_bar: v.bar, u_taper: v.taper, u_fog: v.fog, u_relief: v.relief, u_ky: v.ky };
     for (const n in vals) if (u[n]) gl.uniform1f(u[n], vals[n]);
   }
 
@@ -1303,6 +1304,10 @@ export class GLBoard {
     const hit = h * HIT_Y;
     const proj = projection3D(h, hit, o.perspective, o.curve);
     const headR = HEAD_R * o.noteSize;
+    // A model's thickness is a length of the road (depth units) while its width follows the lane: a narrow lane (7 drum lanes) or a tall pane would stretch it along the road, a wide short
+    // pane flatten it. Scaling the thickness by the lane's width over the screen length of a depth unit at the hit line keeps its proportions; 1 at the reference (5 lanes, 1500 x 860).
+    const depthRatio = (hh, ww, ln) => { const rw = hh > ww ? ww * 0.9 : Math.min(hh * 1.2, hh * 0.9 + (ww - hh) * 0.3); const ht = hh * HIT_Y; const pr = projection3D(hh, ht, o.perspective, o.curve); return (rw / ln) / Math.max(1, (ht - pr.vy) * pr.k); };
+    const ky = Math.min(1.6, Math.max(0.3, depthRatio(h, w, lanes) / depthRatio(860, 1500, 5)));
     const padRy = laneW * headR * 1.05 * 0.55;
     const padB = hit + padRy;
     const fx = o.fx || {}; // the optional effects (taper, fog, relief, particles, solid): each is on or off; solid is 'own' (our pill models) or 'yarg' (YARG's, once setMeshes has them)
@@ -1312,7 +1317,7 @@ export class GLBoard {
     const sx0 = w * 0.16;
     const v = {
       side, sx0, sy0: h * 0.6, span: (w - sx0) * 0.95 * 3, // (the side view shows a third of the window: a note is as thick as it is tall, so a whole window would crowd them)
-      res: [w, h], hit, vy: proj.vy, k: proj.k, c: proj.c, cx: w / 2, laneW, half: lanes / 2, win: o.windowSec, flip: o.leftHanded ? -1 : 1, headR,
+      res: [w, h], hit, vy: proj.vy, k: proj.k, c: proj.c, cx: w / 2, laneW, half: lanes / 2, win: o.windowSec, flip: o.leftHanded ? -1 : 1, headR, ky,
       taper: fx.taper ? 1 : 0, fog: fx.fog ? 1 : 0, relief: fx.relief ? 1 : 0,
       lit: o.litLag > 0 ? o.litLag : 0, held: o.heldMotion ? 1 : 0,
       end: proj.end, fh: side > 0.5 ? -1 : h * 0.26, padB: h - padB > 2 && side < 0.5 ? padB : h * 4, board: o.boardK, tailW: o.sustainWidth, bar: BAR_DEPTH * o.kickBar,
