@@ -99,7 +99,7 @@ const BODIES = {
   vec4 acc = vec4(0.0);
   if (p.y < hor) { float k = p.y / hor; over(acc, mix(c0, c1, k), mix(0.1, 0.5, k) + 0.1 * u_au.x); }
   float baseR = min(W, H) * 0.2;
-  float R = baseR * (1.0 + 0.07 * mp + 0.07 * u_kick.x + 0.04 * u_au.y);
+  float R = baseR; // (the sun keeps its size: no pulse)
   vec2 sc = vec2(cx, hor - R * 0.5);
   float dist = length(p - sc);
   float v = (p.y - (sc.y - R)) / (2.0 * R);
@@ -111,7 +111,7 @@ const BODIES = {
   float ph = fract(s * 8.0 - crawl), wd = 16.0 * (0.045 + 0.07 * max(s, 0.0)) * grow, fw = max(fwidth(s * 8.0), 1e-4);
   float cut = s > 0.0 ? 1.0 - smoothstep(wd - fw, wd + fw, ph) : 0.0;
   over(acc, sunCol, cov(dist, R) * (1.0 - cut));
-  if (p.y < hor) addLight(acc, c1, (1.0 - smoothstep(R * 0.6, R * 2.2, dist)) * (0.2 + 0.25 * mp + 0.2 * u_sp + 0.3 * u_kick.x));
+  if (p.y < hor) addLight(acc, c1, (1.0 - smoothstep(R * 0.6, R * 2.2, dist)) * (0.26 + 0.2 * u_sp));
   float x01 = p.x / W;
   float rid = 0.012 + 0.02 * vn(vec2(x01 * 9.0, 1.0)) + 0.17 * spec(abs(x01 - 0.5) * 2.0) * clamp(u_au.x * 4.0, 0.0, 1.0);
   float top = hor - rid * H;
@@ -160,7 +160,6 @@ const SPOT_BODY = `void main() {
     light += col * (1.0 - smoothstep(0.0, 1.0, ell)) * 0.5 * drive * power * 0.8;
     light += col * (1.0 - smoothstep(0.0, 26.0, length(p - origin))) * power;
   }
-  light *= 1.0 + 0.25 * u_kick.y;
   acc.a = clamp(acc.a + maxc(light) * (1.0 - acc.a), 0.0, 1.0);
   acc.rgb = min(acc.rgb + light, vec3(acc.a));
   o = acc;
@@ -210,7 +209,7 @@ function spotlightsPort(gl) {
       const pal = data.palette, layers = data.layers ?? [];
       const n = Math.min(MAX_BEAMS, Math.max(w > 1100 ? 8 : 6, layers.length)); // more beams than instruments: an instrument lights every few beams across the stage
       const len = Math.hypot(w * 0.35, h) * 1.2;
-      const drive = clamp(0.8 + 0.3 * s.density + 0.25 * s.vocal + 0.15 * s.sp + 0.5 * s.audio.kick, 0, 1.5);
+      const drive = clamp(0.8 + 0.3 * s.density + 0.25 * s.vocal + 0.15 * s.sp, 0, 1.2); // (no flash on the kicks: it was in the way)
       const warmK = s.sp * 0.65;
       for (let i = 0; i < n; i++) {
         const layer = layers.length ? layers[i % layers.length] : undefined;

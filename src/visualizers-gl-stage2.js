@@ -214,7 +214,9 @@ function radialPort(gl) {
 
 // ---- Embers ----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-const EMBERS = 150;
+const EMBERS = 300;
+const EMBER_RATE_FULL = 24; // notes per second (all the instruments) at which every spark is lit
+const EMBER_MIN = 0.05; // the share of sparks left in a silent part
 const EMBER_VS = `${HEAD}uniform float u_phase, u_vis, u_hit, u_pulse, u_kick, u_tre, u_t; uniform vec4 u_col[${MAX_LAYERS}]; uniform int u_nc;
 out vec2 v_q; out vec3 v_col; out float v_a;
 float hh(float n, float s) { return fract(sin(n * 12.9898 + s * 78.233) * 43758.5453); }
@@ -222,6 +224,7 @@ void main() {
   float fi = float(gl_InstanceID);
   vec2 c = vec2(float(gl_VertexID & 1), float((gl_VertexID >> 1) & 1)) * 2.0 - 1.0;
   float life = 5.0 + hh(fi, 3.0) * 6.0;
+  float present = clamp(u_vis - fi, 0.0, 1.0); // (a spark fades in and out as the count rises and falls)
   float phase = fract(hh(fi, 1.0) + u_phase / life);
   float x = hh(fi, 2.0) * u_res.x + sin(phase * 6.2831853 * 1.5 + hh(fi, 4.0) * 20.0) * u_res.x * 0.02;
   float y = u_res.y * (1.05 - phase * 1.15);
@@ -229,10 +232,10 @@ void main() {
   float size = (10.0 + hh(fi, 5.0) * 28.0) * (1.0 - phase * 0.55) * (1.0 + u_hit * 0.35 + 0.55 * u_kick) * (0.8 + 0.35 * min(1.5, cc.a));
   float tw = 0.5 + 0.5 * sin(u_t * 5.0 + hh(fi, 6.0) * 30.0); tw *= tw;
   float tws = 1.0 + u_tre * 1.2 * (0.5 + 0.5 * sin(u_t * 17.0 + hh(fi, 8.0) * 60.0)); // the highs make them glint
-  v_a = min(1.0, sin(phase * 3.14159265) * (0.5 + 0.5 * tw) * (0.55 + 0.45 * u_pulse + 0.25 * u_kick) * min(1.4, cc.a) * tws);
+  v_a = min(1.0, sin(phase * 3.14159265) * (0.5 + 0.5 * tw) * (0.55 + 0.45 * u_pulse + 0.25 * u_kick) * min(1.4, cc.a) * tws) * present;
   v_col = cc.rgb; v_q = c;
   vec2 px = vec2(x, y) + c * size;
-  gl_Position = float(gl_InstanceID) < u_vis ? vec4(px.x / u_res.x * 2.0 - 1.0, 1.0 - px.y / u_res.y * 2.0, 0.0, 1.0) : vec4(2.0, 2.0, 2.0, 1.0);
+  gl_Position = present > 0.0 ? vec4(px.x / u_res.x * 2.0 - 1.0, 1.0 - px.y / u_res.y * 2.0, 0.0, 1.0) : vec4(2.0, 2.0, 2.0, 1.0);
 }`;
 const EMBER_FS = `${HEAD}in vec2 v_q; in vec3 v_col; in float v_a; out vec4 o;
 void main() {
@@ -246,7 +249,14 @@ const EMBER_GLOW = `void main() {
   o = vec4(u_pal[3] * a, a);
 }`;
 
+// How many notes start in [a, b) (a sorted time array of `count` entries).
+function countBetween(times, count, a, b) {
+  const lb = (x) => { let lo = 0, hi = count; while (lo < hi) { const m = (lo + hi) >> 1; if (times[m] < x) lo = m + 1; else hi = m; } return lo; };
+  return lb(b) - lb(a);
+}
+
 function embersPort(gl) {
+  let lit = 0, lastClock = null;
   const glow = fullScreenPort(gl, 'embers-glow', EMBER_GLOW);
   const pr = program(gl, 'embers', EMBER_VS, EMBER_FS);
   const cols = new Float32Array(MAX_LAYERS * 4);
@@ -265,7 +275,13 @@ function embersPort(gl) {
       const u = pr.u;
       gl.uniform2f(u.u_res, w, h); gl.uniform1f(u.u_sc, sc);
       gl.uniform1f(u.u_phase, s.travel * 0.9 + s.bt * 0.5);
-      gl.uniform1f(u.u_vis, Math.floor(EMBERS * (0.3 + 0.7 * s.density)));
+      const ev = data.events;
+      const rate = ev ? countBetween(ev.times, ev.count, s.t - 1, s.t + 1) / 2 : s.density * EMBER_RATE_FULL; // the notes of the last and the next second: the sparks follow the music's activity
+      const want = EMBERS * (EMBER_MIN + (1 - EMBER_MIN) * Math.min(1, rate / EMBER_RATE_FULL));
+      const dt = lastClock === null ? 1 : Math.min(0.2, Math.max(0, s.clock - lastClock));
+      lastClock = s.clock;
+      lit += (want - lit) * (1 - Math.exp(-dt * 2.5)); // (rises and falls over about half a second)
+      gl.uniform1f(u.u_vis, lit);
       gl.uniform1f(u.u_hit, s.hit); gl.uniform1f(u.u_pulse, Math.pow(1 - s.beat.phase, 3)); gl.uniform1f(u.u_kick, s.audio.kick); gl.uniform1f(u.u_tre, s.audio.treble); gl.uniform1f(u.u_t, s.t);
       gl.uniform4fv(u.u_col, cols); gl.uniform1i(u.u_nc, n);
       gl.blendFunc(gl.ONE, gl.ONE);
@@ -294,10 +310,10 @@ const COVER_BODY = `void main() {
   vec3 col = texture(u_cover, vec2(clamp(u, 0.0, 1.0), clamp(v, 0.0, 1.0))).rgb;
   col += vec3(max(slope, 0.0) * 0.16);
   col *= 1.0 - max(-slope, 0.0) * 0.2;
-  col *= 1.0 + 0.1 * u_kick.x + 0.04 * u_au.w;
   o = vec4(col, 1.0);
 }`;
 
+const PAN_FREQ_X = [0.025, 0.057, 0.094], PAN_FREQ_Y = [0.02, 0.047, 0.08], PAN_REACH = 0.6; // (a quarter of the old speed and 60 % of its reach: the picture drifts very slowly)
 const wander = (t, f, ph) => 0.55 * Math.sin(t * f[0] + ph[0]) + 0.3 * Math.sin(t * f[1] + ph[1]) + 0.15 * Math.sin(t * f[2] + ph[2]); // -1..1: the camera's slow, never repeating drift
 
 function coverPort(gl) {
@@ -309,9 +325,9 @@ function coverPort(gl) {
       gl.uniform1i(pr.u.u_cover, 1);
       gl.uniform2f(pr.u.u_cv2, has ? 1 : 0, 0);
       const size = Math.max(w, h) * 1.2; // the picture is always 20 % larger than the screen (its larger side): room to pan over it
-      const amp = h * 0.02 * (0.85 + 0.3 * s.density) * (1 + 0.8 * s.audio.bass + 0.4 * s.audio.kick);
+      const amp = h * 0.02 * (0.85 + 0.3 * s.density);
       const room = (view) => Math.max(view * 0.03, (size - view) / 2 - amp * 1.5);
-      const cx = w / 2 + wander(s.bt, [0.1, 0.23, 0.39], [0.6, 2.1, 4.4]) * room(w), cy = h / 2 + wander(s.bt, [0.08, 0.19, 0.33], [2.2, 0.4, 3.3]) * room(h);
+      const cx = w / 2 + wander(s.bt, PAN_FREQ_X, [0.6, 2.1, 4.4]) * room(w) * PAN_REACH, cy = h / 2 + wander(s.bt, PAN_FREQ_Y, [2.2, 0.4, 3.3]) * room(h) * PAN_REACH;
       gl.uniform4f(pr.u.u_cv, cx, cy, size, amp);
       gl.activeTexture(gl.TEXTURE0);
     },
