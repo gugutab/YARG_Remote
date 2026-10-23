@@ -61,7 +61,7 @@ export function glUnsupported(hw, chart) {
 
 // ---- shaders ------------------------------------------------------------------------------------------------------------------------------------------------------
 
-const UNIFORMS = `uniform vec2 u_res; uniform float u_hit, u_vy, u_k, u_c, u_cx, u_laneW, u_half, u_t, u_win, u_flip, u_headR, u_end, u_fh, u_padB, u_board, u_taper, u_fog, u_relief, u_side, u_sx0, u_sy0, u_span, u_lit, u_held, u_ky;`;
+const UNIFORMS = `uniform vec2 u_res; uniform float u_hit, u_vy, u_k, u_c, u_cx, u_laneW, u_half, u_t, u_win, u_flip, u_headR, u_end, u_fh, u_padB, u_board, u_taper, u_fog, u_relief, u_side, u_sx0, u_sy0, u_span, u_lit, u_held, u_ky, u_dim;`;
 const COMMON = `#version 300 es
 precision highp float;
 ${UNIFORMS}
@@ -183,7 +183,7 @@ void main() {
     float lo = 1.1 * v_hp * al, th = 0.85 * v_hp * f;
     a *= step(0.0, f) * step(cn, 12.0) * step(al, f) * smoothstep(lo - 0.7, lo + 0.7, back) * (1.0 - smoothstep(lo + th - 0.7, lo + th + 0.7, back));
   }
-  o = vec4(v_col.rgb * a, a);
+  o = vec4(mix(v_col.rgb, vec3(dot(v_col.rgb, vec3(0.3, 0.59, 0.11))), 0.94 * u_dim) * a, a);
 }`],
   // notes, bars (kick, open) and pads: sprites from the atlas, one instance each (time, lane, uv rect, size factors, length, bar, bar width in lanes, depth offset of a double kick);
   // a pad is lit by its lane's flash. The burst animation: a head shrinks into the line and is gone after 0.1 s (a long note that has arrived is not drawn); a bar thins out and fades.
@@ -236,6 +236,7 @@ void main() {
   c.rgb = mix(c.rgb, vec3(0.10, 0.14, 0.24) * c.a, u_fog * 0.5 * smoothstep(0.1, 1.0, v_d));
   c.rgb = min(c.rgb * (1.0 + v_boost * 1.4) + c.a * v_boost * 0.35, vec3(c.a));
   c.rgb = mix(c.rgb, vec3(c.a), v_white);
+  c.rgb = mix(c.rgb, vec3(dot(c.rgb, vec3(0.3, 0.59, 0.11))), 0.94 * u_dim);
   o = c;
 }`],
   // the resting hit pads (shown when the hit line bar is off): a rounded rectangle (a triangle on a cymbal lane) with a fill and a 2 px ring in the lane's colour, brighter while the
@@ -625,6 +626,7 @@ void main() {
   else if (v_role < 2.5) c = mix(vec3(1.0), v_lane, 0.12) * (0.68 + 0.32 * lam); // the white of a HOPO
   else c = vec3(0.04) * (0.6 + 0.8 * lam) + vec3(1.0) * sp * 0.3; // the dark of a tap
   c = mix(c, vec3(0.10, 0.14, 0.24), u_fog * 0.5 * smoothstep(0.1, 1.0, v_d)); // (the fog of the other effect, when it is on)
+  c = mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))), 0.94 * u_dim); // (a disabled note, the replayed stretch: almost no colour)
   float a = v_a * edgeFade(v_y);
   o = vec4(c * a, a);
 }`],
@@ -1037,6 +1039,10 @@ export class GLBoard {
       times.push(n.time);
       lanesOf.push(bar ? -1 : n.lane);
       for (let j = 0; j < dk; j++) (bar ? instBars : inst).push([n.time, bar ? lanes / 2 - 0.5 : n.lane, uv[0], uv[1], uv[2], uv[3], 1, 1, n.length > 0 && !bar ? n.length : 0, bar ? 1 : 0, lanes, bar ? j * 1.3 : (n.cymbal ? 1 : 0)]);
+      if (chart.ghost) { // (the disabled notes of a replay: drawn dim, no activation mark, no hit effects)
+        if (!bar) { const rgb = hexRgb(noteColor({ lane: n.lane, sp: sp[i] }, colors)); (solids[n.cymbal ? (n.accent ? 'ca' : n.ghost ? 'cg' : 'c') : n.tap ? 't' : n.hopo ? 'h' : n.accent ? 'a' : n.ghost ? 'g' : 'n'] ??= []).push({ time: n.time, row: [n.time, n.lane, n.length > 0 ? n.length : 0, 0, ...rgb, sp[i] ? 1 : 0] }); if (n.length > 0) tails.push({ t0: n.time, t1: n.time + n.length, lane: n.lane, rgb }); }
+        return;
+      }
       if (n.activation) acts.push(n.time, bar ? -1 : n.lane, n.cymbal ? 1 : 0, bar ? 1 : 0);
       if (bar) { barHits.push(n.time, 0, 0, 0, ...hexRgb(barColor), n.time); return; }
       const rgb = hexRgb(noteColor({ lane: n.lane, sp: sp[i] }, colors)); // (a star power note's tail and burst take its tinted colour)
@@ -1258,7 +1264,7 @@ export class GLBoard {
   shared(pr, t, v) {
     const gl = this.gl, u = pr.u;
     if (u.u_res) gl.uniform2f(u.u_res, v.res[0], v.res[1]);
-    const vals = { u_side: v.side, u_sx0: v.sx0, u_sy0: v.sy0, u_span: v.span, u_hit: v.hit, u_vy: v.vy, u_k: v.k, u_c: v.c, u_cx: v.cx, u_laneW: v.laneW, u_half: v.half, u_t: t, u_win: v.win, u_flip: v.flip, u_headR: v.headR, u_end: v.end, u_fh: v.fh, u_padB: v.padB, u_board: v.board, u_lit: v.lit, u_held: v.held, u_tailW: v.tailW, u_bar: v.bar, u_taper: v.taper, u_fog: v.fog, u_relief: v.relief, u_ky: v.ky };
+    const vals = { u_side: v.side, u_sx0: v.sx0, u_sy0: v.sy0, u_span: v.span, u_hit: v.hit, u_vy: v.vy, u_k: v.k, u_c: v.c, u_cx: v.cx, u_laneW: v.laneW, u_half: v.half, u_t: t, u_win: v.win, u_flip: v.flip, u_headR: v.headR, u_end: v.end, u_fh: v.fh, u_padB: v.padB, u_board: v.board, u_lit: v.lit, u_held: v.held, u_tailW: v.tailW, u_bar: v.bar, u_taper: v.taper, u_fog: v.fog, u_relief: v.relief, u_ky: v.ky, u_dim: v.dim };
     for (const n in vals) if (u[n]) gl.uniform1f(u[n], vals[n]);
   }
 
@@ -1321,7 +1327,7 @@ export class GLBoard {
     const sx0 = w * 0.16;
     const v = {
       side, sx0, sy0: h * 0.6, span: (w - sx0) * 0.95 * 3, // (the side view shows a third of the window: a note is as thick as it is tall, so a whole window would crowd them)
-      res: [w, h], hit, vy: proj.vy, k: proj.k, c: proj.c, cx: w / 2, laneW, half: lanes / 2, win: o.windowSec, flip: o.leftHanded ? -1 : 1, headR, ky,
+      res: [w, h], hit, vy: proj.vy, k: proj.k, c: proj.c, cx: w / 2, laneW, half: lanes / 2, win: o.windowSec, flip: o.leftHanded ? -1 : 1, headR, ky, dim: o.ghostOnly ? 1 : 0,
       taper: fx.taper ? 1 : 0, fog: fx.fog ? 1 : 0, relief: fx.relief ? 1 : 0,
       lit: o.litLag > 0 ? o.litLag : 0, held: o.heldMotion ? 1 : 0,
       end: proj.end, fh: side > 0.5 ? -1 : h * 0.26, padB: h - padB > 2 && side < 0.5 ? padB : h * 4, board: o.boardK, tailW: o.sustainWidth, bar: BAR_DEPTH * o.kickBar,
@@ -1334,8 +1340,11 @@ export class GLBoard {
     let pr;
     const use = (name) => { pr = P[name]; gl.useProgram(pr.p); this.shared(pr, t, v); };
 
+    const ghostPass = !!o.ghostOnly; // the disabled notes of a replay: only the sustains, bars and heads, at half opacity and nearly grey (no road, bands, pads, bursts)
+    if (ghostPass) { gl.blendColor(0, 0, 0, 0.5); gl.blendFuncSeparate(gl.CONSTANT_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.CONSTANT_ALPHA, gl.ONE_MINUS_SRC_ALPHA); }
     // the road, then its dark base behind it (premultiplied blending cannot draw behind: the base goes first, the road on top of it)
     const road = this.roadGeometry(lanes, o.laneStripes);
+    if (!ghostPass) {
     use('flat');
     gl.uniform1f(pr.u.u_dpr, dpr);
     gl.uniform1f(pr.u.u_noFade, 2);
@@ -1348,11 +1357,12 @@ export class GLBoard {
     this.vao(d, 'road', () => { gl.bindBuffer(gl.ARRAY_BUFFER, road.road.buf); this.attrib(pr, 'a_pos', 2, 28, 0, 0); this.attrib(pr, 'a_col', 4, 28, 8, 0); this.attrib(pr, 'a_ext', 1, 28, 24, 0); });
     this.calls++;
     gl.drawArrays(gl.TRIANGLES, 0, road.road.count);
+    }
 
     // the bands (star power, solo, fills, rolls, the big rock ending): the ones in view, any overlapping
     const bands = d.bands;
     const bFrom = lowerBound(bands.starts, t - bands.maxLen - 1e-6), bTo = lowerBound(bands.starts, t + win + 1e-6);
-    if (bTo > bFrom) {
+    if (!ghostPass && bTo > bFrom) {
       use('bands');
       const mul = new Float32Array(MUL_SLOTS).fill(1);
       if (bands.bre) for (let l = 0; l < lanes && l < MUL_SLOTS - 1; l++) mul[l] = breAlpha(t, l, lanes, o.breBand === 'pulse');
@@ -1362,7 +1372,7 @@ export class GLBoard {
     }
 
     // the beat lines in the window
-    if (o.beatStyle) {
+    if (o.beatStyle && !ghostPass) {
       const lo = lowerBound(d.beats.times, t), hi = lowerBound(d.beats.times, t + win);
       if (hi > lo) {
         use('beats');
@@ -1373,7 +1383,7 @@ export class GLBoard {
     }
 
     // the pads (without the hit line bar, whose coloured segments replace them)
-    if (!o.hitLine) {
+    if (!o.hitLine && !ghostPass) {
       use('pads');
       gl.uniform1fv(pr.u.u_flash, d.padFlash);
       gl.uniform3fv(pr.u.u_lc, d.lc);
@@ -1452,7 +1462,7 @@ export class GLBoard {
       gl.activeTexture(gl.TEXTURE0);
     }
 
-    if (fx.solid && models && fx.glow > 0) { // the glow of the lit glass: a halo of the lane's colour round each note with a model, added
+    if (fx.solid && models && fx.glow > 0 && !ghostPass) { // the glow of the lit glass: a halo of the lane's colour round each note with a model, added
       gl.blendFunc(gl.ONE, gl.ONE);
       use('glow');
       gl.uniform1f(pr.u.u_gain, fx.glow);
@@ -1470,7 +1480,7 @@ export class GLBoard {
     }
 
     // the fill activation marks, over the heads (under the hit line bar, as in the 2D code)
-    if (o.fillActivation && d.actB.count) {
+    if (o.fillActivation && d.actB.count && !ghostPass) {
       const aFrom = lowerBound(d.actB.times, t - 0.12), aTo = lowerBound(d.actB.times, t + win);
       if (aTo > aFrom) {
         use('marks');
@@ -1480,7 +1490,7 @@ export class GLBoard {
     }
 
     // the hit line bar over the notes and tails: a segment per lane (whiter while it is hit) and a border at each end (the open note / pedal colour when the chart has them)
-    if (o.hitLine) {
+    if (o.hitLine && !ghostPass) {
       use('hitbar');
       gl.uniform1fv(pr.u.u_flash, d.flash);
       gl.uniform3fv(pr.u.u_lc, d.lc);
@@ -1492,6 +1502,7 @@ export class GLBoard {
       this.inst(gl.TRIANGLE_STRIP, 0, 4, lanes + 2);
     }
 
+    if (ghostPass) { gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); this.drawn += drawn; return drawn; }
     // the hit bursts and the held glow, added over everything (three quads per instance: the looping bursts of a held note), then the bar bursts
     gl.blendFunc(gl.ONE, gl.ONE);
     use('burst');
@@ -1522,6 +1533,7 @@ export class GLBoard {
     }
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     this.drawn += drawn;
+    if (o.ghost) this.drawPane(o.ghost, t, rect, { ...o, ghost: null, ghostOnly: true }); // (the disabled notes of a replay, over the pane)
     return drawn;
   }
 
