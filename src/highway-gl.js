@@ -20,6 +20,7 @@ import {
   HIT_Y, HIT_FLASH_SEC, BAR_FLASH_SEC, BAND_BORDERS, FILL_COLORS, FILL_BORDER, FILL_BORDER_LANES, FILL_STRONG, ROLL_LEAD_SEC, ROLL_COLUMN_ALPHA, HIT_LINE_BORDER_SOFT,
 } from './gfx.js';
 
+const CYMBAL_HEIGHT = 0.9; // the height of a cymbal model as a fraction of a rectangular note's (setMeshes)
 const HEAD_R = 0.36; // note head radius in lane widths (highway3d.js)
 const ROAD_NEAR = -0.14; // the road starts below the pads
 const BAR_DEPTH = 0.0058; // pedal / open bar thickness along the road, in depth units
@@ -698,6 +699,8 @@ export class GLBoard {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       texs[name] = tex;
     }
+    const zSpan = (m) => { let lo = Infinity, hi = -Infinity; for (let i = 2; i < m.pos.length; i += 3) { lo = Math.min(lo, m.pos[i]); hi = Math.max(hi, m.pos[i]); } return hi - lo; };
+    const noteHeight = meshes.n ? zSpan(meshes.n) * (0.435 / meshes.n.size[0]) * 0.8 : 0; // the height of a rectangular note, in lanes: a cymbal is set against it
     for (const [kind, m] of Object.entries(meshes)) {
       const n = m.role.length;
       const data = new Float32Array(n * 9);
@@ -706,7 +709,7 @@ export class GLBoard {
       const half = cym ? 0.44 / m.size[0] : 0.435 / 3.85; // (a note's half width is 0.435 lanes, a cymbal's radius 0.44; the HOPO and tap models are narrower on their own)
       let minZ = Infinity;
       for (let i = 0; i < n; i++) minZ = Math.min(minZ, m.pos[i * 3 + 2]);
-      this.meshes[kind] = { buf: this.buffer(data), count: n, tex: texs[m.tex], shine: texs[`${m.tex}Shine`] ?? texs[m.tex], cym, msz: [half, half * 0.053, half * (cym ? 0.5 : 0.8)], base: minZ, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1 }; // (a cymbal is flatter than a note)
+      this.meshes[kind] = { buf: this.buffer(data), count: n, tex: texs[m.tex], shine: texs[`${m.tex}Shine`] ?? texs[m.tex], cym, msz: [half, half * 0.053, cym && noteHeight ? (noteHeight * CYMBAL_HEIGHT) / zSpan(m) : half * 0.8], base: minZ, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1 }; // (a cymbal is flatter than a note)
     }
   }
 
