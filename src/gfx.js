@@ -1,7 +1,8 @@
 // Drawing constants and helpers shared by the 2D and 3D highway renderers.
 // The lane, kick, open and tap colours below are YARG's defaults; the renderers draw with NOTE_PALETTE (src/palette.js, setting
 // highway.palette), read at draw time, which holds these same colours unless another palette is chosen.
-export { NOTE_PALETTE } from './palette.js';
+import { NOTE_PALETTE } from './palette.js';
+export { NOTE_PALETTE };
 export const GUITAR_LANE_COLORS = ['#79d304', '#ff1d23', '#ffe900', '#00bfff', '#ff8400']; // YARG.Core ColorProfile.Defaults.cs
 export const KICK_COLOR = '#ff8400'; // YARG's 4-lane kick (the 5-lane one is KICK_COLOR_5)
 export const KICK_COLOR_5 = '#c800ff'; // YARG's 5-lane kick (ColorProfile.FiveLaneDrums KickNote = DefaultPurple)
@@ -597,7 +598,11 @@ export function starPowerColor(hex) {
   }
   return out;
 }
-export const noteColor = (n, colors) => (n.sp ? starPowerColor(colors[n.lane]) : colors[n.lane]);
+// The colour of a note's lane: a cymbal of the 4-lane Pro kit takes its own tint when the palette has them (`NOTE_PALETTE.cymbals4`, see palette.js), the others the lane's colour.
+export const noteLaneColor = (n, colors) => (n.cymbal && colors === NOTE_PALETTE.drums4 && NOTE_PALETTE.cymbals4 ? NOTE_PALETTE.cymbals4[n.lane] ?? colors[n.lane] : colors[n.lane]);
+export const noteColor = (n, colors) => (n.sp ? starPowerColor(noteLaneColor(n, colors)) : noteLaneColor(n, colors));
+// A kick bar's base colour: the open note's, a double kick's own (4 lanes purple, 5 lanes dark silver), or the kick's.
+export const kickBarColor = (n, chart) => (n.open ? NOTE_PALETTE.open : chart.drumKind === 'five' ? (n.doubleKick ? NOTE_PALETTE.doubleKick5 : NOTE_PALETTE.kick5) : n.doubleKick ? NOTE_PALETTE.doubleKick : NOTE_PALETTE.kick);
 
 // The spans of `list` (chart.fills, chart.rolls) whose `key` is `value`, filtered once per chart instead of on every frame.
 export function spansOfKind(chart, list, key, value) {
@@ -615,9 +620,11 @@ const fadeColor = (a) => `rgba(0,0,0,${a})`;
 const smootherstep = (u) => u * u * u * (u * (u * 6 - 15) + 10);
 export const BOTTOM_FADE_STOPS = [[0, 0], [0.3, 0.2], [0.6, 0.6], [0.85, 0.92], [1, 1]].map(([at, a]) => [at, fadeColor(a)]); // just below the pads
 export const EDGE_FADE_STOPS = Array.from({ length: 13 }, (_, n) => { const u = n / 12; return [u, fadeColor((1 - smootherstep(u)).toFixed(3))]; }); // far edge of the board
-// Star power lyrics, as YARG draws them (VocalStaticLyricPhraseElement): yellow while ahead, a dark yellow once sung (the grey of the others' past).
-export const LYRIC_SP_FUTURE = '#ffeb04';
-export const LYRIC_SP_PAST = '#757519';
+// Star power lyrics (YARG draws them yellow, #FFEB04 / #757519, VocalStaticLyricPhraseElement): here gold, a rich gold while ahead and a dark gold once sung (the grey of the others' past).
+export const LYRIC_SP_FUTURE = '#ffbf2b';
+export const LYRIC_SP_PAST = '#80601a';
+// The gold outline of a star power vocal note (and the glow of its hit), as 0..1 rgb for the shaders.
+export const VOCAL_SP_GOLD = '#ffc53d';
 export const LYRIC_RAMP_STOPS = Array.from({ length: 17 }, (_, n) => { const pos = n / 16; return [pos, fadeColor(1 - smootherstep(Math.pow(pos, 0.7)))]; }); // lyric sheet edges
 
 // A vertical gradient (x = 0) of one of the stop lists above from y0 to y1, kept for the next frame: panes of the same height share it

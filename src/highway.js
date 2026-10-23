@@ -5,7 +5,7 @@ import { renderDpr } from './quality.js';
 import { sanitizeSizes, fitWidths } from './panesizes.js';
 import { PER_INSTRUMENT_BASES, instrumentDefaults } from './perinstrument.js';
 import {
-  NOTE_PALETTE, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, LYRIC_RAMP_STOPS, LYRIC_SP_FUTURE, LYRIC_SP_PAST,
+  NOTE_PALETTE, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, LYRIC_RAMP_STOPS, LYRIC_SP_FUTURE, LYRIC_SP_PAST, VOCAL_SP_GOLD,
   STAR_POWER_GOLD,
   STAR_POWER_BAND,
   SOLO_BAND,
@@ -65,6 +65,8 @@ import {
   setCymbalSize,
   HOPO_SCALE,
   noteColor,
+  noteLaneColor,
+  kickBarColor,
   tailShimmer,
   heldPulse,
   fadeGradient,
@@ -73,6 +75,7 @@ import {
 export { firstVisibleIndex } from './gfx.js';
 import { renderLanes3D, lookahead3D } from './highway3d.js';
 import { GLBoard, glUnsupported, loadNoteModels } from './highway-gl.js';
+import { VocalFrame, rgbOf } from './vocals-gl.js';
 import { buildKaraokeLines, karaokeAt, syllableProgress } from './karaoke.js';
 import { countdownColors, vocalColors, mixHex } from './uicolors.js';
 import { waitCountdowns, countdownAt, countdownAlpha, measureStarts, measuresLeft, COUNTDOWN_HIDE_SEC, MIN_COUNTDOWN_SEC } from './countdown.js';
@@ -236,6 +239,8 @@ export class Highway {
     this.glActive = false; // this frame's panes may be drawn by the board
     this.glBlur = -1; // the index of the motion blur sample being drawn (the board averages them in a framebuffer, see GLBoard.begin), -1 outside a blur
     this.glOpts = {};
+    this.vocalFrame = new VocalFrame(); // what the vocal view records for the board (vocals-gl.js)
+    this.curRect = null; // the pane being drawn: { x, y, w, h } on the stage
     // The 3D notes of the board (setting highway.notes3d: 'off', 'yarg' = YARG's own models, 'own' = our lamp) and how they look (highway.noteMetal / noteGlass / cymbalTop: indices of
     // the style lists of highway-gl.js, noteGlow: 0..2, noteSparks / noteFog: the optional effects). They need the board, so they are ignored with perf.renderer 'canvas'.
     this._notes3d = 'off';
@@ -846,6 +851,7 @@ export class Highway {
     try {
       this.chart = pane.chart;
       this.curPane = pane;
+      (this.curRect ??= { x: 0, y: 0, w: 0, h: 0 }).x = x; this.curRect.y = y; this.curRect.w = pw; this.curRect.h = ph;
       this.maxLength = pane.maxLength;
       this.vRange = pane.vRange;
       if (pane.chart.mode === 'vocals') {
@@ -1098,7 +1104,7 @@ export class Highway {
         g.strokeStyle = 'rgba(0,0,0,0.65)';
         g.strokeText(syl.text, x, cy);
       }
-      g.fillStyle = syl.sp ? `rgba(255,235,4,${alpha})` : `rgba(255,255,255,${alpha})`; // (a star power lyric is yellow until it is sung)
+      g.fillStyle = syl.sp ? `rgba(255,191,43,${alpha})` : `rgba(255,255,255,${alpha})`; // (a star power lyric is yellow until it is sung)
       g.fillText(syl.text, x, cy);
       const p = prog ? prog[i] : 0;
       if (p > 0) { // the sung part
@@ -1660,7 +1666,7 @@ export class Highway {
       const full = laneW * chart.lanes;
       const height = KICK_BAR_HALF_H * this.kickBar * 2 * (1 + 0.4 * k); // (setting highway.kickBarHeight)
       g.globalAlpha = 1 - k;
-      g.fillStyle = tintWhite(n.open ? NOTE_PALETTE.open : chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick, k);
+      g.fillStyle = tintWhite(kickBarColor(n, chart), k); // (a double kick has its own colour)
       // double kick: a second bar stacked above the first
       g.fillRect(x0, cy + 0 - height / 2, full, height);
       if (n.doubleKick) g.fillRect(x0, cy + -(height + DOUBLE_KICK_GAP) - height / 2, full, height);
@@ -1727,7 +1733,7 @@ export class Highway {
       const faced = !n.cymbal && this.noteStyle === 'rect'; // a note in the rectangular style: the vector note after the design (chrome caps, coloured band, base)
       if (faced) {
         const nhw = r * wide * NOTE_RECT_W * (n.tap ? HOPO_SCALE : 1), nhh = r * NOTE_RECT_H * (n.tap ? HOPO_SCALE : 1);
-        drawYNote(g, cx, cy, nhw, nhh, n, colors[n.lane], tintWhite(n.sp ? noteColor(n, colors) : colors[n.lane], white), 0, YNOTE_SIDE_2D * this.noteBase, white === 0);
+        drawYNote(g, cx, cy, nhw, nhh, n, noteLaneColor(n, colors), tintWhite(n.sp ? noteColor(n, colors) : noteLaneColor(n, colors), white), 0, YNOTE_SIDE_2D * this.noteBase, white === 0);
         if (n.activation && this.fillActivation) marks.push(n, cx, cy, r * wide * NOTE_RECT_W, r * NOTE_RECT_H, g.globalAlpha);
         continue;
       }
@@ -1735,12 +1741,12 @@ export class Highway {
       const disc = n.cymbal && this.noteStyle === 'rect'; // the rectangular style draws a cymbal as YARG's chrome disc (the circle style keeps the triangle)
       if (disc) noteShape(g, cx, cy, r * 0.95, r * 0.95, 'round');
       else noteShape(g, cx, cy, n.cymbal ? r : r * wide, r, n.cymbal ? 'tri' : this.noteStyle); // cymbals: rounded triangle
-      g.fillStyle = tintWhite(n.sp ? noteColor(n, colors) : n.tap ? NOTE_PALETTE.tap : colors[n.lane], white);
+      g.fillStyle = tintWhite(n.sp ? noteColor(n, colors) : n.tap ? NOTE_PALETTE.tap : noteLaneColor(n, colors), white);
       g.fill();
-      if (disc) drawCymbalFace(g, cx, cy, r * 0.95, r * 0.95, n, colors[n.lane]);
+      if (disc) drawCymbalFace(g, cx, cy, r * 0.95, r * 0.95, n, noteLaneColor(n, colors));
       // accent: same size, with a thicker outline in a darker shade of the note's colour (not on a cymbal disc: its current path is the cone's after drawCymbalFace, and the disc has no outline)
       g.lineWidth = n.accent ? ACCENT_OUTLINE_WIDTH : 2;
-      g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : 'rgba(0,0,0,0.5)'; // (star power notes have no coloured outline: the white body and, in the rectangular style, the gold caps mark them)
+      g.strokeStyle = n.accent ? darken(noteLaneColor(n, colors), ACCENT_OUTLINE_DARKEN) : 'rgba(0,0,0,0.5)'; // (star power notes have no coloured outline: the white body and, in the rectangular style, the gold caps mark them)
       if (!disc) g.stroke();
       if (n.hopo) { // guitar HOPO: a white dot in the head (the rectangular style has white strips instead)
         g.beginPath();
@@ -1809,7 +1815,9 @@ export class Highway {
     // the lyric track goes away during a percussion section or a rest with a countdown, and comes back 1 s before the next words appear at the right edge
     const stK = this.curPane ? this.restFade(this.curPane, t, look) : 1;
     const trackA = 0.3 * stK; // (the 0.15 layer under it is not drawn while it is hidden either)
-    this.trackBase(0, 0, w, h, 0.15 * stK);
+    const gv = this.glVocalsOn(); // the board draws the notes, the percussion, the beat lines and the glow (the lyrics and the bands behind them stay here)
+    const frame = gv ? this.vocalFrame : null;
+    if (gv) { frame.begin(t, hitX); frame.quad(0, 0, w, h, [0, 0, 0], 0.15 * stK); frame.quad(0, 0, w, h, [1, 1, 1], 0.00625 * stK); } else this.trackBase(0, 0, w, h, 0.15 * stK);
     if (trackA > 0.004) {
       const mid1 = lyricY; // the middle of the letters (they are drawn with a middle baseline)
       this.trackBase(0, mid1 - fontSize * 0.75, w, fontSize * 1.5, trackA);
@@ -1838,22 +1846,26 @@ export class Highway {
     for (let i = 0; beats && i < beats.length; i++) {
       const b = beats[i];
       if (b.time < t - behind || b.time > t + ahead) continue;
-      g.fillStyle = b.measure ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)';
       const lw = b.measure ? 2 : 1;
+      if (gv) { frame.quad(Math.round(vocX(b.time) - lw / 2), 0, lw, h, [1, 1, 1], b.measure ? 0.35 : 0.12); continue; }
+      g.fillStyle = b.measure ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)';
       g.fillRect(Math.round(vocX(b.time) - lw / 2), 0, lw, h); // centred on the beat, so what sits on it (percussion) lines up
     }
 
-    g.fillStyle = 'rgba(255,255,255,0.7)';
-    g.fillRect(hitX - 2, 0, 3, h);
+    if (gv) frame.quad(hitX - 2, 0, 3, h, [1, 1, 1], 0.7);
+    else { g.fillStyle = 'rgba(255,255,255,0.7)'; g.fillRect(hitX - 2, 0, 3, h); }
 
     // harmonies first, so the lead is drawn on top
     const harmonies = chart.harmonies;
     for (let i = 0; harmonies && i < harmonies.length; i++) {
       const harmony = harmonies[i];
       const base = this.vocColors.harmony[harmony.part] || this.vocColors.harmony[1];
-      this.vocalNotes(harmony.notes, t, ahead, behind, harmHalf, this.harmonyColors(harmony.part, base), hitX); // the part past the hit line is lit, like the lead's
+      if (gv) this.vocalNotesGl(frame, harmony.notes, t, ahead, behind, harmHalf, this.harmonyColors(harmony.part, base), hitX);
+      else this.vocalNotes(harmony.notes, t, ahead, behind, harmHalf, this.harmonyColors(harmony.part, base), hitX); // the part past the hit line is lit, like the lead's
     }
-    this.vocalNotes(chart.notes, t, ahead, behind, leadHalf, (this.leadColors ??= [tintWhite(this.vocColors.lead, 0.6), this.vocColors.lead]), hitX); // lit: a lighter shade of the note's own colour
+    const leadColors = (this.leadColors ??= [tintWhite(this.vocColors.lead, 0.6), this.vocColors.lead]);
+    if (gv) this.vocalNotesGl(frame, chart.notes, t, ahead, behind, leadHalf, leadColors, hitX);
+    else this.vocalNotes(chart.notes, t, ahead, behind, leadHalf, leadColors, hitX); // lit: a lighter shade of the note's own colour
 
     // percussion: a drum-head marker per hit, in the vertical middle of the chart; a hit flashes when it crosses the line and
     // then dims as it scrolls off.
@@ -1865,6 +1877,10 @@ export class Highway {
       const x = past > 0 ? hitX : vocX(p.time);
       const r = Math.max(14, Math.min(22, h * 0.08)); // percussion marker radius
       const k = past > 0 ? Math.min(1, past / PERC_HOLD) : 0; // 0..1 over the pulse
+      if (gv) {
+        frame.hit(x, percussionY, r, past, k, past > PERC_HOLD * 0.7 ? 1 - (past - PERC_HOLD * 0.7) / (PERC_HOLD * 0.3) : 1, past > 0 && past < 0.12 ? 1 + 0.65 * Math.sin((Math.PI * past) / 0.12) : 1, past > 0 && past < PERC_HOLD ? 1 - past / PERC_HOLD : 0);
+        continue;
+      }
       g.save();
       g.globalAlpha = past > PERC_HOLD * 0.7 ? 1 - (past - PERC_HOLD * 0.7) / (PERC_HOLD * 0.3) : 1;
       if (past > 0 && past < PERC_HOLD) {
@@ -1910,6 +1926,11 @@ export class Highway {
       g.strokeStyle = 'rgba(13,17,23,0.55)';
       g.stroke();
       g.restore();
+    }
+
+    if (gv) {
+      frame.percColors = { ...this.vocColors.perc, dark: '#0d1117' };
+      this.glBoard.drawVocals(this.curRect, frame);
     }
 
     // lyrics under the notes, each at its start time
@@ -1959,6 +1980,7 @@ export class Highway {
       g.restore();
       g.setLineDash([4, 3]);
       g.lineWidth = 2;
+      if (n.sp) g.strokeStyle = VOCAL_SP_GOLD; // (a star power note: a gold outline)
       g.strokeRect(x1, ty, bw, VOC_BOTTOM - ty);
       g.setLineDash([]);
       return;
@@ -1986,6 +2008,47 @@ export class Highway {
     if (g.roundRect) g.roundRect(x1, y - half, bw, half * 2, Math.min(half, bw / 2));
     else g.rect(x1, y - half, bw, half * 2);
     g.fill();
+    if (n.sp) { // a star power note: a gold outline
+      g.save();
+      g.strokeStyle = VOCAL_SP_GOLD;
+      g.lineWidth = 2.5;
+      g.stroke();
+      g.restore();
+    }
+  }
+
+  // Does the board draw the vocal notes this frame? (the page's WebGL board is in use, it can draw them, and the pane's place is known)
+  glVocalsOn() {
+    return this.glActive && !!this.glBoard && !this.glBoard.lost && !this.glBoard.vocalsFailed && this.curRect !== null;
+  }
+
+  // vocalNotes for the board: records what is visible into the frame (vocals-gl.js) instead of drawing it: a bar per note, the ribbon of a pitch slide, the box of a talkie, and
+  // the glow of the voice at the hit line.
+  vocalNotesGl(frame, notes, t, ahead, behind, half, colors, hitX) {
+    const grp = frame.group();
+    const idle = rgbOf(colors[1]);
+    const passed = rgbOf(colors[0]);
+    for (let i = 0; i < notes.length; i++) {
+      const n = notes[i];
+      const prev = notes[i - 1];
+      const joined = n.slide && prev && !prev.talkie && prev.time <= t + ahead;
+      if (n.end < t - behind || (n.time > t + ahead && !joined)) continue;
+      const x1 = vocX(n.time);
+      const x2 = Math.max(x1 + 6, vocX(n.end));
+      if (n.talkie) {
+        const ty = VOC_TOP + 10; // a free note fills the chart area above the lyrics
+        frame.bar(grp, x1, x2, (ty + VOC_BOTTOM) / 2, (VOC_BOTTOM - ty) / 2, idle, passed, true, n.sp);
+        continue;
+      }
+      const y = vocY(n.pitch);
+      if (n.slide && prev && !prev.talkie) {
+        const lead = Math.min(10, half * 1.5); // tucks under both bars so no seam shows
+        frame.ribbon(grp, vocX(prev.end) - lead, x1 + lead, vocY(prev.pitch), y, half, idle, passed, n.sp);
+      }
+      frame.bar(grp, x1, x2, y, half, idle, passed, false, n.sp);
+    }
+    const gp = this.vocalGlowParams(notes, t, half, hitX);
+    if (gp) frame.glow(gp.y, gp.R, gp.env, gp.age, idle, gp.sp, gp.seed);
   }
 
   // Notes of a vocal part: rounded pitched bars, a ribbon joining a pitch slide to the note before it (same colour as the
@@ -2039,17 +2102,17 @@ export class Highway {
     return null;
   }
 
-  // The hit zone while the voice is at the line: a glow a little larger than the thickness of the note, on the line of the voice (it rises, falls and bends with
-  // the pitch, also along the ribbons that join the notes), in the note's colour with a lighter heart. Its size and strength vary all the time, from two
-  // shimmers of different speeds, so it looks alive but never flashes. It fades in as a note starts and, when the voice stops, stays for a moment (HOLD) and
-  // then fades out (FADE): a short gap between two notes does not make it disappear at all.
-  vocalHitGlow(notes, t, half, color, hitX) {
+  // The state of the glow of the voice at the hit line, or null when there is none: where it is on the line of the voice (it rises, falls and bends with the pitch, also along
+  // the ribbons that join the notes: it glides to the new height in about 60 ms instead of jumping, and snaps after a seek or a pause), how strong (`env`, 0..1: a very
+  // quick fade in as a note starts and, when the voice stops, it stays for a moment (VOC_GLOW_HOLD) and then fades out (VOC_GLOW_FADE): a short gap between two notes does not
+  // make it disappear at all), its radius, the seconds since the note started and whether the note is a star power one.
+  vocalGlowParams(notes, t, half, hitX) {
     let i = -1;
     for (let k = 0; k < notes.length; k++) { // the last note that has started (a few ms ahead: the fade-in begins just before)
       if (notes[k].time > t + 0.04) break;
       if (!notes[k].talkie) i = k;
     }
-    if (i < 0) return;
+    if (i < 0) return null;
     const envOf = (n) => { // 0..1: fade in over the start, 1 while sung and held, then the fade-out
       const attack = Math.max(0, Math.min(1, (t - n.time + 0.02) / 0.04)); // a very quick fade in
       const after = t - n.end;
@@ -2062,7 +2125,7 @@ export class Highway {
     const prev = prevI >= 0 ? notes[prevI] : null;
     let env = envOf(n);
     if (prev) env = Math.max(env, envOf(prev)); // the strength carries over from the previous note while the new one fades in (the position does not: it is always the latest note's)
-    if (env <= 0.004) return;
+    if (env <= 0.004) return null;
     let y = this.vocalLineY(n, prev, hitX);
     const next = notes[i + 1];
     if (next && !next.talkie && next.slide) y = this.vocalLineY(next, n, hitX) ?? y; // on the ribbon that joins a slide
@@ -2075,55 +2138,56 @@ export class Highway {
     st.t = t;
     this.vocGlowState.set(notes, st);
     y = st.y;
-    const g = this.g;
-    const v = 0.5 + 0.5 * Math.sin(t * 9 + n.time * 3) * 0.6 + 0.5 * Math.sin(t * 23 + n.time * 7) * 0.4; // 0..1, varying
     const R = Math.max(9, half * 1.7) * (0.3 + 0.7 * env); // scales in and out with the fade
-    // A glint, not a halo: a thin vertical streak of light along the hit line and a shorter horizontal one through the note, crossing in a small bright core, all in
-    // the note's colour. Each streak is a few stacked ellipses (wide and faint to narrow and strong), and their lengths shimmer.
-    // A spike has an arrowhead at each end: straight sides from the tip out to the shoulders (halfway out, the widest part) and back in to a narrow waist at
-    // the middle; a few of them stacked, wide and faint to narrow and strong.
-    const spike = (len, wid, strength, rot) => {
-      const c = Math.cos(rot);
-      const sn = Math.sin(rot);
-      const P = (u, w) => [hitX + u * c - w * sn, y + u * sn + w * c]; // a point along (u) and across (w) the spike
-      for (let q = 0; q < 4; q++) {
-        const k = 1 - q * 0.2;
-        const L = len * 0.4 * k; // 60 % shorter than before
-        const W = wid * 2.2 * k; // and thicker
-        g.globalAlpha = 0.7 * strength * env * (0.1 + q * 0.09); // 30 % more transparent
-        g.beginPath();
-        let first = true;
-        for (const [u, w] of [[L, 0], [L * 0.5, W], [L * 0.12, W * 0.16], [-L * 0.12, W * 0.16], [-L * 0.5, W], [-L, 0], [-L * 0.5, -W], [-L * 0.12, -W * 0.16], [L * 0.12, -W * 0.16], [L * 0.5, -W]]) {
-          const p = P(u, w);
-          if (first) { g.moveTo(p[0], p[1]); first = false; } else g.lineTo(p[0], p[1]);
-        }
-        g.closePath();
-        g.fill();
-      }
-    };
+    return { y, R, env, age: t - n.time, sp: !!n.sp, seed: n.time % 97 };
+  }
+
+  // The hit area while the voice is at the line (2D drawing; the board draws the same in vocals-gl.js). Calm, never a flash: a soft halo and a warm core on the line of the voice,
+  // a ring that blooms outwards when a note starts, and a few embers that drift up and back from the hit; gold for a star power note.
+  vocalHitGlow(notes, t, half, color, hitX) {
+    const p = this.vocalGlowParams(notes, t, half, hitX);
+    if (!p) return;
+    const g = this.g;
+    const tone = p.sp ? VOCAL_SP_GOLD : color;
+    const hot = tintWhite(tone, 0.55);
     g.save();
-    g.fillStyle = '#ffffff'; // white, with transparency (the note's colour is not used)
-    // Three crosses, each turned differently and each with its own rotation speed: the upright one (it only rocks), one at 45 degrees and one at 22.5 degrees that
-    // keeps turning; lengths wander too (slow sines of different speeds and phases), so the glint turns and breathes and is never the same twice.
-    const wob = (f, ph) => Math.sin(t * f + n.time * 5 + ph);
-    const rotA = 0.1 * wob(4.3, 1);
-    const rotB = Math.PI / 4 + 0.25 * wob(2.6, 5);
-    const rotC = Math.PI / 8 + t * 0.7 + 0.2 * wob(3.4, 9);
-    spike(R * (3.2 + 0.8 * wob(7, 0)), R * 0.5, 1, rotA + Math.PI / 2); // up and down the line
-    spike(R * (2.4 + 0.6 * wob(5.1, 2)), R * 0.38, 0.9, rotA); // sideways through the note
-    spike(R * (2.5 + 0.7 * wob(6.2, 4)), R * 0.4, 0.7, rotB);
-    spike(R * (2.5 + 0.7 * wob(5.6, 6)), R * 0.4, 0.7, rotB + Math.PI / 2);
-    spike(R * (2.0 + 0.6 * wob(6.8, 8)), R * 0.32, 0.55, rotC); // the third cross: shorter, fainter, always turning
-    spike(R * (2.0 + 0.6 * wob(5.9, 10)), R * 0.32, 0.55, rotC + Math.PI / 2);
-    g.globalAlpha = 0.7 * (0.35 + 0.2 * v) * env; // the core
-    g.beginPath();
-    g.arc(hitX, y, R * 0.55, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = '#ffffff';
-    g.globalAlpha = 0.7 * (0.55 + 0.25 * v) * env;
-    g.beginPath();
-    g.arc(hitX, y, R * 0.28, 0, Math.PI * 2);
-    g.fill();
+    g.globalCompositeOperation = 'lighter';
+    const disc = (r, stops) => {
+      const gr = g.createRadialGradient(hitX, p.y, 0, hitX, p.y, r);
+      for (const [pos, c, a] of stops) gr.addColorStop(pos, withAlpha(c, a));
+      g.fillStyle = gr;
+      g.beginPath();
+      g.arc(hitX, p.y, r, 0, Math.PI * 2);
+      g.fill();
+    };
+    disc(p.R * 2.7, [[0, tone, 0.4 * p.env], [0.5, tone, 0.16 * p.env], [1, tone, 0]]);
+    disc(p.R * 1.1, [[0, hot, 0.7 * p.env], [1, hot, 0]]);
+    const lg = g.createLinearGradient(0, p.y - p.R * 3.3, 0, p.y + p.R * 3.3); // the stretch of the hit line that lights up
+    lg.addColorStop(0, withAlpha(hot, 0));
+    lg.addColorStop(0.5, withAlpha(hot, 0.55 * p.env));
+    lg.addColorStop(1, withAlpha(hot, 0));
+    g.fillStyle = lg;
+    g.fillRect(hitX - 2, p.y - p.R * 3.3, 3, p.R * 6.6);
+    const ra = Math.min(1, p.age / 0.6);
+    if (ra < 1) { // the ring that blooms when a note starts
+      g.beginPath();
+      g.arc(hitX, p.y, p.R * (0.7 + 3 * (1 - (1 - ra) * (1 - ra))), 0, Math.PI * 2);
+      g.lineWidth = 3.2 * (1 - ra) + 0.9;
+      g.strokeStyle = withAlpha(tone, 0.8 * (1 - ra) * Math.min(1, p.env * 3));
+      g.stroke();
+    }
+    const hsh = (a, b) => { const v = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return v - Math.floor(v); };
+    g.fillStyle = hot;
+    for (let k = 0; k < 8; k++) { // embers
+      const h1 = hsh(k, p.seed * 3.7), h2 = hsh(k * 2.3, p.seed * 1.3);
+      const ph = (t * (0.3 + 0.22 * h1) + h2) % 1;
+      const x = hitX - ph * p.R * (2.6 + 3.6 * h1);
+      const y = p.y - ph * p.R * (0.6 + 2.2 * h2) + Math.sin(ph * 6.2832 * (1 + h1) + k) * p.R * 0.25;
+      g.globalAlpha = 0.8 * p.env * (1 - ph) * (1 - ph) * Math.min(1, ph / 0.12);
+      g.beginPath();
+      g.arc(x, y, Math.max(1, p.R * (0.17 + 0.12 * h2) * (1 - 0.7 * ph)), 0, Math.PI * 2);
+      g.fill();
+    }
     g.restore();
   }
 

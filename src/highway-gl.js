@@ -15,6 +15,7 @@
 // What it does not draw (the 2D code does, or the pane falls back to it, see glUnsupported): other note styles, hit animations and tail styles, the loop / replay dimming;
 // the countdown, lyrics and vocals are overlays or other panes. Motion blur: begin(..., i) / end() average the samples (see begin).
 import { projection3D } from './highway3d.js';
+import { GLVocals } from './vocals-gl.js';
 import {
   drawYNote, drawCymbalFace, YNOTE_SIDE_3D, NOTE_RECT_W, NOTE_RECT_H, NOTE_PALETTE, noteColor, withAlpha, spansOfKind, breAlpha, ynoteVersion,
   HIT_Y, HIT_FLASH_SEC, FILL_ACTIVATION, BAR_FLASH_SEC, BAND_BORDERS, FILL_COLORS, FILL_BORDER, FILL_BORDER_LANES, FILL_STRONG, ROLL_LEAD_SEC, ROLL_COLUMN_ALPHA, HIT_LINE_BORDER_SOFT, TAPER_GAIN, NOTE_TRI_W, NOTE_TRI_H, NOTE_TRI_ROUND, NOTE_RECT_ROUND,
@@ -1020,6 +1021,8 @@ export class GLBoard {
     const drums = !!chart.drumKind;
     const barColor = drums ? (chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick) : NOTE_PALETTE.open;
     const laneColor = (l) => colors[Math.min(Math.max(l, 0), colors.length - 1)];
+    const cymColor = (n) => (n.cymbal && colors === NOTE_PALETTE.drums4 && NOTE_PALETTE.cymbals4 ? NOTE_PALETTE.cymbals4[n.lane] ?? laneColor(n.lane) : laneColor(n.lane)); // (the tint of a 4-lane Pro cymbal)
+    const dkColor = chart.drumKind === 'five' ? NOTE_PALETTE.doubleKick5 : NOTE_PALETTE.doubleKick; // (a double kick's own colour)
     const spans = sortedBy(chart.starPower || [], 'start');
     let si = 0;
     const src = [...chart.notes].sort((a, b) => a.time - b.time);
@@ -1035,19 +1038,19 @@ export class GLBoard {
       const bar = n.open || n.lane < 0;
       const dk = bar && n.doubleKick ? 2 : 1;
       let uv;
-      if (bar) uv = this.cellFor('bar', barColor, false);
-      else if (drums) uv = this.cellFor(n.cymbal ? (n.accent ? 'ca' : n.ghost ? 'cg' : 'c') : n.accent ? 'a' : n.ghost ? 'g' : 'n', laneColor(n.lane), sp[i]);
+      if (bar) uv = this.cellFor('bar', n.doubleKick && !n.open ? dkColor : barColor, false);
+      else if (drums) uv = this.cellFor(n.cymbal ? (n.accent ? 'ca' : n.ghost ? 'cg' : 'c') : n.accent ? 'a' : n.ghost ? 'g' : 'n', cymColor(n), sp[i]);
       else uv = this.cellFor(n.tap ? 't' : n.hopo ? 'h' : 'n', laneColor(n.lane), sp[i]);
       times.push(n.time);
       lanesOf.push(bar ? -1 : n.lane);
       for (let j = 0; j < dk; j++) (bar ? instBars : inst).push([n.time, bar ? lanes / 2 - 0.5 : n.lane, uv[0], uv[1], uv[2], uv[3], 1, 1, n.length > 0 && !bar ? n.length : 0, bar ? 1 : 0, lanes, bar ? j * 1.3 : (n.cymbal ? 1 : 0)]);
       if (chart.ghost) { // (the disabled notes of a replay: drawn dim, no activation mark, no hit effects)
-        if (!bar) { const rgb = hexRgb(noteColor({ lane: n.lane, sp: sp[i] }, colors)); (solids[n.cymbal ? (n.accent ? 'ca' : n.ghost ? 'cg' : 'c') : n.tap ? 't' : n.hopo ? 'h' : n.accent ? 'a' : n.ghost ? 'g' : 'n'] ??= []).push({ time: n.time, row: [n.time, n.lane, n.length > 0 ? n.length : 0, 0, ...rgb, sp[i] ? 1 : 0] }); if (n.length > 0) tails.push({ t0: n.time, t1: n.time + n.length, lane: n.lane, rgb }); }
+        if (!bar) { const rgb = hexRgb(noteColor({ lane: n.lane, sp: sp[i], cymbal: n.cymbal }, colors)); (solids[n.cymbal ? (n.accent ? 'ca' : n.ghost ? 'cg' : 'c') : n.tap ? 't' : n.hopo ? 'h' : n.accent ? 'a' : n.ghost ? 'g' : 'n'] ??= []).push({ time: n.time, row: [n.time, n.lane, n.length > 0 ? n.length : 0, 0, ...rgb, sp[i] ? 1 : 0] }); if (n.length > 0) tails.push({ t0: n.time, t1: n.time + n.length, lane: n.lane, rgb }); }
         return;
       }
       if (n.activation) acts.push(n.time, bar ? -1 : n.lane, n.cymbal ? 1 : 0, bar ? 1 : 0);
-      if (bar) { barHits.push(n.time, 0, 0, 0, ...hexRgb(barColor), n.time); return; }
-      const rgb = hexRgb(noteColor({ lane: n.lane, sp: sp[i] }, colors)); // (a star power note's tail and burst take its tinted colour)
+      if (bar) { barHits.push(n.time, 0, 0, 0, ...hexRgb(n.doubleKick && !n.open ? dkColor : barColor), n.time); return; }
+      const rgb = hexRgb(noteColor({ lane: n.lane, sp: sp[i], cymbal: n.cymbal }, colors)); // (a star power note's tail and burst take its tinted colour)
       const cym = n.cymbal ? 1 : 0;
       (solids[cym ? (n.accent ? 'ca' : n.ghost ? 'cg' : 'c') : n.tap ? 't' : n.hopo ? 'h' : n.accent ? 'a' : n.ghost ? 'g' : 'n'] ??= []).push({ time: n.time, row: [n.time, n.lane, n.length > 0 ? n.length : 0, 0, ...rgb, sp[i] ? 1 : 0] });
       if (n.length > 0) { tails.push({ t0: n.time, t1: n.time + n.length, lane: n.lane, rgb }); helds.push(n.time, n.lane, n.time + n.length, cym, ...rgb, 1); }
@@ -1294,6 +1297,20 @@ export class GLBoard {
     for (let l = 0; l < 8; l++) pf[l] = f[l]; // (the pads: the lane's own flash; the bar's goes in on its own)
     for (let l = 0; l < 8; l++) f[l] = Math.max(f[l], bar);
     return bar;
+  }
+
+  // Draws a vocal frame (vocals-gl.js VocalFrame) into the pane's rect: the notes, the percussion, the beat lines and the glow of the voice. False when it cannot (the page then
+  // draws them in 2D).
+  drawVocals(rect, frame) {
+    if (this.lost || this.vocalsFailed || !(rect.w >= 1 && rect.h >= 1)) return false;
+    try {
+      (this.vocals ??= new GLVocals(this.gl)).draw(rect, frame, this.dpr, this.H);
+      return true;
+    } catch (err) {
+      console.warn('WebGL vocals:', err);
+      this.vocalsFailed = true;
+      return false;
+    }
   }
 
   // Draws one lane pane. rect: { x, y, w, h } in CSS px of the stage (y from the top). opts: the highway's settings for this pane (neck, perspective, curve, noteSize,

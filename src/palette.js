@@ -7,8 +7,12 @@ const YARG_LANES = ['#79d304', '#ff1d23', '#ffe900', '#00bfff', '#ff8400']; // g
 // Extended Pro drums (chart.js EXTENDED_DRUM_LANES): red, yellow tom, yellow cymbal, blue tom, blue cymbal, green tom, green cymbal.
 const YARG_EXTENDED = ['#ff1d23', '#ffe900', '#ffd010', '#00bfff', '#2090ff', '#79d304', '#a0d010'];
 
+// The cymbal NOTES of the 4-lane Pro kit have their own tints (ColorProfile.FourLaneDrums: DefaultRedCymbal ... DefaultGreenCymbal), in the order of drums4 (red, yellow, blue, green);
+// a double kick has its own colour too (4 lanes: DefaultPurple, 5 lanes: DefaultSilver, a dark grey).
+const YARG_CYMBALS = ['#f02040', '#ffd010', '#2090ff', '#a0d010'];
+
 export const PALETTES = [
-  { id: 'yarg', label: 'YARG (default)', lanes: YARG_LANES, kick: '#ff8400', kick5: '#c800ff', open: '#c800ff', tap: '#b25cff', extended: YARG_EXTENDED },
+  { id: 'yarg', label: 'YARG (default)', lanes: YARG_LANES, kick: '#ff8400', kick5: '#c800ff', open: '#c800ff', tap: '#b25cff', extended: YARG_EXTENDED, cymbals: YARG_CYMBALS, doubleKick: '#c800ff', doubleKick5: '#202020' },
   // After Okabe & Ito's colour-blind safe set, tuned so the five lanes stay apart under deuteranopia, protanopia and tritanopia
   // (test/palette.test.js simulates them) while keeping the green / red / yellow / blue / orange order of the frets.
   { id: 'colorblind', label: 'Colour-blind safe', lanes: ['#00c08b', '#c43c3c', '#ffe600', '#3a6fe8', '#d98a00'], kick: '#d98a00', kick5: '#cc79a7', open: '#cc79a7', tap: '#e5a8d0' },
@@ -43,6 +47,8 @@ export function resolvePalette(id, custom) {
   const [g, r, y, b, o] = p.lanes;
   return {
     lanes: [...p.lanes], kick: p.kick, kick5: p.kick5, open: p.open, tap: p.tap,
+    doubleKick: p.doubleKick ?? p.kick, doubleKick5: p.doubleKick5 ?? p.kick5, // (the presets other than YARG's keep the kick's colour for a double kick)
+    cymbals4: p.cymbals ? [...p.cymbals] : null, // (the tints of the 4-lane Pro cymbals; null: they take their tom's colour)
     drums4: [r, y, b, g],
     drums5: [r, y, b, o, g],
     extended: p.extended ? [...p.extended] : [r, y, mix(y, '#ffffff', 0.3), b, mix(b, '#ffffff', 0.3), g, mix(g, '#ffffff', 0.3)], // a cymbal is its tom's colour, lighter
@@ -54,5 +60,6 @@ export const NOTE_PALETTE = resolvePalette('yarg');
 
 export function applyPalette(resolved) {
   for (const k of ['lanes', 'drums4', 'drums5', 'extended']) NOTE_PALETTE[k].splice(0, NOTE_PALETTE[k].length, ...resolved[k]);
-  for (const k of ['kick', 'kick5', 'open', 'tap']) NOTE_PALETTE[k] = resolved[k];
+  for (const k of ['kick', 'kick5', 'open', 'tap', 'doubleKick', 'doubleKick5']) NOTE_PALETTE[k] = resolved[k];
+  NOTE_PALETTE.cymbals4 = resolved.cymbals4;
 }

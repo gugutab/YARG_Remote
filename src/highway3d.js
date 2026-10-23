@@ -3,7 +3,7 @@
 // vocals keep the flat view. Like the 2D view, drawing is a pure function of the playback time.
 import {
   NOTE_PALETTE, breAlpha, HELD_SCALE, drawYNote, YNOTE_SIDE_3D, TAPER_GAIN, drawCymbalFace, sprite3D, noteSpritePx, NOTE_RECT_W, NOTE_RECT_H, NOTE_TRI_W, NOTE_TRI_H, STAR_POWER_GOLD, ACCENT_OUTLINE_WIDTH,
-  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, setDesaturated, isDesaturated, dcol, desaturate, exitTime, heldAmount, litFrom, noteDisabled, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, ROLL_COLUMN_ALPHA, ROLL_LEAD_SEC, HIT_LINE_COLOR, HIT_LINE_BORDER, HIT_LINE_BORDER_SOFT, drawHitBurst, drawBarBurst, BURST_SEC, BAR_BURST_SEC, BURST_LOOP_SEC, BURST_VANISH_SEC, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
+  ACCENT_OUTLINE_DARKEN, GHOST_ALPHA, setDesaturated, isDesaturated, dcol, desaturate, exitTime, heldAmount, litFrom, noteDisabled, noteLaneColor, kickBarColor, fillHalo, haloProfile, tailShimmer, HIT_FLASH_SEC, BAR_FLASH_SEC, PAD_FILL_ALPHA, PAD_RING_ALPHA, noteShape, heldPulse, ROLL_COLORS, FILL_COLORS, FILL_STRONG, FILL_BORDER, FILL_BORDER_LANES, BAND_BORDERS, ROLL_COLUMN_ALPHA, ROLL_LEAD_SEC, HIT_LINE_COLOR, HIT_LINE_BORDER, HIT_LINE_BORDER_SOFT, drawHitBurst, drawBarBurst, BURST_SEC, BAR_BURST_SEC, BURST_LOOP_SEC, BURST_VANISH_SEC, FILL_EDGE, FILL_ACTIVATION, drawActivationMark, FADE_SEC, firstVisibleIndex, spansOfKind, tintWhite, darken, withAlpha, noteScale, noteColor, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, fadeGradient, boardBase,
   laneLookFactor, HIT_Y, HOPO_SCALE
 } from './gfx.js';
 
@@ -504,7 +504,7 @@ function drawHead3D(g, x, y, rx, ry, vy, n, colors, body, lw, disc, headStyle) {
   } else {
     g.beginPath();
     noteShape(g, x, y + th, rx, ry, headStyle, y + th - vy);
-    g.fillStyle = darken(n.tap && !n.sp ? NOTE_PALETTE.tap : colors[n.lane], 0.45); // the edge keeps the plain lane colour (no star power overlay)
+    g.fillStyle = darken(n.tap && !n.sp ? NOTE_PALETTE.tap : noteLaneColor(n, colors), 0.45); // the edge keeps the plain lane colour (no star power overlay)
     g.fill();
   }
   g.beginPath();
@@ -512,11 +512,11 @@ function drawHead3D(g, x, y, rx, ry, vy, n, colors, body, lw, disc, headStyle) {
   g.fillStyle = body;
   g.fill();
   if (disc) { // (a disc has no outline: after drawCymbalFace the current path is the cone's, so a stroke here ringed the cone; the accent has its white ring)
-    drawCymbalFace(g, x, y, rx, ry, n, colors[n.lane]);
+    drawCymbalFace(g, x, y, rx, ry, n, noteLaneColor(n, colors));
     return;
   }
   g.lineWidth = lw;
-  g.strokeStyle = n.accent ? darken(colors[n.lane], ACCENT_OUTLINE_DARKEN) : 'rgba(0,0,0,0.5)';
+  g.strokeStyle = n.accent ? darken(noteLaneColor(n, colors), ACCENT_OUTLINE_DARKEN) : 'rgba(0,0,0,0.5)';
   g.stroke();
 }
 
@@ -679,7 +679,7 @@ export function renderLanes3D(hw, t, w, h) {
     const kx = Math.max(0, past) / barFade;
     const e = easeOut(kx);
     const d = depth(n.time);
-    const base = n.open ? NOTE_PALETTE.open : chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick;
+    const base = kickBarColor(n, chart); // (a double kick has its own colour)
     const far = Math.min(1, (1 - d) / FADE_IN);
     const alpha = far * (1 - e * e); // stays solid for a moment, then drops
     const thick = barDepth * (1 - 0.55 * e); // the bar thins as it is "consumed"
@@ -808,13 +808,13 @@ export function renderLanes3D(hw, t, w, h) {
     }
     const faced = !n.cymbal && hw.noteStyle === 'rect'; // a note in the rectangular style: YARG's chrome caps and coloured band
     const disc = n.cymbal && hw.noteStyle === 'rect'; // ...and a cymbal is a chrome disc with a coloured cone
-    const body = tintWhite(n.sp ? noteColor(n, colors) : n.tap && !faced ? NOTE_PALETTE.tap : colors[n.lane], Math.min(1, kx + amt * (0.32 + 0.12 * shimmer))); // an active long note's head is lighter, like its tail
+    const body = tintWhite(n.sp ? noteColor(n, colors) : n.tap && !faced ? NOTE_PALETTE.tap : noteLaneColor(n, colors), Math.min(1, kx + amt * (0.32 + 0.12 * shimmer))); // an active long note's head is lighter, like its tail
     g.globalAlpha = (1 - kx) * hw.noteAlpha(n) * Math.min(1, (1 - d) / FADE_IN);
     if (faced) { // the rectangular style: the vector note after the design, with its base in perspective (no separate thickness edge)
       const hopoLike = n.hopo || n.tap; // (a tap is drawn like a HOPO, with black strips instead of white ones)
       const fw = RECT_SCALE * (hopoLike ? RECT_HOPO_W : 1) * (n.tap ? HOPO_SCALE : 1), fh = RECT_SCALE * (hopoLike ? RECT_HOPO_H : RECT_H) * (n.tap ? HOPO_SCALE : 1);
       const nhw = rx * NOTE_RECT_W * fw, nhh = ry * NOTE_RECT_H * fh;
-      drawYNote(g, x, y, nhw, nhh, n, colors[n.lane], body, TAPER_GAIN / (y - vy), YNOTE_SIDE_3D * hw.noteBase, kx === 0 && amt === 0); // (a held or exiting note changes tint and size every frame: drawn directly)
+      drawYNote(g, x, y, nhw, nhh, n, noteLaneColor(n, colors), body, TAPER_GAIN / (y - vy), YNOTE_SIDE_3D * hw.noteBase, kx === 0 && amt === 0); // (a held or exiting note changes tint and size every frame: drawn directly)
       if (n.activation && hw.fillActivation) drawActivationMark(g, x, y, rx * NOTE_RECT_W * fw, ry * NOTE_RECT_H * fh, p, t);
       continue;
     }
@@ -822,7 +822,7 @@ export function renderLanes3D(hw, t, w, h) {
     if (disc) { // a steady cymbal disc comes from a cached picture, scaled (see sprite3D); a held or exiting one changes every frame: drawn directly
       const dist = y - vy;
       if (!(kx === 0 && amt === 0 && g.filter === 'none' && g.globalCompositeOperation === 'source-over'
-        && sprite3D(g, x, y, rx, noteSpritePx(), `disc|${body}|${colors[n.lane]}|${n.sp ? 1 : 0}${n.accent ? 1 : 0}${n.ghost ? 1 : 0}|${Math.round((lw * 100) / rx)}|${Math.round((dist * 100) / rx)}`,
+        && sprite3D(g, x, y, rx, noteSpritePx(), `disc|${body}|${noteLaneColor(n, colors)}|${n.sp ? 1 : 0}${n.accent ? 1 : 0}${n.ghost ? 1 : 0}|${Math.round((lw * 100) / rx)}|${Math.round((dist * 100) / rx)}`,
           1.08 + (TAPER_GAIN * 0.9 * rx) / dist + lw / rx, 1.12 + lw / rx, (sg) => drawHead3D(sg, 0, 0, rx, ry, -dist, n, colors, body, lw, true, 'round')))) {
         drawHead3D(g, x, y, rx, ry, vy, n, colors, body, lw, true, 'round');
       }
@@ -833,7 +833,7 @@ export function renderLanes3D(hw, t, w, h) {
       const dist = y - vy;
       const dot = n.hopo && g.globalAlpha === 1; // (while the note fades in, its dot is drawn over the faded picture, as before: in the picture it would fade as one piece with the face and turn grey)
       if (kx === 0 && amt === 0 && g.filter === 'none' && g.globalCompositeOperation === 'source-over'
-        && sprite3D(g, x, y, rx, noteSpritePx(), `head|${style}|${body}|${colors[n.lane]}|${n.tap && !n.sp ? 1 : 0}${n.accent ? 1 : 0}${dot ? 1 : 0}|${Math.round((lw * 100) / rx)}|${Math.round((dist * 100) / rx)}`,
+        && sprite3D(g, x, y, rx, noteSpritePx(), `head|${style}|${body}|${noteLaneColor(n, colors)}|${n.tap && !n.sp ? 1 : 0}${n.accent ? 1 : 0}${dot ? 1 : 0}|${Math.round((lw * 100) / rx)}|${Math.round((dist * 100) / rx)}`,
           headExtentX(style, rx, dist, lw), headExtentY(style, rx, lw), (sg) => { drawHead3D(sg, 0, 0, rx, ry, -dist, n, colors, body, lw, false, style); if (dot) hopoDot(sg, 0, 0, rx, ry, hw.noteStyle, dist, 0); })) {
         if (n.hopo && !dot) hopoDot(g, x, y, rx, ry, hw.noteStyle, dist, 0);
         if (n.activation && hw.fillActivation) drawActivationMark(g, x, y, rx, ry, p, t);

@@ -101,3 +101,25 @@ test('palette: the colour-blind preset keeps every pair of lanes apart under deu
   // the lanes stay readable on the dark track: no lane darker than L* 45
   for (const c of lanes) assert.ok(lab(linearRgb(c))[0] >= 45, `${c} is too dark for the track`);
 });
+
+test('noteLaneColor / kickBarColor: the 4-lane Pro cymbals have YARG\'s tints, a double kick its own colour', async () => {
+  const { noteLaneColor, kickBarColor } = await import('../src/gfx.js');
+  const four = NOTE_PALETTE.drums4;
+  assert.equal(noteLaneColor({ lane: 1 }, four), '#ffe900'); // a tom keeps the lane's colour
+  assert.equal(noteLaneColor({ lane: 1, cymbal: true }, four), '#ffd010');
+  assert.equal(noteLaneColor({ lane: 2, cymbal: true }, four), '#2090ff');
+  assert.equal(noteLaneColor({ lane: 3, cymbal: true }, four), '#a0d010');
+  assert.equal(noteLaneColor({ lane: 1, cymbal: true }, NOTE_PALETTE.drums5), '#ffe900'); // (5 lanes and the guitar: the lane colour)
+  assert.equal(kickBarColor({ lane: -1 }, { drumKind: 'pro' }), '#ff8400');
+  assert.equal(kickBarColor({ lane: -1, doubleKick: true }, { drumKind: 'pro' }), '#c800ff');
+  assert.equal(kickBarColor({ lane: -1 }, { drumKind: 'five' }), '#c800ff');
+  assert.equal(kickBarColor({ lane: -1, doubleKick: true }, { drumKind: 'five' }), '#202020');
+  assert.equal(kickBarColor({ lane: -1, open: true }, { drumKind: 'pro' }), NOTE_PALETTE.open);
+  try { // a preset without the tints keeps the tom colours
+    applyPalette(resolvePalette('colorblind'));
+    assert.equal(noteLaneColor({ lane: 1, cymbal: true }, four), four[1]);
+    assert.equal(kickBarColor({ lane: -1, doubleKick: true }, { drumKind: 'pro' }), NOTE_PALETTE.kick);
+  } finally {
+    applyPalette(resolvePalette('yarg'));
+  }
+});

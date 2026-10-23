@@ -368,8 +368,9 @@ export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
     return list;
   };
   markStarPower(lyrics); markStarPower(lyrics1); markStarPower(lyrics2);
+  const inStarPower = (time) => spRanges.some((r) => time >= r.start - 1e-6 && time < r.end - 1e-6); // (the notes of those phrases: a gold outline in the views)
 
-  const shape = (wrapped) => wrapped.filter((n) => !n.perc).map((n) => ({ ...timed(n), pitch: n.pitch, slide: n.slide, talkie: n.talkie }));
+  const shape = (wrapped) => wrapped.filter((n) => !n.perc).map((n) => { const tm = timed(n); return { ...tm, pitch: n.pitch, slide: n.slide, talkie: n.talkie, sp: spRanges.length > 0 && inStarPower(tm.time) }; });
   const pitched = [notes1, ...walkedExtra.map((e) => e.notes)].flat().filter((n) => !n.perc && !n.talkie);
   const anyPhrases = walked1.length > 0 || walkedExtra.some((e) => e.walked.length > 0);
   return {
