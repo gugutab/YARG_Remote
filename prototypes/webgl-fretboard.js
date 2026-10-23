@@ -9,7 +9,7 @@
 // out, a background visualizer (?viz=rings|aurora|warp), a benchmark (?bench=6) and a song picker. The drawing itself lives in src/highway-gl.js.
 import { parseMidi } from '../src/midi.js';
 import { buildChart, instrumentOptions, DIFFICULTIES } from '../src/chart.js';
-import { GLBoard, METAL_STYLES, GLASS_STYLES } from '../src/highway-gl.js';
+import { GLBoard, METAL_STYLES, GLASS_STYLES, CYMBAL_STYLES } from '../src/highway-gl.js';
 import { NOTE_PALETTE, laneLookFactor } from '../src/gfx.js';
 import { createDriver } from '../src/visualizers.js';
 import { PORTS } from '../src/visualizers-gl.js';
@@ -113,7 +113,8 @@ $('glass').innerHTML = GLASS_STYLES.map((n, i) => `<option value="${i}">${i}: ${
 if (params.get('metal')) $('metal').value = params.get('metal');
 $('metal').value = params.get('metal') ?? '0'; // (the notes: satin stainless steel and candy gel by default; ?metal=3 is the satin gold)
 $('glass').value = params.get('glass') ?? '4';
-if (params.get('cymbal')) $('cymbal').value = params.get('cymbal');
+$('cymbal').innerHTML = CYMBAL_STYLES.map((n, i) => `<option value="${i}">${i}: ${n}</option>`).join('');
+$('cymbal').value = params.get('cymbal') ?? '1';
 if (params.get('side')) $('side').value = params.get('side');
 
 function render(t) {

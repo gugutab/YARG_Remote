@@ -23,8 +23,9 @@ import {
 const CYMBAL_HEIGHT = 0.9; // the height of a cymbal model as a fraction of a rectangular note's (setMeshes)
 const RECT_SCALE = 1.15; // the rectangular notes and the pads under them are this much larger than the other heads (highway3d.js)
 // The material styles of the YARG models, chosen with fx.metal and fx.glass (the indices): the metal parts (the frame, the caps, the cymbal's rim) and the glass (the lit middle).
-export const METAL_STYLES = ['Satin stainless', 'Polished chrome', 'Brushed steel', 'Satin gold', 'Polished gold', 'Champagne', 'Rose gold', 'Copper', 'Gunmetal', 'Black chrome'];
-export const GLASS_STYLES = ['Lamp', 'Neon tube', 'Frosted', 'Crystal', 'Candy gel', 'Ember'];
+export const METAL_STYLES = ['Satin stainless', 'Polished chrome', 'Brushed steel', 'Satin gold', 'Polished gold', 'Champagne', 'Rose gold', 'Copper', 'Gunmetal', 'Black chrome', 'Titanium', 'Nickel', 'Pewter', 'Bronze', 'Platinum', 'Anodized (lane colour)'];
+export const GLASS_STYLES = ['Lamp', 'Neon tube', 'Frosted', 'Crystal', 'Candy gel', 'Ember', 'Jelly', 'Acrylic', 'Gemstone', 'Stained glass', 'Iridescent', 'Pearl'];
+export const CYMBAL_STYLES = ['Same glass as the notes', 'Reflective metal', 'Brass', 'Chrome mirror', 'Hammered', 'Anodized', 'Pearl metal']; // (fx.cymbal: the coloured top of a cymbal)
 const HEAD_R = 0.36; // note head radius in lane widths (highway3d.js)
 const ROAD_NEAR = -0.14; // the road starts below the pads
 const BAR_DEPTH = 0.0058; // pedal / open bar thickness along the road, in depth units
@@ -457,7 +458,13 @@ void metalStyle(float k, out vec3 tint, out float refl, out float spec, out floa
   else if (k < 6.5) { tint = vec3(0.94, 0.62, 0.54); refl = 0.45; spec = 0.4; sexp = 20.0; brush = 0.05; lift = 0.5; }
   else if (k < 7.5) { tint = vec3(0.90, 0.48, 0.30); refl = 0.45; spec = 0.4; sexp = 20.0; brush = 0.12; lift = 0.4; }
   else if (k < 8.5) { tint = vec3(0.36, 0.38, 0.43); refl = 0.40; spec = 0.5; sexp = 24.0; brush = 0.15; lift = 0.3; }
-  else { tint = vec3(0.12, 0.12, 0.14); refl = 0.90; spec = 1.0; sexp = 60.0; brush = 0.0; lift = 0.2; }
+  else if (k < 9.5) { tint = vec3(0.12, 0.12, 0.14); refl = 0.90; spec = 1.0; sexp = 60.0; brush = 0.0; lift = 0.2; }
+  else if (k < 10.5) { tint = vec3(0.62, 0.66, 0.72); refl = 0.35; spec = 0.3; sexp = 16.0; brush = 0.2; lift = 0.4; }
+  else if (k < 11.5) { tint = vec3(0.78, 0.78, 0.76); refl = 0.40; spec = 0.45; sexp = 22.0; brush = 0.08; lift = 0.45; }
+  else if (k < 12.5) { tint = vec3(0.55, 0.56, 0.58); refl = 0.20; spec = 0.2; sexp = 8.0; brush = 0.1; lift = 0.35; }
+  else if (k < 13.5) { tint = vec3(0.78, 0.56, 0.30); refl = 0.35; spec = 0.35; sexp = 14.0; brush = 0.1; lift = 0.4; }
+  else if (k < 14.5) { tint = vec3(0.88, 0.90, 0.92); refl = 0.60; spec = 0.7; sexp = 30.0; brush = 0.03; lift = 0.55; }
+  else { tint = vec3(0.80, 0.80, 0.80); refl = 0.30; spec = 0.3; sexp = 12.0; brush = 0.25; lift = 0.45; } // (anodized: the lane's colour is mixed in where it is used)
 }
 float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hash2(i), hash2(i + vec2(1.0, 0.0)), f.x), mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), f.x), f.y); }
 void main() {
@@ -507,6 +514,7 @@ void main() {
     float aniso = pow(sqrt(max(1.0 - pow(dot(Tb, H), 2.0), 0.0)), 14.0) * max(dot(N, L) * 0.7 + 0.3, 0.0);
     vec3 tint; float refl, spec, sexp, brush, lift;
     metalStyle(u_mmetal, tint, refl, spec, sexp, brush, lift);
+    if (u_mmetal > 14.5) tint = mix(tint, v_lane * 1.15, 0.7); // (anodized aluminium: tinted by the lane)
     float baked = mix(g, 1.0, lift);
     vec3 Rm = reflect(-Vc, N);
     float sky = smoothstep(-0.3, 0.8, Rm.z);
@@ -528,12 +536,17 @@ void main() {
       float lathe = 0.6 * vnoise(vec2(r * 55.0, ang * 1.5)) + 0.4 * vnoise(vec2(r * 140.0, ang * 3.0));
       vec3 Tc = normalize(vec3(-v_mp.y, -v_mp.x, 0.0) + vec3(0.0001)); // (the direction of the grooves, round the cymbal, in the world)
       float an = pow(sqrt(max(1.0 - pow(dot(Tc, H), 2.0), 0.0)), 22.0) * max(dot(N, L) * 0.7 + 0.3, 0.0);
-      vec3 tint = mix(v_lane, vec3(1.0), 0.18);
-      vec3 Rm = reflect(-Vc, N); float sky = smoothstep(-0.2, 0.9, Rm.z);
+      float cs = u_mcymst; // 1 reflective metal, 2 brass, 3 chrome mirror, 4 hammered, 5 anodized, 6 pearl metal
+      vec3 Nm = N;
+      if (cs > 3.5 && cs < 4.5) { vec2 hp = v_mp.xy * 9.0; Nm = normalize(N + 0.45 * vec3(vnoise(hp) - 0.5, vnoise(hp + 7.3) - 0.5, 0.0)); } // (hammered: dimples bend the normal)
+      vec3 tint = cs < 1.5 ? mix(v_lane, vec3(1.0), 0.18) : cs < 2.5 ? mix(v_lane, vec3(0.95, 0.78, 0.38), 0.5) : cs < 3.5 ? mix(vec3(1.0), v_lane, 0.45) : cs < 4.5 ? mix(v_lane, vec3(1.0), 0.18) : cs < 5.5 ? v_lane * 1.05 : mix(v_lane, vec3(1.0), 0.45);
+      if (cs > 5.5) tint = mix(tint, 0.5 + 0.5 * cos(6.2831853 * (face * 1.3 + vec3(0.0, 0.33, 0.67))), 0.35); // (pearl: the hue turns with the angle)
+      float reflMix = cs < 1.5 ? 0.55 : cs < 2.5 ? 0.5 : cs < 3.5 ? 0.8 : cs < 4.5 ? 0.55 : cs < 5.5 ? 0.25 : 0.5;
+      vec3 Rm = reflect(-Vc, Nm); float sky = smoothstep(-0.2, 0.9, Rm.z);
       vec3 env = mix(vec3(0.06, 0.07, 0.10), vec3(1.0), pow(sky, 1.4)) + vec3(0.8) * pow(max(dot(Rm, normalize(L + vec3(0.0, 0.0, 0.3))), 0.0), 16.0);
-      vec3 body = tint * (0.35 + 0.65 * (0.5 + 0.5 * lam)) * (0.85 + 0.3 * lathe);
-      c = mix(body, env * tint * 1.25, 0.55);
-      c += vec3(1.0) * (an * 0.5 * (0.6 + 0.8 * lathe) + sp * 0.5);
+      vec3 body = tint * (0.35 + 0.65 * (0.5 + 0.5 * lam)) * (0.85 + (cs > 4.5 && cs < 5.5 ? 0.5 : 0.3) * lathe);
+      c = mix(body, env * tint * 1.25, reflMix);
+      c += vec3(1.0) * (an * 0.5 * (0.6 + 0.8 * lathe) + pow(max(dot(Nm, H), 0.0), 36.0) * 0.5);
       c += v_lane * 0.2 * pow(1.0 - face, 2.0);
     } else if (gv < 0.5) { // lamp: a saturated light, hottest where we look straight into it, gathering at the edge, with the cloud and the shine map's streak on it
       vec3 lamp = v_lane * (0.62 + 0.9 * core);
@@ -566,12 +579,41 @@ void main() {
       lamp *= mix(0.55, 1.0, smoothstep(0.0, 0.5, face));
       float fres = pow(1.0 - face, 3.0);
       c = lamp + vec3(1.0) * (pow(max(dot(N, H), 0.0), 70.0) * 1.2 + pow(max(dot(reflect(-Vc, N), L), 0.0), 30.0) * 0.25) + v_lane * 0.15 * fres;
-    } else { // ember: hot spots drifting in a darker glow
+    } else if (gv < 5.5) { // ember: hot spots drifting in a darker glow
       float heat = smoothstep(0.35, 0.85, vnoise(q * 1.6 + 3.0));
       vec3 hot = mix(v_lane, vec3(1.0, 0.92, 0.65), 0.75);
       vec3 lamp = mix(v_lane * 0.5, hot, heat) * (0.6 + 0.8 * core);
       lamp += v_lane * 0.4 * pow(1.0 - face, 2.0);
       c = lamp + vec3(1.0) * sp * 0.3;
+    } else if (gv < 6.5) { // jelly: thick and translucent, brighter at the edge where the light goes through it, a soft broad highlight
+      vec3 lamp = v_lane * (0.55 + 0.55 * smoothstep(0.0, 0.7, face));
+      lamp += v_lane * 0.6 * pow(1.0 - face, 1.5);
+      c = lamp + vec3(1.0) * pow(max(dot(N, H), 0.0), 16.0) * 0.5;
+    } else if (gv < 7.5) { // acrylic: flat saturated plastic, a crisp small highlight, a thin bright rim
+      vec3 lamp = v_lane * (0.8 + 0.2 * core);
+      c = lamp + vec3(1.0) * (pow(max(dot(N, H), 0.0), 90.0) * 1.1 + 0.25 * pow(1.0 - face, 4.0));
+    } else if (gv < 8.5) { // gemstone: deep, banded in facets, the hue turning towards the edge, a sparkle
+      float fq = floor(face * 3.0) / 3.0;
+      vec3 lamp = v_lane * (0.45 + 0.9 * pow(face, 1.5));
+      lamp = mix(lamp, v_lane.gbr * (0.45 + 0.6 * fq), (1.0 - face) * 0.35);
+      lamp += vec3(1.0) * step(0.96, fract(sin(floor(face * 9.0) * 91.7 + floor(v_uv.x * 6.0) * 37.1) * 43758.5453)) * 0.5;
+      c = lamp + vec3(1.0) * sp * 0.5;
+    } else if (gv < 9.5) { // stained glass: cells of slightly different colour with dark leads between them, lit from behind
+      vec2 cu = v_uv * 8.0; vec2 cid = floor(cu);
+      float hcell = fract(sin(dot(cid, vec2(127.1, 311.7))) * 43758.5453);
+      float edge = min(min(fract(cu.x), 1.0 - fract(cu.x)), min(fract(cu.y), 1.0 - fract(cu.y)));
+      vec3 lamp = v_lane * (0.65 + 0.35 * hcell) * (0.7 + 0.6 * core);
+      lamp = mix(lamp, vec3(0.04), 0.85 * (1.0 - smoothstep(0.0, 0.07, edge)));
+      c = lamp + vec3(1.0) * sp * 0.3;
+    } else if (gv < 10.5) { // iridescent: the colour shifts with the angle like an oil film
+      vec3 irid = 0.5 + 0.5 * cos(6.2831853 * (face * 1.2 + vec3(0.0, 0.33, 0.67)));
+      vec3 lamp = mix(v_lane, irid, 0.5) * (0.7 + 0.6 * core);
+      c = lamp + vec3(1.0) * sp * 0.4;
+    } else { // pearl: a pale pearly colour with soft bands of sheen
+      vec3 lamp = mix(v_lane, vec3(1.0), 0.55) * (0.8 + 0.2 * core);
+      lamp += vec3(0.06) * sin(face * 14.0);
+      lamp = mix(lamp, 0.5 + 0.5 * cos(6.2831853 * (face + vec3(0.0, 0.33, 0.67))), 0.1);
+      c = lamp + vec3(1.0) * pow(max(dot(N, H), 0.0), 20.0) * 0.3;
     }
   }
   else if (v_role < 2.5) c = mix(vec3(1.0), v_lane, 0.12) * (0.68 + 0.32 * lam); // the white of a HOPO
