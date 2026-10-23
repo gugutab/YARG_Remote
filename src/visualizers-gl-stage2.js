@@ -70,7 +70,7 @@ function coverTexture(gl, unit) {
 }
 
 // What the equalizer and the radial spectrum share in the shader: the per-instrument uniforms and a lookup of the level / peak of a bar.
-const EQ_DECL = `uniform sampler2D u_eq; uniform vec4 u_eqh[${MAX_LAYERS}]; uniform vec3 u_ecol[${MAX_LAYERS}]; uniform vec2 u_eqn;
+const EQ_DECL = `uniform vec2 u_eqr; uniform sampler2D u_eq; uniform vec4 u_eqh[${MAX_LAYERS}]; uniform vec3 u_ecol[${MAX_LAYERS}]; uniform vec2 u_eqn;
 float eqLevel(int li, float bin) { return texture(u_eq, vec2((bin + 0.5) / u_eqn.x, (float(li) + 0.5) / ${EQ_ROWS}.0)).r * 1.3; }
 float eqPeak(int li, float bin) { return texture(u_eq, vec2((bin + 0.5) / u_eqn.x, (float(li + ${MAX_LAYERS}) + 0.5) / ${EQ_ROWS}.0)).r * 1.3; }
 float eqIdle(float bin, int li) { return 0.04 + 0.03 * sin(bin * 0.45 + u_pos * 1.3 + float(li)); }`;
@@ -93,16 +93,26 @@ const EQ_BODY = `void main() {
   float n = u_eqn.x; int L = int(u_eqn.y);
   float x = p.x / u_res.x * n, k = floor(x), fx = x - k;
   float inbar = smoothstep(0.1, 0.16, fx) * (1.0 - smoothstep(0.84, 0.9, fx));
-  float au = spec((k + 0.5) / n) * clamp(u_au.x * 4.0, 0.0, 1.0); // the real spectrum under this bar (low to high, as the pitch axis)
+  float u01 = (k + 0.5) / n;
+  float kp = (u_eqr.x + (u_eqr.y - u_eqr.x) * u01) * n - 0.5; // the notes' pitch range stretched over the whole width (a song rarely uses the whole scale)
+  float au = spec(u01) * clamp(u_au.x * 4.0, 0.0, 1.0); // the real spectrum under this bar (low to high, as the pitch axis)
   vec4 acc = vec4(0.0);
+  // The backdrop that fills the whole width, also where no instrument plays at that pitch: the sound's own spectrum (tilted up towards the highs, which carry less), or a slow
+  // swell of the palette when nothing is heard. Dim, under the instruments' bars.
+  float swell = 0.2 + 0.08 * sin(k * 0.17 + u_pos * 0.5) + 0.05 * sin(k * 0.07 - u_pos * 0.35);
+  float bgv = max(swell * (1.0 - 0.45 * clamp(u_au.x * 4.0, 0.0, 1.0)), au * (1.0 + 3.4 * u01)) * 0.8;
+  float bgh = bgv * H;
+  vec3 bgc = palAt(u01 * 0.85 + 0.05);
+  over(acc, bgc, inbar * clamp(bgh - yb + 0.5, 0.0, 1.0) * mix(0.2, 0.34, clamp(yb / max(bgh, 1.0), 0.0, 1.0)));
+  over(acc, mix(bgc, vec3(1.0), 0.5), inbar * clamp(1.0 - abs(yb - (bgh - 1.5)) / 2.0 + 0.5, 0.0, 1.0) * 0.5);
   for (int pass = 0; pass < 2; pass++) {
     for (int li = ${MAX_LAYERS - 1}; li >= 0; li--) {
       if (li >= L) continue;
       bool on = u_eqh[li].y > 0.5;
       if ((pass == 0) == on) continue; // the faint layers first (behind), then the lit ones; each from the tallest (back) to the shortest (front)
       vec3 col = u_ecol[li];
-      float idle = eqIdle(k, li), maxH = u_eqh[li].x;
-      float lvl = min(1.3, eqLevel(li, k) + idle);
+      float idle = eqIdle(kp, li), maxH = u_eqh[li].x;
+      float lvl = min(1.3, eqLevel(li, kp) + idle);
       lvl = lvl * (0.82 + 0.45 * au) + 0.1 * au;
       float bh = lvl * maxH;
       if (!on) { over(acc, col, 0.15 * inbar * clamp(bh - yb + 0.5, 0.0, 1.0)); continue; }
@@ -111,7 +121,7 @@ const EQ_BODY = `void main() {
       over(acc, col, fill * mix(0.6, 0.5, 1.0 - top) * (L > 1 ? 1.0 : 0.95));
       float cap = inbar * clamp(1.0 - abs(yb - (bh - 2.0)) / 2.5 + 0.5, 0.0, 1.0);
       over(acc, mix(col, vec3(1.0), 0.72), cap * 0.95);
-      float pk = (min(1.3, eqPeak(li, k) + idle) * (0.82 + 0.45 * au) + 0.1 * au) * maxH;
+      float pk = (min(1.3, eqPeak(li, kp) + idle) * (0.82 + 0.45 * au) + 0.1 * au) * maxH;
       if (pk > bh + 6.0) over(acc, mix(col, vec3(1.0), 0.72), inbar * clamp(1.0 - abs(yb - (pk - 1.5)) / 2.0 + 0.5, 0.0, 1.0) * 0.95);
     }
   }
@@ -120,13 +130,30 @@ const EQ_BODY = `void main() {
 
 function equalizerPort(gl) {
   const eq = eqTexture(gl, EQ_BARS, 1);
+  const ranges = new WeakMap(); // (the lowest and highest pitch of a song's events, found once)
+  const rangeOf = (ev) => {
+    if (!ev || !ev.count) return [0, 1];
+    let r = ranges.get(ev);
+    if (!r) {
+      let lo = 1, hi = 0;
+      for (let i = 0; i < ev.count; i++) { lo = Math.min(lo, ev.pos[i]); hi = Math.max(hi, ev.pos[i]); }
+      lo = Math.max(0, lo - 0.05); hi = Math.min(1, hi + 0.05);
+      if (hi - lo < 0.4) { const m = (lo + hi) / 2; lo = Math.max(0, m - 0.2); hi = Math.min(1, lo + 0.4); }
+      r = [lo, hi];
+      ranges.set(ev, r);
+    }
+    return r;
+  };
   return fullScreenPort(gl, 'equalizer', EQ_BODY, {
+    calm: true, // (no kick, and the spectrum moves smoothly: the backdrop must not flicker)
     decl: EQ_DECL,
     extra(pr, s, data, w, h, sc, common) {
-      const info = eq.update(s, data, Math.max(3, EQ_BARS / 14), 4);
+      const info = eq.update(s, data, Math.max(3, EQ_BARS / 10), 4); // (wide hills: each note lights a broad stretch of the bars)
       gl.uniform2f(pr.u.u_eqn, EQ_BARS, info.L);
+      const range = rangeOf(data.events);
+      gl.uniform2f(pr.u.u_eqr, range[0], range[1]);
       const L = info.L;
-      setEq(gl, pr, common, info, w, h, s, (li) => h * (L === 1 ? 0.9 : 0.28 + 0.62 * (li / (L - 1))) * (1 + 0.045 * Math.cos((s.beat.pos + li * 0.25) * TAU)) * (1 + 0.06 * s.audio.kick)); // (the layer breathes once per beat; a kick lifts it)
+      setEq(gl, pr, common, info, w, h, s, (li) => h * (L === 1 ? 0.9 : 0.28 + 0.62 * (li / (L - 1))) * (1 + 0.045 * Math.cos((s.beat.pos + li * 0.25) * TAU)) ); // (the layer breathes once per beat)
       gl.activeTexture(gl.TEXTURE0);
     },
   });
