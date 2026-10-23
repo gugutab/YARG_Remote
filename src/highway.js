@@ -939,8 +939,21 @@ export class Highway {
     return this.countdowns ? pane.countdownsLyrics : [];
   }
 
-  // What the sheet's side rail shows: the rests (also when the countdowns are off), the percussion sections and the length.
-  lyricCtx(pane) {
+  // The rests of one voice of a harmony chart (key 'v1' / 'v2' / 'v3'): from the notes of that voice alone, so each sheet has its own countdowns (YARG builds them for the selected
+  // vocal part). null for a key without notes of its own (the chart then has one sheet).
+  voiceRests(pane, key) {
+    pane.voiceRests ??= {};
+    if (!(key in pane.voiceRests)) {
+      const c = pane.chart;
+      const part = Number(key.slice(1));
+      const notes = part === 1 ? c.notes : c.harmonies?.find((h) => h.part === part)?.notes;
+      pane.voiceRests[key] = notes ? waitCountdowns({ notes, harmonies: [], percussion: [], fills: c.fills }, { percussion: false, min: this.countdownMin }) : null;
+    }
+    return pane.voiceRests[key];
+  }
+
+  // What the sheet's side rail shows: the rests (also when the countdowns are off), the percussion sections and the length. `key`: the voice's own rests in a harmony sheet.
+  lyricCtx(pane, key = null) {
     pane.railCtx ??= (() => {
       const hits = (pane.chart.percussion || []).map((x) => x.time).sort((a, b) => a - b);
       const perc = [];
@@ -955,6 +968,8 @@ export class Highway {
       const duration = Math.max(pane.chart.duration || 0, lines.length ? lines[lines.length - 1].end : 0, hits.length ? hits[hits.length - 1] : 0, 1);
       return { pauses: waitCountdowns(pane.chart, { percussion: false, min: this.countdownMin }), perc, duration };
     })();
+    const own = key && key !== 'main' ? this.voiceRests(pane, key) : null;
+    if (own) return { ...pane.railCtx, gaps: this.countdowns ? own : [], pauses: own };
     return { gaps: this.lyricGaps(pane), ...pane.railCtx };
   }
 
@@ -1534,7 +1549,7 @@ export class Highway {
       g.translate(bx, by);
       this.sheetPresent = colour[key];
       try {
-        this.renderLyricSheet(t, bw, bh, this.karaokeLines(pane, key), this.sheetState(pane, key), x0 + bx, y0 + by, this.lyricCtx(pane));
+        this.renderLyricSheet(t, bw, bh, this.karaokeLines(pane, key), this.sheetState(pane, key), x0 + bx, y0 + by, this.lyricCtx(pane, key));
       } finally {
         this.sheetPresent = null;
       }
@@ -2003,6 +2018,19 @@ export class Highway {
       if (n.sp) g.strokeStyle = VOCAL_SP_GOLD; // (a star power note: a gold outline)
       g.strokeRect(x1, ty, bw, VOC_BOTTOM - ty);
       g.setLineDash([]);
+      if (x1 <= VOC_HIT_X) { // inside the box, in the part that has passed the hit line: a voice meter, thin bars that jump up and down, strongest next to the line and fading behind it
+        const mid = (ty + VOC_BOTTOM) / 2, hh = (VOC_BOTTOM - ty) * 0.45;
+        g.fillStyle = tintWhite(n.sp ? VOCAL_SP_GOLD : color, 0.5);
+        for (let k = 0; x1 + k * 6 < Math.min(x1 + bw, VOC_HIT_X); k++) {
+          const bx = x1 + k * 6 + 1;
+          const behind = VOC_HIT_X - bx;
+          const f = Math.min(1, Math.max(0, (behind + 1) / 4)) * (1 - Math.min(1, Math.max(0, (behind - 70) / 120)));
+          if (f <= 0.01) continue;
+          const h = (0.2 + 0.8 * Math.abs(Math.sin(k * 1.9 + VOC_T * 7) * Math.sin(k * 0.71 - VOC_T * 3.7 + 1.3))) * hh;
+          g.globalAlpha = 0.7 * f;
+          g.fillRect(bx, mid - h, 3, h * 2);
+        }
+      }
       return;
     }
     if (n.slide && prev && !prev.talkie) { // continues the previous note: a smooth ribbon from its end to this note's start
@@ -2084,43 +2112,49 @@ export class Highway {
     if (gp) frame.glow(gp.y, gp.R, gp.env, gp.age, idle, gp.sp, gp.seed);
   }
 
-  // The effect of a talkie box passing the hit line (2D drawing; the board draws the same in vocals-gl.js): its stretch of the hit line lights up, two walls of light slide back from it,
-  // a soft halo and a few embers across the height of the box; gold for a star power note.
+  // The effect of a talkie box passing the hit line (2D drawing; the board draws the same in vocals-gl.js): it happens inside the box's height: its stretch of the hit line lights up, a
+  // bright point sweeps up and down it and sparks are thrown back from that point into the box; gold for a star power note.
   talkieHit2d(n, t, color, hitX) {
     const env = this.talkieEnv(n, t);
     if (env <= 0.004) return;
     const g = this.g;
-    const top = VOC_TOP + 10, bot = VOC_BOTTOM, H = Math.max(8, bot - top);
+    const top = VOC_TOP + 10, bot = VOC_BOTTOM, H = Math.max(8, bot - top), cy = (top + bot) / 2;
     const tone = n.sp ? VOCAL_SP_GOLD : color;
-    const hot = tintWhite(tone, 0.4);
+    const hot = tintWhite(tone, 0.45);
+    const seed = n.time % 97;
     g.save();
     g.beginPath();
-    g.rect(hitX - H - 120, top - 12, H + 120 + 1.5, H + 24); // nothing on the right of the line
+    g.rect(hitX - 150, top - 12, 150 + 1.5, H + 24); // nothing on the right of the line
     g.clip();
     g.globalCompositeOperation = 'lighter';
-    const hg = g.createLinearGradient(hitX - (H * 0.45 + 20), 0, hitX, 0); // the halo
-    hg.addColorStop(0, withAlpha(tone, 0));
-    hg.addColorStop(1, withAlpha(tone, 0.28 * env));
-    g.fillStyle = hg;
-    g.fillRect(hitX - (H * 0.45 + 20), top, H * 0.45 + 20, H);
     g.fillStyle = withAlpha(hot, 0.9 * env); // the stretch of the hit line
     g.fillRect(hitX - 1.5, top, 3, H);
-    for (let i = 0; i < 2; i++) { // two walls of light sliding back
-      const ph = (t * 0.8 + i * 0.5 + (n.time % 97) * 0.07) % 1;
-      g.fillStyle = withAlpha(tone, 0.5 * env * (1 - ph) * (1 - ph) * Math.min(1, ph / 0.12));
-      const w = 2 + 5 * ph;
-      g.fillRect(hitX - ph * (H * 0.9 + 30) - w, top, w * 2, H);
-    }
+    const sweep = (time) => cy + Math.sin(time * 4.2 + seed) * H * 0.42;
+    const sy = sweep(t);
+    const sg = g.createRadialGradient(hitX, sy, 0, hitX, sy, 9); // the point that sweeps the line
+    sg.addColorStop(0, withAlpha(hot, env));
+    sg.addColorStop(1, withAlpha(hot, 0));
+    g.fillStyle = sg;
+    g.fillRect(hitX - 9, sy - 9, 18, 18);
     const hsh = (a, b) => { const v = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return v - Math.floor(v); };
-    g.fillStyle = tone;
-    const seed = n.time % 97;
-    for (let k = 0; k < 10; k++) { // embers
-      const h1 = hsh(k, seed * 3.7), h2 = hsh(k * 2.3, seed * 1.3);
-      const ph = (t * (0.3 + 0.22 * h1) + h2) % 1;
-      g.globalAlpha = env * (1 - ph) * (1 - ph) * Math.min(1, ph / 0.12);
+    g.strokeStyle = tintWhite(tone, 0.7);
+    g.lineCap = 'round';
+    g.lineWidth = 1.6;
+    for (let k = 0; k < 10; k++) { // sparks, each thrown from where the point was when it left
+      const h1 = hsh(k * 3.1, seed * 2.9), h2 = hsh(k * 1.7, seed * 5.3);
+      const rate = 1.1 + 0.8 * h1;
+      const ph = (t * rate + h2) % 1;
+      const ey = sweep(t - ph / rate);
+      const ang = Math.PI + (h1 - 0.5) * 0.9;
+      const dx = Math.cos(ang), dy = Math.sin(ang);
+      const d = ph * (36 + 80 * h2), L = (7 + 8 * h2) * (1 - 0.6 * ph);
+      const hx = hitX + dx * d, hy = ey + dy * d;
+      if (hy < top || hy > bot) continue;
+      g.globalAlpha = env * Math.pow(1 - ph, 1.2) * Math.min(1, ph / 0.08);
       g.beginPath();
-      g.arc(hitX - ph * (H * 0.5 + 30) * (0.5 + h1), top + 4 + (H - 8) * ((h2 * 7 + seed) % 1) - ph * H * 0.25, Math.max(1, (4 + 3 * h2) * (1 - 0.7 * ph)), 0, Math.PI * 2);
-      g.fill();
+      g.moveTo(hx - dx * L, hy - dy * L);
+      g.lineTo(hx, hy);
+      g.stroke();
     }
     g.restore();
   }
@@ -2272,6 +2306,31 @@ export class Highway {
       g.beginPath();
       g.arc(x, y, Math.max(1, p.R * (0.2 + 0.13 * h2) * (1 - 0.7 * ph)), 0, Math.PI * 2);
       g.fill();
+    }
+    g.restore();
+    // sparks: short bright streaks thrown back from the hit point, to the left and a little up or down
+    g.save();
+    g.beginPath();
+    g.rect(hitX - p.R * 14, p.y - p.R * 5, p.R * 14 + 1.5, p.R * 10);
+    g.clip();
+    g.globalCompositeOperation = 'lighter';
+    g.strokeStyle = tintWhite(tone, 0.65);
+    g.lineCap = 'round';
+    for (let k = 0; k < 10; k++) {
+      const h1 = hsh(k * 3.1, p.seed * 2.9), h2 = hsh(k * 1.7, p.seed * 5.3), h3 = hsh(k * 7.7, p.seed * 1.7);
+      const rate = 1 + 0.9 * h1;
+      const ph = (t * rate + h2) % 1;
+      const ang = Math.PI + (h3 - 0.5) * 1.2;
+      const dx = Math.cos(ang), dy = Math.sin(ang);
+      const d = ph * p.R * (2.4 + 3.4 * h1);
+      const L = p.R * (0.5 + 0.4 * h2) * (1 - 0.6 * ph);
+      const hx = hitX + dx * d, hy = p.y + dy * d;
+      g.globalAlpha = p.env * Math.pow(1 - ph, 1.3) * Math.min(1, ph / 0.08);
+      g.lineWidth = 1.6;
+      g.beginPath();
+      g.moveTo(hx - dx * L, hy - dy * L);
+      g.lineTo(hx, hy);
+      g.stroke();
     }
     g.restore();
   }

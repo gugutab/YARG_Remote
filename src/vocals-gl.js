@@ -128,8 +128,16 @@ const PROGRAMS = {
     float live = smoothstep(x1 - 2.0, x1 + 2.0, u_hitx) * (1.0 - smoothstep(x2 - 2.0, x2 + 2.0, u_hitx));
     float dash = step(fract((v_p.x + v_p.y) / 7.0), 4.0 / 7.0);
     float edge = (1.0 - smoothstep(0.5, 1.5, abs(d + 1.0))) * dash;
-    float a = max(inside * (0.35 + 0.2 * live), edge);
-    col = mix(col, vec3(1.0), 0.25 * live * inside);
+    // inside the box, in the part that has passed the hit line: a voice meter, thin bars that jump up and down, strongest next to the line and fading away behind it
+    float behind = u_hitx - v_p.x;
+    float meterOn = step(x1, v_p.x) * smoothstep(-1.0, 3.0, behind) * (1.0 - smoothstep(70.0, 190.0, behind)) * step(0.0, u_hitx - x1);
+    float k = floor((v_p.x - x1) / 6.0);
+    float bar = step(0.15, fract((v_p.x - x1) / 6.0)) * (1.0 - step(0.85, fract((v_p.x - x1) / 6.0)));
+    float bh = (0.2 + 0.8 * abs(sin(k * 1.9 + u_t * 7.0) * sin(k * 0.71 - u_t * 3.7 + 1.3))) * hs.y * 0.9;
+    float meter = bar * cover(abs(v_p.y - y) - bh) * meterOn * inside;
+    float a = max(max(inside * (0.35 + 0.15 * live), edge), meter * 0.7);
+    col = mix(col, vec3(1.0), 0.2 * live * inside);
+    col = mix(col, mix(sp ? GOLD : v_a1.rgb, vec3(1.0), 0.5), meter);
     col = mix(col, GOLD, sp ? edge : 0.0);
     o = vec4(col * a, a);
     return;
@@ -211,44 +219,47 @@ const PROGRAMS = {
   o = acc * alpha;
 }`)],
 
-  // a talkie box passing the hit line: top, bottom, env, age | r, g, b, star power | seed. The effect goes over the whole height of the box: its stretch of the hit line lights up, two
-  // walls of light slide back from it over and over, a soft halo and a few embers across the height; gold for star power. Only while the box is over the line (and a moment after).
-  talk: [VS('vec4(u_hitx - (a0.y - a0.x) - 90.0, a0.x - 12.0, u_hitx + 10.0, a0.y + 12.0)'), FS('',
+  // a talkie box passing the hit line: top, bottom, env, age | r, g, b, star power | seed. It all happens inside the box's height while it is over the line (and a moment after): its
+  // stretch of the hit line lights up, a bright point sweeps up and down it, and sparks are thrown back from that point into the box (each from where the point was when it
+  // left); gold for star power.
+  talk: [VS('vec4(u_hitx - 150.0, a0.x - 12.0, u_hitx + 10.0, a0.y + 12.0)'), FS('',
     `void main() {
   float top = v_a0.x, bot = v_a0.y, env = v_a0.z;
   vec3 tone = v_a1.w > 0.5 ? GOLD : v_a1.rgb;
   float seed = v_a2.x;
-  float H = max(bot - top, 8.0);
+  float H = max(bot - top, 8.0), cy = 0.5 * (top + bot);
   float dx = v_p.x - u_hitx;
   float side = 1.0 - smoothstep(0.0, 8.0, dx - 1.5);
   float inY = smoothstep(top - 3.0, top + 3.0, v_p.y) * (1.0 - smoothstep(bot - 3.0, bot + 3.0, v_p.y));
   float line = exp(-dx * dx / 10.0) * inY * env;
-  float halo = exp(-pow(dx / (H * 0.45 + 20.0), 2.0)) * inY * 0.28 * env * side;
-  float walls = 0.0;
-  for (int i = 0; i < 2; i++) {
-    float ph = fract(u_t * 0.8 + float(i) * 0.5 + seed * 0.07);
-    float w = 2.0 + 5.0 * ph;
-    walls += exp(-pow((v_p.x - (u_hitx - ph * (H * 0.9 + 30.0))) / w, 2.0)) * (1.0 - ph) * (1.0 - ph) * smoothstep(0.0, 0.12, ph);
-  }
-  walls *= 0.5 * inY * env * side;
-  float em = 0.0;
-  for (int i = 0; i < 16; i++) {
+  float halo = exp(-pow(dx / (H * 0.35 + 14.0), 2.0)) * inY * 0.16 * env * side;
+  float sy = cy + sin(u_t * 4.2 + seed) * H * 0.42;
+  vec2 sd = v_p - vec2(u_hitx, sy);
+  float scan = (exp(-dot(sd, sd) / 36.0) + 0.55 * exp(-dx * dx / 16.0) * exp(-pow((v_p.y - sy) / (H * 0.1 + 4.0), 2.0))) * env;
+  float spk = 0.0;
+  for (int i = 0; i < 14; i++) {
     float fi = float(i);
-    float h1 = fract(sin(fi * 12.9898 + seed * 3.7) * 43758.5453), h2 = fract(sin(fi * 78.233 + seed * 1.3) * 12345.678);
-    float ph = fract(u_t * (0.3 + 0.22 * h1) + h2);
-    vec2 pc = vec2(u_hitx - ph * (H * 0.5 + 30.0) * (0.5 + h1), top + 4.0 + (H - 8.0) * fract(h2 * 7.0 + seed) - ph * H * 0.25);
-    float sz = (4.0 + 3.0 * h2) * (1.0 - 0.7 * ph);
-    vec2 q = v_p - pc;
-    em += exp(-dot(q, q) / (sz * sz)) * (1.0 - ph) * (1.0 - ph) * smoothstep(0.0, 0.12, ph);
+    float h1 = fract(sin(fi * 41.17 + seed * 2.9) * 24634.6345), h2 = fract(sin(fi * 17.31 + seed * 5.3) * 53758.5453);
+    float rate = 1.1 + 0.8 * h1;
+    float ph = fract(u_t * rate + h2);
+    float te = u_t - ph / rate;
+    float ey = cy + sin(te * 4.2 + seed) * H * 0.42;
+    float ang = 3.14159265 + (h1 - 0.5) * 0.9;
+    vec2 dir = vec2(cos(ang), sin(ang));
+    vec2 pos = vec2(u_hitx, ey) + dir * ph * (36.0 + 80.0 * h2);
+    vec2 q = v_p - pos;
+    float along = dot(q, dir), perp = dot(q, vec2(-dir.y, dir.x));
+    float L = (7.0 + 8.0 * h2) * (1.0 - 0.6 * ph);
+    spk += exp(-pow(perp / 1.1, 2.0)) * smoothstep(-L, 0.0, along) * (1.0 - smoothstep(0.0, 1.6, along)) * pow(1.0 - ph, 1.2) * smoothstep(0.0, 0.08, ph);
   }
-  em *= env;
-  vec3 hot = mix(tone, vec3(1.0), 0.4);
-  vec3 light = tone * (halo + walls + em) + hot * line * 0.9;
+  spk *= inY * env * side;
+  vec3 hot = mix(tone, vec3(1.0), 0.45);
+  vec3 light = tone * halo + hot * (line * 0.9 + scan * 1.0) + mix(tone, vec3(1.0), 0.7) * spk * 1.3;
   o = vec4(light, clamp(max(light.r, max(light.g, light.b)) * 0.9, 0.0, 1.0));
 }`)],
 
   // the voice at the hit line: y, R, env, age | r, g, b, star power | seed. The effects of a little fire in the colour of the track (gold for star power), without the flame itself:
-  // embers rising and drifting back, a soft halo and warm core, the stretch of the hit line that lights up and two gentle ripples. Continuous and calm, never a flash, and kept to
+  // embers rising and drifting back, sparks thrown back from the hit, a soft halo and warm core, the stretch of the hit line that lights up and two gentle ripples. Continuous and calm, never a flash, and kept to
   // the left of the hit line (the side the note has already passed).
   glow: [VS('vec4(u_hitx - a0.y * 13.0, a0.x - a0.y * 4.4, u_hitx + a0.y * 1.5, a0.x + a0.y * 4.4)'), FS('const float SX = 2.2; // the animation is stretched along the line of the notes: this much wider than tall',
     `void main() {
@@ -282,8 +293,24 @@ const PROGRAMS = {
     em += exp(-dot(q, q) / (sz * sz)) * (1.0 - ph) * (1.0 - ph) * smoothstep(0.0, 0.12, ph);
   }
   em *= 1.0 * env;
+  // sparks: short bright streaks thrown back from the hit point, to the left and a little up or down, each one fading as it flies
+  float spk = 0.0;
+  for (int i = 0; i < 14; i++) {
+    float fi = float(i);
+    float h1 = fract(sin(fi * 41.17 + seed * 2.9) * 24634.6345), h2 = fract(sin(fi * 17.31 + seed * 5.3) * 53758.5453), h3 = fract(sin(fi * 93.7 + seed * 1.7) * 31415.9265);
+    float rate = 1.0 + 0.9 * h1;
+    float ph = fract(u_t * rate + h2);
+    float ang = 3.14159265 + (h3 - 0.5) * 1.2;
+    vec2 dir = vec2(cos(ang), sin(ang));
+    vec2 pos = vec2(u_hitx, y) + dir * ph * R * (2.4 + 3.4 * h1);
+    vec2 q = v_p - pos;
+    float along = dot(q, dir), perp = dot(q, vec2(-dir.y, dir.x));
+    float L = R * (0.5 + 0.4 * h2) * (1.0 - 0.6 * ph);
+    spk += exp(-pow(perp / 1.1, 2.0)) * smoothstep(-L, 0.0, along) * (1.0 - smoothstep(0.0, 1.6, along)) * pow(1.0 - ph, 1.3) * smoothstep(0.0, 0.08, ph);
+  }
+  spk *= env * side;
   vec3 hot = mix(tone, vec3(1.0), 0.4);
-  vec3 light = tone * (halo + rip + em) + hot * (core * 0.8 + line * 0.7);
+  vec3 light = tone * (halo + rip + em) + hot * (core * 0.8 + line * 0.7) + mix(tone, vec3(1.0), 0.65) * spk * 1.2;
   o = vec4(light, clamp(max(light.r, max(light.g, light.b)) * 0.9, 0.0, 1.0));
 }`)],
 };
