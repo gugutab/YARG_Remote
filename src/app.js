@@ -48,6 +48,7 @@ import { createThumbs, renderCoverThumb } from './thumbs.js';
 import { snapPoints, snapTime, clampLoop, currentSectionRange, sectionRange, loopForSection, shouldWrap, MIN_LOOP } from './looprange.js';
 import { trainerConfig, startTrainer, nextTrainerState, trainerStatus, stepNote } from './trainer.js';
 import { VISUALIZERS, showsStage, createDriver as createVisualizerDriver } from './visualizers.js';
+import { createAudioFeatures } from './audio-features.js';
 import { createVizGl } from './visualizers-gl.js';
 import { paintRange, installRangeUi } from './range-ui.js';
 import { canSkipDraw as idleCanSkip, IDLE_AFTER_MS, IDLE_REFRESH_MS } from './idle.js';
@@ -3199,7 +3200,11 @@ function buildVizAll() {
     shown: layers.map((l) => isOn(l.g)),
   };
 }
+const audioFeatures = createAudioFeatures();
+let visualizerAudio = true; // setting highway.visualizerAudio
+const spectrumBytes = new Uint8Array(player.analyser.frequencyBinCount);
 const vizDriver = createVisualizerDriver({
+  getAudio: (now) => audioFeatures.update(spectrumBytes, visualizerAudio ? player.readSpectrum(spectrumBytes) : 0, player.analyser.fftSize, now), // (what the visualizers hear: src/audio-features.js)
   getSource() { // rebuilt only when the charts on screen change (setCharts makes a new panes array)
     if (!current || !highway.panes.length) return null;
     if (['equalizer', 'radial', 'spotlights', 'embers', 'aurora', 'warp'].includes(vizDriver.id) && !liveStage) { // the visualizers that follow the notes show every instrument of the song, the ones on screen highlighted
@@ -3838,6 +3843,7 @@ const EFFECTS = {
   'ui.radius': (v) => document.documentElement.style.setProperty('--radius', `${v}px`),
   'ui.font': (v) => document.documentElement.style.setProperty('--font', fontCss(v)),
   'highway.visualizer': () => applyVisualizer(), // (economy mode and the adaptive quality may hide it: effective.visualizer)
+  'highway.visualizerAudio': (v) => { visualizerAudio = !!v; },
   'highway.visualizerQuality': (v) => { vizDriver.quality = { high: 1, medium: 0.6, low: 0.4 }[v] ?? 0.6; },
   'highway.visualizerFps': (v) => { vizFps = v === 'unlimited' ? Infinity : Math.max(1, Number(v) || 60); highway.invalidate(); },
   'highway.visualizerOpacity': () => { applyVizOpacity(); syncVizPop(); },

@@ -2,14 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { usesVizGl, createVizGl, PORTS } from '../src/visualizers-gl.js';
 
-test('usesVizGl: only the ported and the WebGL-only visualizers, and never with the canvas renderer', () => {
-  for (const id of ['rings', 'aurora', 'warp', 'lava', 'kaleido', 'smoke', 'galaxy']) {
+test('usesVizGl: every visualizer but none is on WebGL, and never with the canvas renderer', () => {
+  for (const id of ['rings', 'aurora', 'warp', 'lava', 'kaleido', 'smoke', 'galaxy', 'synthwave', 'equalizer', 'embers', 'radial', 'spotlights', 'tunnel', 'cover']) {
     assert.equal(usesVizGl('auto', id), true, `${id} auto`);
     assert.equal(usesVizGl('webgl', id), true, `${id} webgl`);
     assert.equal(usesVizGl('canvas', id), false, `${id} canvas`);
   }
-  for (const id of ['none', 'cover', 'synthwave', 'equalizer', 'embers', 'radial', 'spotlights', 'tunnel', 'toString', undefined]) assert.equal(usesVizGl('webgl', id), false, String(id));
-  assert.deepEqual(Object.keys(PORTS).sort(), ['aurora', 'galaxy', 'kaleido', 'lava', 'rings', 'smoke', 'warp']);
+  for (const id of ['none', 'toString', undefined]) assert.equal(usesVizGl('webgl', id), false, String(id));
+  assert.deepEqual(Object.keys(PORTS).sort(), ['aurora', 'cover', 'embers', 'equalizer', 'galaxy', 'kaleido', 'lava', 'radial', 'rings', 'smoke', 'spotlights', 'synthwave', 'tunnel', 'warp']);
 });
 
 test('createVizGl: without WebGL 2 it never wants the visualizer (the 2D path stays)', () => {

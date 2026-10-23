@@ -6,7 +6,8 @@
 // The song's notes.mid comes from the app's server (/songs/<folder>/notes.mid); its guitar, bass, drums and vocals are the layers.
 import { parseMidi } from '../src/midi.js';
 import { buildChart, instrumentOptions, DIFFICULTIES } from '../src/chart.js';
-import { createDriver } from '../src/visualizers.js';
+import { createDriver, VISUALIZERS } from '../src/visualizers.js';
+import { createAudioFeatures } from '../src/audio-features.js';
 import { PORTS } from '../src/visualizers-gl.js';
 
 const params = new URLSearchParams(location.search);
@@ -15,6 +16,7 @@ const song = params.get('song') || 'Rock Band 1/Black Sabbath (WaveGroup) - Para
 const scale = Number(params.get('scale') || 0.6);
 const benchSecs = Number(params.get('bench') || 0);
 const STAGE_RGB = '13, 17, 23';
+$('viz').innerHTML = VISUALIZERS.filter((v) => v.id !== 'none').map((v) => `<option value="${v.id}">${v.label}${PORTS[v.id] ? ' (GL)' : ''}</option>`).join('');
 $('viz').value = params.get('viz') || 'rings';
 $('mode').value = params.get('mode') || 'both';
 
@@ -32,7 +34,21 @@ async function load() {
     if (chart) { charts.push(chart); kinds.push(id.startsWith('drums') ? 'drum' : KINDS[id] ?? ''); }
   }
 }
-const driver = createDriver({ getSource: () => ({ key: 'k', song: { title: 'Paranoid', artist: 'Black Sabbath' }, charts, kinds, shown: charts.map(() => true) }) });
+// A made-up sound (a kick twice a second, a snare off the beat, a pad, a hi-hat shimmer) through the real feature extractor, so the visualizers can be seen listening (?audio=0 turns it off).
+const features = createAudioFeatures();
+const FFT = 2048, SR = 48000, spectrumBytes = new Uint8Array(FFT / 2);
+const fakeAudio = (now) => {
+  if (params.get('audio') === '0') return features.update(null, 0, FFT, now);
+  const bt = songTime * 2, kick = Math.exp(-(bt % 1) * 7), snare = Math.exp(-(((bt + 0.5) % 1)) * 9) * (Math.floor(bt) % 2 ? 1 : 0.3);
+  for (let i = 0; i < spectrumBytes.length; i++) {
+    const hz = (i * SR) / FFT;
+    let v = 40 * Math.exp(-hz / 3000) + 70 * Math.exp(-((hz - 440 * (1 + Math.floor(songTime % 4) * 0.25)) ** 2) / 60000) * (0.6 + 0.4 * Math.sin(songTime * 3));
+    v += 190 * kick * Math.exp(-hz / 90) + 150 * snare * Math.exp(-((hz - 1800) ** 2) / 4e6) + 60 * (0.5 + 0.5 * Math.sin(songTime * 30 + hz * 0.01)) * (hz > 6000 ? 1 : 0.2) * 0.5;
+    spectrumBytes[i] = Math.max(0, Math.min(255, v));
+  }
+  return features.update(spectrumBytes, SR, FFT, now);
+};
+const driver = createDriver({ getAudio: fakeAudio, getSource: () => ({ key: 'k', song: { title: 'Paranoid', artist: 'Black Sabbath' }, charts, kinds, shown: charts.map(() => true) }) });
 
 const c2d = $('c2d'), cgl = $('cgl');
 const g2 = c2d.getContext('2d');
@@ -80,7 +96,7 @@ function frame(now) {
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       driver.select(id);
-      if (driver.prepare(cw, ch, songTime, STAGE_RGB, 1)) portFor(id).draw(driver.state, driver.data, cw, ch, scale);
+      if (PORTS[id] && driver.prepare(cw, ch, songTime, STAGE_RGB, 1)) portFor(id).draw(driver.state, driver.data, cw, ch, scale);
       if (ext && gpuQuery) {
         gl.endQuery(ext.TIME_ELAPSED_EXT);
         const q = gpuQuery; gpuQuery = null;

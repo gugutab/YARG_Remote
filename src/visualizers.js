@@ -1346,20 +1346,20 @@ const softViz = (ctx) => ({
 
 export const VISUALIZERS = [
   { id: 'none', label: 'None', hint: 'Plain background', swatch: 'transparent', create: null },
-  { id: 'cover', label: 'Album art', hint: 'The cover, waving softly like cloth', swatch: 'linear-gradient(135deg,#6b5b95,#d9822b)', create: coverViz, opaque: true },
-  { id: 'aurora', label: 'Aurora', hint: 'Flowing ribbons in the cover colours', swatch: 'linear-gradient(135deg,#0f9b8e,#6a4fc2)', create: auroraViz, maxScale: 0.5 },
-  { id: 'synthwave', label: 'Synthwave', hint: 'Grid and sun, rolling with the beats', swatch: 'linear-gradient(180deg,#ff5fa2,#ffb347 55%,#3a1c71)', create: synthViz },
-  { id: 'warp', label: 'Warp', hint: 'Stars that rush faster in busy parts', swatch: 'radial-gradient(circle,#fff 0 6%,#4a6fd8 40%,#0a1030)', create: warpViz },
-  { id: 'rings', label: 'Beat rings', hint: 'A ring on every beat, a swell on every bar', swatch: 'repeating-radial-gradient(circle,#7fd1ff 0 3px,#10203a 3px 9px)', create: ringsViz },
-  { id: 'equalizer', label: 'MIDI equalizer', hint: 'Bars driven by the notes being played', swatch: 'linear-gradient(90deg,#3ddc97 0 20%,#ffd23f 20% 40%,#ff7043 40% 60%,#ffd23f 60% 80%,#3ddc97 80%)', create: eqViz },
-  { id: 'embers', label: 'Embers', hint: 'Sparks rising with the energy', swatch: 'radial-gradient(circle at 50% 80%,#ffb347,#8b1e1e 55%,#1a0a0a)', create: embersViz },
-  { id: 'radial', label: 'Radial spectrum', hint: 'A ring of bars around a spinning record', swatch: 'radial-gradient(circle,#222 0 22%,#f6c344 24% 30%,#222 32% 40%,#ff6b9d 42% 62%,#14142a 64%)', create: radialViz },
-  { id: 'spotlights', label: 'Spotlights', hint: 'Stage lights sweeping with the tempo', swatch: 'conic-gradient(from 160deg at 50% 0,#0a0a1a 0 4%,#ffd36b 10%,#0a0a1a 18% 30%,#7fd1ff 36%,#0a0a1a 44% 56%,#ff7aa8 62%,#0a0a1a 70%)', create: spotViz, maxScale: 0.5 },
-  { id: 'lava', label: 'Lava lamp', hint: 'Blobs of the cover colours that swell with the notes and merge', swatch: 'radial-gradient(circle at 30% 40%,#ff7a59 0 18%,transparent 19%),radial-gradient(circle at 62% 58%,#ffb347 0 22%,transparent 23%),radial-gradient(circle at 48% 25%,#c25bff 0 14%,transparent 15%),#1a0f24', create: softViz },
-  { id: 'kaleido', label: 'Kaleidoscope', hint: 'Mirrored folds of colour, turning with the tempo', swatch: 'conic-gradient(from 0deg,#ff5fa2,#7fd1ff,#ffd23f,#ff5fa2,#7fd1ff,#ffd23f,#ff5fa2)', create: softViz, maxScale: 0.6 },
-  { id: 'smoke', label: 'Smoke', hint: 'Flowing smoke tinted by the instruments that play', swatch: 'radial-gradient(circle at 35% 60%,#6a4fc2,transparent 55%),radial-gradient(circle at 70% 35%,#0f9b8e,transparent 55%),#0d1117', create: softViz, maxScale: 0.6 },
-  { id: 'galaxy', label: 'Galaxy', hint: 'A spiral galaxy that turns with the music and flares on the hits', swatch: 'radial-gradient(circle,#fff6d8 0 6%,#f6c344 12%,#7a3fc9 40%,#0a0a1e 70%)', create: softViz },
-  { id: 'tunnel', label: 'Tunnel', hint: 'Rounded rings rushing towards you', swatch: 'repeating-radial-gradient(circle,#0b0b1e 0 3px,#6be0d0 3px 5px,#0b0b1e 5px 9px,#c06bff 9px 11px)', create: tunnelViz },
+  { id: 'cover', label: 'Album art', hint: 'The cover, waving like cloth; the bass makes it ripple', swatch: 'linear-gradient(135deg,#6b5b95,#d9822b)', create: coverViz, opaque: true },
+  { id: 'aurora', label: 'Aurora', hint: 'Flowing ribbons in the cover colours, swelling with the bass', swatch: 'linear-gradient(135deg,#0f9b8e,#6a4fc2)', create: auroraViz, maxScale: 0.5 },
+  { id: 'synthwave', label: 'Synthwave', hint: 'Sun, grid and a skyline that is the spectrum; the kick pulses the sun', swatch: 'linear-gradient(180deg,#ff5fa2,#ffb347 55%,#3a1c71)', create: synthViz },
+  { id: 'warp', label: 'Warp', hint: 'Stars that rush faster in busy parts and streak on the kicks', swatch: 'radial-gradient(circle,#fff 0 6%,#4a6fd8 40%,#0a1030)', create: warpViz },
+  { id: 'rings', label: 'Beat rings', hint: 'A ring on every beat, a swell on every bar, a flash on the kick', swatch: 'repeating-radial-gradient(circle,#7fd1ff 0 3px,#10203a 3px 9px)', create: ringsViz },
+  { id: 'equalizer', label: 'MIDI equalizer', hint: 'Bars of each instrument\'s notes, dancing with the real spectrum', swatch: 'linear-gradient(90deg,#3ddc97 0 20%,#ffd23f 20% 40%,#ff7043 40% 60%,#ffd23f 60% 80%,#3ddc97 80%)', create: eqViz },
+  { id: 'embers', label: 'Embers', hint: 'Sparks rising with the energy, flaring on the kicks', swatch: 'radial-gradient(circle at 50% 80%,#ffb347,#8b1e1e 55%,#1a0a0a)', create: embersViz },
+  { id: 'radial', label: 'Radial spectrum', hint: 'A ring of bars around a spinning record, bouncing with the sound', swatch: 'radial-gradient(circle,#222 0 22%,#f6c344 24% 30%,#222 32% 40%,#ff6b9d 42% 62%,#14142a 64%)', create: radialViz },
+  { id: 'spotlights', label: 'Spotlights', hint: 'Stage lights sweeping with the tempo, flashing on the kicks', swatch: 'conic-gradient(from 160deg at 50% 0,#0a0a1a 0 4%,#ffd36b 10%,#0a0a1a 18% 30%,#7fd1ff 36%,#0a0a1a 44% 56%,#ff7aa8 62%,#0a0a1a 70%)', create: spotViz, maxScale: 0.5 },
+  { id: 'lava', label: 'Lava lamp', hint: 'Blobs of the cover colours that swell with the notes and the bass', swatch: 'radial-gradient(circle at 30% 40%,#ff7a59 0 18%,transparent 19%),radial-gradient(circle at 62% 58%,#ffb347 0 22%,transparent 23%),radial-gradient(circle at 48% 25%,#c25bff 0 14%,transparent 15%),#1a0f24', create: softViz },
+  { id: 'kaleido', label: 'Kaleidoscope', hint: 'Mirrored folds of colour with the spectrum standing in them', swatch: 'conic-gradient(from 0deg,#ff5fa2,#7fd1ff,#ffd23f,#ff5fa2,#7fd1ff,#ffd23f,#ff5fa2)', create: softViz, maxScale: 0.6 },
+  { id: 'smoke', label: 'Smoke', hint: 'Flowing smoke tinted by the instruments, pushed by the bass', swatch: 'radial-gradient(circle at 35% 60%,#6a4fc2,transparent 55%),radial-gradient(circle at 70% 35%,#0f9b8e,transparent 55%),#0d1117', create: softViz, maxScale: 0.6 },
+  { id: 'galaxy', label: 'Galaxy', hint: 'A spiral galaxy that flares on the bass and ringed by the spectrum', swatch: 'radial-gradient(circle,#fff6d8 0 6%,#f6c344 12%,#7a3fc9 40%,#0a0a1e 70%)', create: softViz },
+  { id: 'tunnel', label: 'Tunnel', hint: 'Rounded rings rushing towards you, faster on the bass', swatch: 'repeating-radial-gradient(circle,#0b0b1e 0 3px,#6be0d0 3px 5px,#0b0b1e 5px 9px,#c06bff 9px 11px)', create: tunnelViz },
 ];
 
 export const VISUALIZER_IDS = VISUALIZERS.map((v) => v.id);
@@ -1394,10 +1394,14 @@ async function loadCover(url) {
 
 // What Highway.setVisualizer gets. getSource() -> { key, song, charts, coverUrl }: `key` changes when the charts do.
 // Draws the chosen visualizer (unblurred: the app blurs it with the CSS #bgGlass layer). Nothing is laid over it: the stage colour (`s.stage`, 'r, g, b') is only offered to the effects that want it.
-export function createDriver({ getSource }) {
+// The state's `audio` when nothing listens (the prototypes without sound): every number 0, so a visualizer reads it without checking.
+const NO_AUDIO = { on: false, level: 0, bass: 0, mid: 0, treble: 0, kick: 0, flux: 0, bands: new Float32Array(48) };
+
+// getAudio(nowSeconds) -> the audio features (src/audio-features.js), called once per frame; optional.
+export function createDriver({ getSource, getAudio = null }) {
   const tA = {};
   const tB = {};
-  const state = { bt: 0, bpm: 120, tempo: 1, t: 0, w: 0, h: 0, dpr: 1, beat: {}, density: 0, travel: 0, sp: 0, solo: 0, vocal: 0, perc: 0, hit: 0, section: 0, clock: 0 };
+  const state = { bt: 0, bpm: 120, tempo: 1, t: 0, w: 0, h: 0, dpr: 1, beat: {}, density: 0, travel: 0, sp: 0, solo: 0, vocal: 0, perc: 0, hit: 0, section: 0, clock: 0, audio: NO_AUDIO };
   let id = 'none';
   let data = null;
   let dataKey = null;
@@ -1442,6 +1446,7 @@ export function createDriver({ getSource }) {
       s.stage = bgRgb; // the stage colour, 'r, g, b': for effects that want to use it
       s.dpr = dpr;
       s.clock = performance.now() / 1000;
+      s.audio = getAudio ? getAudio(s.clock) : NO_AUDIO;
       beatInfo(data.beats, t, s.beat);
       s.beat.pulse = 0; // no punch on the beat (it read as flicker); the tempo-locked motion (beat.pos) stays
       // The tempo: `bt` is the beat count in units of a 120 BPM second (it runs faster in a fast part, slower in a slow one, continuously: the clock of every

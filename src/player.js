@@ -509,7 +509,16 @@ export class MultiTrackPlayer {
     this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     this.master = this.ctx.createGain();
     this.master.connect(this.ctx.destination);
-    this.impl = new WorkletPlayer(this.ctx, this.master);
+    // The mix goes through a bus before the master volume: the visualizers listen to it there (an AnalyserNode, src/audio-features.js), so what they see does not depend on how loud the user plays it.
+    this.bus = this.ctx.createGain();
+    this.bus.connect(this.master);
+    this.analyser = this.ctx.createAnalyser();
+    this.analyser.fftSize = 2048;
+    this.analyser.smoothingTimeConstant = 0.45;
+    this.analyser.minDecibels = -85;
+    this.analyser.maxDecibels = -15;
+    this.bus.connect(this.analyser);
+    this.impl = new WorkletPlayer(this.ctx, this.bus);
     this.impl.onLate = () => this.onLate?.(); // late stems joined (or failed): the app refreshes its stem states
     this.speed = 1;
     this.engine = 'worklet';
@@ -523,7 +532,7 @@ export class MultiTrackPlayer {
     } catch (err) {
       if (!err.workletUnavailable) throw err;
       console.warn('AudioWorklet unavailable, using the legacy player:', err);
-      this.impl = new LegacyPlayer(this.ctx, this.master);
+      this.impl = new LegacyPlayer(this.ctx, this.bus);
       this.engine = 'legacy';
       const ok = await this.impl.load(stems, opts);
       this.impl.setRate(this.speed);
@@ -540,6 +549,12 @@ export class MultiTrackPlayer {
   get outputLatency() { return this.impl.outputLatency || 0; } // seconds until the sound is heard (worklet engine)
   get jumpPending() { return !!this.impl.jumpPending; } // a seek(t, { heard: true }) not heard yet
   setMaster(value) { this.master.gain.value = value; }
+  // The analyser's spectrum bytes into `out` (Uint8Array of analyser.frequencyBinCount); returns the sample rate, or 0 while nothing plays.
+  readSpectrum(out) {
+    if (!this.playing) return 0;
+    this.analyser.getByteFrequencyData(out);
+    return this.ctx.sampleRate;
+  }
   setVolume(id, value) { this.impl.setVolume(id, value); }
   setRate(rate) { this.speed = rate; this.impl.setRate(rate); }
   currentTime() { return this.impl.currentTime(); }
