@@ -83,6 +83,28 @@ marked **not confirmed**. The wiki (`wiki.yarg.in`) has no note numbers or rende
 17. Drum and harmony colors: the `ColorProfile` values were not read; our drum colors follow the
     Rock Band convention, unconfirmed by YARG.
 
+## 3b. Status of the suggestions (checked against the code, October 2026)
+
+| # | Suggestion | Status |
+|---|---|---|
+| 1 | Beat lines on three levels | Done: measure / strong beat / weak beat (`beatLineStyles`, `BEAT_ALPHAS` 0.35 / 0.2 / 0.12 in 2D, 0.4 / 0.22 / 0.14 in 3D) with the setting `highway.beatLines` (off, subtle, normal, strong = x1.8, which reaches about the 0.6 / 0.4 / 0.3 asked for). The default alphas stay lower on purpose. |
+| 2 | Drum fills and the activator note | Done (`chart.fills`, the band and the activation marks, BRE as its own pulsing band). |
+| 3 | Accent and ghost | Done another way: a bar on top of the note (`YN_TOP_BAR`), ghost notes at 80 % (`GHOST_SCALE`), their own models on the WebGL board. No double ring. |
+| 4 | Talkie (unpitched) vocals | Done: a dashed box in the middle of the pitch area (`renderVocalNote`). |
+| 5 | Star power in vocals turns the lyric yellow | **Open**: nothing in `karaoke.js` / the vocal views reads `starPower`. |
+| 6 | Pitch range from the range-shift events | Done (`rangeShifts` in `vocals.js`, YARG's `GetRangeShifts`). |
+| 7 | Harmony lyrics in up to 3 lines | **Partly**: one sheet per voice with words, but the karaoke shows two sheets (voices 1 and 2). |
+| 8 | BRE / coda | **Partly**: the BRE band exists; no coda marker on the timeline. |
+| 9 | `FAR_SCALE` 0.37 instead of 0.30 | **Open** (still 0.30; our own estimate, to compare side by side before changing). |
+| 10 | Hit glow of 0.25 s instead of 0.14 s | **Open** (`HIT_FLASH_SEC` 0.14). |
+| 11 | Held sustain glow x3 and the inactive fret in grey | **Partly**: the held halo and shimmer exist (`heldPulse`, `tailShimmer`, the held glow of the board); the grey inactive fret was not found. |
+| 12 | Static track background drawn once | Solved on the WebGL board (the road is static geometry on the GPU); the 2D code still draws it per frame in a pane layer. |
+| 13 | Cache the fade gradient | Done (`fadeGradient`). |
+| 14 | Frame-rate cap | Done (`perf.fpsCap` and the adaptive quality of `quality.js`). |
+| 15 | Object pool / bars in a shader | Done on the WebGL board (instanced sprites and models, placement in the vertex shader). A test on a real phone is still pending. |
+| 16 | Vocal range up to note 84 | Checked: `VOCAL_RANGE = [36, 84]` is YARG's own constant (`MidIOHelper` `VOCALS_RANGE_START/END`), kept. |
+| 17 | Drum and harmony colours | Harmony colours and the guitar palette follow YARG's `ColorProfile`; the drum colours are still the Rock Band convention, unconfirmed. |
+
 ## 4. Not confirmed
 
 Default value of `NoteSpeed`; fade curve and direction (shader); strike line appearance; note meshes; order and
