@@ -1104,7 +1104,7 @@ export class Highway {
         g.strokeStyle = 'rgba(0,0,0,0.65)';
         g.strokeText(syl.text, x, cy);
       }
-      g.fillStyle = syl.sp ? `rgba(255,191,43,${alpha})` : `rgba(255,255,255,${alpha})`; // (a star power lyric is yellow until it is sung)
+      g.fillStyle = mixHex('#0d1117', syl.sp ? VOCAL_SP_GOLD : '#ffffff', alpha); // opaque, already faded towards the stage colour: a translucent fill let the dark outline show through the middle of the letters (a star power lyric is the same gold as the notes' outline)
       g.fillText(syl.text, x, cy);
       const p = prog ? prog[i] : 0;
       if (p > 0) { // the sung part
