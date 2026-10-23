@@ -4,7 +4,7 @@
 export { NOTE_PALETTE } from './palette.js';
 export const GUITAR_LANE_COLORS = ['#79d304', '#ff1d23', '#ffe900', '#00bfff', '#ff8400']; // YARG.Core ColorProfile.Defaults.cs
 export const KICK_COLOR = '#ff8400'; // YARG's 4-lane kick (the 5-lane one is KICK_COLOR_5)
-export const KICK_COLOR_5 = '#e63fff'; // YARG's 5-lane kick (purple)
+export const KICK_COLOR_5 = '#c800ff'; // YARG's 5-lane kick (ColorProfile.FiveLaneDrums KickNote = DefaultPurple)
 export const STAR_POWER_GOLD = '#ffd700'; // the metal of a star power note in YARG
 export const STAR_POWER_BAND = 'rgba(255,176,0,0.13)'; // the track under a star power phrase (YARG: gold-orange overlay)
 export const SOLO_BAND = 'rgba(0,150,220,0.12)'; // ...and a solo (YARG: cyan-blue overlay)
@@ -615,6 +615,9 @@ const fadeColor = (a) => `rgba(0,0,0,${a})`;
 const smootherstep = (u) => u * u * u * (u * (u * 6 - 15) + 10);
 export const BOTTOM_FADE_STOPS = [[0, 0], [0.3, 0.2], [0.6, 0.6], [0.85, 0.92], [1, 1]].map(([at, a]) => [at, fadeColor(a)]); // just below the pads
 export const EDGE_FADE_STOPS = Array.from({ length: 13 }, (_, n) => { const u = n / 12; return [u, fadeColor((1 - smootherstep(u)).toFixed(3))]; }); // far edge of the board
+// Star power lyrics, as YARG draws them (VocalStaticLyricPhraseElement): yellow while ahead, a dark yellow once sung (the grey of the others' past).
+export const LYRIC_SP_FUTURE = '#ffeb04';
+export const LYRIC_SP_PAST = '#757519';
 export const LYRIC_RAMP_STOPS = Array.from({ length: 17 }, (_, n) => { const pos = n / 16; return [pos, fadeColor(1 - smootherstep(Math.pow(pos, 0.7)))]; }); // lyric sheet edges
 
 // A vertical gradient (x = 0) of one of the stop lists above from y0 to y1, kept for the next frame: panes of the same height share it

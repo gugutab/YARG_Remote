@@ -8,6 +8,7 @@ import { splitStaticPhrases } from './lyricphrases.js';
 const VOCAL_RANGE = [36, 84]; // MidIOHelper VOCALS_RANGE_START/END
 const RANGE_SHIFT_NOTE = 0;
 const LYRIC_SHIFT_NOTE = 1;
+const STARPOWER_NOTE = 116; // MidIOHelper STARPOWER_NOTE: on a vocal track too
 const PHRASE_NOTES = [105, 106]; // LYRICS_PHRASE_1/2: both are a scoring phrase and a static lyric phrase
 const PERCUSSION_NOTE = 96;
 const DUMMY_RANGE = { time: 0, length: 0, min: 48, max: 72 }; // GetRangeShifts: `new(48, 72, 0, 0, 0, 0)`
@@ -274,7 +275,7 @@ function rangeShifts(track, events, notes, toSec) {
 // Returns { notes, harmonies, percussion, lyrics, lyrics1, lyrics2, phrases, rangeShifts }: `lyrics` are the merged static lyrics (karaoke),
 // `lyrics1` the lead voice's own words and `lyrics2` the other voices' own words (harmony charts; null / [] otherwise).
 //   notes/harmonies[].notes: { time, end, length, pitch, slide, talkie } (slide: continues the previous note; talkie: unpitched)
-//   lyrics: { time, end, text, join } with `end` from the paired note; phrases: { start, end, from, to } (lyrics[from..to)),
+//   lyrics: { time, end, text, join, sp } with `end` from the paired note (`sp` true inside a star power phrase: drawn yellow); phrases: { start, end, from, to } (lyrics[from..to)),
 //   the display lines of YARG's static lyrics; rangeShifts: { time, length, min, max }.
 export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
   const harmony = harmonyParts.length > 0;
@@ -353,6 +354,20 @@ export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
     }
     lyrics2.sort((x, y) => x.time - y.time);
   }
+
+  // Star power lyrics (MoonSongLoader.Vocals.cs GetVocalsPhraseFlags): a scoring phrase (note 105/106) is a star power phrase when it starts inside a star power
+  // phrase (note 116); a lyric is star power when it falls in one of those scoring phrases (VocalStaticLyricPhraseElement). YARG draws them yellow.
+  const spTrack = track.notes.some((n) => n.pitch === STARPOWER_NOTE) || !soloTrack ? track : soloTrack;
+  const spSpans = spTrack.notes.filter((n) => n.pitch === STARPOWER_NOTE).map((n) => ({ tick: n.tick, end: n.endTick }));
+  const spRanges = phrases1
+    .filter((p) => spSpans.some((s) => p.tick >= s.tick && p.tick < s.end))
+    .map((p) => ({ start: toSec(p.tick), end: toSec(p.end) }));
+  const markStarPower = (list) => {
+    if (!list || spRanges.length === 0) return list;
+    for (const l of list) if (spRanges.some((r) => l.time >= r.start - 1e-6 && l.time < r.end - 1e-6)) l.sp = true;
+    return list;
+  };
+  markStarPower(lyrics); markStarPower(lyrics1); markStarPower(lyrics2);
 
   const shape = (wrapped) => wrapped.filter((n) => !n.perc).map((n) => ({ ...timed(n), pitch: n.pitch, slide: n.slide, talkie: n.talkie }));
   const pitched = [notes1, ...walkedExtra.map((e) => e.notes)].flat().filter((n) => !n.perc && !n.talkie);

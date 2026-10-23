@@ -8,7 +8,7 @@ const YARG_LANES = ['#79d304', '#ff1d23', '#ffe900', '#00bfff', '#ff8400']; // g
 const YARG_EXTENDED = ['#ff1d23', '#ffe900', '#ffd010', '#00bfff', '#2090ff', '#79d304', '#a0d010'];
 
 export const PALETTES = [
-  { id: 'yarg', label: 'YARG (default)', lanes: YARG_LANES, kick: '#ff8400', kick5: '#e63fff', open: '#c800ff', tap: '#b25cff', extended: YARG_EXTENDED },
+  { id: 'yarg', label: 'YARG (default)', lanes: YARG_LANES, kick: '#ff8400', kick5: '#c800ff', open: '#c800ff', tap: '#b25cff', extended: YARG_EXTENDED },
   // After Okabe & Ito's colour-blind safe set, tuned so the five lanes stay apart under deuteranopia, protanopia and tritanopia
   // (test/palette.test.js simulates them) while keeping the green / red / yellow / blue / orange order of the frets.
   { id: 'colorblind', label: 'Colour-blind safe', lanes: ['#00c08b', '#c43c3c', '#ffe600', '#3a6fe8', '#d98a00'], kick: '#d98a00', kick5: '#cc79a7', open: '#cc79a7', tap: '#e5a8d0' },

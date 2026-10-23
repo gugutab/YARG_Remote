@@ -20,7 +20,7 @@ export function buildKaraokeLines(lyrics, phrases) {
     for (const l of group) {
       const join = l.join ?? /[-‿]$/.test(l.text);
       const text = join ? l.text.replace(/[-‿]$/, '') : l.text;
-      if (text) syl.push({ time: l.time, end: l.end, text, join });
+      if (text) syl.push({ time: l.time, end: l.end, text, join, sp: !!l.sp });
     }
     if (syl.length) lines.push({ start: syl[0].time, end: syl[syl.length - 1].end, syl });
   }

@@ -5,7 +5,7 @@ import { renderDpr } from './quality.js';
 import { sanitizeSizes, fitWidths } from './panesizes.js';
 import { PER_INSTRUMENT_BASES, instrumentDefaults } from './perinstrument.js';
 import {
-  NOTE_PALETTE, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, LYRIC_RAMP_STOPS,
+  NOTE_PALETTE, BOTTOM_FADE_STOPS, EDGE_FADE_STOPS, LYRIC_RAMP_STOPS, LYRIC_SP_FUTURE, LYRIC_SP_PAST,
   STAR_POWER_GOLD,
   STAR_POWER_BAND,
   SOLO_BAND,
@@ -1098,7 +1098,7 @@ export class Highway {
         g.strokeStyle = 'rgba(0,0,0,0.65)';
         g.strokeText(syl.text, x, cy);
       }
-      g.fillStyle = `rgba(255,255,255,${alpha})`;
+      g.fillStyle = syl.sp ? `rgba(255,235,4,${alpha})` : `rgba(255,255,255,${alpha})`; // (a star power lyric is yellow until it is sung)
       g.fillText(syl.text, x, cy);
       const p = prog ? prog[i] : 0;
       if (p > 0) { // the sung part
@@ -1941,7 +1941,7 @@ export class Highway {
         g.lineJoin = 'round';
         g.strokeText(l.text, x, y);
       }
-      g.fillStyle = l.time > t ? colors[0] : t < sungUntil ? colors[1] : colors[2];
+      g.fillStyle = l.time > t ? (l.sp ? LYRIC_SP_FUTURE : colors[0]) : t < sungUntil ? colors[1] : (l.sp ? LYRIC_SP_PAST : colors[2]); // (a star power lyric is yellow)
       g.fillText(l.text, x, y);
     }
   }

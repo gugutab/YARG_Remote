@@ -103,3 +103,19 @@ test('karaoke lines follow the chart phrases and use the paired note ends', () =
   assert.equal(lines.length, 1);
   assert.deepEqual(lines[0].syl.map((s) => [s.text, s.join, s.end]), [['Hel', true, 0.5], ['lo', false, 0.8], ['you', false, 1.5]]);
 });
+
+test('star power lyrics: a scoring phrase that starts inside a note 116 phrase flags its lyrics (YARG draws them yellow), and the karaoke lines keep it', () => {
+  const chart = chartOf(VOCALS, track('PART VOCALS',
+    n(0, 2 * SEC, 105), sung([[0, 0.5, 'Hel-'], [0.5, 0.5, 'lo']]),
+    n(4 * SEC, 6 * SEC, 105), n(3.5 * SEC, 6.5 * SEC, 116), sung([[4, 0.5, 'Star'], [5, 0.5, 'power']]),
+    n(8 * SEC, 10 * SEC, 105), sung([[8, 0.5, 'Plain'], [9, 0.5, 'again']])));
+  assert.deepEqual(chart.lyrics.filter((l) => l.sp).map((l) => l.text), ['Star', 'power']);
+  assert.equal(chart.lyrics.filter((l) => !l.sp).length, 4);
+  const lines = buildKaraokeLines(chart.lyrics, chart.phrases);
+  assert.deepEqual(lines.flatMap((l) => l.syl).filter((s) => s.sp).map((s) => s.text), ['Star', 'power']);
+});
+
+test('star power lyrics: no 116 phrase, no flag', () => {
+  const chart = chartOf(VOCALS, track('PART VOCALS', n(0, 2 * SEC, 105), sung([[0, 0.5, 'Just'], [1, 0.5, 'words']])));
+  assert.ok(chart.lyrics.every((l) => !l.sp));
+});
