@@ -2146,21 +2146,22 @@ export class Highway {
     return { y, R, env, age: t - n.time, sp: !!n.sp, seed: n.time % 97 };
   }
 
-  // The hit area while the voice is at the line (2D drawing; the board draws the same in vocals-gl.js). Calm and continuous, never a flash, and kept to the left of the hit line (the
-  // side the note has already passed): a soft half halo and a warm core on the line of the voice, the stretch of the hit line that lights up, two gentle ripples that keep going
-  // outwards for as long as the note is sung, and a few embers that drift up and back; gold for a star power note.
+  // The hit area while the voice is at the line (2D drawing; the board draws the same in vocals-gl.js): a little fire in the colour of the track (gold for a star power note): a flame
+  // that sways gently at the hit line, its embers rising and drifting back, a soft halo, the stretch of the hit line that lights up and two gentle ripples. Continuous and calm, never
+  // a flash, and kept to the left of the hit line (the side the note has already passed).
   vocalHitGlow(notes, t, half, color, hitX) {
     const p = this.vocalGlowParams(notes, t, half, hitX);
     if (!p) return;
     const g = this.g;
     const tone = p.sp ? VOCAL_SP_GOLD : color;
-    const hot = tintWhite(tone, 0.55);
+    const warm = tintWhite(tone, 0.5); // the base of the flame
+    const SX = 2.2; // the halo and the ripples are stretched along the line of the notes: this much wider than tall
     g.save();
     g.beginPath();
     g.rect(hitX - p.R * 14, p.y - p.R * 4.5, p.R * 14 + 1.5, p.R * 9); // nothing on the right of the line
     g.clip();
     g.globalCompositeOperation = 'lighter';
-    const SX = 2.2; // the animation is stretched along the line of the notes: this much wider than tall
+    g.save();
     g.translate(hitX, p.y);
     g.scale(SX, 1);
     const disc = (r, stops) => {
@@ -2171,14 +2172,7 @@ export class Highway {
       g.arc(0, 0, r, 0, Math.PI * 2);
       g.fill();
     };
-    disc(p.R * 2.3, [[0, tone, 0.3 * p.env], [0.5, tone, 0.12 * p.env], [1, tone, 0]]);
-    disc(p.R * 0.95, [[0, hot, 0.6 * p.env], [1, hot, 0]]);
-    const lg = g.createLinearGradient(0, -p.R * 2.8, 0, p.R * 2.8); // the stretch of the hit line that lights up
-    lg.addColorStop(0, withAlpha(hot, 0));
-    lg.addColorStop(0.5, withAlpha(hot, 0.5 * p.env));
-    lg.addColorStop(1, withAlpha(hot, 0));
-    g.fillStyle = lg;
-    g.fillRect(-2 / SX, -p.R * 2.8, 3 / SX, p.R * 5.6);
+    disc(p.R * 2.3, [[0, tone, 0.32 * p.env], [0.5, tone, 0.12 * p.env], [1, tone, 0]]);
     for (let i = 0; i < 2; i++) { // two ripples half a period apart
       const ph = (t * 0.8 + i * 0.5 + p.seed * 0.07) % 1;
       g.beginPath();
@@ -2187,17 +2181,38 @@ export class Highway {
       g.strokeStyle = withAlpha(tone, 0.5 * p.env * (1 - ph) * (1 - ph) * Math.min(1, ph / 0.12));
       g.stroke();
     }
+    g.restore();
+    const lg = g.createLinearGradient(0, p.y - p.R * 2.8, 0, p.y + p.R * 2.8); // the stretch of the hit line that lights up
+    lg.addColorStop(0, withAlpha(warm, 0));
+    lg.addColorStop(0.5, withAlpha(warm, 0.45 * p.env));
+    lg.addColorStop(1, withAlpha(warm, 0));
+    g.fillStyle = lg;
+    g.fillRect(hitX - 2, p.y - p.R * 2.8, 3, p.R * 5.6);
+    // the flame: a teardrop from just left of the hit point, its tip swaying
+    const fx = hitX - p.R * 0.55, fy = p.y + p.R * 0.35, h = p.R * 2.9, w = p.R * 0.95;
+    const sway = (Math.sin(t * 2.6 + p.seed + 3) * 0.22 + Math.sin(t * 1.7 + p.seed * 2) * 0.1) * p.R;
+    const fg = g.createLinearGradient(0, fy, 0, fy - h);
+    fg.addColorStop(0, withAlpha(warm, 0.9 * p.env));
+    fg.addColorStop(0.45, withAlpha(tone, 0.7 * p.env));
+    fg.addColorStop(1, withAlpha(tone, 0));
+    g.fillStyle = fg;
+    g.beginPath();
+    g.moveTo(fx - w, fy);
+    g.quadraticCurveTo(fx - w * 0.9, fy - h * 0.45, fx + sway, fy - h);
+    g.quadraticCurveTo(fx + w * 0.9, fy - h * 0.45, fx + w, fy);
+    g.ellipse(fx, fy, w, p.R * 0.8, 0, 0, Math.PI);
+    g.closePath();
+    g.fill();
     const hsh = (a, b) => { const v = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return v - Math.floor(v); };
-    g.fillStyle = hot;
-    for (let k = 0; k < 8; k++) { // embers
+    g.fillStyle = tone;
+    for (let k = 0; k < 10; k++) { // embers, rising from the flame and drifting back
       const h1 = hsh(k, p.seed * 3.7), h2 = hsh(k * 2.3, p.seed * 1.3);
       const ph = (t * (0.3 + 0.22 * h1) + h2) % 1;
-      const x = -ph * p.R * (2.2 + 3.2 * h1);
-      const y = -ph * p.R * (0.5 + 2 * h2) + Math.sin(ph * 6.2832 * (1 + h1) + k) * p.R * 0.22;
-      g.globalAlpha = 0.8 * p.env * (1 - ph) * (1 - ph) * Math.min(1, ph / 0.12);
+      const x = fx - ph * p.R * SX * (0.9 + 2.6 * h1) + Math.sin(ph * 6.2832 * (1 + h1) + k) * p.R * 0.3;
+      const y = fy - p.R * 0.35 - ph * p.R * (1.4 + 2.8 * h2);
+      g.globalAlpha = p.env * (1 - ph) * (1 - ph) * Math.min(1, ph / 0.12);
       g.beginPath();
-      const er = Math.max(1, p.R * (0.17 + 0.12 * h2) * (1 - 0.7 * ph));
-      g.ellipse(x, y, er / SX, er, 0, 0, Math.PI * 2); // (a circle: the context is stretched by SX)
+      g.arc(x, y, Math.max(1, p.R * (0.2 + 0.13 * h2) * (1 - 0.7 * ph)), 0, Math.PI * 2);
       g.fill();
     }
     g.restore();
