@@ -118,12 +118,19 @@ const PROGRAMS = {
   int fl = int(v_a1.w + 0.5); bool tk = (fl & 1) != 0; bool sp = (fl & 2) != 0;
   float d = sdRR(v_p - vec2((x1 + x2) * 0.5, y), hs, tk ? 0.0 : min(hf, hs.x));
   vec3 col = mix(v_a1.rgb, v_a2.rgb, v_p.x < u_hitx ? 0.8 : 0.0); // (past the hit line: the colour veiled in the dark passed colour)
-  if (tk) { // a free note: a faint fill and a dashed border 2 px wide, just inside (only in the fill pass)
+  if (tk) { // a free note: a faint fill and a dashed border 2 px wide, just inside (only in the fill pass); alive: the dashes march along the border, the fill breathes, a soft band of
+    // light slides up the box over and over, and while the box is over the hit line it is lit a little more
     if (u_pass < 1.5) { o = vec4(0.0); return; }
     float inside = cover(d);
-    float dash = step(fract((v_p.x + v_p.y) / 7.0), 4.0 / 7.0);
+    float live = smoothstep(x1 - 2.0, x1 + 2.0, u_hitx) * (1.0 - smoothstep(x2 - 2.0, x2 + 2.0, u_hitx));
+    float dash = step(fract((v_p.x + v_p.y) / 7.0 - u_t * 0.9), 4.0 / 7.0);
     float edge = (1.0 - smoothstep(0.5, 1.5, abs(d + 1.0))) * dash;
-    float a = max(0.35 * inside, edge);
+    float y01 = (v_p.y - (y - hs.y)) / max(2.0 * hs.y, 1.0);
+    float bc = 1.15 - fract(u_t * 0.45 + x1 * 0.013) * 1.5;
+    float band = exp(-pow((y01 - bc) * 4.5, 2.0));
+    float breathe = 0.3 + 0.1 * sin(u_t * 2.4 + x1 * 0.05);
+    float a = max(inside * (breathe + 0.3 * band + 0.28 * live), edge * (0.85 + 0.15 * live));
+    col = mix(col, vec3(1.0), 0.28 * live * inside);
     col = mix(col, GOLD, sp ? edge : 0.0);
     o = vec4(col * a, a);
     return;
@@ -205,9 +212,9 @@ const PROGRAMS = {
   o = acc * alpha;
 }`)],
 
-  // the voice at the hit line: y, R, env, age | r, g, b, star power | seed. A little fire in the colour of the track (gold for star power): a flame that sways gently at the hit
-  // line, its embers rising and drifting back, a soft halo, the stretch of the hit line that lights up and two gentle ripples. Continuous and calm, never a flash, and kept to the
-  // left of the hit line (the side the note has already passed).
+  // the voice at the hit line: y, R, env, age | r, g, b, star power | seed. The effects of a little fire in the colour of the track (gold for star power), without the flame itself:
+  // embers rising and drifting back, a soft halo and warm core, the stretch of the hit line that lights up and two gentle ripples. Continuous and calm, never a flash, and kept to
+  // the left of the hit line (the side the note has already passed).
   glow: [VS('vec4(u_hitx - a0.y * 13.0, a0.x - a0.y * 4.4, u_hitx + a0.y * 1.5, a0.x + a0.y * 4.4)'), FS('const float SX = 2.2; // the animation is stretched along the line of the notes: this much wider than tall',
     `void main() {
   float y = v_a0.x, R = v_a0.y, env = v_a0.z;
@@ -229,29 +236,19 @@ const PROGRAMS = {
     rip += (1.0 - ph) * (1.0 - ph) * (1.0 - smoothstep(0.0, 1.0, abs(re - rr) / w)) * smoothstep(0.0, 0.12, ph);
   }
   rip *= 0.5 * env * side;
-  // the flame: a teardrop that rises from just left of the hit point, narrowing to a tip that sways; hotter (lighter) at its base, the track's colour higher up
-  vec2 fd = v_p - vec2(u_hitx - R * 0.55, y + R * 0.35);
-  float tt = clamp(-fd.y / (R * 2.9), 0.0, 1.0);
-  float sway = (sin(u_t * 2.6 + seed + tt * 3.0) * 0.22 + sin(u_t * 1.7 + seed * 2.0) * 0.1) * R * tt;
-  float wid = R * 0.95 * pow(1.0 - tt, 0.85);
-  float up = step(0.0, -fd.y) * (1.0 - smoothstep(0.82, 1.0, tt)) * (1.0 - smoothstep(wid * 0.45, max(wid, 0.001), abs(fd.x - sway)));
-  float below = step(0.0, fd.y) * (1.0 - smoothstep(0.7, 1.0, length(vec2(fd.x / (R * 0.95), fd.y / (R * 0.8)))));
-  float flame = max(up, below) * env * side;
-  float heat = clamp(1.0 - tt * 1.15, 0.0, 1.0);
-  vec3 fc = mix(tone, mix(tone, vec3(1.0), 0.55), heat * heat);
   float em = 0.0;
   for (int i = 0; i < 16; i++) {
     float fi = float(i);
     float h1 = fract(sin(fi * 12.9898 + seed * 3.7) * 43758.5453), h2 = fract(sin(fi * 78.233 + seed * 1.3) * 12345.678);
     float ph = fract(u_t * (0.3 + 0.22 * h1) + h2);
-    vec2 pc = vec2(u_hitx - R * 0.55 - ph * R * SX * (0.9 + 2.6 * h1) + sin(ph * 6.2832 * (1.0 + h1) + fi) * R * 0.3, y - ph * R * (1.4 + 2.8 * h2)); // (they rise from the flame, drifting back)
+    vec2 pc = vec2(u_hitx - R * 0.55 - ph * R * SX * (0.9 + 2.6 * h1) + sin(ph * 6.2832 * (1.0 + h1) + fi) * R * 0.3, y - ph * R * (1.0 + 2.8 * h2)); // (they rise from the hit and drift back)
     float sz = R * (0.2 + 0.13 * h2) * (1.0 - 0.7 * ph);
     vec2 q = v_p - pc;
     em += exp(-dot(q, q) / (sz * sz)) * (1.0 - ph) * (1.0 - ph) * smoothstep(0.0, 0.12, ph);
   }
   em *= 1.0 * env;
   vec3 hot = mix(tone, vec3(1.0), 0.4);
-  vec3 light = tone * (halo + rip + em) + hot * (core * 0.7 + line * 0.7) + fc * flame * 0.9;
+  vec3 light = tone * (halo + rip + em) + hot * (core * 0.8 + line * 0.7);
   o = vec4(light, clamp(max(light.r, max(light.g, light.b)) * 0.9, 0.0, 1.0));
 }`)],
 };

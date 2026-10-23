@@ -1974,15 +1974,17 @@ export class Highway {
     g.strokeStyle = color;
     if (n.talkie) {
       g.save();
-      g.globalAlpha *= 0.35;
+      g.globalAlpha *= 0.3 + 0.1 * Math.sin(VOC_T * 2.4 + x1 * 0.05); // (the fill breathes)
       const ty = VOC_TOP + 10; // a little room above the box
       g.fillRect(x1, ty, bw, VOC_BOTTOM - ty); // a free note fills the chart area above the lyrics
       g.restore();
       g.setLineDash([4, 3]);
+      g.lineDashOffset = -VOC_T * 6.3; // (the dashes march along the border)
       g.lineWidth = 2;
       if (n.sp) g.strokeStyle = VOCAL_SP_GOLD; // (a star power note: a gold outline)
       g.strokeRect(x1, ty, bw, VOC_BOTTOM - ty);
       g.setLineDash([]);
+      g.lineDashOffset = 0;
       return;
     }
     if (n.slide && prev && !prev.talkie) { // continues the previous note: a smooth ribbon from its end to this note's start
@@ -2146,9 +2148,9 @@ export class Highway {
     return { y, R, env, age: t - n.time, sp: !!n.sp, seed: n.time % 97 };
   }
 
-  // The hit area while the voice is at the line (2D drawing; the board draws the same in vocals-gl.js): a little fire in the colour of the track (gold for a star power note): a flame
-  // that sways gently at the hit line, its embers rising and drifting back, a soft halo, the stretch of the hit line that lights up and two gentle ripples. Continuous and calm, never
-  // a flash, and kept to the left of the hit line (the side the note has already passed).
+  // The hit area while the voice is at the line (2D drawing; the board draws the same in vocals-gl.js): the effects of a little fire in the colour of the track (gold for a star power
+  // note), without the flame itself: embers rising and drifting back, a soft halo, the stretch of the hit line that lights up and two gentle ripples. Continuous and calm, never a
+  // flash, and kept to the left of the hit line (the side the note has already passed).
   vocalHitGlow(notes, t, half, color, hitX) {
     const p = this.vocalGlowParams(notes, t, half, hitX);
     if (!p) return;
@@ -2188,21 +2190,7 @@ export class Highway {
     lg.addColorStop(1, withAlpha(warm, 0));
     g.fillStyle = lg;
     g.fillRect(hitX - 2, p.y - p.R * 2.8, 3, p.R * 5.6);
-    // the flame: a teardrop from just left of the hit point, its tip swaying
-    const fx = hitX - p.R * 0.55, fy = p.y + p.R * 0.35, h = p.R * 2.9, w = p.R * 0.95;
-    const sway = (Math.sin(t * 2.6 + p.seed + 3) * 0.22 + Math.sin(t * 1.7 + p.seed * 2) * 0.1) * p.R;
-    const fg = g.createLinearGradient(0, fy, 0, fy - h);
-    fg.addColorStop(0, withAlpha(warm, 0.9 * p.env));
-    fg.addColorStop(0.45, withAlpha(tone, 0.7 * p.env));
-    fg.addColorStop(1, withAlpha(tone, 0));
-    g.fillStyle = fg;
-    g.beginPath();
-    g.moveTo(fx - w, fy);
-    g.quadraticCurveTo(fx - w * 0.9, fy - h * 0.45, fx + sway, fy - h);
-    g.quadraticCurveTo(fx + w * 0.9, fy - h * 0.45, fx + w, fy);
-    g.ellipse(fx, fy, w, p.R * 0.8, 0, 0, Math.PI);
-    g.closePath();
-    g.fill();
+    const fx = hitX - p.R * 0.55, fy = p.y + p.R * 0.35; // (where the embers rise from)
     const hsh = (a, b) => { const v = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return v - Math.floor(v); };
     g.fillStyle = tone;
     for (let k = 0; k < 10; k++) { // embers, rising from the flame and drifting back
