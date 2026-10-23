@@ -130,7 +130,7 @@ const PROGRAMS = {
     float edge = (1.0 - smoothstep(0.5, 1.5, abs(d + 1.0))) * dash;
     // inside the box, in the part that has passed the hit line: a voice meter, thin bars that jump up and down, strongest next to the line and fading away behind it
     float behind = u_hitx - v_p.x;
-    float meterOn = step(x1, v_p.x) * smoothstep(-1.0, 3.0, behind) * (1.0 - smoothstep(70.0, 190.0, behind)) * step(0.0, u_hitx - x1);
+    float meterOn = step(x1, v_p.x) * smoothstep(-1.0, 3.0, behind) * (1.0 - smoothstep(10.0, 120.0, behind)) * step(0.0, u_hitx - x1);
     float k = floor((v_p.x - x1) / 6.0);
     float bar = step(0.15, fract((v_p.x - x1) / 6.0)) * (1.0 - step(0.85, fract((v_p.x - x1) / 6.0)));
     float bh = (0.2 + 0.8 * abs(sin(k * 1.9 + u_t * 7.0) * sin(k * 0.71 - u_t * 3.7 + 1.3))) * hs.y * 0.9;
@@ -156,10 +156,10 @@ const PROGRAMS = {
   }
   float a = cover(d);
   // inside the note, in the part that has passed the hit line while the voice is on it: a voice meter, thin light bars that jump up and down, strongest next to the line and
-  // fading out within ~60 px behind it
+  // fading out about 120 px behind it
   float behind = u_hitx - v_p.x;
   float live = step(x1, u_hitx) * (1.0 - smoothstep(x2, x2 + 24.0, u_hitx));
-  float on = live * smoothstep(-1.0, 4.0, behind) * (1.0 - smoothstep(4.0, 60.0, behind)); // (appears at the line and fades out within a short distance)
+  float on = live * smoothstep(-1.0, 4.0, behind) * (1.0 - smoothstep(10.0, 120.0, behind)); // (appears at the line and fades out about 120 px behind it)
   float fx = (v_p.x - x1) / 5.0;
   float k = floor(fx);
   float barX = step(0.15, fract(fx)) * (1.0 - step(0.85, fract(fx)));

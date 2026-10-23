@@ -2024,7 +2024,7 @@ export class Highway {
         for (let k = 0; x1 + k * 6 < Math.min(x1 + bw, VOC_HIT_X); k++) {
           const bx = x1 + k * 6 + 1;
           const behind = VOC_HIT_X - bx;
-          const f = Math.min(1, Math.max(0, (behind + 1) / 4)) * (1 - Math.min(1, Math.max(0, (behind - 70) / 120)));
+          const f = Math.min(1, Math.max(0, (behind + 1) / 4)) * (1 - Math.min(1, Math.max(0, (behind - 10) / 110)));
           if (f <= 0.01) continue;
           const h = (0.2 + 0.8 * Math.abs(Math.sin(k * 1.9 + VOC_T * 7) * Math.sin(k * 0.71 - VOC_T * 3.7 + 1.3))) * hh;
           g.globalAlpha = 0.7 * f;
@@ -2191,7 +2191,7 @@ export class Highway {
         g.fillStyle = tintWhite(n.sp ? VOCAL_SP_GOLD : colors[1], 0.6);
         for (let k = 0; x1 + k * 5 < Math.min(x2, hitX); k++) {
           const bx = x1 + k * 5 + 0.75, behindPx = hitX - bx;
-          const f = Math.min(1, Math.max(0, (behindPx + 1) / 4)) * (1 - Math.min(1, Math.max(0, (behindPx - 4) / 56))) * live;
+          const f = Math.min(1, Math.max(0, (behindPx + 1) / 4)) * (1 - Math.min(1, Math.max(0, (behindPx - 10) / 110))) * live;
           if (f <= 0.01) continue;
           const h = (0.25 + 0.75 * Math.abs(Math.sin(k * 1.9 + t * 7) * Math.sin(k * 0.71 - t * 3.7 + 1.3))) * half * 0.85;
           g.globalAlpha = 0.85 * f;
