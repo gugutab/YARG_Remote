@@ -510,7 +510,11 @@ void main() {
   else if (v_role < 0.5) { // the metal (the style is a choice: fx.metal): the base map's baked shading kept for the form, a studio reflected on it, a highlight, and a brushing that goes from none to strong
     float capFace = step(0.6, abs(N.x));
     float rr = length(v_mp.yz), ang = atan(v_mp.y, v_mp.z);
-    float lines = capFace > 0.5 ? vnoise(vec2(rr * 40.0, ang * 2.0)) : vnoise(vec2((v_mp.y + v_mp.z) * 40.0, v_mp.x * 1.5)); // (fast across the lines, slow along them)
+    // The brushing: value noise, fast across the lines and slow along them, in two octaves. Each octave fades out where a pixel covers more than about one of its cells (fwidth),
+    // so a far or moving note does not shimmer, and the nearest notes, which are big, keep a fine grain instead of the blocky cells of one coarse octave.
+    vec2 bp = capFace > 0.5 ? vec2(rr * 40.0, ang * 2.0) : vec2((v_mp.y + v_mp.z) * 40.0, v_mp.x * 1.5);
+    float fwc = max(fwidth(bp.x), fwidth(bp.y)), fwf = fwc * 3.3;
+    float lines = 0.5 + (vnoise(bp) - 0.5) * (1.0 - smoothstep(0.35, 1.0, fwc)) * 0.65 + (vnoise(bp * vec2(3.3, 3.0) + 5.7) - 0.5) * (1.0 - smoothstep(0.35, 1.0, fwf)) * 0.45;
     vec3 Tb = capFace > 0.5 ? normalize(vec3(0.0, v_mp.z, v_mp.y) + vec3(0.0, 0.0001, 0.0)) : vec3(1.0, 0.0, 0.0);
     float aniso = pow(sqrt(max(1.0 - pow(dot(Tb, H), 2.0), 0.0)), 14.0) * max(dot(N, L) * 0.7 + 0.3, 0.0);
     vec3 tint; float refl, spec, sexp, brush, lift;
