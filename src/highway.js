@@ -240,6 +240,7 @@ export class Highway {
     this.glBlur = -1; // the index of the motion blur sample being drawn (the board averages them in a framebuffer, see GLBoard.begin), -1 outside a blur
     this.glOpts = {};
     this.vocalFrame = new VocalFrame(); // what the vocal view records for the board (vocals-gl.js)
+    this.sheetPresent = null; // the colour of the part already sung of a karaoke sheet while a harmony sheet is drawn (null: the lead's)
     this.curRect = null; // the pane being drawn: { x, y, w, h } on the stage
     // The 3D notes of the board (setting highway.notes3d: 'off', 'yarg' = YARG's own models, 'own' = our lamp) and how they look (highway.noteMetal / noteGlass / cymbalTop: indices of
     // the style lists of highway-gl.js, noteGlow: 0..2, noteSparks / noteFog: the optional effects). They need the board, so they are ignored with perf.renderer 'canvas'.
@@ -670,7 +671,7 @@ export class Highway {
         g.clip();
         g.translate(0, vh);
         try {
-          if ((vocal.chart.lyrics2 || []).length > 0) this.renderSheetsSplit(t, w, h - vh, vocal, 0, vh); // harmony: one sheet per voice
+          if (this.sheetKeys(vocal.chart).length > 0) this.renderSheetsSplit(t, w, h - vh, vocal, 0, vh); // harmony: one sheet per voice
           else this.renderLyricSheet(t, w, h - vh, this.karaokeLines(vocal, 'main'), this.sheetState(vocal, 'main'), 0, vh, this.lyricCtx(vocal));
         } finally {
           g.restore();
@@ -1112,7 +1113,7 @@ export class Highway {
         g.beginPath();
         g.rect(x, cy - sz, sw * p, sz * 2);
         g.clip();
-        g.fillStyle = this.vocColors.present;
+        g.fillStyle = this.sheetPresent || this.vocColors.present; // (the voice's own colour in the harmony sheets)
         g.fillText(syl.text, x, cy);
         g.restore();
       }
@@ -1123,16 +1124,24 @@ export class Highway {
   }
 
   // Lines of a lyric list, cached per pane. 'main' = the merged static lyrics (YARG's), 'v1' = the lead voice's own words,
-  // 'v2' = the other voices' own words (harmony charts).
+  // 'v2' / 'v3' = the words of voice 2 / 3 (their own, and the lead's where they sing along), harmony charts.
   karaokeLines(pane, key = 'main') {
     pane.kl ??= {};
     if (!pane.kl[key]) {
       const c = pane.chart;
-      pane.kl[key] = key === 'v2' ? buildKaraokeLines(c.lyrics2 || [])
+      pane.kl[key] = key === 'v3' ? buildKaraokeLines(c.voiceLyrics?.[3] || [])
+        : key === 'v2' ? buildKaraokeLines(c.voiceLyrics?.[2] ?? c.lyrics2 ?? [])
         : key === 'v1' ? buildKaraokeLines(c.lyrics1?.length ? c.lyrics1 : c.lyrics || [])
           : buildKaraokeLines(c.lyrics || [], c.phrases);
     }
     return pane.kl[key];
+  }
+
+  // The karaoke sheets a chart has: ['v1', 'v2', 'v3'] for the voices that have words, or [] when there is one sheet only (a solo chart: the merged lyrics).
+  sheetKeys(chart) {
+    const v = chart.voiceLyrics;
+    const keys = v ? [2, 3].filter((p) => (v[p] || []).length > 0).map((p) => `v${p}`) : (chart.lyrics2 || []).length > 0 ? ['v2'] : [];
+    return keys.length ? ['v1', ...keys] : [];
   }
 
   sheetState(pane, key) {
@@ -1496,11 +1505,11 @@ export class Highway {
     return this.sheets.find((sh) => sh.playBtn && x >= sh.playBtn.x && x <= sh.playBtn.x + sh.playBtn.w && y >= sh.playBtn.y && y <= sh.playBtn.y + sh.playBtn.h) ?? null;
   }
 
-  // Two lyric sheets, VOCAL 1 (the lead's words) and VOCAL 2 (the other voices'), side by side in a wide area and one above
-  // the other in a narrow one. The area is at (x0, y0) of the canvas and the origin is already there.
+  // One lyric sheet per voice, VOCAL 1 (the lead's words), 2 and 3 (their own words and the lead's where they sing along), side by side in a wide area and one above the other in a
+  // narrow one. The part of a syllable already sung is filled in its voice's colour (the lead's, and the theme's harmony colours for voices 2 and 3). The area is at (x0, y0) of the canvas and the origin is already there.
   renderSheetsSplit(t, w, h, pane, x0, y0) {
     const g = this.g;
-    const cols = w >= 760 && w >= h * 1.1;
+    const cols = w >= 380 * this.sheetKeys(pane.chart).length && w >= h * 1.1;
     const caption = (text, x, y) => {
       g.font = '700 12px system-ui';
       g.textAlign = 'left';
@@ -1509,9 +1518,13 @@ export class Highway {
       g.fillText(text, x, y);
       g.textBaseline = 'alphabetic';
     };
-    [['v1', 'VOCAL 1'], ['v2', 'VOCAL 2']].forEach(([key, name], k) => {
-      const bw = cols ? w / 2 : w;
-      const bh = cols ? h : h / 2;
+    const keys = this.sheetKeys(pane.chart);
+    const n = keys.length;
+    const colour = { v1: this.vocColors.present, v2: this.vocColors.harmony[2], v3: this.vocColors.harmony[3] };
+    keys.forEach((key, k) => {
+      const name = `VOCAL ${key.slice(1)}`;
+      const bw = cols ? w / n : w;
+      const bh = cols ? h : h / n;
       const bx = cols ? k * bw : 0;
       const by = cols ? 0 : k * bh;
       g.save();
@@ -1519,19 +1532,26 @@ export class Highway {
       g.rect(bx, by, bw, bh);
       g.clip();
       g.translate(bx, by);
-      this.renderLyricSheet(t, bw, bh, this.karaokeLines(pane, key), this.sheetState(pane, key), x0 + bx, y0 + by, this.lyricCtx(pane));
+      this.sheetPresent = colour[key];
+      try {
+        this.renderLyricSheet(t, bw, bh, this.karaokeLines(pane, key), this.sheetState(pane, key), x0 + bx, y0 + by, this.lyricCtx(pane));
+      } finally {
+        this.sheetPresent = null;
+      }
       caption(name, 12, 14);
       g.restore();
     });
     g.fillStyle = 'rgba(255,255,255,0.12)';
-    if (cols) g.fillRect(Math.round(w / 2), 0, 1, h);
-    else g.fillRect(0, Math.round(h / 2), w, 1);
+    for (let k = 1; k < n; k++) {
+      if (cols) g.fillRect(Math.round((w * k) / n), 0, 1, h);
+      else g.fillRect(0, Math.round((h * k) / n), w, 1);
+    }
   }
 
   // Karaoke: only the lyrics, as a sheet that scrolls (two sheets, vocal 1 and vocal 2, when the harmony voices have words of
   // their own), alone on the stage or in the band above the other charts.
   renderKaraoke(t, w, h, pane) {
-    if ((pane.chart.lyrics2 || []).length > 0) this.renderSheetsSplit(t, w, h, pane, 0, 0);
+    if (this.sheetKeys(pane.chart).length > 0) this.renderSheetsSplit(t, w, h, pane, 0, 0);
     else this.renderLyricSheet(t, w, h, this.karaokeLines(pane, 'main'), this.sheetState(pane, 'main'), 0, 0, this.lyricCtx(pane));
   }
 

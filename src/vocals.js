@@ -273,7 +273,8 @@ function rangeShifts(track, events, notes, toSec) {
 // midi: parsed file; track: the lead track (PART VOCALS, or HARM1 for harmonies); harmonyParts: [{ part, track }] when
 // building the harmony instrument; timed(note) -> { time, end, length }.
 // Returns { notes, harmonies, percussion, lyrics, lyrics1, lyrics2, phrases, rangeShifts }: `lyrics` are the merged static lyrics (karaoke),
-// `lyrics1` the lead voice's own words and `lyrics2` the other voices' own words (harmony charts; null / [] otherwise).
+// `lyrics1` the lead voice's own words and `lyrics2` the other voices' own words (harmony charts; null / [] otherwise); `voiceLyrics` the words of each voice for the karaoke sheets
+// ({ 1, 2, 3 }: its own words plus the lead's where it sings along; null for a solo chart).
 //   notes/harmonies[].notes: { time, end, length, pitch, slide, talkie } (slide: continues the previous note; talkie: unpitched)
 //   lyrics: { time, end, text, join, sp } with `end` from the paired note (`sp` true inside a star power phrase: drawn yellow); phrases: { start, end, from, to } (lyrics[from..to)),
 //   the display lines of YARG's static lyrics; rangeShifts: { time, length, min, max }.
@@ -336,6 +337,7 @@ export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
   // The other voices' own words (HARM2/HARM3), for a second lyric line: the visible lyrics of those parts that the lead
   // does not sing at the same moment with the same text.
   const lyrics2 = [];
+  let voiceLyrics = null; // { 1: the lead's words, 2: voice 2's, 3: voice 3's } (harmony charts)
   let lyrics1 = null; // the lead voice's own words (the merged `lyrics` hold every voice's, as YARG's static lyrics do)
   if (harmony) {
     const lead = walked1.flatMap((p) => p.lyrics);
@@ -353,6 +355,22 @@ export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
       });
     }
     lyrics2.sort((x, y) => x.time - y.time);
+    // The words of every voice for the karaoke, one sheet each (VOCAL 1, 2 and 3): the voice's own words, and also the lead's words wherever the voice sings along with it (its notes
+    // cover the word's start) and has no word of its own there: a voice that sings the same words as the lead shows them too.
+    voiceLyrics = { 1: lyrics1 };
+    for (const e of walkedExtra) {
+      const own = e.walked.flatMap((p) => p.lyrics.filter((l) => !l.hidden && l.text)).map((l) => ({ time: l.time, end: l.end, text: l.text, join: l.join, part: e.part }));
+      const spans = e.notes.filter((n) => !n.perc).map((n) => [toSec(n.tick), toSec(totalEndTick(n))]);
+      const words = [...own];
+      for (const l of lyrics1) {
+        if (spans.some(([a, b]) => l.time >= a - 0.05 && l.time <= b) && !own.some((o) => Math.abs(o.time - l.time) < 0.2)) words.push({ time: l.time, end: l.end, text: l.text, join: l.join, part: e.part, shared: true });
+      }
+      words.sort((x, y) => x.time - y.time);
+      voiceLyrics[e.part] = words.map((w, k) => { // (a syllable only joins the next one when that one is shown too, and close by)
+        const next = words[k + 1];
+        return { ...w, join: !!(w.join && next && next.time - (w.end > w.time ? w.end : w.time) < 0.8) };
+      });
+    }
   }
 
   // Star power lyrics (MoonSongLoader.Vocals.cs GetVocalsPhraseFlags): a scoring phrase (note 105/106) is a star power phrase when it starts inside a star power
@@ -368,6 +386,7 @@ export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
     return list;
   };
   markStarPower(lyrics); markStarPower(lyrics1); markStarPower(lyrics2);
+  if (voiceLyrics) for (const p of [2, 3]) markStarPower(voiceLyrics[p]);
   const inStarPower = (time) => spRanges.some((r) => time >= r.start - 1e-6 && time < r.end - 1e-6); // (the notes of those phrases: a gold outline in the views)
 
   const shape = (wrapped) => wrapped.filter((n) => !n.perc).map((n) => { const tm = timed(n); return { ...tm, pitch: n.pitch, slide: n.slide, talkie: n.talkie, sp: spRanges.length > 0 && inStarPower(tm.time) }; });
@@ -380,6 +399,7 @@ export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
     lyrics,
     lyrics1,
     lyrics2,
+    voiceLyrics,
     phrases,
     rangeShifts: anyPhrases ? rangeShifts(track, events, pitched, toSec) : [DUMMY_RANGE],
   };

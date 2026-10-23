@@ -119,3 +119,18 @@ test('star power lyrics: no 116 phrase, no flag', () => {
   const chart = chartOf(VOCALS, track('PART VOCALS', n(0, 2 * SEC, 105), sung([[0, 0.5, 'Just'], [1, 0.5, 'words']])));
   assert.ok(chart.lyrics.every((l) => !l.sp));
 });
+
+test('harmony karaoke: each voice has its own sheet words, the lead\'s words where it sings along, and voice 3 gets one when it has notes', () => {
+  const phrase = n(0, 8 * SEC, 105);
+  const c = chartOf(HARMONY,
+    track('HARM1', phrase, lyric(0, 'Hold'), n(0, SEC / 2, 60), lyric(SEC, 'on'), n(SEC, 1.5 * SEC, 62), lyric(2 * SEC, 'tight'), n(2 * SEC, 2.5 * SEC, 64)),
+    track('HARM2', phrase, lyric(SEC, 'ooh'), n(0, SEC / 2, 64), n(SEC, 1.5 * SEC, 65)), // sings along on "Hold" (no word of its own), has its own word on 2nd note
+    track('HARM3', phrase, n(2 * SEC, 2.5 * SEC, 67))); // sings along on "tight" only
+  const v = c.voiceLyrics;
+  assert.deepEqual(v[1].map((l) => l.text), ['Hold', 'on', 'tight']);
+  assert.deepEqual(v[2].map((l) => l.text), ['Hold', 'ooh'], 'voice 2: the leads word where it sings along without words, its own word where it has one; nothing where it is silent');
+  assert.deepEqual(v[3].map((l) => l.text), ['tight'], 'voice 3 sings along only on the last word');
+  assert.ok(v[2][0].shared && !v[2][1].shared);
+  const solo = chartOf(VOCALS, track('PART VOCALS', n(0, 2 * SEC, 105), lyric(0, 'a'), n(0, SEC / 2, 60)));
+  assert.equal(solo.voiceLyrics ?? null, null, 'a solo chart has no per-voice words');
+});
