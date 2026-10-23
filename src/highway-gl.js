@@ -22,6 +22,9 @@ import {
 
 const CYMBAL_HEIGHT = 0.9; // the height of a cymbal model as a fraction of a rectangular note's (setMeshes)
 const RECT_SCALE = 1.15; // the rectangular notes and the pads under them are this much larger than the other heads (highway3d.js)
+// The material styles of the YARG models, chosen with fx.metal and fx.glass (the indices): the metal parts (the frame, the caps, the cymbal's rim) and the glass (the lit middle).
+export const METAL_STYLES = ['Satin stainless', 'Polished chrome', 'Brushed steel', 'Satin gold', 'Polished gold', 'Champagne', 'Rose gold', 'Copper', 'Gunmetal', 'Black chrome'];
+export const GLASS_STYLES = ['Lamp', 'Neon tube', 'Frosted', 'Crystal', 'Candy gel', 'Ember'];
 const HEAD_R = 0.36; // note head radius in lane widths (highway3d.js)
 const ROAD_NEAR = -0.14; // the road starts below the pads
 const BAR_DEPTH = 0.0058; // pedal / open bar thickness along the road, in depth units
@@ -438,11 +441,24 @@ void main() {
   gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clip; v_y = px.y; v_d = d;
   v_uv = m_uv; v_n = vec3(m_nrm.x, -m_nrm.y, m_nrm.z); v_lane = s1.rgb; v_role = m_role; v_mp = m_pos;
   v_a = clamp((1.0 - d) / 0.14, 0.0, 1.0) * u_malpha;
-}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane, v_mp; in float v_role, v_y, v_d, v_a; uniform float u_mcel, u_mtoon, u_mcym; out vec4 o;
+}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane, v_mp; in float v_role, v_y, v_d, v_a; uniform float u_mcel, u_mtoon, u_mcym, u_mmetal, u_mglass; out vec4 o;
 // The middle of a note (YARG's RectangularNote shader graph, material NoteMiddle): the base map times a darkness mask that drifts with time (a soft cloud: gradient noise,
 // scale -2.8 / speed 0.4 / tiling 1.1 x 1.3 in the material; here a value noise of two octaves), times the lane's colour, over which the shine map is laid with the opacity
 // shine amount x its alpha (0.1); a small emission of the colour (0.1). The metal is the base map under the light, smoothness 0.5.
 float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+// The metals: its colour, how much of a studio it reflects (a high value: a mirror), the strength and tightness of the highlight, how brushed it is, and how far the base map's darks are lifted
+void metalStyle(float k, out vec3 tint, out float refl, out float spec, out float sexp, out float brush, out float lift) {
+  if (k < 0.5) { tint = vec3(0.80, 0.82, 0.85); refl = 0.28; spec = 0.22; sexp = 10.0; brush = 0.07; lift = 0.45; }
+  else if (k < 1.5) { tint = vec3(0.93, 0.95, 0.98); refl = 0.85; spec = 0.9; sexp = 48.0; brush = 0.0; lift = 0.6; }
+  else if (k < 2.5) { tint = vec3(0.76, 0.78, 0.82); refl = 0.12; spec = 0.35; sexp = 14.0; brush = 0.55; lift = 0.3; }
+  else if (k < 3.5) { tint = vec3(0.93, 0.75, 0.35); refl = 0.28; spec = 0.25; sexp = 10.0; brush = 0.07; lift = 0.45; }
+  else if (k < 4.5) { tint = vec3(1.0, 0.80, 0.34); refl = 0.82; spec = 0.9; sexp = 48.0; brush = 0.0; lift = 0.6; }
+  else if (k < 5.5) { tint = vec3(0.90, 0.82, 0.62); refl = 0.30; spec = 0.22; sexp = 10.0; brush = 0.10; lift = 0.5; }
+  else if (k < 6.5) { tint = vec3(0.94, 0.62, 0.54); refl = 0.45; spec = 0.4; sexp = 20.0; brush = 0.05; lift = 0.5; }
+  else if (k < 7.5) { tint = vec3(0.90, 0.48, 0.30); refl = 0.45; spec = 0.4; sexp = 20.0; brush = 0.12; lift = 0.4; }
+  else if (k < 8.5) { tint = vec3(0.36, 0.38, 0.43); refl = 0.40; spec = 0.5; sexp = 24.0; brush = 0.15; lift = 0.3; }
+  else { tint = vec3(0.12, 0.12, 0.14); refl = 0.90; spec = 1.0; sexp = 60.0; brush = 0.0; lift = 0.2; }
+}
 float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hash2(i), hash2(i + vec2(1.0, 0.0)), f.x), mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), f.x), f.y); }
 void main() {
   float g = texture(u_mtex, v_uv).r;
@@ -483,32 +499,68 @@ void main() {
     else c = mix(ink, v_lane * 0.35, step(0.55, v_uv.x)); // the dark core of a tap (dome)
     c = min(c, vec3(1.0));
   }
-  else if (v_role < 0.5) { // the metal: satin stainless steel, a light silver a little matte: the base map's baked shading kept for the form but with its darks lifted, a blurred studio reflected on it, a broad soft highlight and brushing so fine it only breathes on the surface
+  else if (v_role < 0.5) { // the metal (the style is a choice: fx.metal): the base map's baked shading kept for the form, a studio reflected on it, a highlight, and a brushing that goes from none to strong
     float capFace = step(0.6, abs(N.x));
     float rr = length(v_mp.yz), ang = atan(v_mp.y, v_mp.z);
     float lines = capFace > 0.5 ? vnoise(vec2(rr * 40.0, ang * 2.0)) : vnoise(vec2((v_mp.y + v_mp.z) * 40.0, v_mp.x * 1.5)); // (fast across the lines, slow along them)
     vec3 Tb = capFace > 0.5 ? normalize(vec3(0.0, v_mp.z, v_mp.y) + vec3(0.0, 0.0001, 0.0)) : vec3(1.0, 0.0, 0.0);
     float aniso = pow(sqrt(max(1.0 - pow(dot(Tb, H), 2.0), 0.0)), 14.0) * max(dot(N, L) * 0.7 + 0.3, 0.0);
-    vec3 silver = vec3(0.80, 0.82, 0.85);
-    float baked = mix(g, 1.0, 0.45);
+    vec3 tint; float refl, spec, sexp, brush, lift;
+    metalStyle(u_mmetal, tint, refl, spec, sexp, brush, lift);
+    float baked = mix(g, 1.0, lift);
     vec3 Rm = reflect(-Vc, N);
-    vec3 env = mix(vec3(0.30, 0.32, 0.36), vec3(0.95, 0.97, 1.0), smoothstep(-0.3, 0.8, Rm.z)); // (a blurred studio: a bright sky, a grey floor)
-    c = silver * baked * (0.5 + 0.55 * lam);
-    c = mix(c, env * silver, 0.28); // the satin reflection
-    c += vec3(1.0) * (pow(max(dot(N, H), 0.0), 10.0) * 0.22 + aniso * 0.12); // a broad soft highlight, a faint sheen across the brushing
-    c *= 1.0 + 0.07 * (lines - 0.5);
+    float sky = smoothstep(-0.3, 0.8, Rm.z);
+    vec3 env = mix(vec3(0.22, 0.24, 0.28), vec3(0.97, 0.99, 1.0), sky); // (a blurred studio: a bright sky, a grey floor)
+    if (refl > 0.6) env = mix(vec3(0.04, 0.05, 0.08), vec3(1.0), pow(sky, 1.6)) + vec3(0.7) * pow(max(dot(Rm, normalize(L + vec3(0.0, 0.0, 0.3))), 0.0), 12.0); // (a mirror: a harder studio)
+    c = tint * baked * (0.5 + 0.55 * lam);
+    c = mix(c, env * tint, refl);
+    c += vec3(1.0) * (pow(max(dot(N, H), 0.0), sexp) * spec + aniso * (0.12 + brush * 0.9));
+    c *= 1.0 + (0.07 + brush * 0.9) * (lines - 0.5);
   }
-  else if (v_role < 1.5) { // the glass, lit from inside: a saturated light, hottest where we look straight into it, gathering at the edge, with the drifting cloud and the shine streak on it
+  else if (v_role < 1.5) { // the glass, lit from inside (the style is a choice: fx.glass)
     vec2 q = v_uv * vec2(1.1, 1.3) * 7.0 + vec2(u_t * 0.4, u_t * 0.25) * u_mnoise.x;
     float cloud = mix(u_mnoise.y, 1.0, 0.65 * vnoise(q) + 0.35 * vnoise(q * 2.3 + 11.0)); // (the darkness mask of the material, here only a gentle modulation)
     float face = clamp(dot(N, Vc), 0.0, 1.0);
     float core = pow(face, 2.2);
-    vec3 lamp = v_lane * (0.62 + 0.9 * core); // the colour at full strength, brighter in the middle
-    lamp = mix(lamp, vec3(1.0), 0.3 * core * core); // a hot centre
-    lamp *= mix(0.72, 1.0, (u_mcym > 0.5 ? 1.0 : g) * cloud); // the base map's darker rim and the cloud (a cymbal's own map is not used: it washed the glass out; it has the note's glass)
-    lamp += v_lane * 0.55 * pow(1.0 - face, 2.5); // light gathering at the edge of the glass
-    lamp = mix(lamp, vec3(1.0), (u_mcym > 0.5 ? 0.0 : 0.5) * texture(u_mshine, v_uv).a); // the shine map's streak (not on a cymbal: its own streak whitened the whole top)
-    c = lamp + vec3(1.0) * sp * 0.45; // (self-lit: the scene's light only adds a highlight)
+    float gv = u_mglass;
+    if (gv < 0.5) { // lamp: a saturated light, hottest where we look straight into it, gathering at the edge, with the cloud and the shine map's streak on it
+      vec3 lamp = v_lane * (0.62 + 0.9 * core);
+      lamp = mix(lamp, vec3(1.0), 0.3 * core * core);
+      lamp *= mix(0.72, 1.0, (u_mcym > 0.5 ? 1.0 : g) * cloud);
+      lamp += v_lane * 0.55 * pow(1.0 - face, 2.5);
+      lamp = mix(lamp, vec3(1.0), (u_mcym > 0.5 ? 0.0 : 0.5) * texture(u_mshine, v_uv).a);
+      c = lamp + vec3(1.0) * sp * 0.45; // (self-lit: the scene's light only adds a highlight)
+    } else if (gv < 1.5) { // neon tube: a thin white-hot core, saturated colour, dark at the edge
+      vec3 lamp = v_lane * (0.5 + 1.3 * core);
+      lamp = mix(lamp, vec3(1.0), smoothstep(0.55, 0.9, core));
+      lamp *= 0.35 + 0.65 * smoothstep(0.0, 0.4, face);
+      c = lamp + vec3(1.0) * sp * 0.3;
+    } else if (gv < 2.5) { // frosted: milky, soft, lighter than the lane's colour
+      vec3 base = mix(v_lane, vec3(1.0), 0.5);
+      vec3 lamp = base * (0.78 + 0.3 * core);
+      lamp = mix(lamp, v_lane, 0.25 * (1.0 - core));
+      lamp *= 0.9 + 0.1 * cloud;
+      c = lamp + vec3(1.0) * pow(max(dot(N, H), 0.0), 14.0) * 0.2;
+    } else if (gv < 3.5) { // crystal: facets in steps of how much the glass faces us, with bright edges between them
+      float fq = floor(face * 5.0) / 5.0;
+      vec3 lamp = v_lane * (0.5 + 0.95 * fq);
+      float fe = 1.0 - smoothstep(0.0, 0.05, min(fract(face * 5.0), 1.0 - fract(face * 5.0)));
+      lamp += vec3(1.0) * 0.25 * fe;
+      lamp = mix(lamp, vec3(1.0), 0.35 * step(0.8, face));
+      c = lamp + vec3(1.0) * sp * 0.4;
+    } else if (gv < 4.5) { // candy gel: deep and glossy, dark at the edge, a hard highlight and a reflection
+      vec3 lamp = v_lane * (0.42 + 0.7 * core);
+      lamp = pow(lamp, vec3(0.9));
+      lamp *= mix(0.55, 1.0, smoothstep(0.0, 0.5, face));
+      float fres = pow(1.0 - face, 3.0);
+      c = lamp + vec3(1.0) * (pow(max(dot(N, H), 0.0), 70.0) * 1.2 + pow(max(dot(reflect(-Vc, N), L), 0.0), 30.0) * 0.25) + v_lane * 0.15 * fres;
+    } else { // ember: hot spots drifting in a darker glow
+      float heat = smoothstep(0.35, 0.85, vnoise(q * 1.6 + 3.0));
+      vec3 hot = mix(v_lane, vec3(1.0, 0.92, 0.65), 0.75);
+      vec3 lamp = mix(v_lane * 0.5, hot, heat) * (0.6 + 0.8 * core);
+      lamp += v_lane * 0.4 * pow(1.0 - face, 2.0);
+      c = lamp + vec3(1.0) * sp * 0.3;
+    }
   }
   else if (v_role < 2.5) c = mix(vec3(1.0), v_lane, 0.12) * (0.68 + 0.32 * lam); // the white of a HOPO
   else c = vec3(0.04) * (0.6 + 0.8 * lam) + vec3(1.0) * sp * 0.3; // the dark of a tap
@@ -1311,7 +1363,7 @@ export class GLBoard {
         const first = sol.count - sTo;
         gl.bindTexture(gl.TEXTURE_2D, mesh.tex);
         gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, mesh.shine); gl.activeTexture(gl.TEXTURE1);
-        gl.uniform1f(pr.u.u_mcel, mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mcym, mesh.cym && !mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mtoon, fx.shade === 'glossy' ? 2 : fx.shade === 'smooth' || fx.cel === false ? 0 : 1);
+        gl.uniform1f(pr.u.u_mcel, mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mcym, mesh.cym && !mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mmetal, fx.metal || 0); gl.uniform1f(pr.u.u_mglass, fx.glass || 0); gl.uniform1f(pr.u.u_mtoon, fx.shade === 'glossy' ? 2 : fx.shade === 'smooth' || fx.cel === false ? 0 : 1);
         gl.uniform2f(pr.u.u_mnoise, mesh.cym ? 0.62 : 1.0, 0.7); // (the middle's noise speed: the note 0.4, the cymbal 0.25, relative to the note; its minimum darkness)
         gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, mesh.alpha);
         this.vao(d, `solid_${kind}`, () => {

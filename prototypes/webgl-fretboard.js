@@ -9,7 +9,7 @@
 // out, a background visualizer (?viz=rings|aurora|warp), a benchmark (?bench=6) and a song picker. The drawing itself lives in src/highway-gl.js.
 import { parseMidi } from '../src/midi.js';
 import { buildChart, instrumentOptions, DIFFICULTIES } from '../src/chart.js';
-import { GLBoard } from '../src/highway-gl.js';
+import { GLBoard, METAL_STYLES, GLASS_STYLES } from '../src/highway-gl.js';
 import { NOTE_PALETTE, laneLookFactor } from '../src/gfx.js';
 import { createDriver } from '../src/visualizers.js';
 import { PORTS } from '../src/visualizers-gl.js';
@@ -108,6 +108,10 @@ for (const box of document.querySelectorAll('[data-fx]')) {
 if (params.get('model')) $('model').value = params.get('model');
 if (params.get('shade')) $('shade').value = params.get('shade');
 if (params.get('glow')) $('glow').value = params.get('glow');
+$('metal').innerHTML = METAL_STYLES.map((n, i) => `<option value="${i}">${i}: ${n}</option>`).join('');
+$('glass').innerHTML = GLASS_STYLES.map((n, i) => `<option value="${i}">${i}: ${n}</option>`).join('');
+if (params.get('metal')) $('metal').value = params.get('metal');
+if (params.get('glass')) $('glass').value = params.get('glass');
 if (params.get('side')) $('side').value = params.get('side');
 
 function render(t) {
@@ -121,7 +125,7 @@ function render(t) {
     board.drawPane(p.chart, t, { x: i * pw, y: 0, w, h: H }, {
       neck: Number($('neck').value), perspective: Number($('persp').value), curve, noteSize: 1, sustainWidth: 1, kickBar: 1, hitLine: params.get('hitline') !== '0', laneStripes: true,
       trackOpacity: 0.75, boardK: 1, leftHanded: params.get('lefty') === '1', heldMotion: true, starPowerBand: true, soloBand: true, fillBand: true, breBand: 'pulse', bandBorders: true,
-      side: Number($('side').value), fx: { ...FX, solid: FX.solid ? $('model').value : false, shade: $('shade').value, glow: Number($('glow').value) }, beatStyle: BEATS, windowSec: (DEPTH_SEC / Number($('neck').value)) * laneLookFactor(H),
+      side: Number($('side').value), fx: { ...FX, solid: FX.solid ? $('model').value : false, shade: $('shade').value, glow: Number($('glow').value), metal: Number($('metal').value), glass: Number($('glass').value) }, beatStyle: BEATS, windowSec: (DEPTH_SEC / Number($('neck').value)) * laneLookFactor(H),
     });
   });
 }
