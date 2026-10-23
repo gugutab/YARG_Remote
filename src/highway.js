@@ -62,6 +62,7 @@ import {
   spansOfKind,
   fillTailHalo,
   noteScale,
+  setCymbalSize,
   HOPO_SCALE,
   noteColor,
   tailShimmer,
@@ -238,6 +239,7 @@ export class Highway {
     // The 3D notes of the board (setting highway.notes3d: 'off', 'yarg' = YARG's own models, 'own' = our lamp) and how they look (highway.noteMetal / noteGlass / cymbalTop: indices of
     // the style lists of highway-gl.js, noteGlow: 0..2, noteSparks / noteFog: the optional effects). They need the board, so they are ignored with perf.renderer 'canvas'.
     this._notes3d = 'off';
+    this._cymbalScale = 1; // highway.cymbalSize (both renderers)
     this.glSupersample = 'auto'; // setting perf.glSupersample: the board draws at 2x the canvas resolution ('auto': on screens under 1.5 device pixels per CSS pixel, where a note has few pixels and its edges crawl), the browser scales it down
     this.noteLook = { metal: 0, glass: 4, cymbal: 5, glow: 0.4, sparks: true, fog: true };
     this.glModels = 'none'; // the YARG models: 'none', 'loading', 'ready', 'failed'
@@ -339,6 +341,9 @@ export class Highway {
 
   // The board's supersampling factor on a canvas of `dpr` device pixels per CSS pixel (see glSupersample).
   glScale(dpr) { return this.glSupersample === '2x' ? 2 : this.glSupersample === 'off' ? 1 : dpr < 1.5 ? 2 : 1; }
+
+  get cymbalScale() { return this._cymbalScale; }
+  set cymbalScale(v) { this._cymbalScale = v; setCymbalSize(v); this.invalidate(); }
 
   get notes3d() { return this._notes3d; }
   set notes3d(v) { this._notes3d = v; this.loadModels(); this.invalidate(); }
@@ -914,6 +919,7 @@ export class Highway {
     fx.solid = this._notes3d === 'own' ? 'own' : this._notes3d === 'yarg' && this.glModels === 'ready' ? 'yarg' : false;
     fx.metal = look.metal; fx.glass = look.glass; fx.cymbal = look.cymbal; fx.glow = look.glow; fx.particles = look.sparks; fx.fog = look.fog; fx.shade = 'cel';
     o.fx = fx;
+    o.cymbalScale = this._cymbalScale;
     o.ghost = pane.replayGhost ?? null; // (the disabled notes of a replay, drawn dim over the pane)
     this.glBoard.drawPane(chart, t, { x, y, w: pw, h: ph }, o);
   }

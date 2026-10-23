@@ -579,7 +579,9 @@ export function beatLineStyles(level, view) {
 // Hammer-on / pull-off notes (and their tails) are drawn 20% smaller than strummed ones.
 export const HOPO_SCALE = 0.8;
 export const GHOST_SCALE = 0.8; // YARG's ghost note model is about 80% as wide as a normal one
-export const noteScale = (n) => (n.hopo ? HOPO_SCALE : n.ghost ? GHOST_SCALE : 1);
+let cymbalSize = 1; // setting highway.cymbalSize: the size of a cymbal relative to the other notes
+export const setCymbalSize = (v) => { cymbalSize = v; };
+export const noteScale = (n) => (n.cymbal ? cymbalSize : 1) * (n.hopo ? HOPO_SCALE : n.ghost ? GHOST_SCALE : 1);
 
 // Star power notes: a white overlay at 50% over the lane colour (the colour and the centre still show through; it was 80%, too washed out).
 export const STAR_POWER_OVERLAY = 0.5;

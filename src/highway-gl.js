@@ -61,7 +61,7 @@ export function glUnsupported(hw, chart) {
 
 // ---- shaders ------------------------------------------------------------------------------------------------------------------------------------------------------
 
-const UNIFORMS = `uniform vec2 u_res; uniform float u_hit, u_vy, u_k, u_c, u_cx, u_laneW, u_half, u_t, u_win, u_flip, u_headR, u_end, u_fh, u_padB, u_board, u_taper, u_fog, u_relief, u_side, u_sx0, u_sy0, u_span, u_lit, u_held, u_ky, u_dim;`;
+const UNIFORMS = `uniform vec2 u_res; uniform float u_hit, u_vy, u_k, u_c, u_cx, u_laneW, u_half, u_t, u_win, u_flip, u_headR, u_end, u_fh, u_padB, u_board, u_taper, u_fog, u_relief, u_side, u_sx0, u_sy0, u_span, u_lit, u_held, u_ky, u_dim, u_cymsc;`;
 const COMMON = `#version 300 es
 precision highp float;
 ${UNIFORMS}
@@ -199,7 +199,7 @@ void main() {
   float sc = scaleAt(d); vec2 size;
   float bth = max(2.0, (u_hit - u_vy) * u_k * sc * sc * u_bar * (1.0 - 0.55 * e));
   if (bar) size = vec2(a2.z * u_laneW * sc + 4.0, bth + 2.0 * max(1.0, 2.0 * sc) + 2.0); // (the bar is drawn in the fragment shader: the fill and its two edge lines)
-  else size = (a1.xy - a0.zw) * u_atlas * (u_laneW * u_headR * sc / ${REF_RX.toFixed(1)}) * a1.zw * (u_pad > 0.5 ? 1.0 : 1.0 - 0.5 * kx);
+  else size = (a1.xy - a0.zw) * u_atlas * (u_laneW * u_headR * sc / ${REF_RX.toFixed(1)}) * a1.zw * (u_pad > 0.5 ? 1.0 : 1.0 - 0.5 * kx) * (u_pad < 0.5 && a2.w > 0.5 ? u_cymsc : 1.0); // (a2.w 1: a cymbal, smaller by highway.cymbalSize)
   vec2 off = (c - 0.5) * size;
   if (u_taper > 0.0 && !bar && u_pad < 0.5) { // (the effect "taper": the far edge of a note is narrower than its near edge, as the road is)
     float dd = 0.5 * size.y / max(1.0, (u_hit - u_vy) * u_k * sc * sc);
@@ -427,18 +427,18 @@ void main() {
   // kind of note, drawn instanced (one instance per note, `divisor` 1) with the depth buffer on, so the faces hide one another. Each vertex is placed like the road: its width
   // along the lane, its depth along the road (in depth units) and its height lifted on the screen by the perspective scale at its depth, so the model gets a true perspective.
   // Lit by a fixed light above and in front: a texture of the model gives the metal its brushed look, the lane's colour tints the middle. Instances (time, lane, length, 0) + (r, g, b, 0).
-  solid: [`${COMMON}in vec3 m_pos; in vec3 m_nrm; in vec2 m_uv; in float m_role; in vec4 s0; in vec4 s1; uniform vec3 u_msz; uniform float u_mbase, u_malpha;
+  solid: [`${COMMON}in vec3 m_pos; in vec3 m_nrm; in vec2 m_uv; in float m_role; in vec4 s0; in vec4 s1; uniform vec3 u_msz; uniform float u_mbase, u_malpha, u_mscale;
 out vec2 v_uv; out vec3 v_n, v_lane, v_mp; out float v_role, v_y, v_d, v_a, v_sp;
 void main() {
   float past = u_t - (s0.x + s0.z); float kx = clamp(past / 0.1, 0.0, 1.0); float sh = 1.0 - 0.5 * kx;
   bool gone = past > 0.1 || (s0.z > 0.0 && u_t >= s0.x);
   float d = clamp((s0.x - u_t) / u_win, 0.0, 1.0);
   float hs = u_headR / ${HEAD_R.toFixed(2)};
-  float x = s0.y + 0.5 - u_half + m_pos.x * u_msz.x * sh * hs;
+  float x = s0.y + 0.5 - u_half + m_pos.x * u_msz.x * sh * hs * u_mscale;
   float ky = mix(u_ky, (u_laneW * u_msz.z) / max(u_span * u_msz.y, 1.0), u_side); // (in the side view a unit of depth is as long on the screen as a unit of height; in the usual view u_ky keeps its thickness in proportion to its width, see drawPane)
-  float dep = d - m_pos.y * u_msz.y * ky * sh; // (the model's +y points at the player)
+  float dep = d - m_pos.y * u_msz.y * ky * sh * u_mscale; // (the model's +y points at the player)
   dep = max(dep, -0.3 / u_k); // (its near edge stays short of the vanishing point behind the hit line, where the perspective blows up)
-  float hgt = (m_pos.z - u_mbase) * u_msz.z * sh * hs;
+  float hgt = (m_pos.z - u_mbase) * u_msz.z * sh * hs * u_mscale;
   vec2 px = project(x, dep) - vec2(0.0, hgt * u_laneW * scaleAt(dep));
   vec4 clip = clipPos(px); clip.z = clamp(dep * 1.7 - 0.1 - hgt * 0.3, -0.99, 0.99); // (nearer and higher wins the depth test)
   gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clip; v_y = px.y; v_d = d;
@@ -1266,7 +1266,7 @@ export class GLBoard {
   shared(pr, t, v) {
     const gl = this.gl, u = pr.u;
     if (u.u_res) gl.uniform2f(u.u_res, v.res[0], v.res[1]);
-    const vals = { u_side: v.side, u_sx0: v.sx0, u_sy0: v.sy0, u_span: v.span, u_hit: v.hit, u_vy: v.vy, u_k: v.k, u_c: v.c, u_cx: v.cx, u_laneW: v.laneW, u_half: v.half, u_t: t, u_win: v.win, u_flip: v.flip, u_headR: v.headR, u_end: v.end, u_fh: v.fh, u_padB: v.padB, u_board: v.board, u_lit: v.lit, u_held: v.held, u_tailW: v.tailW, u_bar: v.bar, u_taper: v.taper, u_fog: v.fog, u_relief: v.relief, u_ky: v.ky, u_dim: v.dim };
+    const vals = { u_side: v.side, u_sx0: v.sx0, u_sy0: v.sy0, u_span: v.span, u_hit: v.hit, u_vy: v.vy, u_k: v.k, u_c: v.c, u_cx: v.cx, u_laneW: v.laneW, u_half: v.half, u_t: t, u_win: v.win, u_flip: v.flip, u_headR: v.headR, u_end: v.end, u_fh: v.fh, u_padB: v.padB, u_board: v.board, u_lit: v.lit, u_held: v.held, u_tailW: v.tailW, u_bar: v.bar, u_taper: v.taper, u_fog: v.fog, u_relief: v.relief, u_ky: v.ky, u_dim: v.dim, u_cymsc: v.cymsc };
     for (const n in vals) if (u[n]) gl.uniform1f(u[n], vals[n]);
   }
 
@@ -1329,7 +1329,7 @@ export class GLBoard {
     const sx0 = w * 0.16;
     const v = {
       side, sx0, sy0: h * 0.6, span: (w - sx0) * 0.95 * 3, // (the side view shows a third of the window: a note is as thick as it is tall, so a whole window would crowd them)
-      res: [w, h], hit, vy: proj.vy, k: proj.k, c: proj.c, cx: w / 2, laneW, half: lanes / 2, win: o.windowSec, flip: o.leftHanded ? -1 : 1, headR, ky, dim: o.ghostOnly ? 1 : 0,
+      res: [w, h], hit, vy: proj.vy, k: proj.k, c: proj.c, cx: w / 2, laneW, half: lanes / 2, win: o.windowSec, flip: o.leftHanded ? -1 : 1, headR, ky, dim: o.ghostOnly ? 1 : 0, cymsc: o.cymbalScale ?? 1,
       taper: fx.taper ? 1 : 0, fog: fx.fog ? 1 : 0, relief: fx.relief ? 1 : 0,
       lit: o.litLag > 0 ? o.litLag : 0, held: o.heldMotion ? 1 : 0,
       end: proj.end, fh: side > 0.5 ? -1 : h * 0.26, padB: h - padB > 2 && side < 0.5 ? padB : h * 4, board: o.boardK, tailW: o.sustainWidth, bar: BAR_DEPTH * o.kickBar,
@@ -1451,7 +1451,7 @@ export class GLBoard {
         gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, mesh.shine); gl.activeTexture(gl.TEXTURE1);
         gl.uniform1f(pr.u.u_mcel, mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mcym, mesh.cym && !mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mmetal, fx.metal || 0); gl.uniform1f(pr.u.u_mglass, fx.glass || 0); gl.uniform1f(pr.u.u_mcymst, fx.cymbal || 0); gl.uniform1f(pr.u.u_mtoon, fx.shade === 'glossy' ? 2 : fx.shade === 'smooth' || fx.cel === false ? 0 : 1);
         gl.uniform2f(pr.u.u_mnoise, mesh.cym ? 0.62 : 1.0, 0.7); // (the middle's noise speed: the note 0.4, the cymbal 0.25, relative to the note; its minimum darkness)
-        gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, mesh.alpha);
+        gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, mesh.alpha); gl.uniform1f(pr.u.u_mscale, mesh.cym ? (o.cymbalScale ?? 1) : 1);
         this.vao(d, `solid_${kind}`, () => {
           gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
           this.attrib(pr, 'm_pos', 3, 36, 0, 0); this.attrib(pr, 'm_nrm', 3, 36, 12, 0); this.attrib(pr, 'm_uv', 2, 36, 24, 0); this.attrib(pr, 'm_role', 1, 36, 32, 0);

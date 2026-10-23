@@ -3854,6 +3854,7 @@ const EFFECTS = {
   'highway.fillActivation': (v) => { highway.fillActivation = !!v; },
   'highway.tailStyle': (v) => { highway.tailStyle = v; highway.invalidate(); },
   'highway.hitAnimation': (v) => { highway.hitAnimation = v; highway.invalidate(); },
+  'highway.cymbalSize': (v) => { highway.cymbalScale = v / 100; },
   'highway.notes3d': (v) => { highway.notes3d = v; },
   'highway.noteMetal': (v) => { highway.noteLook.metal = Number(v); highway.invalidate(); },
   'highway.noteGlass': (v) => { highway.noteLook.glass = Number(v); highway.invalidate(); },
