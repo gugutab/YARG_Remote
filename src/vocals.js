@@ -398,12 +398,13 @@ export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
     const clash = (l) => v2.some((o) => !same(o, l) && o.time < l.end + 0.05 && l.time < Math.max(o.end, o.time + 0.3)); // a different word of voice 2 sung over it
     const lane2 = [];
     const lane3 = [];
-    const seen = new Set();
+    const seen = new Map(); // text|time -> the entry; a word both voices sing is one entry flagged `both` (shown in white)
     for (const l of [...v2, ...(voiceLyrics[3] || [])].sort((x, y) => x.time - y.time || x.part - y.part)) {
       const k = `${l.text}|${Math.round(l.time * 10)}`;
-      if (seen.has(k)) continue;
-      seen.add(k);
-      (l.part === 3 && clash(l) ? lane3 : lane2).push({ ...l, vw: undefined });
+      if (seen.has(k)) { seen.get(k).both = true; continue; }
+      const entry = { ...l, vw: undefined };
+      seen.set(k, entry);
+      (l.part === 3 && clash(l) ? lane3 : lane2).push(entry);
     }
     lyricsLane2 = lane2.length ? lane2 : null;
     lyricsLane3 = lane3.length ? lane3 : null;

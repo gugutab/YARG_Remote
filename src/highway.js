@@ -1062,7 +1062,7 @@ export class Highway {
     const fontSize = Math.max(24, Math.min(36, h * 0.095)) * this.lyricScale;
     const lyricY = h - fontSize * 0.75;
     const bottom = lyricY - fontSize * 0.5 - 16;
-    const third = chart.lyricsLane3?.length > 0 ? secondSize * 1.05 : 0;
+    const third = chart.lyricsLane3?.length > 0 ? secondSize * 0.9 : 0;
     const top = Math.max(second ? secondSize * 0.75 + secondSize * 0.75 + third : 8, bottom - this.vocalMaxArea(w));
     return (top + bottom) / 2;
   }
@@ -1842,7 +1842,7 @@ export class Highway {
     const secondSize = Math.max(15, Math.min(26, h * 0.08)) * this.lyricScale; // (setting highway.lyricSize)
     const secondY = secondSize * 0.75; // the harmony line (and its track) sits right at the top edge
     const third = chart.lyricsLane3?.length > 0; // voice 3's words that differ from voice 2's get a line under the second one
-    const thirdY = secondY + secondSize * 1.05;
+    const thirdY = secondY + secondSize * 0.9; // right under the first line, on the same time grid
     let top = second ? (third ? thirdY : secondY) + secondSize * 0.75 : 8; // pitch area: below the second lyric line(s), if any, down to the lyrics
     const fontSize = Math.max(24, Math.min(36, h * 0.095)) * this.lyricScale; // lyric size, grows with the band
     const lyricY = h - fontSize * 0.75; // the lyrics and their track sit right at the bottom edge of the window
@@ -1976,14 +1976,17 @@ export class Highway {
     g.textAlign = 'left';
     g.textBaseline = 'middle';
     this.lyricRow(second && chart.lyrics1?.length ? chart.lyrics1 : chart.lyrics, lyricY, fontSize, this.vocColors.lyrics, t, behind, ahead); // with a second line, the first one is the lead's own words
-    if (second) this.lyricRow(chart.lyricsLane2 || chart.lyrics2, secondY, secondSize, this.vocColors.lyrics2, t, behind, ahead); // the other voices, above the chart
-    if (third) this.lyricRow(chart.lyricsLane3, thirdY, secondSize, this.vocColors.lyrics2, t, behind, ahead);
+    // the other voices, above the chart: each word in its voice's colour (voice 2's when the chart has no voice 3), white where both sing the same word
+    const voiceTone = (l) => (l.both ? '#ffffff' : this.vocColors.harmony[l.part === 3 ? 3 : 2]);
+    if (second) this.lyricRow(chart.lyricsLane2 || chart.lyrics2, secondY, secondSize, this.vocColors.lyrics2, t, behind, ahead, chart.lyricsLane2 ? voiceTone : null);
+    if (third) this.lyricRow(chart.lyricsLane3, thirdY, secondSize, this.vocColors.lyrics2, t, behind, ahead, voiceTone);
     g.textBaseline = 'alphabetic';
   }
 
   // One row of syllables. Colours as in YARG's static lyrics (VocalStaticLyricPhraseElement): past grey, present teal,
   // future white (`colors` = [future, present, past]). A syllable never overlaps the one before it.
-  lyricRow(list, y, size, colors, t, behind, ahead) {
+  // `toneOf(word)`: the colour a word has in place of `colors` (future: the colour, being sung: lighter, sung: dim).
+  lyricRow(list, y, size, colors, t, behind, ahead, toneOf = null) {
     const g = this.g;
     g.font = lyricFont(size);
     let prevRight = -Infinity;
@@ -2002,7 +2005,10 @@ export class Highway {
         g.lineJoin = 'round';
         g.strokeText(l.text, x, y);
       }
-      g.fillStyle = l.time > t ? (l.sp ? LYRIC_SP_FUTURE : colors[0]) : t < sungUntil ? colors[1] : (l.sp ? LYRIC_SP_PAST : colors[2]); // (a star power lyric is yellow)
+      let cols = colors;
+      const tone = toneOf?.(l);
+      if (tone) cols = (l._tone === tone ? l._cols : (l._tone = tone, l._cols = tone === '#ffffff' ? [tone, colors[1], colors[2]] : [tone, mixHex(tone, '#ffffff', 0.55), mixHex(tone, '#0d1117', 0.6)]));
+      g.fillStyle = l.time > t ? (l.sp ? LYRIC_SP_FUTURE : cols[0]) : t < sungUntil ? cols[1] : (l.sp ? LYRIC_SP_PAST : cols[2]); // (a star power lyric is yellow)
       g.fillText(l.text, x, y);
     }
   }
