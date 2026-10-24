@@ -104,7 +104,6 @@ const laneY = (time) => LY_HIT - (time - LY_T) * LY_PPS;
 let VOC_HIT_X = 0;
 const NOTE_PAD_BELOW_LYRICS = 12; // px between the harmony lyric background and the highest note (a note is drawn above its pitch line by half its thickness)
 const HARMONY_DOUBLE_OFFSET = 4; // px: how far a harmony note that sings the lead's note sits above / below it
-const SP_OUTLINE = '#c79a2f'; // the outline of star power lyrics: the star power gold, a shade darker
 let VOC_T = 0;
 let VOC_PPS = 1;
 let VOC_LO = 0;
@@ -1130,11 +1129,8 @@ export class Highway {
     g.lineJoin = 'round';
     line.syl.forEach((syl, i) => {
       const sw = g.measureText(syl.text).width;
-      if (syl.sp) { // star power: the letters keep their colours, with a gold outline
-        g.lineWidth = Math.max(2.5, sz * 0.11);
-        g.strokeStyle = mixHex('#0d1117', SP_OUTLINE, alpha);
-        g.strokeText(syl.text, x, cy);
-      } else if (this.lyricOutline) {
+      if (syl.sp) this.spGlow(syl.text, x, cy, sz, alpha); // star power: a gold glow behind the letters and their outline
+      if (this.lyricOutline) {
         g.lineWidth = Math.max(3, sz * 0.14);
         g.strokeStyle = 'rgba(0,0,0,0.65)';
         g.strokeText(syl.text, x, cy);
@@ -2009,6 +2005,19 @@ export class Highway {
     g.textBaseline = 'alphabetic';
   }
 
+  // The star power glow of a lyric: the gold of the star power notes as a soft halo around the letters, drawn first so the usual dark outline and the letters sit over it.
+  spGlow(text, x, y, size, k) {
+    const g = this.g;
+    g.save();
+    g.shadowColor = VOCAL_SP_GOLD;
+    g.shadowBlur = Math.max(8, size * 0.55);
+    g.globalAlpha *= k; // (a shadow takes the alpha of what casts it: the gold letters under the real ones, which hide them, cast it)
+    g.fillStyle = VOCAL_SP_GOLD;
+    g.fillText(text, x, y);
+    g.fillText(text, x, y);
+    g.restore();
+  }
+
   // One row of syllables. Colours as in YARG's static lyrics (VocalStaticLyricPhraseElement): past grey, present teal,
   // future white (`colors` = [future, present, past]). A syllable never overlaps the one before it.
   // `toneOf(word)`: the colour a word has in place of `colors` (future: the colour, being sung: lighter, sung: dim).
@@ -2025,12 +2034,8 @@ export class Highway {
       prevRight = x + l.vw;
       if (l.time < t - behind - 0.8) continue;
       const sungUntil = l.end > l.time ? l.end : list[i + 1]?.time ?? Infinity; // the paired note's end, else the next syllable
-      if (l.sp) { // star power: the letters keep their colours, with a gold outline (dimmer once sung)
-        g.lineWidth = Math.max(2.5, size * 0.11);
-        g.strokeStyle = l.time > t || t < sungUntil ? SP_OUTLINE : mixHex(SP_OUTLINE, '#0d1117', 0.5); // (a gold a shade darker than the star power notes')
-        g.lineJoin = 'round';
-        g.strokeText(l.text, x, y);
-      } else if (this.lyricOutline) { // a dark outline under the letters, so they read over any background (setting highway.lyricOutline)
+      if (l.sp) this.spGlow(l.text, x, y, size, l.time > t || t < sungUntil ? 1 : 0.45); // star power: a gold glow behind the letters and their outline (dimmer once sung)
+      if (this.lyricOutline) { // a dark outline under the letters, so they read over any background (setting highway.lyricOutline)
         g.lineWidth = Math.max(3, size * 0.16);
         g.strokeStyle = 'rgba(0,0,0,0.85)';
         g.lineJoin = 'round';
