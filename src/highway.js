@@ -1129,8 +1129,11 @@ export class Highway {
     g.lineJoin = 'round';
     line.syl.forEach((syl, i) => {
       const sw = g.measureText(syl.text).width;
-      if (syl.sp) this.spGlow(syl.text, x, cy, sz, alpha, 0.5, 4); // star power: a gold glow behind the letters and their outline
-      if (this.lyricOutline) {
+      if (syl.sp) { // star power: a gold outline (the notes view has a glow instead)
+        g.lineWidth = Math.max(2.5, sz * 0.11);
+        g.strokeStyle = mixHex('#0d1117', '#c79a2f', alpha);
+        g.strokeText(syl.text, x, cy);
+      } else if (this.lyricOutline) {
         g.lineWidth = Math.max(3, sz * 0.14);
         g.strokeStyle = 'rgba(0,0,0,0.65)';
         g.strokeText(syl.text, x, cy);
