@@ -1128,34 +1128,34 @@ export class Highway {
     g.textAlign = 'left';
     g.textBaseline = 'middle';
     g.lineJoin = 'round';
+    // The syllables go in passes (every gold ring, then every dark outline, then every fill), so the outline of one syllable never lies over the letters of its neighbour.
+    const xs = [];
+    let px = x;
+    for (const syl of line.syl) { xs.push(px); px += g.measureText(syl.text).width + (syl.join ? 0 : gw); }
+    const darkW = Math.max(3, sz * 0.14);
+    if (line.syl.some((s) => s.sp)) {
+      g.lineWidth = darkW + 2 * Math.max(2, sz * 0.07);
+      g.strokeStyle = mixHex('#0d1117', SP_LYRIC_GOLD, alpha);
+      line.syl.forEach((syl, i) => { if (syl.sp) g.strokeText(syl.text, xs[i], cy); }); // star power: a gold ring outside the usual dark outline, both showing (the notes view has a glow instead)
+    }
     line.syl.forEach((syl, i) => {
-      const sw = g.measureText(syl.text).width;
-      const darkW = Math.max(3, sz * 0.14);
-      if (syl.sp) { // star power: a gold ring outside the usual dark outline, both showing (the notes view has a glow instead)
-        g.lineWidth = darkW + 2 * Math.max(2, sz * 0.07);
-        g.strokeStyle = mixHex('#0d1117', SP_LYRIC_GOLD, alpha);
-        g.strokeText(syl.text, x, cy);
-        g.lineWidth = darkW;
-        g.strokeStyle = mixHex('#0d1117', '#05070a', alpha); // (opaque, so the gold under it does not tint it)
-        g.strokeText(syl.text, x, cy);
-      } else if (this.lyricOutline) {
-        g.lineWidth = darkW;
-        g.strokeStyle = 'rgba(0,0,0,0.65)';
-        g.strokeText(syl.text, x, cy);
-      }
-      g.fillStyle = mixHex('#0d1117', '#ffffff', alpha); // opaque, already faded towards the stage colour: a translucent fill let the dark outline show through the middle of the letters (a star power lyric is the same gold as the notes' outline)
-      g.fillText(syl.text, x, cy);
+      if (syl.sp) { g.lineWidth = darkW; g.strokeStyle = mixHex('#0d1117', '#05070a', alpha); } // (opaque, so the gold under it does not tint it)
+      else if (this.lyricOutline) { g.lineWidth = darkW; g.strokeStyle = 'rgba(0,0,0,0.65)'; } else return;
+      g.strokeText(syl.text, xs[i], cy);
+    });
+    g.fillStyle = mixHex('#0d1117', '#ffffff', alpha); // opaque, already faded towards the stage colour: a translucent fill let the dark outline show through the middle of the letters
+    line.syl.forEach((syl, i) => g.fillText(syl.text, xs[i], cy));
+    line.syl.forEach((syl, i) => {
       const p = prog ? prog[i] : 0;
       if (p > 0) { // the sung part
         g.save();
         g.beginPath();
-        g.rect(x, cy - sz, sw * p, sz * 2);
+        g.rect(xs[i], cy - sz, g.measureText(syl.text).width * p, sz * 2);
         g.clip();
         g.fillStyle = this.sheetPresent || this.vocColors.present; // (the voice's own colour in the harmony sheets)
-        g.fillText(syl.text, x, cy);
+        g.fillText(syl.text, xs[i], cy);
         g.restore();
       }
-      x += sw + (syl.join ? 0 : gw);
     });
     g.textBaseline = 'alphabetic';
     return { x: (w - total) / 2, total };
