@@ -359,8 +359,13 @@ export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
     // cover the word's start) and has no word of its own there: a voice that sings the same words as the lead shows them too.
     voiceLyrics = { 1: lyrics1 };
     for (const e of walkedExtra) {
-      const own = e.walked.flatMap((p) => p.lyrics.filter((l) => !l.hidden && l.text)).map((l) => ({ time: l.time, end: l.end, text: l.text, join: l.join, part: e.part }));
-      const spans = e.notes.filter((n) => !n.perc).map((n) => [toSec(n.tick), toSec(totalEndTick(n))]);
+      // A note that doubles the lead's (same pitch, same start) is no voice of its own: charts copy the lead into HARM2 / HARM3 where the voice just sings along in unison, and
+      // the highway shows nothing separate there. Those stretches give the voice no words in its sheet (it shows the ones where it sings a line of its own).
+      const unison = (n) => !n.perc && notes1.some((m) => !m.perc && m.pitch === n.pitch && Math.abs(m.tick - n.tick) <= 5);
+      const mine = e.notes.filter((n) => !n.perc && !unison(n));
+      const spans = mine.map((n) => [toSec(n.tick), toSec(totalEndTick(n))]);
+      const own = e.walked.flatMap((p) => p.lyrics.filter((l) => !l.hidden && l.text)).map((l) => ({ time: l.time, end: l.end, text: l.text, join: l.join, part: e.part }))
+        .filter((l) => spans.some(([a, b]) => l.time >= a - 0.05 && l.time <= b));
       const words = [...own];
       for (const l of lyrics1) {
         if (spans.some(([a, b]) => l.time >= a - 0.05 && l.time <= b) && !own.some((o) => Math.abs(o.time - l.time) < 0.2)) words.push({ time: l.time, end: l.end, text: l.text, join: l.join, part: e.part, shared: true });
