@@ -102,7 +102,7 @@ let LY_PPS = 1;
 const laneY = (time) => LY_HIT - (time - LY_T) * LY_PPS;
 // The mapping of the vocal chart of the current renderVocals call: time -> x and pitch -> y (closures made on every frame before).
 let VOC_HIT_X = 0;
-const HARMONY_DOUBLE_OFFSET = 4; // px: how far a harmony note that sings the lead's note sits above / below it
+const HARMONY_DOUBLE_OFFSET = 5; // px: how far a harmony note that sings the lead's note sits above / below it
 let VOC_T = 0;
 let VOC_PPS = 1;
 let VOC_LO = 0;
@@ -1063,7 +1063,7 @@ export class Highway {
     const fontSize = Math.max(24, Math.min(36, h * 0.095)) * this.lyricScale;
     const lyricY = h - fontSize * 0.75;
     const bottom = lyricY - fontSize * 0.5 - 16;
-    const third = chart.lyricsLane3?.length > 0 ? secondSize * 0.9 : 0;
+    const third = chart.lyricsLane3?.length > 0 ? secondSize * 1.15 : 0;
     const top = Math.max(second ? secondSize * 0.75 + secondSize * 0.75 + third : 8, bottom - this.vocalMaxArea(w));
     return (top + bottom) / 2;
   }
@@ -1843,7 +1843,7 @@ export class Highway {
     const secondSize = Math.max(15, Math.min(26, h * 0.08)) * this.lyricScale; // (setting highway.lyricSize)
     const secondY = secondSize * 0.75; // the harmony line (and its track) sits right at the top edge
     const third = chart.lyricsLane3?.length > 0; // voice 3's words that differ from voice 2's get a line under the second one
-    const thirdY = secondY + secondSize * 0.9; // right under the first line, on the same time grid
+    const thirdY = secondY + secondSize * 1.15; // under the first line (a little apart), on the same time grid
     let top = second ? (third ? thirdY : secondY) + secondSize * 0.75 : 8; // pitch area: below the second lyric line(s), if any, down to the lyrics
     const fontSize = Math.max(24, Math.min(36, h * 0.095)) * this.lyricScale; // lyric size, grows with the band
     const lyricY = h - fontSize * 0.75; // the lyrics and their track sit right at the bottom edge of the window
@@ -2361,7 +2361,7 @@ export class Highway {
   }
 
   // Where voice 2 or 3 sings exactly the lead's note (same pitch, overlapping in time) its own note would hide under the lead's: it is drawn behind the lead's with a vertical offset of
-  // 4 px (up for voice 2, down for voice 3) so it shows as a card behind. The offset is a `dy` on the harmony note, worked out once per chart.
+  // 5 px (up for voice 2, down for voice 3) so it shows as a card behind. The offset is a `dy` on the harmony note, worked out once per chart.
   markHarmonyDoubles() {
     const chart = this.chart;
     if (chart.doublesMarked) return;

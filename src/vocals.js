@@ -412,6 +412,10 @@ export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
       seen.set(k, entry);
       (l.part === 3 && clash(l) ? lane3 : lane2).push(entry);
     }
+    if (lane3.length) { // two lines in this song: voice 2's words always on the top one, voice 3's always on the one under it (words both sing stay on the top one)
+      for (let k = lane2.length - 1; k >= 0; k--) if (lane2[k].part === 3 && !lane2[k].both) lane3.push(lane2.splice(k, 1)[0]);
+      lane3.sort((x, y) => x.time - y.time);
+    }
     lyricsLane2 = lane2.length ? lane2 : null;
     lyricsLane3 = lane3.length ? lane3 : null;
   }

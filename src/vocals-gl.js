@@ -389,15 +389,17 @@ export class GLVocals {
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     this.w = rect.w; this.h = rect.h; this.hitX = frame.hitX; this.t = frame.t;
     this.pass('flat', frame.flat);
-    for (let i = 0; i < frame.used; i++) { // per voice: the glow, then the outline, then the fill, of all its ribbons and bars
-      const grp = frame.groups[i];
-      for (let ps = 0; ps < 3; ps++) {
-        const setPass = (pr) => gl.uniform1f(pr.u.u_pass, ps);
-        if (ps === 0) { gl.blendEquation(gl.MAX); gl.blendFunc(gl.ONE, gl.ONE); } // (the glows of neighbouring shapes take the strongest, they do not add up at a joint)
+    // pass by pass over all the voices: the glows, then the outlines of all of them, then the fills. So the dark outline of the lead's notes (drawn last) never lies over the notes
+    // of the other voices behind them: it sits under their fills and shows only around the outside of what is drawn.
+    for (let ps = 0; ps < 3; ps++) {
+      const setPass = (pr) => gl.uniform1f(pr.u.u_pass, ps);
+      if (ps === 0) { gl.blendEquation(gl.MAX); gl.blendFunc(gl.ONE, gl.ONE); } // (the glows of neighbouring shapes take the strongest, they do not add up at a joint)
+      for (let i = 0; i < frame.used; i++) {
+        const grp = frame.groups[i];
         this.pass('ribbons', grp.ribbons, setPass);
         this.pass('bars', grp.bars, setPass);
-        if (ps === 0) { gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); }
       }
+      if (ps === 0) { gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); }
     }
     const pc = frame.percColors;
     if (pc) this.pass('perc', frame.perc, (pr) => { for (const k of ['glow', 'ring', 'ball', 'lit', 'dark']) gl.uniform3fv(pr.u[`u_p${k}`], rgbOf(pc[k])); });
