@@ -103,6 +103,7 @@ const laneY = (time) => LY_HIT - (time - LY_T) * LY_PPS;
 // The mapping of the vocal chart of the current renderVocals call: time -> x and pitch -> y (closures made on every frame before).
 let VOC_HIT_X = 0;
 const HARMONY_DOUBLE_OFFSET = 4; // px: how far a harmony note that sings the lead's note sits above / below it
+const SP_OUTLINE = '#c79a2f'; // the outline of star power lyrics: the star power gold, a shade darker
 let VOC_T = 0;
 let VOC_PPS = 1;
 let VOC_LO = 0;
@@ -1119,7 +1120,7 @@ export class Highway {
       const sw = g.measureText(syl.text).width;
       if (syl.sp) { // star power: the letters keep their colours, with a gold outline
         g.lineWidth = Math.max(2.5, sz * 0.11);
-        g.strokeStyle = mixHex('#0d1117', VOCAL_SP_GOLD, alpha);
+        g.strokeStyle = mixHex('#0d1117', SP_OUTLINE, alpha);
         g.strokeText(syl.text, x, cy);
       } else if (this.lyricOutline) {
         g.lineWidth = Math.max(3, sz * 0.14);
@@ -2009,7 +2010,7 @@ export class Highway {
       const sungUntil = l.end > l.time ? l.end : list[i + 1]?.time ?? Infinity; // the paired note's end, else the next syllable
       if (l.sp) { // star power: the letters keep their colours, with a gold outline (dimmer once sung)
         g.lineWidth = Math.max(2.5, size * 0.11);
-        g.strokeStyle = l.time > t || t < sungUntil ? LYRIC_SP_FUTURE : LYRIC_SP_PAST;
+        g.strokeStyle = l.time > t || t < sungUntil ? SP_OUTLINE : mixHex(SP_OUTLINE, '#0d1117', 0.5); // (a gold a shade darker than the star power notes')
         g.lineJoin = 'round';
         g.strokeText(l.text, x, y);
       } else if (this.lyricOutline) { // a dark outline under the letters, so they read over any background (setting highway.lyricOutline)
