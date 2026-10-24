@@ -2052,7 +2052,7 @@ export class Highway {
       const l = shown[k];
       if (!l.sp) continue;
       const live = l.time > t || t < shown[k + 2];
-      g.lineWidth = darkW + 2 * Math.max(2, size * 0.07);
+      g.lineWidth = darkW + 2 * Math.max(1.5, size * 0.05);
       g.strokeStyle = live ? SP_LYRIC_GOLD : mixHex(SP_LYRIC_GOLD, '#0d1117', 0.5);
       g.strokeText(l.text, shown[k + 1], y);
     }
