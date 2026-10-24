@@ -1057,7 +1057,7 @@ export class Highway {
   vocalMaxArea(w) { return Math.max(150, w / 6); }
 
   vocalCenterY(chart, h, w = Infinity) {
-    const second = (chart.lyrics2 || []).length > 0;
+    const second = (chart.lyricsLane2 || chart.lyrics2 || []).length > 0;
     const secondSize = Math.max(15, Math.min(26, h * 0.08)) * this.lyricScale;
     const fontSize = Math.max(24, Math.min(36, h * 0.095)) * this.lyricScale;
     const lyricY = h - fontSize * 0.75;
@@ -1837,7 +1837,7 @@ export class Highway {
     const range = this.vocalRange(t, look + 1.5);
     const lo = range[0];
     const hi = range[1];
-    const second = (chart.lyrics2 || []).length > 0; // harmony charts: the other voices' own words get a line above the chart
+    const second = (chart.lyricsLane2 || chart.lyrics2 || []).length > 0; // harmony charts: the words of voices 2 and 3 get a line above the chart, shown together with the lead's
     const secondSize = Math.max(15, Math.min(26, h * 0.08)) * this.lyricScale; // (setting highway.lyricSize)
     const secondY = secondSize * 0.75; // the harmony line (and its track) sits right at the top edge
     let top = second ? secondY + secondSize * 0.75 : 8; // pitch area: below the second lyric line, if any, down to the lyrics
@@ -1901,6 +1901,7 @@ export class Highway {
     const leadColors = (this.leadColors ??= [darken(this.vocColors.lead, 0.35), this.vocColors.lead]);
     if (gv) this.vocalNotesGl(frame, chart.notes, t, ahead, behind, leadHalf, leadColors, hitX);
     else this.vocalNotes(chart.notes, t, ahead, behind, leadHalf, leadColors, hitX); // lit: a lighter shade of the note's own colour
+    this.harmonyDoubles(t, ahead, behind, leadHalf, hitX); // voices 2 and 3 singing the lead's note: a line above / below it
 
     // percussion: a drum-head marker per hit, in the vertical middle of the chart; a hit flashes when it crosses the line and
     // then dims as it scrolls off.
@@ -1972,7 +1973,7 @@ export class Highway {
     g.textAlign = 'left';
     g.textBaseline = 'middle';
     this.lyricRow(second && chart.lyrics1?.length ? chart.lyrics1 : chart.lyrics, lyricY, fontSize, this.vocColors.lyrics, t, behind, ahead); // with a second line, the first one is the lead's own words
-    if (second) this.lyricRow(chart.lyrics2, secondY, secondSize, this.vocColors.lyrics2, t, behind, ahead); // the other voices, above the chart
+    if (second) this.lyricRow(chart.lyricsLane2 || chart.lyrics2, secondY, secondSize, this.vocColors.lyrics2, t, behind, ahead); // the other voices, above the chart
     g.textBaseline = 'alphabetic';
   }
 
@@ -2346,6 +2347,48 @@ export class Highway {
       g.stroke();
     }
     g.restore();
+  }
+
+  // Where voice 2 or 3 sings exactly the lead's note (same pitch, at the same time) its own note hides under the lead's, so the lead's note gets a short line in that voice's colour:
+  // above it for voice 2, below it for voice 3, over the stretch they sing together; the part past the hit line in the darker shade of the colour. (Drawn on the 2D canvas over the board.)
+  harmonyDoubles(t, ahead, behind, half, hitX) {
+    const chart = this.chart;
+    const harmonies = chart.harmonies;
+    if (!harmonies?.length) return;
+    const g = this.g;
+    const th = Math.max(2.5, Math.min(4, half * 0.3));
+    for (const harmony of harmonies) {
+      if (harmony.part !== 2 && harmony.part !== 3) continue;
+      const base = this.vocColors.harmony[harmony.part] || this.vocColors.harmony[1];
+      const [dark, lit] = this.harmonyColors(harmony.part, base);
+      const dir = harmony.part === 2 ? -1 : 1; // above / below
+      const hn = harmony.notes;
+      for (const n of chart.notes) {
+        if (n.end < t - behind) continue;
+        if (n.time > t + ahead) break;
+        if (n.talkie) continue;
+        for (const m of hn) {
+          if (m.end < n.time) continue;
+          if (m.time > n.end) break;
+          if (m.talkie || m.pitch !== n.pitch) continue;
+          const a = Math.max(n.time, m.time), b = Math.min(n.end, m.end);
+          if (b <= a) continue;
+          const x1 = vocX(a), x2 = Math.max(x1 + 4, vocX(b)), y = vocY(n.pitch) + dir * (half + th * 0.9 + 1.5);
+          g.save();
+          g.lineCap = 'round';
+          g.lineWidth = th;
+          for (const [colour, from, to] of [[dark, x1, Math.min(x2, hitX)], [lit, Math.max(x1, hitX), x2]]) {
+            if (to <= from) continue;
+            g.strokeStyle = colour;
+            g.beginPath();
+            g.moveTo(from + th / 2, y);
+            g.lineTo(to - th / 2, y);
+            g.stroke();
+          }
+          g.restore();
+        }
+      }
+    }
   }
 
   // Lowest and highest pitched note of the whole chart (and its harmonies), cached per chart.
