@@ -1118,7 +1118,7 @@ export class Highway {
     line.syl.forEach((syl, i) => {
       const sw = g.measureText(syl.text).width;
       if (syl.sp) { // star power: the letters keep their colours, with a gold outline
-        g.lineWidth = Math.max(3.5, sz * 0.2);
+        g.lineWidth = Math.max(2.5, sz * 0.11);
         g.strokeStyle = mixHex('#0d1117', VOCAL_SP_GOLD, alpha);
         g.strokeText(syl.text, x, cy);
       } else if (this.lyricOutline) {
@@ -2008,7 +2008,7 @@ export class Highway {
       if (l.time < t - behind - 0.8) continue;
       const sungUntil = l.end > l.time ? l.end : list[i + 1]?.time ?? Infinity; // the paired note's end, else the next syllable
       if (l.sp) { // star power: the letters keep their colours, with a gold outline (dimmer once sung)
-        g.lineWidth = Math.max(3.5, size * 0.2);
+        g.lineWidth = Math.max(2.5, size * 0.11);
         g.strokeStyle = l.time > t || t < sungUntil ? LYRIC_SP_FUTURE : LYRIC_SP_PAST;
         g.lineJoin = 'round';
         g.strokeText(l.text, x, y);
