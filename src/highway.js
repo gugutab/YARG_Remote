@@ -1143,19 +1143,32 @@ export class Highway {
       else if (this.lyricOutline) { g.lineWidth = darkW; g.strokeStyle = 'rgba(0,0,0,0.65)'; } else return;
       g.strokeText(syl.text, xs[i], cy);
     });
-    g.fillStyle = mixHex('#0d1117', '#ffffff', alpha); // opaque, already faded towards the stage colour: a translucent fill let the dark outline show through the middle of the letters
-    line.syl.forEach((syl, i) => g.fillText(syl.text, xs[i], cy));
+    // The fills: every letter is drawn once, in the sung colour to the left of the sung edge and in white (opaque, already faded towards the stage colour: a translucent fill let the dark
+    // outline show through the middle of the letters) to the right of it. The edge is snapped to a device pixel, and nothing is drawn twice: the coloured letter over a white one left a
+    // fringe of white at its antialiased edges and the cut fell inside a pixel.
+    const white = mixHex('#0d1117', '#ffffff', alpha);
+    const sung = this.sheetPresent || this.vocColors.present; // (the voice's own colour in the harmony sheets)
+    const ds = g.getTransform().a || 1;
     line.syl.forEach((syl, i) => {
       const p = prog ? prog[i] : 0;
-      if (p > 0) { // the sung part
-        g.save();
-        g.beginPath();
-        g.rect(xs[i], cy - sz, g.measureText(syl.text).width * p, sz * 2);
-        g.clip();
-        g.fillStyle = this.sheetPresent || this.vocColors.present; // (the voice's own colour in the harmony sheets)
-        g.fillText(syl.text, xs[i], cy);
-        g.restore();
-      }
+      const sw = g.measureText(syl.text).width;
+      if (p <= 0) { g.fillStyle = white; g.fillText(syl.text, xs[i], cy); return; }
+      if (p >= 1) { g.fillStyle = sung; g.fillText(syl.text, xs[i], cy); return; }
+      const edge = Math.round((xs[i] + sw * p) * ds) / ds;
+      g.save();
+      g.beginPath();
+      g.rect(xs[i] - sz, cy - sz, edge - xs[i] + sz, sz * 2);
+      g.clip();
+      g.fillStyle = sung;
+      g.fillText(syl.text, xs[i], cy);
+      g.restore();
+      g.save();
+      g.beginPath();
+      g.rect(edge, cy - sz, sw + sz, sz * 2);
+      g.clip();
+      g.fillStyle = white;
+      g.fillText(syl.text, xs[i], cy);
+      g.restore();
     });
     g.textBaseline = 'alphabetic';
     return { x: (w - total) / 2, total };
