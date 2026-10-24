@@ -754,7 +754,7 @@ export class Highway {
   // With two harmony lyric lines the default band is taller by the room they take, so the notes keep the height they have with one (a height the user dragged to is kept as it is).
   bandHeight(h, fallback, chart = null) {
     const base = this.vocalH ?? fallback;
-    const extra = this.vocalH == null && chart?.lyricsLane3?.length > 0 ? 2.5 * Math.max(15, Math.min(26, base * 0.08)) * this.lyricScale : 0;
+    const extra = this.vocalH == null && chart?.lyricsLane3?.length > 0 ? 2.5 * this.harmonyLyricSize(base, false) : 0;
     return Math.round(Math.max(90, Math.min(h - 160, base + extra)));
   }
 
@@ -1061,9 +1061,15 @@ export class Highway {
   // sit close to the lyrics. (VocalTrack.cs MIN_ASPECT_RATIO.)
   vocalMaxArea(w) { return Math.max(150, w / 6); }
 
+  // The size of the harmony lyric lines (setting highway.lyricSize): a little larger when there are two lines, but never above 80% of the lead's lyrics, which grow with the band too.
+  harmonyLyricSize(h, twoLines) {
+    const size = Math.max(15, Math.min(26, h * 0.08)) * (twoLines ? 1.45 : 1) * this.lyricScale;
+    return twoLines ? Math.min(size, Math.max(24, Math.min(36, h * 0.095)) * this.lyricScale * 0.8) : size;
+  }
+
   vocalCenterY(chart, h, w = Infinity) {
     const second = (chart.lyricsLane2 || chart.lyrics2 || []).length > 0;
-    const secondSize = Math.max(15, Math.min(26, h * 0.08)) * (chart.lyricsLane3?.length > 0 ? 1.45 : 1) * this.lyricScale;
+    const secondSize = this.harmonyLyricSize(h, chart.lyricsLane3?.length > 0);
     const fontSize = Math.max(24, Math.min(36, h * 0.095)) * this.lyricScale;
     const lyricY = h - fontSize * 0.75;
     const bottom = lyricY - fontSize * 0.5 - 16;
@@ -1850,7 +1856,7 @@ export class Highway {
     const hi = range[1];
     const second = (chart.lyricsLane2 || chart.lyrics2 || []).length > 0; // harmony charts: the words of voices 2 and 3 get a line above the chart, shown together with the lead's
     const twoLines = chart.lyricsLane3?.length > 0;
-    const secondSize = Math.max(15, Math.min(26, h * 0.08)) * (twoLines ? 1.45 : 1) * this.lyricScale; // (setting highway.lyricSize; a little larger when there are two lines)
+    const secondSize = this.harmonyLyricSize(h, twoLines);
     const secondY = secondSize * 0.75; // the harmony line (and its track) sits right at the top edge
     const third = chart.lyricsLane3?.length > 0; // voice 3's words that differ from voice 2's get a line under the second one
     const thirdY = secondY + secondSize * 1.25; // under the first line (a little apart), on the same time grid

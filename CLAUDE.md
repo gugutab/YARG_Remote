@@ -761,3 +761,4 @@ Only checked by synthetic test, headless run or code reading:
 - The gold outline of star power lyrics is a shade darker than the note gold (`SP_OUTLINE` #c79a2f, half darker once sung).
 - Harmony lyric lines in the notes view, two-line case: font 1.45 x the single-line size, the track background behind them covers both lines, and the note area starts `NOTE_PAD_BELOW_LYRICS` (12 px) below them (vocalCenterY counts it too), so notes never overlap the lyrics.
 - With two harmony lyric lines the default vocal band is taller (`bandHeight(h, fallback, chart)` adds 2.5 x the single harmony line size) so the note area keeps the height it has with one line; a height the user dragged the band to is kept as it is.
+- Two harmony lyric lines: their size (`Highway.harmonyLyricSize`) is capped at 80% of the lead's lyric size, so a taller band no longer makes them bigger than the lead's.
