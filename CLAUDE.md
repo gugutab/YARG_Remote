@@ -762,3 +762,4 @@ Only checked by synthetic test, headless run or code reading:
 - Harmony lyric lines in the notes view, two-line case: font 1.45 x the single-line size, the track background behind them covers both lines, and the note area starts `NOTE_PAD_BELOW_LYRICS` (12 px) below them (vocalCenterY counts it too), so notes never overlap the lyrics.
 - With two harmony lyric lines the default vocal band is taller (`bandHeight(h, fallback, chart)` adds 2.5 x the single harmony line size) so the note area keeps the height it has with one line; a height the user dragged the band to is kept as it is.
 - Two harmony lyric lines: their size (`Highway.harmonyLyricSize`) is capped at 80% of the lead's lyric size, so a taller band no longer makes them bigger than the lead's.
+- Two harmony lyric lines: the smallest size is 2 pt above the previous one (15 x 1.45 + 2 px), also when the 80% cap of the lead's lyrics would be lower.

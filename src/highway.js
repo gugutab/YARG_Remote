@@ -1063,8 +1063,11 @@ export class Highway {
 
   // The size of the harmony lyric lines (setting highway.lyricSize): a little larger when there are two lines, but never above 80% of the lead's lyrics, which grow with the band too.
   harmonyLyricSize(h, twoLines) {
-    const size = Math.max(15, Math.min(26, h * 0.08)) * (twoLines ? 1.45 : 1) * this.lyricScale;
-    return twoLines ? Math.min(size, Math.max(24, Math.min(36, h * 0.095)) * this.lyricScale * 0.8) : size;
+    const scale = this.lyricScale;
+    if (!twoLines) return Math.max(15, Math.min(26, h * 0.08)) * scale;
+    const least = (15 * 1.45 + 2) * scale; // the smallest it gets with two lines: 2 pt above the one-line minimum times 1.45
+    const size = Math.max(least, Math.min(26, h * 0.08) * 1.45 * scale);
+    return Math.min(size, Math.max(least, Math.max(24, Math.min(36, h * 0.095)) * scale * 0.8));
   }
 
   vocalCenterY(chart, h, w = Infinity) {
