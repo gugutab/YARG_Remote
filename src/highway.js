@@ -2185,13 +2185,12 @@ export class Highway {
         this.vocalShape(n, prev, x1, bw, y, half, colors[0]);
         g.restore();
       }
-      if (colors && !n.talkie && x1 <= hitX && hitX <= x2 + 24) { // a voice meter inside the part of the note past the line: thin bars that jump, strongest next to the line
-        const live = 1 - Math.min(1, Math.max(0, (hitX - x2) / 24));
+      if (colors && !n.talkie && x1 <= hitX) { // a voice meter inside the part of the note past the line: thin bars that jump, strongest next to the line
         g.save();
         g.fillStyle = tintWhite(n.sp ? VOCAL_SP_GOLD : colors[1], 0.6);
         for (let k = 0; x1 + k * 5 < Math.min(x2, hitX); k++) {
           const bx = x1 + k * 5 + 0.75, behindPx = hitX - bx;
-          const f = Math.min(1, Math.max(0, (behindPx + 1) / 4)) * (1 - Math.min(1, Math.max(0, (behindPx - 10) / 110))) * live;
+          const f = Math.min(1, Math.max(0, (behindPx + 1) / 4)) * (1 - Math.min(1, Math.max(0, (behindPx - 10) / 110)));
           if (f <= 0.01) continue;
           const h = (0.25 + 0.75 * Math.abs(Math.sin(k * 1.9 + t * 7) * Math.sin(k * 0.71 - t * 3.7 + 1.3))) * half * 0.85;
           g.globalAlpha = 0.85 * f;

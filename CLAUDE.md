@@ -748,3 +748,4 @@ Only checked by synthetic test, headless run or code reading:
 - The voice meter inside pitched notes appears at the hit line and fades out within ~60 px behind it (was 150 px).
 - The voice meter (pitched notes and talkie boxes) appears at the hit line and fades out about 120 px behind it (the 60 px of the last change was too short to see).
 - Talkie passing effect (GL `talk` program): the soft halo that trailed left of the hit line is gone; the lit stretch of the line, the sweeping point, the sparks and the voice meter stay (the 2D version never had the halo).
+- The voice meter inside pitched notes no longer cuts off when the note's end crosses the hit line: it keeps jumping in the part of the note that slides away and fades with the distance behind the line.

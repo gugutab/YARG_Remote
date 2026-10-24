@@ -158,7 +158,7 @@ const PROGRAMS = {
   // inside the note, in the part that has passed the hit line while the voice is on it: a voice meter, thin light bars that jump up and down, strongest next to the line and
   // fading out about 120 px behind it
   float behind = u_hitx - v_p.x;
-  float live = step(x1, u_hitx) * (1.0 - smoothstep(x2, x2 + 24.0, u_hitx));
+  float live = step(x1, u_hitx); // (no cut when the note ends: the bars keep jumping while they slide away from the line and fade with the distance)
   float on = live * smoothstep(-1.0, 4.0, behind) * (1.0 - smoothstep(10.0, 120.0, behind)); // (appears at the line and fades out about 120 px behind it)
   float fx = (v_p.x - x1) / 5.0;
   float k = floor(fx);
