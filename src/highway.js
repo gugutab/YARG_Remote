@@ -102,6 +102,7 @@ let LY_PPS = 1;
 const laneY = (time) => LY_HIT - (time - LY_T) * LY_PPS;
 // The mapping of the vocal chart of the current renderVocals call: time -> x and pitch -> y (closures made on every frame before).
 let VOC_HIT_X = 0;
+const NOTE_PAD_BELOW_LYRICS = 12; // px between the harmony lyric background and the highest note (a note is drawn above its pitch line by half its thickness)
 const HARMONY_DOUBLE_OFFSET = 4; // px: how far a harmony note that sings the lead's note sits above / below it
 const SP_OUTLINE = '#c79a2f'; // the outline of star power lyrics: the star power gold, a shade darker
 let VOC_T = 0;
@@ -1060,12 +1061,12 @@ export class Highway {
 
   vocalCenterY(chart, h, w = Infinity) {
     const second = (chart.lyricsLane2 || chart.lyrics2 || []).length > 0;
-    const secondSize = Math.max(15, Math.min(26, h * 0.08)) * (chart.lyricsLane3?.length > 0 ? 1.2 : 1) * this.lyricScale;
+    const secondSize = Math.max(15, Math.min(26, h * 0.08)) * (chart.lyricsLane3?.length > 0 ? 1.45 : 1) * this.lyricScale;
     const fontSize = Math.max(24, Math.min(36, h * 0.095)) * this.lyricScale;
     const lyricY = h - fontSize * 0.75;
     const bottom = lyricY - fontSize * 0.5 - 16;
     const third = chart.lyricsLane3?.length > 0 ? secondSize * 1.25 : 0;
-    const top = Math.max(second ? secondSize * 0.75 + secondSize * 0.75 + third : 8, bottom - this.vocalMaxArea(w));
+    const top = Math.max(second ? secondSize * 0.75 + secondSize * 0.75 + third + NOTE_PAD_BELOW_LYRICS : 8, bottom - this.vocalMaxArea(w));
     return (top + bottom) / 2;
   }
 
@@ -1847,11 +1848,11 @@ export class Highway {
     const hi = range[1];
     const second = (chart.lyricsLane2 || chart.lyrics2 || []).length > 0; // harmony charts: the words of voices 2 and 3 get a line above the chart, shown together with the lead's
     const twoLines = chart.lyricsLane3?.length > 0;
-    const secondSize = Math.max(15, Math.min(26, h * 0.08)) * (twoLines ? 1.2 : 1) * this.lyricScale; // (setting highway.lyricSize; a little larger when there are two lines)
+    const secondSize = Math.max(15, Math.min(26, h * 0.08)) * (twoLines ? 1.45 : 1) * this.lyricScale; // (setting highway.lyricSize; a little larger when there are two lines)
     const secondY = secondSize * 0.75; // the harmony line (and its track) sits right at the top edge
     const third = chart.lyricsLane3?.length > 0; // voice 3's words that differ from voice 2's get a line under the second one
     const thirdY = secondY + secondSize * 1.25; // under the first line (a little apart), on the same time grid
-    let top = second ? (third ? thirdY : secondY) + secondSize * 0.75 : 8; // pitch area: below the second lyric line(s), if any, down to the lyrics
+    let top = second ? (third ? thirdY : secondY) + secondSize * 0.75 + NOTE_PAD_BELOW_LYRICS : 8; // pitch area: below the second lyric line(s) and the room of their background, if any, down to the lyrics
     const fontSize = Math.max(24, Math.min(36, h * 0.095)) * this.lyricScale; // lyric size, grows with the band
     const lyricY = h - fontSize * 0.75; // the lyrics and their track sit right at the bottom edge of the window
     const bottom = lyricY - fontSize * 0.5 - 16; // and 16 px of air between them and the notes
@@ -1868,8 +1869,9 @@ export class Highway {
       const mid1 = lyricY; // the middle of the letters (they are drawn with a middle baseline)
       this.trackBase(0, mid1 - fontSize * 0.75, w, fontSize * 1.5, trackA);
       if (second) {
-        const mid2 = secondY;
-        this.trackBase(0, Math.max(0, mid2 - secondSize * 0.75), w, secondSize * 1.5, trackA);
+        const mid2 = secondY; // (the background covers both harmony lines when there are two)
+        const y0 = Math.max(0, mid2 - secondSize * 0.75);
+        this.trackBase(0, y0, w, (third ? thirdY - secondY : 0) + secondSize * 1.5 + (mid2 - secondSize * 0.75 - y0), trackA);
       }
     }
     VOC_LO = lo;
