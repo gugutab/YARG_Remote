@@ -401,7 +401,13 @@ export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
     const seen = new Map(); // text|time -> the entry; a word both voices sing is one entry flagged `both` (shown in white)
     for (const l of [...v2, ...(voiceLyrics[3] || [])].sort((x, y) => x.time - y.time || x.part - y.part)) {
       const k = `${l.text}|${Math.round(l.time * 10)}`;
-      if (seen.has(k)) { seen.get(k).both = true; continue; }
+      if (seen.has(k)) {
+        // White (`both`) only where both voices have the word as their own lyric. A word one voice has of its own and the other only sings along with (the lead's word its notes
+        // cover) keeps the colour of the voice that has it; two voices that both only sing the lead's word along are shown for both.
+        const e = seen.get(k);
+        if (e.shared && !l.shared) { e.part = l.part; e.shared = false; } else if (e.shared === l.shared) e.both = true;
+        continue;
+      }
       const entry = { ...l, vw: undefined };
       seen.set(k, entry);
       (l.part === 3 && clash(l) ? lane3 : lane2).push(entry);
