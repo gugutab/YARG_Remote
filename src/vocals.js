@@ -360,10 +360,10 @@ export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
     voiceLyrics = { 1: lyrics1 };
     for (const e of walkedExtra) {
       const own = e.walked.flatMap((p) => p.lyrics.filter((l) => !l.hidden && l.text)).map((l) => ({ time: l.time, end: l.end, text: l.text, join: l.join, part: e.part }));
-      const spans = e.notes.filter((n) => !n.perc).map((n) => [toSec(n.tick), toSec(totalEndTick(n))]);
+      const starts = e.notes.filter((n) => !n.perc).map((n) => toSec(n.tick)); // the voice sings a word of the lead's only where one of its notes starts with it (a long note held under the lead's words is not singing them)
       const words = [...own];
       for (const l of lyrics1) {
-        if (spans.some(([a, b]) => l.time >= a - 0.05 && l.time <= b) && !own.some((o) => Math.abs(o.time - l.time) < 0.2)) words.push({ time: l.time, end: l.end, text: l.text, join: l.join, part: e.part, shared: true });
+        if (starts.some((s) => Math.abs(s - l.time) <= 0.1) && !own.some((o) => Math.abs(o.time - l.time) < 0.2)) words.push({ time: l.time, end: l.end, text: l.text, join: l.join, part: e.part, shared: true });
       }
       words.sort((x, y) => x.time - y.time);
       voiceLyrics[e.part] = words.map((w, k) => { // (a syllable only joins the next one when that one is shown too, and close by)

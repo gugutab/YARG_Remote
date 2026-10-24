@@ -764,3 +764,4 @@ Only checked by synthetic test, headless run or code reading:
 - Two harmony lyric lines: their size (`Highway.harmonyLyricSize`) is capped at 80% of the lead's lyric size, so a taller band no longer makes them bigger than the lead's.
 - Two harmony lyric lines: the smallest size is 2 pt above the previous one (15 x 1.45 + 2 px), also when the 80% cap of the lead's lyrics would be lower.
 - Two harmony lyric lines: the white words (both voices) are drawn vertically centred between the two lines, the voice-coloured ones stay on their own line (`chart.lane2Split`: the words with `both` and the rest are drawn as two lists, each with its own spacing).
+- Harmony karaoke: a voice only shares the lead's word where one of its notes starts with it (within 0.1 s); a long note held under the lead's words (Suspicious Minds, Outro D: voice 3's 'ooh') no longer copies them into that voice's sheet.
