@@ -2000,7 +2000,11 @@ export class Highway {
     this.lyricRow(second && chart.lyrics1?.length ? chart.lyrics1 : chart.lyrics, lyricY, fontSize, this.vocColors.lyrics, t, behind, ahead); // with a second line, the first one is the lead's own words
     // the other voices, above the chart: each word in its voice's colour (voice 2's when the chart has no voice 3), white where both sing the same word
     const voiceTone = (l) => (l.both ? '#ffffff' : this.vocColors.harmony[l.part === 3 ? 3 : 2]);
-    if (second) this.lyricRow(chart.lyricsLane2 || chart.lyrics2, secondY, secondSize, this.vocColors.lyrics2, t, behind, ahead, chart.lyricsLane2 ? voiceTone : null);
+    if (second && third) { // two lines: the words both voices sing (white) sit vertically centred in the space of the two lines, the others on their own line
+      if (!chart.lane2Split) chart.lane2Split = { mid: chart.lyricsLane2.filter((l) => l.both), top: chart.lyricsLane2.filter((l) => !l.both) };
+      this.lyricRow(chart.lane2Split.top, secondY, secondSize, this.vocColors.lyrics2, t, behind, ahead, voiceTone);
+      this.lyricRow(chart.lane2Split.mid, (secondY + thirdY) / 2, secondSize, this.vocColors.lyrics2, t, behind, ahead, voiceTone);
+    } else if (second) this.lyricRow(chart.lyricsLane2 || chart.lyrics2, secondY, secondSize, this.vocColors.lyrics2, t, behind, ahead, chart.lyricsLane2 ? voiceTone : null);
     if (third) this.lyricRow(chart.lyricsLane3, thirdY, secondSize, this.vocColors.lyrics2, t, behind, ahead, voiceTone);
     g.textBaseline = 'alphabetic';
   }

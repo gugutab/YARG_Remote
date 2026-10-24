@@ -763,3 +763,4 @@ Only checked by synthetic test, headless run or code reading:
 - With two harmony lyric lines the default vocal band is taller (`bandHeight(h, fallback, chart)` adds 2.5 x the single harmony line size) so the note area keeps the height it has with one line; a height the user dragged the band to is kept as it is.
 - Two harmony lyric lines: their size (`Highway.harmonyLyricSize`) is capped at 80% of the lead's lyric size, so a taller band no longer makes them bigger than the lead's.
 - Two harmony lyric lines: the smallest size is 2 pt above the previous one (15 x 1.45 + 2 px), also when the 80% cap of the lead's lyrics would be lower.
+- Two harmony lyric lines: the white words (both voices) are drawn vertically centred between the two lines, the voice-coloured ones stay on their own line (`chart.lane2Split`: the words with `both` and the rest are drawn as two lists, each with its own spacing).
