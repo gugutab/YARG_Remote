@@ -2026,22 +2026,6 @@ export class Highway {
     g.textBaseline = 'alphabetic';
   }
 
-  // The star power glow of a lyric: the gold of the star power notes as a soft halo around the letters, drawn first so the usual dark outline and the letters sit over it.
-  spGlow(text, x, y, size, k, spread = 0.55, passes = 2) {
-    const g = this.g;
-    const OFF = 6000; // device pixels: the letters are drawn this far off to the left and their shadow thrown back, so only the glow shows (no gold letters under the outline)
-    const s = g.getTransform().a || 1;
-    g.save();
-    g.shadowColor = SP_LYRIC_GOLD;
-    g.shadowBlur = Math.max(6, size * spread) * s;
-    g.shadowOffsetX = OFF;
-    g.shadowOffsetY = 0;
-    g.globalAlpha *= k;
-    g.fillStyle = '#000';
-    for (let i = 0; i < passes; i++) g.fillText(text, x - OFF / s, y);
-    g.restore();
-  }
-
   // One row of syllables. Colours as in YARG's static lyrics (VocalStaticLyricPhraseElement): past grey, present teal,
   // future white (`colors` = [future, present, past]). A syllable never overlaps the one before it.
   // `toneOf(word)`: the colour a word has in place of `colors` (future: the colour, being sung: lighter, sung: dim).
@@ -2049,6 +2033,8 @@ export class Highway {
     const g = this.g;
     g.font = lyricFont(size);
     let prevRight = -Infinity;
+    const shown = (this.lyricShown ??= []); // the words on screen: [word, x, sung until, past]
+    shown.length = 0;
     for (let i = 0; i < list.length; i++) {
       const l = list[i];
       if (l.time < t - behind - 3) continue; // (a few syllables before the window still push the next ones along)
@@ -2057,19 +2043,33 @@ export class Highway {
       if (l.vw === undefined || l.vwSize !== size) { l.vw = g.measureText(l.text).width; l.vwSize = size; } // (a word's width at one size never changes: no TextMetrics per frame)
       prevRight = x + l.vw;
       if (l.time < t - behind - 0.8) continue;
-      const sungUntil = l.end > l.time ? l.end : list[i + 1]?.time ?? Infinity; // the paired note's end, else the next syllable
-      if (l.sp) this.spGlow(l.text, x, y, size, l.time > t || t < sungUntil ? 1 : 0.55, 0.3, 2); // star power: a gold glow behind the letters and their outline (dimmer once sung)
-      if (this.lyricOutline) { // a dark outline under the letters, so they read over any background (setting highway.lyricOutline)
-        g.lineWidth = Math.max(3, size * 0.16);
-        g.strokeStyle = 'rgba(0,0,0,0.85)';
-        g.lineJoin = 'round';
-        g.strokeText(l.text, x, y);
-      }
+      shown.push(l, x, l.end > l.time ? l.end : list[i + 1]?.time ?? Infinity); // sung until: the paired note's end, else the next syllable
+    }
+    // In passes over all the words (the gold rings, then the dark outlines, then the fills), so the wide ring of a star power word never covers its neighbour's letters.
+    const darkW = Math.max(3, size * 0.16);
+    g.lineJoin = 'round';
+    for (let k = 0; k < shown.length; k += 3) { // star power: a ring of gold outside the dark outline (dimmer once sung)
+      const l = shown[k];
+      if (!l.sp) continue;
+      const live = l.time > t || t < shown[k + 2];
+      g.lineWidth = darkW + 2 * Math.max(2, size * 0.07);
+      g.strokeStyle = live ? SP_LYRIC_GOLD : mixHex(SP_LYRIC_GOLD, '#0d1117', 0.5);
+      g.strokeText(l.text, shown[k + 1], y);
+    }
+    for (let k = 0; k < shown.length; k += 3) {
+      const l = shown[k];
+      if (l.sp) { g.lineWidth = darkW; g.strokeStyle = '#05070a'; } // (opaque, so the gold under it does not tint it)
+      else if (this.lyricOutline) { g.lineWidth = darkW; g.strokeStyle = 'rgba(0,0,0,0.85)'; } // a dark outline under the letters, so they read over any background (setting highway.lyricOutline)
+      else continue;
+      g.strokeText(l.text, shown[k + 1], y);
+    }
+    for (let k = 0; k < shown.length; k += 3) {
+      const l = shown[k];
       let cols = colors;
       const tone = toneOf?.(l);
       if (tone) cols = (l._tone === tone ? l._cols : (l._tone = tone, l._cols = tone === '#ffffff' ? [tone, colors[1], colors[2]] : [tone, mixHex(tone, '#ffffff', 0.55), mixHex(tone, '#0d1117', 0.6)]));
-      g.fillStyle = l.time > t ? cols[0] : t < sungUntil ? cols[1] : cols[2];
-      g.fillText(l.text, x, y);
+      g.fillStyle = l.time > t ? cols[0] : t < shown[k + 2] ? cols[1] : cols[2];
+      g.fillText(l.text, shown[k + 1], y);
     }
   }
 
