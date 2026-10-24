@@ -103,6 +103,7 @@ const laneY = (time) => LY_HIT - (time - LY_T) * LY_PPS;
 // The mapping of the vocal chart of the current renderVocals call: time -> x and pitch -> y (closures made on every frame before).
 let VOC_HIT_X = 0;
 const NOTE_PAD_BELOW_LYRICS = 12; // px between the harmony lyric background and the highest note (a note is drawn above its pitch line by half its thickness)
+const SP_LYRIC_GOLD = '#a68028'; // the gold of star power lyrics (glow in the notes view, outline in karaoke): the notes' gold #ffc53d at 65%
 const HARMONY_DOUBLE_OFFSET = 4; // px: how far a harmony note that sings the lead's note sits above / below it
 let VOC_T = 0;
 let VOC_PPS = 1;
@@ -1136,7 +1137,7 @@ export class Highway {
       }
       if (syl.sp) { // star power: the gold outline over the usual one (the notes view has a glow instead)
         g.lineWidth = Math.max(2.5, sz * 0.11);
-        g.strokeStyle = mixHex('#0d1117', '#c79a2f', alpha);
+        g.strokeStyle = mixHex('#0d1117', SP_LYRIC_GOLD, alpha);
         g.strokeText(syl.text, x, cy);
       }
       g.fillStyle = mixHex('#0d1117', '#ffffff', alpha); // opaque, already faded towards the stage colour: a translucent fill let the dark outline show through the middle of the letters (a star power lyric is the same gold as the notes' outline)
@@ -2015,7 +2016,7 @@ export class Highway {
     const OFF = 6000; // device pixels: the letters are drawn this far off to the left and their shadow thrown back, so only the glow shows (no gold letters under the outline)
     const s = g.getTransform().a || 1;
     g.save();
-    g.shadowColor = VOCAL_SP_GOLD;
+    g.shadowColor = SP_LYRIC_GOLD;
     g.shadowBlur = Math.max(6, size * spread) * s;
     g.shadowOffsetX = OFF;
     g.shadowOffsetY = 0;

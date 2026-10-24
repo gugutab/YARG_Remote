@@ -772,3 +772,4 @@ Only checked by synthetic test, headless run or code reading:
 - Star power lyric glow spread: back to 0.3 x size in the notes view; karaoke reduced to 0.5 x size (was 0.7 before, 1.0 for a moment).
 - Karaoke star power lyrics: back to the thin gold outline (#c79a2f, 0.11 x size), no glow; the notes view keeps the glow (`spGlow`).
 - Karaoke star power lyrics: the gold outline is drawn after (over) the standard dark outline, which is kept under it.
+- Star power lyric gold is darker in both modes (`SP_LYRIC_GOLD` #a68028, the note gold at 65%): the glow in the notes view and the outline in karaoke.
