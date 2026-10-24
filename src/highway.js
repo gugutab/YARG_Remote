@@ -665,7 +665,7 @@ export class Highway {
       this.vocalAlone = true;
       if (this.vocalView === 'karaoke') this.drawPane(vocal, t, 0, 0, w, h); // the lyrics fill the stage (renderKaraoke)
       else { // the chart keeps the height it has next to other charts; the rest of the lyrics fill the space below
-        const vh = this.bandHeight(h, (Math.min(h * 0.34, 280) - 20) * 0.8); // (the default is 20% shorter)
+        const vh = this.bandHeight(h, (Math.min(h * 0.34, 280) - 20) * 0.8, vocal.chart); // (the default is 20% shorter)
         this.drawPane(vocal, t, 0, 0, w, vh);
         this.drawDivider({ type: 'row', y: vh - 1, w });
         g.save();
@@ -686,7 +686,7 @@ export class Highway {
     }
     let top = 0;
     if (vocal) { // vocals use the top of the other tracks
-      top = this.bandHeight(h, ((this.vocalView === 'karaoke' ? Math.min(h * 0.3, 230) : Math.min(h * 0.34, 280)) - 40) * 0.8); // 20 px shorter than the band of vocals alone
+      top = this.bandHeight(h, ((this.vocalView === 'karaoke' ? Math.min(h * 0.3, 230) : Math.min(h * 0.34, 280)) - 40) * 0.8, vocal.chart); // 20 px shorter than the band of vocals alone
       this.drawPane(vocal, t, 0, 0, w, top);
       this.drawDivider({ type: 'row', y: top - 1, w });
     }
@@ -751,9 +751,11 @@ export class Highway {
   }
 
   // The height of the vocal band: the default, or what the user dragged it to (kept within sensible limits).
-  bandHeight(h, fallback) {
+  // With two harmony lyric lines the default band is taller by the room they take, so the notes keep the height they have with one (a height the user dragged to is kept as it is).
+  bandHeight(h, fallback, chart = null) {
     const base = this.vocalH ?? fallback;
-    return Math.round(Math.max(90, Math.min(h - 160, base)));
+    const extra = this.vocalH == null && chart?.lyricsLane3?.length > 0 ? 2.5 * Math.max(15, Math.min(26, base * 0.08)) * this.lyricScale : 0;
+    return Math.round(Math.max(90, Math.min(h - 160, base + extra)));
   }
 
   // A divider between two panes: a thin line, brighter while the pointer is over it or it is being dragged.
