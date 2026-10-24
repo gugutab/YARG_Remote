@@ -102,7 +102,7 @@ let LY_PPS = 1;
 const laneY = (time) => LY_HIT - (time - LY_T) * LY_PPS;
 // The mapping of the vocal chart of the current renderVocals call: time -> x and pitch -> y (closures made on every frame before).
 let VOC_HIT_X = 0;
-const HARMONY_DOUBLE_OFFSET = 5; // px: how far a harmony note that sings the lead's note sits above / below it
+const HARMONY_DOUBLE_OFFSET = 4; // px: how far a harmony note that sings the lead's note sits above / below it
 let VOC_T = 0;
 let VOC_PPS = 1;
 let VOC_LO = 0;
@@ -1872,6 +1872,7 @@ export class Highway {
     const semi = (bottom - top) / (hi - lo); // px per semitone
     const leadHalf = Math.max(6, semi * 0.75); // a note is 1.5 semitones thick, as in YARG (CurrentNoteWidth)
     const harmHalf = Math.max(4, leadHalf * 0.67);
+    this.harmHalfNow = harmHalf; // (a lead note that a harmony doubles is drawn this thick, not the lead's own size)
     const mid = (top + bottom) / 2; // talkies (unpitched notes) sit in the middle of the pitch area
     const percussionY = this.vocalCenterY(chart, h, w); // percussion hits sit in the vertical middle of the chart
     VOC_HIT_X = hitX;
@@ -2114,11 +2115,13 @@ export class Highway {
         continue;
       }
       const y = vocY(n.pitch) + (n.dy || 0);
+      const hf = n.small ? this.harmHalfNow : half;
       if (n.slide && prev && !prev.talkie) {
-        const lead = Math.min(10, half * 1.5); // tucks under both bars so no seam shows
-        frame.ribbon(grp, vocX(prev.end) - lead, x1 + lead, vocY(prev.pitch) + (prev.dy || 0), y, half, idle, passed, n.sp);
+        const rh = Math.min(hf, prev.small ? this.harmHalfNow : half);
+        const lead = Math.min(10, rh * 1.5); // tucks under both bars so no seam shows
+        frame.ribbon(grp, vocX(prev.end) - lead, x1 + lead, vocY(prev.pitch) + (prev.dy || 0), y, rh, idle, passed, n.sp);
       }
-      frame.bar(grp, x1, x2, y, half, idle, passed, false, n.sp);
+      frame.bar(grp, x1, x2, y, hf, idle, passed, false, n.sp);
     }
     const gp = this.vocalGlowParams(notes, t, half, hitX);
     if (gp) frame.glow(gp.y, gp.R, gp.env, gp.age, idle, gp.sp, gp.seed);
@@ -2186,7 +2189,8 @@ export class Highway {
       const x2 = Math.max(x1 + 6, vocX(n.end));
       const bw = x2 - x1;
       const y = vocY(n.pitch) + (n.dy || 0);
-      this.vocalShape(n, prev, x1, bw, y, half, colors ? colors[1] : keep);
+      const hf = n.small ? this.harmHalfNow : half;
+      this.vocalShape(n, prev, x1, bw, y, hf, colors ? colors[1] : keep);
       if (n.talkie && colors) this.talkieHit2d(n, t, colors[1], hitX); // (the effect of the box passing the hit line)
       if (colors && (joined ? vocX(prev.end) : x1) < hitX) { // (the ribbon of a continuation starts at the previous note's end) // only the part that has crossed the hit line changes colour
         g.save();
@@ -2194,7 +2198,7 @@ export class Highway {
         g.rect(-1e4, -1e4, hitX + 1e4, 2e4);
         g.clip();
         g.globalAlpha *= 0.8; // a dark veil over the colour it had (the note keeps its hue), not an opaque colour
-        this.vocalShape(n, prev, x1, bw, y, half, colors[0]);
+        this.vocalShape(n, prev, x1, bw, y, hf, colors[0]);
         g.restore();
       }
       if (colors && !n.talkie && x1 <= hitX) { // a voice meter inside the part of the note past the line: thin bars that jump, strongest next to the line
@@ -2204,7 +2208,7 @@ export class Highway {
           const bx = x1 + k * 5 + 0.75, behindPx = hitX - bx;
           const f = Math.min(1, Math.max(0, (behindPx + 1) / 4)) * (1 - Math.min(1, Math.max(0, (behindPx - 10) / 110)));
           if (f <= 0.01) continue;
-          const h = (0.25 + 0.75 * Math.abs(Math.sin(k * 1.9 + t * 7) * Math.sin(k * 0.71 - t * 3.7 + 1.3))) * half * 0.85;
+          const h = (0.25 + 0.75 * Math.abs(Math.sin(k * 1.9 + t * 7) * Math.sin(k * 0.71 - t * 3.7 + 1.3))) * hf * 0.85;
           g.globalAlpha = 0.85 * f;
           g.fillRect(bx, y - h, 3.5, h * 2);
         }
@@ -2361,7 +2365,7 @@ export class Highway {
   }
 
   // Where voice 2 or 3 sings exactly the lead's note (same pitch, overlapping in time) its own note would hide under the lead's: it is drawn behind the lead's with a vertical offset of
-  // 5 px (up for voice 2, down for voice 3) so it shows as a card behind. The offset is a `dy` on the harmony note, worked out once per chart.
+  // 4 px (up for voice 2, down for voice 3) so it shows as a card behind. The offset is a `dy` on the harmony note, worked out once per chart.
   markHarmonyDoubles() {
     const chart = this.chart;
     if (chart.doublesMarked) return;
@@ -2375,7 +2379,7 @@ export class Highway {
         if (n.talkie) continue;
         while (from < lead.length && lead[from].end < n.time) from++;
         for (let k = from; k < lead.length && lead[k].time <= n.end; k++) {
-          if (lead[k].pitch === n.pitch && Math.min(lead[k].end, n.end) > Math.max(lead[k].time, n.time)) { n.dy = dir * HARMONY_DOUBLE_OFFSET; break; }
+          if (lead[k].pitch === n.pitch && Math.min(lead[k].end, n.end) > Math.max(lead[k].time, n.time)) { n.dy = dir * HARMONY_DOUBLE_OFFSET; lead[k].small = true; break; }
         }
       }
     }
