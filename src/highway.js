@@ -1129,7 +1129,7 @@ export class Highway {
     g.lineJoin = 'round';
     line.syl.forEach((syl, i) => {
       const sw = g.measureText(syl.text).width;
-      if (syl.sp) this.spGlow(syl.text, x, cy, sz, alpha, 0.7, 4); // star power: a gold glow behind the letters and their outline
+      if (syl.sp) this.spGlow(syl.text, x, cy, sz, alpha, 1.0, 4); // star power: a gold glow behind the letters and their outline
       if (this.lyricOutline) {
         g.lineWidth = Math.max(3, sz * 0.14);
         g.strokeStyle = 'rgba(0,0,0,0.65)';
@@ -2037,7 +2037,7 @@ export class Highway {
       prevRight = x + l.vw;
       if (l.time < t - behind - 0.8) continue;
       const sungUntil = l.end > l.time ? l.end : list[i + 1]?.time ?? Infinity; // the paired note's end, else the next syllable
-      if (l.sp) this.spGlow(l.text, x, y, size, l.time > t || t < sungUntil ? 1 : 0.55, 0.3, 2); // star power: a gold glow behind the letters and their outline (dimmer once sung)
+      if (l.sp) this.spGlow(l.text, x, y, size, l.time > t || t < sungUntil ? 1 : 0.55, 0.5, 2); // star power: a gold glow behind the letters and their outline (dimmer once sung)
       if (this.lyricOutline) { // a dark outline under the letters, so they read over any background (setting highway.lyricOutline)
         g.lineWidth = Math.max(3, size * 0.16);
         g.strokeStyle = 'rgba(0,0,0,0.85)';

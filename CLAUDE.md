@@ -768,3 +768,4 @@ Only checked by synthetic test, headless run or code reading:
 - Star power lyrics (notes view and karaoke): the gold outline is replaced by a gold outer glow behind the usual dark outline and the letters (`Highway.spGlow`: gold letters under the real ones cast a canvas shadow, dimmer once sung).
 - Star power lyric glow: stronger in the notes view (spread 0.7 x size, 4 passes), smaller in karaoke (0.3 x size, 2 passes); `spGlow(text, x, y, size, k, spread, passes)`.
 - Star power lyric glow: small in the notes view (0.3 x size), strong in karaoke (0.7 x size, 4 passes); it is now only the shadow (the letters are drawn 6000 px off to the left and their shadow offset back), so no gold letters show under the dark outline and the karaoke text renders clean.
+- Star power lyric glow spread: 0.5 x size in the notes view, 1.0 x size in karaoke.
