@@ -773,3 +773,4 @@ Only checked by synthetic test, headless run or code reading:
 - Karaoke star power lyrics: back to the thin gold outline (#c79a2f, 0.11 x size), no glow; the notes view keeps the glow (`spGlow`).
 - Karaoke star power lyrics: the gold outline is drawn after (over) the standard dark outline, which is kept under it.
 - Star power lyric gold is darker in both modes (`SP_LYRIC_GOLD` #a68028, the note gold at 65%): the glow in the notes view and the outline in karaoke.
+- Karaoke star power lyrics: both outlines show, the usual dark one next to the letters and a ring of `SP_LYRIC_GOLD` outside it (gold stroke wider by 2 x max(2, 0.07 x size), dark one opaque over it).

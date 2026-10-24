@@ -1130,14 +1130,17 @@ export class Highway {
     g.lineJoin = 'round';
     line.syl.forEach((syl, i) => {
       const sw = g.measureText(syl.text).width;
-      if (this.lyricOutline) {
-        g.lineWidth = Math.max(3, sz * 0.14);
-        g.strokeStyle = 'rgba(0,0,0,0.65)';
-        g.strokeText(syl.text, x, cy);
-      }
-      if (syl.sp) { // star power: the gold outline over the usual one (the notes view has a glow instead)
-        g.lineWidth = Math.max(2.5, sz * 0.11);
+      const darkW = Math.max(3, sz * 0.14);
+      if (syl.sp) { // star power: a gold ring outside the usual dark outline, both showing (the notes view has a glow instead)
+        g.lineWidth = darkW + 2 * Math.max(2, sz * 0.07);
         g.strokeStyle = mixHex('#0d1117', SP_LYRIC_GOLD, alpha);
+        g.strokeText(syl.text, x, cy);
+        g.lineWidth = darkW;
+        g.strokeStyle = mixHex('#0d1117', '#05070a', alpha); // (opaque, so the gold under it does not tint it)
+        g.strokeText(syl.text, x, cy);
+      } else if (this.lyricOutline) {
+        g.lineWidth = darkW;
+        g.strokeStyle = 'rgba(0,0,0,0.65)';
         g.strokeText(syl.text, x, cy);
       }
       g.fillStyle = mixHex('#0d1117', '#ffffff', alpha); // opaque, already faded towards the stage colour: a translucent fill let the dark outline show through the middle of the letters (a star power lyric is the same gold as the notes' outline)
