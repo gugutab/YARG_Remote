@@ -389,13 +389,24 @@ export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
   if (voiceLyrics) for (const p of [2, 3]) markStarPower(voiceLyrics[p]);
   // The second lyric line of the notes view: the words of voices 2 and 3 together, also the ones the lead sings at the same moment (YARG shows its lyric lanes at the same time, the
   // same word in both when voices sing it together); a word both voices sing is shown once.
+  // Voice 3 words that differ from voice 2's at the same moment go to a third line (`lyricsLane3`) under it, so neither is pushed aside; where the words are the same, one line shows them.
   let lyricsLane2 = null;
+  let lyricsLane3 = null;
   if (voiceLyrics) {
+    const v2 = voiceLyrics[2] || [];
+    const same = (a, b) => a.text === b.text && Math.abs(a.time - b.time) < 0.1;
+    const clash = (l) => v2.some((o) => !same(o, l) && o.time < l.end + 0.05 && l.time < Math.max(o.end, o.time + 0.3)); // a different word of voice 2 sung over it
+    const lane2 = [];
+    const lane3 = [];
     const seen = new Set();
-    lyricsLane2 = [...(voiceLyrics[2] || []), ...(voiceLyrics[3] || [])].sort((x, y) => x.time - y.time || x.part - y.part)
-      .filter((l) => { const k = `${l.text}|${Math.round(l.time * 10)}`; return seen.has(k) ? false : (seen.add(k), true); })
-      .map((l) => ({ ...l, vw: undefined }));
-    if (lyricsLane2.length === 0) lyricsLane2 = null;
+    for (const l of [...v2, ...(voiceLyrics[3] || [])].sort((x, y) => x.time - y.time || x.part - y.part)) {
+      const k = `${l.text}|${Math.round(l.time * 10)}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      (l.part === 3 && clash(l) ? lane3 : lane2).push({ ...l, vw: undefined });
+    }
+    lyricsLane2 = lane2.length ? lane2 : null;
+    lyricsLane3 = lane3.length ? lane3 : null;
   }
   const inStarPower = (time) => spRanges.some((r) => time >= r.start - 1e-6 && time < r.end - 1e-6); // (the notes of those phrases: a gold outline in the views)
 
@@ -411,6 +422,7 @@ export function buildVocals({ midi, track, harmonyParts = [], toSec, timed }) {
     lyrics2,
     voiceLyrics,
     lyricsLane2,
+    lyricsLane3,
     phrases,
     rangeShifts: anyPhrases ? rangeShifts(track, events, pitched, toSec) : [DUMMY_RANGE],
   };

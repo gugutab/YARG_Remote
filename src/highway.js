@@ -1062,7 +1062,8 @@ export class Highway {
     const fontSize = Math.max(24, Math.min(36, h * 0.095)) * this.lyricScale;
     const lyricY = h - fontSize * 0.75;
     const bottom = lyricY - fontSize * 0.5 - 16;
-    const top = Math.max(second ? secondSize * 0.75 + secondSize * 0.75 : 8, bottom - this.vocalMaxArea(w));
+    const third = chart.lyricsLane3?.length > 0 ? secondSize * 1.05 : 0;
+    const top = Math.max(second ? secondSize * 0.75 + secondSize * 0.75 + third : 8, bottom - this.vocalMaxArea(w));
     return (top + bottom) / 2;
   }
 
@@ -1840,7 +1841,9 @@ export class Highway {
     const second = (chart.lyricsLane2 || chart.lyrics2 || []).length > 0; // harmony charts: the words of voices 2 and 3 get a line above the chart, shown together with the lead's
     const secondSize = Math.max(15, Math.min(26, h * 0.08)) * this.lyricScale; // (setting highway.lyricSize)
     const secondY = secondSize * 0.75; // the harmony line (and its track) sits right at the top edge
-    let top = second ? secondY + secondSize * 0.75 : 8; // pitch area: below the second lyric line, if any, down to the lyrics
+    const third = chart.lyricsLane3?.length > 0; // voice 3's words that differ from voice 2's get a line under the second one
+    const thirdY = secondY + secondSize * 1.05;
+    let top = second ? (third ? thirdY : secondY) + secondSize * 0.75 : 8; // pitch area: below the second lyric line(s), if any, down to the lyrics
     const fontSize = Math.max(24, Math.min(36, h * 0.095)) * this.lyricScale; // lyric size, grows with the band
     const lyricY = h - fontSize * 0.75; // the lyrics and their track sit right at the bottom edge of the window
     const bottom = lyricY - fontSize * 0.5 - 16; // and 16 px of air between them and the notes
@@ -1974,6 +1977,7 @@ export class Highway {
     g.textBaseline = 'middle';
     this.lyricRow(second && chart.lyrics1?.length ? chart.lyrics1 : chart.lyrics, lyricY, fontSize, this.vocColors.lyrics, t, behind, ahead); // with a second line, the first one is the lead's own words
     if (second) this.lyricRow(chart.lyricsLane2 || chart.lyrics2, secondY, secondSize, this.vocColors.lyrics2, t, behind, ahead); // the other voices, above the chart
+    if (third) this.lyricRow(chart.lyricsLane3, thirdY, secondSize, this.vocColors.lyrics2, t, behind, ahead);
     g.textBaseline = 'alphabetic';
   }
 
