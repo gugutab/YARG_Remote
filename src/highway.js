@@ -102,6 +102,7 @@ let LY_PPS = 1;
 const laneY = (time) => LY_HIT - (time - LY_T) * LY_PPS;
 // The mapping of the vocal chart of the current renderVocals call: time -> x and pitch -> y (closures made on every frame before).
 let VOC_HIT_X = 0;
+const HARMONY_DOUBLE_OFFSET = 4; // px: how far a harmony note that sings the lead's note sits above / below it
 let VOC_T = 0;
 let VOC_PPS = 1;
 let VOC_LO = 0;
@@ -1894,6 +1895,7 @@ export class Highway {
     else { g.fillStyle = 'rgba(255,255,255,0.7)'; g.fillRect(hitX - 2, 0, 3, h); }
 
     // harmonies first, so the lead is drawn on top
+    this.markHarmonyDoubles();
     const harmonies = chart.harmonies;
     for (let i = 0; harmonies && i < harmonies.length; i++) {
       const harmony = harmonies[i];
@@ -1904,7 +1906,6 @@ export class Highway {
     const leadColors = (this.leadColors ??= [darken(this.vocColors.lead, 0.35), this.vocColors.lead]);
     if (gv) this.vocalNotesGl(frame, chart.notes, t, ahead, behind, leadHalf, leadColors, hitX);
     else this.vocalNotes(chart.notes, t, ahead, behind, leadHalf, leadColors, hitX); // lit: a lighter shade of the note's own colour
-    this.harmonyDoubles(t, ahead, behind, leadHalf, hitX); // voices 2 and 3 singing the lead's note: a line above / below it
 
     // percussion: a drum-head marker per hit, in the vertical middle of the chart; a hit flashes when it crosses the line and
     // then dims as it scrolls off.
@@ -2046,7 +2047,7 @@ export class Highway {
     }
     if (n.slide && prev && !prev.talkie) { // continues the previous note: a smooth ribbon from its end to this note's start
       const xa = vocX(prev.end);
-      const ya = vocY(prev.pitch);
+      const ya = vocY(prev.pitch) + (prev.dy || 0);
       const lead = Math.min(10, half * 1.5); // tucks under both bars so no seam shows
       const xs = xa - lead;
       const xe = x1 + lead;
@@ -2112,10 +2113,10 @@ export class Highway {
         if (env > 0.004) frame.talkie(ty, VOC_BOTTOM, env, t - n.time, idle, n.sp, n.time % 97);
         continue;
       }
-      const y = vocY(n.pitch);
+      const y = vocY(n.pitch) + (n.dy || 0);
       if (n.slide && prev && !prev.talkie) {
         const lead = Math.min(10, half * 1.5); // tucks under both bars so no seam shows
-        frame.ribbon(grp, vocX(prev.end) - lead, x1 + lead, vocY(prev.pitch), y, half, idle, passed, n.sp);
+        frame.ribbon(grp, vocX(prev.end) - lead, x1 + lead, vocY(prev.pitch) + (prev.dy || 0), y, half, idle, passed, n.sp);
       }
       frame.bar(grp, x1, x2, y, half, idle, passed, false, n.sp);
     }
@@ -2184,7 +2185,7 @@ export class Highway {
       const x1 = vocX(n.time);
       const x2 = Math.max(x1 + 6, vocX(n.end));
       const bw = x2 - x1;
-      const y = vocY(n.pitch);
+      const y = vocY(n.pitch) + (n.dy || 0);
       this.vocalShape(n, prev, x1, bw, y, half, colors ? colors[1] : keep);
       if (n.talkie && colors) this.talkieHit2d(n, t, colors[1], hitX); // (the effect of the box passing the hit line)
       if (colors && (joined ? vocX(prev.end) : x1) < hitX) { // (the ribbon of a continuation starts at the previous note's end) // only the part that has crossed the hit line changes colour
@@ -2263,7 +2264,7 @@ export class Highway {
     let y = this.vocalLineY(n, prev, hitX);
     const next = notes[i + 1];
     if (next && !next.talkie && next.slide) y = this.vocalLineY(next, n, hitX) ?? y; // on the ribbon that joins a slide
-    if (y === null || y === undefined) y = vocY(n.pitch);
+    if (y === null || y === undefined) y = vocY(n.pitch) + (n.dy || 0);
     // The vertical position is animated: it glides to the voice's height (about 60 ms) instead of jumping when the pitch changes; after a seek or a pause of
     // the song it snaps to the new place.
     const st = (this.vocGlowState ??= new WeakMap()).get(notes) ?? { t: -1e9, y };
@@ -2359,43 +2360,22 @@ export class Highway {
     g.restore();
   }
 
-  // Where voice 2 or 3 sings exactly the lead's note (same pitch, at the same time) its own note hides under the lead's, so the lead's note gets a short line in that voice's colour:
-  // above it for voice 2, below it for voice 3, over the stretch they sing together; the part past the hit line in the darker shade of the colour. (Drawn on the 2D canvas over the board.)
-  harmonyDoubles(t, ahead, behind, half, hitX) {
+  // Where voice 2 or 3 sings exactly the lead's note (same pitch, overlapping in time) its own note would hide under the lead's: it is drawn behind the lead's with a vertical offset of
+  // 4 px (up for voice 2, down for voice 3) so it shows as a card behind. The offset is a `dy` on the harmony note, worked out once per chart.
+  markHarmonyDoubles() {
     const chart = this.chart;
-    const harmonies = chart.harmonies;
-    if (!harmonies?.length) return;
-    const g = this.g;
-    const th = Math.max(2.5, Math.min(4, half * 0.3));
-    for (const harmony of harmonies) {
-      if (harmony.part !== 2 && harmony.part !== 3) continue;
-      const base = this.vocColors.harmony[harmony.part] || this.vocColors.harmony[1];
-      const [dark, lit] = this.harmonyColors(harmony.part, base);
-      const dir = harmony.part === 2 ? -1 : 1; // above / below
-      const hn = harmony.notes;
-      for (const n of chart.notes) {
-        if (n.end < t - behind) continue;
-        if (n.time > t + ahead) break;
+    if (chart.doublesMarked) return;
+    chart.doublesMarked = true;
+    const lead = chart.notes.filter((n) => !n.talkie);
+    for (const harmony of chart.harmonies || []) {
+      const dir = harmony.part === 2 ? -1 : harmony.part === 3 ? 1 : 0;
+      if (!dir) continue;
+      let from = 0;
+      for (const n of harmony.notes) {
         if (n.talkie) continue;
-        for (const m of hn) {
-          if (m.end < n.time) continue;
-          if (m.time > n.end) break;
-          if (m.talkie || m.pitch !== n.pitch) continue;
-          const a = Math.max(n.time, m.time), b = Math.min(n.end, m.end);
-          if (b <= a) continue;
-          const x1 = vocX(a), x2 = Math.max(x1 + 4, vocX(b)), y = vocY(n.pitch) + dir * (half + th * 0.9 + 1.5);
-          g.save();
-          g.lineCap = 'round';
-          g.lineWidth = th;
-          for (const [colour, from, to] of [[dark, x1, Math.min(x2, hitX)], [lit, Math.max(x1, hitX), x2]]) {
-            if (to <= from) continue;
-            g.strokeStyle = colour;
-            g.beginPath();
-            g.moveTo(from + th / 2, y);
-            g.lineTo(to - th / 2, y);
-            g.stroke();
-          }
-          g.restore();
+        while (from < lead.length && lead[from].end < n.time) from++;
+        for (let k = from; k < lead.length && lead[k].time <= n.end; k++) {
+          if (lead[k].pitch === n.pitch && Math.min(lead[k].end, n.end) > Math.max(lead[k].time, n.time)) { n.dy = dir * HARMONY_DOUBLE_OFFSET; break; }
         }
       }
     }
