@@ -1059,11 +1059,11 @@ export class Highway {
 
   vocalCenterY(chart, h, w = Infinity) {
     const second = (chart.lyricsLane2 || chart.lyrics2 || []).length > 0;
-    const secondSize = Math.max(15, Math.min(26, h * 0.08)) * this.lyricScale;
+    const secondSize = Math.max(15, Math.min(26, h * 0.08)) * (chart.lyricsLane3?.length > 0 ? 1.2 : 1) * this.lyricScale;
     const fontSize = Math.max(24, Math.min(36, h * 0.095)) * this.lyricScale;
     const lyricY = h - fontSize * 0.75;
     const bottom = lyricY - fontSize * 0.5 - 16;
-    const third = chart.lyricsLane3?.length > 0 ? secondSize * 1.15 : 0;
+    const third = chart.lyricsLane3?.length > 0 ? secondSize * 1.25 : 0;
     const top = Math.max(second ? secondSize * 0.75 + secondSize * 0.75 + third : 8, bottom - this.vocalMaxArea(w));
     return (top + bottom) / 2;
   }
@@ -1117,12 +1117,16 @@ export class Highway {
     g.lineJoin = 'round';
     line.syl.forEach((syl, i) => {
       const sw = g.measureText(syl.text).width;
-      if (this.lyricOutline) {
+      if (syl.sp) { // star power: the letters keep their colours, with a gold outline
+        g.lineWidth = Math.max(3.5, sz * 0.2);
+        g.strokeStyle = mixHex('#0d1117', VOCAL_SP_GOLD, alpha);
+        g.strokeText(syl.text, x, cy);
+      } else if (this.lyricOutline) {
         g.lineWidth = Math.max(3, sz * 0.14);
         g.strokeStyle = 'rgba(0,0,0,0.65)';
         g.strokeText(syl.text, x, cy);
       }
-      g.fillStyle = mixHex('#0d1117', syl.sp ? VOCAL_SP_GOLD : '#ffffff', alpha); // opaque, already faded towards the stage colour: a translucent fill let the dark outline show through the middle of the letters (a star power lyric is the same gold as the notes' outline)
+      g.fillStyle = mixHex('#0d1117', '#ffffff', alpha); // opaque, already faded towards the stage colour: a translucent fill let the dark outline show through the middle of the letters (a star power lyric is the same gold as the notes' outline)
       g.fillText(syl.text, x, cy);
       const p = prog ? prog[i] : 0;
       if (p > 0) { // the sung part
@@ -1526,7 +1530,8 @@ export class Highway {
   // narrow one. The part of a syllable already sung is filled in its voice's colour (the lead's, and the theme's harmony colours for voices 2 and 3). The area is at (x0, y0) of the canvas and the origin is already there.
   renderSheetsSplit(t, w, h, pane, x0, y0) {
     const g = this.g;
-    const cols = w >= 380 * this.sheetKeys(pane.chart).length && w >= h * 1.1;
+    const nSheets = this.sheetKeys(pane.chart).length;
+    const cols = w >= (nSheets > 2 ? 520 : 380) * nSheets && w >= h * 1.1; // (three columns would shrink the lines to fit: below that width they stack)
     const caption = (text, x, y) => {
       g.font = '700 12px system-ui';
       g.textAlign = 'left';
@@ -1840,10 +1845,11 @@ export class Highway {
     const lo = range[0];
     const hi = range[1];
     const second = (chart.lyricsLane2 || chart.lyrics2 || []).length > 0; // harmony charts: the words of voices 2 and 3 get a line above the chart, shown together with the lead's
-    const secondSize = Math.max(15, Math.min(26, h * 0.08)) * this.lyricScale; // (setting highway.lyricSize)
+    const twoLines = chart.lyricsLane3?.length > 0;
+    const secondSize = Math.max(15, Math.min(26, h * 0.08)) * (twoLines ? 1.2 : 1) * this.lyricScale; // (setting highway.lyricSize; a little larger when there are two lines)
     const secondY = secondSize * 0.75; // the harmony line (and its track) sits right at the top edge
     const third = chart.lyricsLane3?.length > 0; // voice 3's words that differ from voice 2's get a line under the second one
-    const thirdY = secondY + secondSize * 1.15; // under the first line (a little apart), on the same time grid
+    const thirdY = secondY + secondSize * 1.25; // under the first line (a little apart), on the same time grid
     let top = second ? (third ? thirdY : secondY) + secondSize * 0.75 : 8; // pitch area: below the second lyric line(s), if any, down to the lyrics
     const fontSize = Math.max(24, Math.min(36, h * 0.095)) * this.lyricScale; // lyric size, grows with the band
     const lyricY = h - fontSize * 0.75; // the lyrics and their track sit right at the bottom edge of the window
@@ -2001,7 +2007,12 @@ export class Highway {
       prevRight = x + l.vw;
       if (l.time < t - behind - 0.8) continue;
       const sungUntil = l.end > l.time ? l.end : list[i + 1]?.time ?? Infinity; // the paired note's end, else the next syllable
-      if (this.lyricOutline) { // a dark outline under the letters, so they read over any background (setting highway.lyricOutline)
+      if (l.sp) { // star power: the letters keep their colours, with a gold outline (dimmer once sung)
+        g.lineWidth = Math.max(3.5, size * 0.2);
+        g.strokeStyle = l.time > t || t < sungUntil ? LYRIC_SP_FUTURE : LYRIC_SP_PAST;
+        g.lineJoin = 'round';
+        g.strokeText(l.text, x, y);
+      } else if (this.lyricOutline) { // a dark outline under the letters, so they read over any background (setting highway.lyricOutline)
         g.lineWidth = Math.max(3, size * 0.16);
         g.strokeStyle = 'rgba(0,0,0,0.85)';
         g.lineJoin = 'round';
@@ -2010,7 +2021,7 @@ export class Highway {
       let cols = colors;
       const tone = toneOf?.(l);
       if (tone) cols = (l._tone === tone ? l._cols : (l._tone = tone, l._cols = tone === '#ffffff' ? [tone, colors[1], colors[2]] : [tone, mixHex(tone, '#ffffff', 0.55), mixHex(tone, '#0d1117', 0.6)]));
-      g.fillStyle = l.time > t ? (l.sp ? LYRIC_SP_FUTURE : cols[0]) : t < sungUntil ? cols[1] : (l.sp ? LYRIC_SP_PAST : cols[2]); // (a star power lyric is yellow)
+      g.fillStyle = l.time > t ? cols[0] : t < sungUntil ? cols[1] : cols[2];
       g.fillText(l.text, x, y);
     }
   }
