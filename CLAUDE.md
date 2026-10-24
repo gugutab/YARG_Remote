@@ -766,3 +766,4 @@ Only checked by synthetic test, headless run or code reading:
 - Two harmony lyric lines: the white words (both voices) are drawn vertically centred between the two lines, the voice-coloured ones stay on their own line (`chart.lane2Split`: the words with `both` and the rest are drawn as two lists, each with its own spacing).
 - Harmony karaoke: a voice only shares the lead's word where one of its notes starts with it (within 0.1 s); a long note held under the lead's words (Suspicious Minds, Outro D: voice 3's 'ooh') no longer copies them into that voice's sheet.
 - Star power lyrics (notes view and karaoke): the gold outline is replaced by a gold outer glow behind the usual dark outline and the letters (`Highway.spGlow`: gold letters under the real ones cast a canvas shadow, dimmer once sung).
+- Star power lyric glow: stronger in the notes view (spread 0.7 x size, 4 passes), smaller in karaoke (0.3 x size, 2 passes); `spGlow(text, x, y, size, k, spread, passes)`.
