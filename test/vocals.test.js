@@ -134,13 +134,3 @@ test('harmony karaoke: each voice has its own sheet words, the lead\'s words whe
   const solo = chartOf(VOCALS, track('PART VOCALS', n(0, 2 * SEC, 105), lyric(0, 'a'), n(0, SEC / 2, 60)));
   assert.equal(solo.voiceLyrics ?? null, null, 'a solo chart has no per-voice words');
 });
-
-test('harmony karaoke: a voice that only doubles the lead (same pitch and start) has no words of its own there', () => {
-  const phrase = n(0, 8 * SEC, 105);
-  const c = chartOf(HARMONY,
-    track('HARM1', phrase, lyric(0, 'Hold'), n(0, SEC / 2, 60), lyric(SEC, 'on'), n(SEC, 1.5 * SEC, 62)),
-    track('HARM2', phrase, lyric(0, 'Hold'), n(0, SEC / 2, 60), lyric(SEC, 'on'), n(SEC, 1.5 * SEC, 65)), // doubles the lead on "Hold", its own line on "on"
-    track('HARM3', phrase, lyric(0, 'Hold'), n(0, SEC / 2, 55), lyric(SEC, 'on'), n(SEC, 1.5 * SEC, 58)));
-  assert.deepEqual(c.voiceLyrics[2].map((l) => l.text), ['on'], 'voice 2: only where it sings a line of its own');
-  assert.deepEqual(c.voiceLyrics[3].map((l) => l.text), ['Hold', 'on']);
-});

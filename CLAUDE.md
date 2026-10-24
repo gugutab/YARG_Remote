@@ -749,4 +749,3 @@ Only checked by synthetic test, headless run or code reading:
 - The voice meter (pitched notes and talkie boxes) appears at the hit line and fades out about 120 px behind it (the 60 px of the last change was too short to see).
 - Talkie passing effect (GL `talk` program): the soft halo that trailed left of the hit line is gone; the lit stretch of the line, the sweeping point, the sparks and the voice meter stay (the 2D version never had the halo).
 - The voice meter inside pitched notes no longer cuts off when the note's end crosses the hit line: it keeps jumping in the part of the note that slides away and fades with the distance behind the line.
-- Harmony karaoke: a voice's notes that double the lead's (same pitch, start within 5 ticks) are not a voice of their own, so HARM2/HARM3 copies of the lead give that voice no words in its sheet there (Bad Medicine: voice 2 only enters at 30 s); the sheet keeps the words where the voice sings a different line.
