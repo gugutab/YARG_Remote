@@ -1129,7 +1129,7 @@ export class Highway {
     g.lineJoin = 'round';
     line.syl.forEach((syl, i) => {
       const sw = g.measureText(syl.text).width;
-      if (syl.sp) this.spGlow(syl.text, x, cy, sz, alpha, 0.3, 2); // star power: a gold glow behind the letters and their outline
+      if (syl.sp) this.spGlow(syl.text, x, cy, sz, alpha, 0.7, 4); // star power: a gold glow behind the letters and their outline
       if (this.lyricOutline) {
         g.lineWidth = Math.max(3, sz * 0.14);
         g.strokeStyle = 'rgba(0,0,0,0.65)';
@@ -2008,12 +2008,16 @@ export class Highway {
   // The star power glow of a lyric: the gold of the star power notes as a soft halo around the letters, drawn first so the usual dark outline and the letters sit over it.
   spGlow(text, x, y, size, k, spread = 0.55, passes = 2) {
     const g = this.g;
+    const OFF = 6000; // device pixels: the letters are drawn this far off to the left and their shadow thrown back, so only the glow shows (no gold letters under the outline)
+    const s = g.getTransform().a || 1;
     g.save();
     g.shadowColor = VOCAL_SP_GOLD;
-    g.shadowBlur = Math.max(6, size * spread);
-    g.globalAlpha *= k; // (a shadow takes the alpha of what casts it: the gold letters under the real ones, which hide them, cast it)
-    g.fillStyle = VOCAL_SP_GOLD;
-    for (let i = 0; i < passes; i++) g.fillText(text, x, y);
+    g.shadowBlur = Math.max(6, size * spread) * s;
+    g.shadowOffsetX = OFF;
+    g.shadowOffsetY = 0;
+    g.globalAlpha *= k;
+    g.fillStyle = '#000';
+    for (let i = 0; i < passes; i++) g.fillText(text, x - OFF / s, y);
     g.restore();
   }
 
@@ -2033,7 +2037,7 @@ export class Highway {
       prevRight = x + l.vw;
       if (l.time < t - behind - 0.8) continue;
       const sungUntil = l.end > l.time ? l.end : list[i + 1]?.time ?? Infinity; // the paired note's end, else the next syllable
-      if (l.sp) this.spGlow(l.text, x, y, size, l.time > t || t < sungUntil ? 1 : 0.55, 0.7, 4); // star power: a gold glow behind the letters and their outline (dimmer once sung)
+      if (l.sp) this.spGlow(l.text, x, y, size, l.time > t || t < sungUntil ? 1 : 0.55, 0.3, 2); // star power: a gold glow behind the letters and their outline (dimmer once sung)
       if (this.lyricOutline) { // a dark outline under the letters, so they read over any background (setting highway.lyricOutline)
         g.lineWidth = Math.max(3, size * 0.16);
         g.strokeStyle = 'rgba(0,0,0,0.85)';
