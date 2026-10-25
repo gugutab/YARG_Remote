@@ -729,12 +729,15 @@ export function renderLanes3D(hw, t, w, h) {
     }
     // the end indicators pass over the coloured bar, a little transparent, in the colour of the open notes or the pedal when the chart has them (white otherwise)
     const hasOpen = (chart.hasOpen ??= chart.notes.some((n) => n.open));
+    const endMarks = chart.drumKind ? (chart.hasPedal ??= chart.notes.some((n) => n.lane < 0 || n.open)) : hasOpen; // (no indicators when the chart has no open notes / pedals)
     const edge = chart.drumKind ? (chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick) : hasOpen ? NOTE_PALETTE.open : null;
-    g.fillStyle = edge ? withAlpha(edge, 0.8) : HIT_LINE_BORDER_SOFT;
-    quad(g, -barDepth, barDepth, -half - FILL_BORDER_LANES, -half + FILL_BORDER_LANES * 0.4); // (the borders are exactly as deep as the hit bar)
-    g.fill();
-    quad(g, -barDepth, barDepth, half - FILL_BORDER_LANES * 0.4, half + FILL_BORDER_LANES);
-    g.fill();
+    if (endMarks) {
+      g.fillStyle = edge ? withAlpha(edge, 0.8) : HIT_LINE_BORDER_SOFT;
+      quad(g, -barDepth, barDepth, -half - FILL_BORDER_LANES, -half + FILL_BORDER_LANES * 0.4); // (the borders are exactly as deep as the hit bar)
+      g.fill();
+      quad(g, -barDepth, barDepth, half - FILL_BORDER_LANES * 0.4, half + FILL_BORDER_LANES);
+      g.fill();
+    }
   }
   // sustains
   if (hw.tailStyle === 'flow') drawFlowTails(g, hw, notes, from, end, t, colors, half, headR, tailW, windowSec, held);

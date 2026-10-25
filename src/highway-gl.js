@@ -1456,12 +1456,14 @@ export class GLBoard {
       use('hitbar');
       gl.uniform1fv(pr.u.u_flash, d.flash);
       gl.uniform3fv(pr.u.u_lc, d.lc);
+      // the end indicators (open note / pedal colour) only when the chart has open notes (guitar, bass) or pedals (drums)
+      if (d.endMarks === undefined) d.endMarks = d.drums ? chart.notes.some((n) => n.lane < 0 || n.open) : d.hasOpen;
       const edge = d.drums ? (chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick) : d.hasOpen ? NOTE_PALETTE.open : null;
       const e = edge ? rgba(withAlpha(edge, 0.8)) : rgba(HIT_LINE_BORDER_SOFT);
       gl.uniform4f(pr.u.u_edge, e[0], e[1], e[2], e[3]);
       if (!d.hitIdx) { d.hitIdx = this.buffer(f32([...Array(lanes).keys(), -1, -2])); }
       this.vao(d, 'hitbar', () => { gl.bindBuffer(gl.ARRAY_BUFFER, d.hitIdx); this.attrib(pr, 'a_i', 1, 4, 0, 1); });
-      this.inst(gl.TRIANGLE_STRIP, 0, 4, lanes + 2);
+      this.inst(gl.TRIANGLE_STRIP, 0, 4, lanes + (d.endMarks ? 2 : 0));
     }
 
     // the pedal / open bars (under the sustains and the heads), far ones first
