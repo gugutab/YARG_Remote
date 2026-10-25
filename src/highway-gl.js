@@ -110,7 +110,7 @@ void main() {
     float width = 0.28 + 0.1 * sin(ph + 1.3 + abs(v_lat)); // (the inner edge of the glow wavers as well)
     float edge = smoothstep(1.0 - width, 1.0, abs(v_lat));
     float glow = edge * (0.35 + 0.65 * wave) * k;
-    a *= (0.9 + 0.9 * glow) * min(1.0, max(v_left, 0.0) / 0.1 + 0.0);
+    a *= (0.9 + 0.9 * glow) * smoothstep(0.0, 0.6, v_left); // (the band fades out softly over its last 0.6 s)
     c = mix(c, vec3(1.0), 0.4 * glow);
   }
   o = vec4(c * a, a);
@@ -341,17 +341,17 @@ void main() {
   vec3 sum = vec3(0.0);
   float rw = rx * 1.05 * (0.7 + 2.4 * e), rh = ry * 0.68 * (0.7 + 2.4 * e);
   float lw = max(0.8, rx * 0.24 * (1.0 - k));
-  sum += tintW(v_col, 0.45) * (1.0 - smoothstep(lw * 0.5 - 0.5, lw * 0.5 + 0.5, abs(sdShape(v_p, vec2(rw, rh))))) * min(1.0, 1.15 * fade);
+  sum += tintW(v_col, 0.12) * 1.25 * (1.0 - smoothstep(lw * 0.5 - 0.5, lw * 0.5 + 0.5, abs(sdShape(v_p, vec2(rw, rh))))) * min(1.0, 1.15 * fade);
   if (k < 0.4) {
     float env = sin(3.14159265 * k / 0.4);
     float cw = rx * 1.05 * (0.6 + 0.5 * e), ch = ry * 0.68 * (0.6 + 0.5 * e);
-    sum += tintW(v_col, 0.7) * (1.0 - smoothstep(-0.5, 0.5, sdShape(v_p, vec2(cw, ch)))) * 0.55 * env * env;
+    sum += tintW(v_col, 0.3) * (1.0 - smoothstep(-0.5, 0.5, sdShape(v_p, vec2(cw, ch)))) * 0.65 * env * env;
   }
   { // the light of the hit: a soft glow of the lane's colour over the hit point (its core a little whiter), in quickly and fading out
     vec2 q = v_p / vec2(rx * 3.2, ry * 2.6);
     float lk = (1.0 - k) * (1.0 - k) * smoothstep(0.0, 0.06, k);
     float q2 = dot(q, q);
-    sum += (v_col * 1.15 * exp(-q2 * 1.6) + tintW(v_col, 0.65) * 0.5 * exp(-q2 * 6.0)) * 0.8 * lk;
+    sum += (v_col * 1.7 * exp(-q2 * 1.6) + tintW(v_col, 0.3) * 0.6 * exp(-q2 * 6.0)) * 0.85 * lk;
   }
   float base = floor(mod(v_seed * 1000.0, 97.0));
   for (int i = 0; i < 8; i++) {
@@ -362,7 +362,7 @@ void main() {
     float cs = cos(a), sn = sin(a), s0 = max(0.0, reach - tl);
     float sd = segDist(v_p, vec2(cs * s0, sn * s0 * 0.62), vec2(cs * reach, sn * reach * 0.62 - e * rx * 0.5 * (0.4 + r)));
     float w = max(0.8, rx * 0.17 * (1.0 - k));
-    sum += tintW(v_col, 0.25) * (1.0 - smoothstep(w * 0.5 - 0.5, w * 0.5 + 0.5, sd)) * min(1.0, 1.1 * fade);
+    sum += tintW(v_col, 0.06) * 1.2 * (1.0 - smoothstep(w * 0.5 - 0.5, w * 0.5 + 0.5, sd)) * min(1.0, 1.1 * fade);
   }
   if (v_glow > 0.0) sum += v_col * v_glow * (1.0 - smoothstep(0.85, 1.0, length(v_p / vec2(v_rg, v_rg * 0.275))));
   o = vec4(sum * edgeFade(v_y), 0.0);
@@ -426,7 +426,7 @@ void main() {
   vec3 sum = vec3(0.0);
   if (k < 0.4) {
     float env = sin(3.14159265 * k / 0.4);
-    sum += tintW(v_col, 0.5) * (1.0 - smoothstep(-0.5, 0.5, sdRound(v_p, vec2(hw, hh * 1.1), hh))) * 0.36 * env * env;
+    sum += tintW(v_col, 0.2) * (1.0 - smoothstep(-0.5, 0.5, sdRound(v_p, vec2(hw, hh * 1.1), hh))) * 0.45 * env * env;
   }
   for (int r = 0; r < 2; r++) {
     float kr = k - float(r) * 0.14;
@@ -434,7 +434,7 @@ void main() {
     float kk = min(1.0, kr / (1.0 - float(r) * 0.14)); float er = 1.0 - (1.0 - kk) * (1.0 - kk);
     float rh = hh * (1.0 + 2.0 * er), rw = hw * (1.0 + 0.04 * er);
     float lw = max(0.8, hh * 0.5 * (1.0 - kr));
-    sum += tintW(v_col, 0.45) * (1.0 - smoothstep(lw * 0.5 - 0.5, lw * 0.5 + 0.5, abs(sdRound(v_p, vec2(rw, rh), min(rh, 10.0))))) * min(1.0, (r == 1 ? 0.7 : 1.05) * (1.0 - kr) * (1.0 - kr));
+    sum += tintW(v_col, 0.12) * 1.25 * (1.0 - smoothstep(lw * 0.5 - 0.5, lw * 0.5 + 0.5, abs(sdRound(v_p, vec2(rw, rh), min(rh, 10.0))))) * min(1.0, (r == 1 ? 0.7 : 1.05) * (1.0 - kr) * (1.0 - kr));
   }
   float base = floor(mod(v_seed * 1000.0, 89.0));
   for (int i = 0; i < 14; i++) {
@@ -446,7 +446,7 @@ void main() {
     float cs = sin(lean), sn = -cos(lean), s0 = max(0.0, reach - tl);
     float sd = segDist(v_p, vec2(sx + cs * s0, sn * s0 * 0.4), vec2(sx + cs * reach, sn * reach * 0.4));
     float w = max(0.8, v_spark * 0.12 * (1.0 - k));
-    sum += tintW(v_col, 0.4) * (1.0 - smoothstep(w * 0.5 - 0.5, w * 0.5 + 0.5, sd)) * min(1.0, 1.1 * fade);
+    sum += tintW(v_col, 0.1) * 1.2 * (1.0 - smoothstep(w * 0.5 - 0.5, w * 0.5 + 0.5, sd)) * min(1.0, 1.1 * fade);
   }
   o = vec4(sum * edgeFade(v_y), 0.0);
 }`],
@@ -708,7 +708,7 @@ void main() {
   float r = max(1.2, u_laneW * (0.02 + 0.03 * r3) * (1.0 - 0.6 * k)); // radius in px
   vec2 px = p + (c - 0.5) * 2.0 * r * 1.6;
   gl_Position = alive > 0.5 ? clipPos(px) : vec4(2.0, 2.0, 2.0, 1.0);
-  v_p = (c - 0.5) * 2.0; v_k = k; v_y = px.y; v_r = r; v_col = mix(b1.rgb, vec3(1.0), 0.35 + 0.4 * r2);
+  v_p = (c - 0.5) * 2.0; v_k = k; v_y = px.y; v_r = r; v_col = mix(b1.rgb, vec3(1.0), 0.08 + 0.22 * r2) * 1.15;
 }`, `${FS_HEAD}in vec2 v_p; in float v_k, v_y, v_r; in vec3 v_col; out vec4 o;
 void main() {
   float d = length(v_p); // 1 at the edge of the quad, whose half size is 1.6 radii
