@@ -195,8 +195,8 @@ void main() {
   bool bar = a2.y > 0.5;
   float dr = (a0.x - u_t) / u_win; float d = u_pad > 0.5 ? 0.0 : clamp(dr, 0.0, 1.0) + (bar ? a2.w * u_bar : 0.0);
   vec2 centre = project(a0.y + 0.5 - u_half, d);
-  float past = u_t - (a0.x + a2.x); float kx = clamp(past / 0.1, 0.0, 1.0); float e = easeOut(kx);
-  bool gone = u_pad < 0.5 && (past > 0.1 || (a2.x > 0.0 && !bar && u_t >= a0.x) || (u_solid > 0.5 && !bar)); // (a note with a model has no sprite, cymbals included)
+  float past = u_t - (a0.x + (bar ? a2.x : 0.0)); float kx = clamp(past / 0.1, 0.0, 1.0); float e = easeOut(kx); // (a bar goes at the end of its sustain, the head of a long note at its hit)
+  bool gone = u_pad < 0.5 && (past > 0.1 || (u_solid > 0.5 && !bar)); // (a note with a model has no sprite, cymbals included)
   float sc = scaleAt(d); vec2 size;
   float bth = max(2.0, (u_hit - u_vy) * u_k * sc * sc * u_bar * (1.0 - 0.55 * e));
   if (bar) size = vec2(a2.z * u_laneW * sc + 4.0, bth + 2.0 * max(1.0, 2.0 * sc) + 2.0); // (the bar is drawn in the fragment shader: the fill and its two edge lines)
@@ -300,7 +300,7 @@ void main() {
   float j = float(gl_InstanceID % 3);
   float past = u_t - b0.x; float k, scl, seed, alive;
   if (b1.w < 0.5) { alive = (j < 0.5 && past >= u_lit && past <= 0.45) ? 1.0 : 0.0; k = past / 0.45; scl = 0.5; seed = b0.x; }
-  else { alive = (past >= u_lit && past <= b0.z - b0.x) ? 1.0 : 0.0; float ph = past / 0.36 + j / 3.0; k = fract(ph); seed = b0.x + floor(ph) * 0.137 + j * 0.31; scl = 0.31; }
+  else { alive = (past >= u_lit && past <= b0.z - b0.x) ? 1.0 : 0.0; float hp = past - 0.3; float ph = hp / 0.36 + j / 3.0; k = hp < 0.0 ? 1.0 : fract(ph); seed = b0.x + floor(ph) * 0.137 + j * 0.31; scl = 0.31; } // (the loop starts 0.3 s after the hit, when the hit animation of the note has played)
   float rx = u_laneW * u_headR * 0.72 * scl;
   float x = clamp(past / 0.2, 0.0, 1.0); float amt = x * x * (3.0 - 2.0 * x);
   float rg = u_laneW * u_headR * 0.38 * u_tailW * (1.0 + 0.04 * amt) * 2.4;
@@ -438,8 +438,8 @@ void main() {
   solid: [`${COMMON}in vec3 m_pos; in vec3 m_nrm; in vec2 m_uv; in float m_role; in vec4 s0; in vec4 s1; uniform vec3 u_msz; uniform float u_mbase, u_malpha, u_mscale;
 out vec2 v_uv; out vec3 v_n, v_lane, v_mp; out float v_role, v_y, v_d, v_a, v_sp, v_van;
 void main() {
-  float past = u_t - (s0.x + s0.z); float kx = clamp(past / 0.14, 0.0, 1.0); float sh = 1.0 + 0.28 * (1.0 - (1.0 - kx) * (1.0 - kx)); // (a hit note vanishes: it swells, flashes white and fades, in 0.14 s)
-  bool gone = past > 0.14 || (s0.z > 0.0 && u_t >= s0.x);
+  float past = u_t - s0.x; float kx = clamp(past / 0.14, 0.0, 1.0); float sh = 1.0 + 0.28 * (1.0 - (1.0 - kx) * (1.0 - kx)); // (a hit note vanishes: it swells, flashes white and fades, in 0.14 s; the head of a long one too, its tail goes on)
+  bool gone = past > 0.14;
   float d = clamp((s0.x - u_t) / u_win, 0.0, 1.0);
   float hs = u_headR / ${HEAD_R.toFixed(2)};
   float x = s0.y + 0.5 - u_half + m_pos.x * u_msz.x * sh * hs * u_mscale;
@@ -648,8 +648,8 @@ void main() {
   glow: [`${COMMON}in vec4 s0; in vec4 s1; uniform vec4 u_gsz; out vec2 v_p; out vec3 v_col; out float v_k, v_y;
 void main() {
   vec2 c = vec2(float(gl_VertexID & 1), float((gl_VertexID >> 1) & 1));
-  float past = u_t - (s0.x + s0.z); float kx = clamp(past / 0.1, 0.0, 1.0); float sh = 1.0 - 0.5 * kx;
-  bool gone = past > 0.1 || (s0.z > 0.0 && u_t >= s0.x);
+  float past = u_t - s0.x; float kx = clamp(past / 0.1, 0.0, 1.0); float sh = 1.0 - 0.5 * kx;
+  bool gone = past > 0.1;
   float d = clamp((s0.x - u_t) / u_win, 0.0, 1.0); float sc = scaleAt(d);
   vec2 centre = project(s0.y + 0.5 - u_half, d) - vec2(0.0, u_gsz.z * u_laneW * sc * (u_headR / ${HEAD_R.toFixed(2)}));
   vec2 hs = vec2(u_gsz.x, u_gsz.y) * u_laneW * sc * (u_headR / ${HEAD_R.toFixed(2)}) * sh * 2.1; // (the halo reaches well past the glass)
@@ -1063,7 +1063,7 @@ export class GLBoard {
       const cym = n.cymbal ? 1 : 0;
       (solids[cym ? (n.accent ? 'ca' : n.ghost ? 'cg' : 'c') : n.tap ? 't' : n.hopo ? 'h' : n.accent ? 'a' : n.ghost ? 'g' : 'n'] ??= []).push({ time: n.time, row: [n.time, n.lane, n.length > 0 ? n.length : 0, 0, ...rgb, sp[i] ? 1 : 0] });
       if (n.length > 0) { tails.push({ t0: n.time, t1: n.time + n.length, lane: n.lane, rgb }); helds.push(n.time, n.lane, n.time + n.length, cym, ...rgb, 1); }
-      else hits.push(n.time, n.lane, n.time, cym, ...rgb, 0);
+      hits.push(n.time, n.lane, n.time, cym, ...rgb, 0); // (a long note also has the whole hit animation when it arrives, then the looping one while it is held)
     });
     const packNotes = (rows) => {
       const count = rows.length;
