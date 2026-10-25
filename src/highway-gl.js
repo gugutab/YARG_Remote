@@ -97,19 +97,21 @@ float edgeFade(float y) {
 const FS_COLOR = `${FS_HEAD}in vec4 v_col; in float v_y; uniform float u_noFade; out vec4 o;
 void main() { float a = v_col.a * (u_noFade > 1.5 ? topFade(v_y) : mix(edgeFade(v_y), 1.0, u_noFade)); o = vec4(v_col.rgb * a, a); } // (u_noFade: 0 the whole fade, 1 none, 2 the far edge only: the dark base reaches the bottom of the pane)`;
 
-// The bands: the flat colour, except for the sustain of an open note (the purple over the whole road), which moves like the tails of the notes do: chevrons (Vs pointing away
-// from the hit line, as in the flow tails) run up it, and while it is held the whole band swells in waves (WAVE_LEN 0.45 s, WAVE_PERIOD 0.6 s) and the chevrons are stronger.
+// The bands: the flat colour, except for the sustain of an open note (the purple over the whole road), whose two sides breathe: a soft glow along each edge that rolls up the
+// band in slow waves (WAVE_LEN 0.8 s, 0.9 s per cycle), a little wider and brighter while the note is held; the middle stays calm.
 const FS_BAND = `${FS_HEAD}in vec4 v_col; in float v_y, v_open, v_ahead, v_lat, v_left, v_held; uniform float u_noFade; out vec4 o;
 void main() {
   float a = v_col.a * (u_noFade > 1.5 ? topFade(v_y) : mix(edgeFade(v_y), 1.0, u_noFade));
   vec3 c = v_col.rgb;
   if (v_open > 0.5) {
-    float x = (v_ahead + 0.45 * abs(v_lat) - u_t * 0.9) / 0.3; float f = fract(x);
-    float stripe = smoothstep(0.0, 0.12, f) * (1.0 - smoothstep(0.12, 0.3, f));
-    float wave = v_held > 0.5 ? 1.0 + 0.3 * sin(6.2831853 * (v_ahead / 0.45 - u_t / 0.6)) : 1.0;
-    float k = 0.45 + 0.55 * v_held;
-    a *= wave * (0.7 + 1.1 * k * stripe) * min(1.0, max(v_left, 0.0) / 0.1 + 0.0);
-    c = mix(c, vec3(1.0), 0.45 * k * stripe);
+    float ph = 6.2831853 * (v_ahead / 0.8 - u_t / 0.9);
+    float wave = 0.5 + 0.5 * sin(ph);
+    float k = 0.55 + 0.45 * v_held;
+    float width = 0.28 + 0.1 * sin(ph + 1.3 + abs(v_lat)); // (the inner edge of the glow wavers as well)
+    float edge = smoothstep(1.0 - width, 1.0, abs(v_lat));
+    float glow = edge * (0.35 + 0.65 * wave) * k;
+    a *= (0.9 + 0.9 * glow) * min(1.0, max(v_left, 0.0) / 0.1 + 0.0);
+    c = mix(c, vec3(1.0), 0.4 * glow);
   }
   o = vec4(c * a, a);
 }`;
