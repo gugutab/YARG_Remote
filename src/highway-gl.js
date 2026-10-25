@@ -478,10 +478,10 @@ void main() {
   vec4 clip = clipPos(px); clip.z = clamp(dep * 1.7 - 0.1 - hgt * 0.3, -0.99, 0.99); // (nearer and higher wins the depth test)
   gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clip; v_y = px.y; v_d = d;
   v_uv = m_uv; v_n = vec3(m_nrm.x, -m_nrm.y, m_nrm.z); v_lane = s1.rgb; v_role = m_role; v_mp = m_pos; v_sp = s1.w;
-  // the circle notes (the ghost cymbal's model) change colours only, by the kind of note: 1 HOPO (a white ring), 2 tap (a nearly black ring with a hint of the colour), 3 accent (a stronger, lighter ring), 4 ghost (a dimmer one)
-  if (u_mvar > 0.5) { if (u_mvar < 1.5) v_lane = mix(v_lane, vec3(1.0), 0.88); else if (u_mvar < 2.5) v_lane = mix(vec3(0.05, 0.05, 0.07), v_lane, 0.22); else if (u_mvar < 3.5) v_lane = min(v_lane * 1.3 + 0.18, vec3(1.0)); else v_lane *= 0.5; }
+  // the circle notes (the ghost cymbal's model; u_mvar = 1 + the kind: 0 plain, 1 HOPO, 2 tap, 3 accent, 4 ghost) change colours only: a white middle, and the ring in the lane colour, white for a HOPO, nearly black with a hint of the colour for a tap, stronger and lighter for an accent, dimmer for a ghost
+  if (u_mvar > 1.5) { if (u_mvar < 2.5) v_lane = mix(v_lane, vec3(1.0), 0.88); else if (u_mvar < 3.5) v_lane = mix(vec3(0.05, 0.05, 0.07), v_lane, 0.22); else if (u_mvar < 4.5) v_lane = min(v_lane * 1.3 + 0.18, vec3(1.0)); else v_lane *= 0.5; }
   v_a = clamp((1.0 - d) / 0.14, 0.0, 1.0) * u_malpha * (1.0 - kx * kx); v_van = past > 0.0 ? kx : 0.0;
-}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane, v_mp; in float v_role, v_y, v_d, v_a, v_sp, v_van; uniform float u_mcel, u_mtoon, u_mcym, u_mmetal, u_mglass, u_mcymst; out vec4 o;
+}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane, v_mp; in float v_role, v_y, v_d, v_a, v_sp, v_van; uniform float u_mvar, u_mcel, u_mtoon, u_mcym, u_mmetal, u_mglass, u_mcymst; out vec4 o;
 // The middle of a note (YARG's RectangularNote shader graph, material NoteMiddle): the base map times a darkness mask that drifts with time (a soft cloud: gradient noise,
 // scale -2.8 / speed 0.4 / tiling 1.1 x 1.3 in the material; here a value noise of two octaves), times the lane's colour, over which the shine map is laid with the opacity
 // shine amount x its alpha (0.1); a small emission of the colour (0.1). The metal is the base map under the light, smoothness 0.5.
@@ -664,6 +664,7 @@ void main() {
     }
   }
   else if (v_role < 2.5) c = mix(vec3(1.0), v_lane, 0.03) * (0.9 + 0.1 * lam) + vec3(0.3); // the white of a HOPO: a lit strip, whiter and stronger than the shaded surface it had (it lights over 1, so it reads as light)
+  else if (u_mvar > 0.5 && u_mvar < 2.5 || u_mvar > 3.5) c = vec3(0.96) * (0.8 + 0.2 * lam); // a circle note's middle: white
   else c = vec3(0.04) * (0.6 + 0.8 * lam) + vec3(1.0) * sp * 0.3; // the dark of a tap
   c = mix(c, vec3(0.10, 0.14, 0.24), u_fog * 0.5 * smoothstep(0.1, 1.0, v_d)); // (the fog of the other effect, when it is on)
   c = mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))), 0.94 * u_dim); // (a disabled note, the replayed stretch: almost no colour)
@@ -1526,8 +1527,8 @@ export class GLBoard {
         gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, mesh.shine); gl.activeTexture(gl.TEXTURE1);
         gl.uniform1f(pr.u.u_mcel, mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mcym, mesh.cym && !mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mmetal, fx.metal || 0); gl.uniform1f(pr.u.u_mglass, fx.glass || 0); gl.uniform1f(pr.u.u_mcymst, fx.cymbal || 0); gl.uniform1f(pr.u.u_mtoon, fx.shade === 'glossy' ? 2 : fx.shade === 'smooth' || fx.cel === false ? 0 : 1);
         gl.uniform2f(pr.u.u_mnoise, mesh.cym ? 0.62 : 1.0, 0.7); // (the middle's noise speed: the note 0.4, the cymbal 0.25, relative to the note; its minimum darkness)
-        gl.uniform1f(pr.u.u_mvar, asRound ? ({ h: 1, t: 2, a: 3, g: 4 }[kind] ?? 0) : 0);
-        gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, mesh.alpha); gl.uniform1f(pr.u.u_mscale, mesh.cym && !asRound ? (o.cymbalScale ?? 1) : 1);
+        gl.uniform1f(pr.u.u_mvar, asRound ? 1 + ({ h: 1, t: 2, a: 3, g: 4 }[kind] ?? 0) : 0);
+        gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, asRound ? (kind === 'g' ? 0.8 : 1) : mesh.alpha); gl.uniform1f(pr.u.u_mscale, mesh.cym && !asRound ? (o.cymbalScale ?? 1) : 1); // (a circle note is opaque: the ghost cymbal's model is see-through, and the tail would show through it)
         this.vao(d, `solid_${kind}${asRound ? 'r' : ''}`, () => {
           gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
           this.attrib(pr, 'm_pos', 3, 36, 0, 0); this.attrib(pr, 'm_nrm', 3, 36, 12, 0); this.attrib(pr, 'm_uv', 2, 36, 24, 0); this.attrib(pr, 'm_role', 1, 36, 32, 0);
