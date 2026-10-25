@@ -390,12 +390,11 @@ void main() {
   barburst: [`${COMMON}in vec4 b0; in vec4 b1; uniform float u_bar; out vec2 v_p; out float v_k, v_hw, v_hh, v_spark, v_seed, v_y; out vec3 v_col;
 void main() {
   vec2 c = vec2(float(gl_VertexID & 1), float((gl_VertexID >> 1) & 1));
-  float past = u_t - b0.x; bool held = b0.z > b0.x; // (a long open note / pedal: the burst repeats every 0.4 s for as long as it is held)
-  float k = held ? fract(past / 0.4) : past / 0.26;
+  float past = u_t - b0.x; float k = past / 0.26;
   float hw = ${'u_half'} * u_laneW; float hh = max(2.0, (u_hit - u_vy) * u_k * u_bar * 0.5); float spark = u_laneW * u_headR * 0.6;
   float up = hh * 3.0 + spark * 2.4, dn = hh * 3.0;
   vec2 off = vec2((c.x - 0.5) * 2.0 * hw * 1.12, mix(-up, dn, c.y));
-  vec2 px = project(0.0, 0.0) + off; gl_Position = (past >= u_lit && (held ? past <= b0.z - b0.x : k < 1.0)) ? clipPos(px) : vec4(2.0, 2.0, 2.0, 1.0); v_y = px.y;
+  vec2 px = project(0.0, 0.0) + off; gl_Position = (past >= u_lit && k < 1.0) ? clipPos(px) : vec4(2.0, 2.0, 2.0, 1.0); v_y = px.y;
   v_p = off; v_k = k; v_hw = hw; v_hh = hh; v_spark = spark; v_seed = b1.w; v_col = b1.rgb;
 }`, `${FS_HEAD}in vec2 v_p; in float v_k, v_hw, v_hh, v_spark, v_seed, v_y; in vec3 v_col; out vec4 o;
 vec3 tintW(vec3 c, float a) { return mix(c, vec3(1.0), a); }
@@ -677,7 +676,9 @@ void main() {
   float r1 = hash(seed), r2 = hash(seed + 1.3), r3 = hash(seed + 2.9);
   float life = 0.45 + 0.6 * r3;
   float past = u_t - b0.x, age, alive;
-  if (b1.w < 0.5 || u_spread > 0.5) { age = past; alive = (past >= 0.0 && past < life) ? 1.0 : 0.0; } // a hit (a bar or a note)
+  bool heldBar = u_spread > 0.5 && b0.z > b0.x; // (a long open note / pedal: sparks of its colour keep rolling along the bar for as long as it is held)
+  if (heldBar) { age = mod(past + r1 * life, life); alive = (past >= 0.0 && past <= b0.z - b0.x + 0.05) ? 1.0 : 0.0; }
+  else if (b1.w < 0.5 || u_spread > 0.5) { age = past; alive = (past >= 0.0 && past < life) ? 1.0 : 0.0; } // a hit (a bar or a note)
   else { age = mod(past + r1 * life, life); alive = (past >= 0.0 && past <= b0.z - b0.x + 0.05 && fi < 12.0) ? 1.0 : 0.0; } // embers while held
   float k = age / life;
   vec2 origin = u_spread > 0.5 ? project(0.0, 0.0) + vec2((r2 - 0.5) * 2.0 * u_half * u_laneW * 0.95, 0.0) : project(b0.y + 0.5 - u_half, 0.0) + vec2((r2 - 0.5) * u_laneW * 0.45, 0.0);
@@ -1543,7 +1544,7 @@ export class GLBoard {
     };
     burst(d.hitB, lowerBound(d.hitB.times, t - 0.45), lowerBound(d.hitB.times, t + 1e-6), 'hitB');
     burst(d.heldB, lowerBound(d.heldB.times, t - d.heldB.maxLen), lowerBound(d.heldB.times, t + 1e-6), 'heldB');
-    const kFrom = lowerBound(d.barB.times, t - Math.max(0.26, d.barB.maxLen)), kTo = lowerBound(d.barB.times, t + 1e-6);
+    const kFrom = lowerBound(d.barB.times, t - 0.26), kTo = lowerBound(d.barB.times, t + 1e-6);
     if (kTo > kFrom) {
       use('barburst');
       this.vao(d, 'barB', () => { gl.bindBuffer(gl.ARRAY_BUFFER, d.barB.buf); this.attrib(pr, 'b0', 4, 32, kFrom * 32, 1); this.attrib(pr, 'b1', 4, 32, kFrom * 32 + 16, 1); });
@@ -1559,7 +1560,7 @@ export class GLBoard {
       };
       sparks(d.hitB, lowerBound(d.hitB.times, t - 1.1), lowerBound(d.hitB.times, t + 1e-6), 'hitS', 0);
       sparks(d.heldB, lowerBound(d.heldB.times, t - d.heldB.maxLen - 1.1), lowerBound(d.heldB.times, t + 1e-6), 'heldS', 0);
-      sparks(d.barB, lowerBound(d.barB.times, t - 1.1), lowerBound(d.barB.times, t + 1e-6), 'barS', 1);
+      sparks(d.barB, lowerBound(d.barB.times, t - 1.1 - d.barB.maxLen), lowerBound(d.barB.times, t + 1e-6), 'barS', 1);
     }
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     this.drawn += drawn;
