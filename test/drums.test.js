@@ -140,3 +140,17 @@ test('extended pro drums: toms and cymbals each get their own lane (7 lanes), th
   // the plain 4-lane and Pro charts are unchanged
   assert.equal(buildChart(midi, { ...DRUMS, drumMode: 'pro' }, EXPERT).lanes, 4);
 });
+
+test('a roll lane with no notes in it stays as a free roll over every pad when it lasts 0.8 s; a short one or one with notes it cannot take is dropped', () => {
+  const midi = drumsMidi([
+    { tick: 0, pitch: 96, len: 120 },        // a kick-free pad hit before
+    { tick: 960, pitch: 127, len: 1920 },    // a 2 s trill lane with nothing in it (480 ticks = 0.5 s)
+    { tick: 4000, pitch: 126, len: 240 },    // a 0.25 s tremolo lane, empty: too short
+    { tick: 6000, pitch: 126, len: 960 },    // a tremolo lane holding a single hit: not valid, not empty
+    { tick: 6240, pitch: 97, len: 120 },
+  ]);
+  const chart = buildChart(midi, DRUMS, EXPERT);
+  assert.equal(chart.rolls.length, 1);
+  assert.deepEqual([chart.rolls[0].free, chart.rolls[0].type, chart.rolls[0].lanes], [true, 'trill', [...Array(chart.lanes).keys()]]);
+  assert.ok(Math.abs(chart.rolls[0].end - chart.rolls[0].start - 2) < 0.01);
+});

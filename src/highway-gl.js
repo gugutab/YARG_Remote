@@ -390,11 +390,12 @@ void main() {
   barburst: [`${COMMON}in vec4 b0; in vec4 b1; uniform float u_bar; out vec2 v_p; out float v_k, v_hw, v_hh, v_spark, v_seed, v_y; out vec3 v_col;
 void main() {
   vec2 c = vec2(float(gl_VertexID & 1), float((gl_VertexID >> 1) & 1));
-  float past = u_t - b0.x; float k = past / 0.26;
+  float past = u_t - b0.x; bool held = b0.z > b0.x; // (a long open note / pedal: the burst repeats every 0.4 s for as long as it is held)
+  float k = held ? fract(past / 0.4) : past / 0.26;
   float hw = ${'u_half'} * u_laneW; float hh = max(2.0, (u_hit - u_vy) * u_k * u_bar * 0.5); float spark = u_laneW * u_headR * 0.6;
   float up = hh * 3.0 + spark * 2.4, dn = hh * 3.0;
   vec2 off = vec2((c.x - 0.5) * 2.0 * hw * 1.12, mix(-up, dn, c.y));
-  vec2 px = project(0.0, 0.0) + off; gl_Position = (past >= u_lit && k < 1.0) ? clipPos(px) : vec4(2.0, 2.0, 2.0, 1.0); v_y = px.y;
+  vec2 px = project(0.0, 0.0) + off; gl_Position = (past >= u_lit && (held ? past <= b0.z - b0.x : k < 1.0)) ? clipPos(px) : vec4(2.0, 2.0, 2.0, 1.0); v_y = px.y;
   v_p = off; v_k = k; v_hw = hw; v_hh = hh; v_spark = spark; v_seed = b1.w; v_col = b1.rgb;
 }`, `${FS_HEAD}in vec2 v_p; in float v_k, v_hw, v_hh, v_spark, v_seed, v_y; in vec3 v_col; out vec4 o;
 vec3 tintW(vec3 c, float a) { return mix(c, vec3(1.0), a); }
@@ -1042,6 +1043,7 @@ export class GLBoard {
     });
     const inst = [], instBars = []; // stride 12, in time order; reversed below (far notes are drawn before near ones); the bars are drawn first, under the sustains and the heads
     const times = [], lanesOf = [];
+    let barMaxLen = 0; // (the longest sustain of an open note / pedal)
     const tails = [], hits = [], helds = [], barHits = [], acts = [], solids = {}; // (solids: per kind of model, the rows of its instances)
     src.forEach((n, i) => {
       const bar = n.open || n.lane < 0;
@@ -1058,7 +1060,7 @@ export class GLBoard {
         return;
       }
       if (n.activation) acts.push(n.time, bar ? -1 : n.lane, n.cymbal ? 1 : 0, bar ? 1 : 0);
-      if (bar) { barHits.push(n.time, 0, 0, 0, ...hexRgb(n.doubleKick && !n.open ? dkColor : barColor), n.time); return; }
+      if (bar) { barMaxLen = Math.max(barMaxLen, n.length || 0); barHits.push(n.time, 0, n.length > 0 ? n.time + n.length : 0, 0, ...hexRgb(n.doubleKick && !n.open ? dkColor : barColor), n.time); return; }
       const rgb = hexRgb(noteColor({ lane: n.lane, sp: sp[i], cymbal: n.cymbal }, colors)); // (a star power note's tail and burst take its tinted colour)
       const cym = n.cymbal ? 1 : 0;
       (solids[cym ? (n.accent ? 'ca' : n.ghost ? 'cg' : 'c') : n.tap ? 't' : n.hopo ? 'h' : n.accent ? 'a' : n.ghost ? 'g' : 'n'] ??= []).push({ time: n.time, row: [n.time, n.lane, n.length > 0 ? n.length : 0, 0, ...rgb, sp[i] ? 1 : 0] });
@@ -1097,7 +1099,7 @@ export class GLBoard {
       hitB: list(hits, 8),
       heldB,
       solid,
-      barB: list(barHits, 8),
+      barB: { ...list(barHits, 8), maxLen: barMaxLen },
       actB: list(acts, 4),
       beats: { buf: this.buffer(f32(beatKinds)), times: Float32Array.from(chart.beats || [], (b) => b.time) },
       pads: { buf: this.buffer(f32(pads)), count: lanes },
@@ -1541,7 +1543,7 @@ export class GLBoard {
     };
     burst(d.hitB, lowerBound(d.hitB.times, t - 0.45), lowerBound(d.hitB.times, t + 1e-6), 'hitB');
     burst(d.heldB, lowerBound(d.heldB.times, t - d.heldB.maxLen), lowerBound(d.heldB.times, t + 1e-6), 'heldB');
-    const kFrom = lowerBound(d.barB.times, t - 0.26), kTo = lowerBound(d.barB.times, t + 1e-6);
+    const kFrom = lowerBound(d.barB.times, t - Math.max(0.26, d.barB.maxLen)), kTo = lowerBound(d.barB.times, t + 1e-6);
     if (kTo > kFrom) {
       use('barburst');
       this.vao(d, 'barB', () => { gl.bindBuffer(gl.ARRAY_BUFFER, d.barB.buf); this.attrib(pr, 'b0', 4, 32, kFrom * 32, 1); this.attrib(pr, 'b1', 4, 32, kFrom * 32 + 16, 1); });

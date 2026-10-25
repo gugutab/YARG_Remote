@@ -321,6 +321,7 @@ function naturalHopo(fretNotes, division, hopoThreshold = Math.floor(division / 
 
 // Drum rolls (MidIOHelper.cs): 125 kick roll, 126 tremolo lane, 127 trill lane, as tick-to-second spans.
 const ROLL_TYPES = { 125: 'kick', 126: 'tremolo', 127: 'trill' };
+export const FREE_ROLL_MIN_SEC = 0.8; // a roll lane with no notes in it shows (as a free roll) only when it lasts this long
 function rollSpans(track, toSec) {
   return track.notes
     .filter((n) => n.pitch in ROLL_TYPES)
@@ -412,7 +413,14 @@ function buildDrumChart(midi, track, kind, difficulty, timed, toSec, settings) {
     });
   }
   const notes = [...kicks.values(), ...pads].sort((a, b) => a.time - b.time);
-  const chart = { mode: 'lanes', lanes, laneColors, laneKinds: extended ? EXTENDED_DRUM_LANES.map((l) => (l.cymbal ? 'cymbal' : 'tom')) : null, drumKind: kind, notes, rolls: validRolls(rollSpans(track, toSec), notes, !extended && kind !== 'five'), ...commonParts(midi, track, toSec, settings, 'drums') };
+  const spans = rollSpans(track, toSec);
+  const valid = validRolls(spans, notes, !extended && kind !== 'five');
+  // Roll lanes with no notes in them: YARG drops them (nothing to validate), but the original games show them as a lane to hit freely (Free Bird's ending, 15 s of drums), so they
+  // stay as free rolls over every pad (a kick roll over the kick), when they last at least FREE_ROLL_MIN_SEC.
+  const free = spans.filter((r) => !valid.includes(r) && r.end - r.start >= FREE_ROLL_MIN_SEC && !notes.some((n) => n.time > r.start + 0.15 && n.time < r.end - 0.15))
+    .map((r) => Object.assign(r, { lanes: r.type === 'kick' ? [-1] : [...Array(lanes).keys()], free: true }));
+  const rolls = [...valid, ...free].sort((x, y) => x.start - y.start);
+  const chart = { mode: 'lanes', lanes, laneColors, laneKinds: extended ? EXTENDED_DRUM_LANES.map((l) => (l.cymbal ? 'cymbal' : 'tom')) : null, drumKind: kind, notes, rolls, ...commonParts(midi, track, toSec, settings, 'drums') };
   markFillNotes(chart);
   return chart;
 }
