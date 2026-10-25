@@ -1,8 +1,8 @@
 // A contact sheet of every kind of note the app draws, with its variations, rendered by the app itself (WebGL, in a real browser), as one PNG.
 //   node scripts/note-sheet.mjs [--out _shots/note-sheet.png] [--styles rect,round] [--notes3d yarg|own|off] [--scale 2] [--cols 3]
-//        [--only guitar,drums-five,drums-pro] [--executable <path to chrome>] [--playwright <dir of playwright-core>] [--keep] [--port 8199]
+//        [--only guitar,drums-five,drums-pro] [--rows "HOPO,Tap,Open"] [--executable <path to chrome>] [--playwright <dir of playwright-core>] [--keep] [--port 8199]
 // It writes two small synthetic songs to a temporary folder (a guitar and a 5-lane drum chart; a Pro drum chart), serves them with the app's own server.mjs, opens each instrument in
-// each note style, pauses on one row of notes at a time (a row = one kind of note across the lanes) and takes a picture of the board. The pictures are put in a labelled grid.
+// each note style (--rows keeps only the rows whose label contains one of the words, to show just the notes a change touches), pauses on one row of notes at a time (a row = one kind of note across the lanes) and takes a picture of the board. The pictures are put in a labelled grid.
 // Nothing of a real song is used. playwright-core is not a dependency of this repo: it is looked for in --playwright, $PLAYWRIGHT_CORE and the usual places on this machine.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -22,6 +22,7 @@ const notes3d = args.notes3d || 'yarg';
 const scale = Number(args.scale || 2);
 const cols = Number(args.cols || 3);
 const only = args.only ? String(args.only).split(',') : null;
+const rowWords = args.rows ? String(args.rows).toLowerCase().split(',').map((s) => s.trim()).filter(Boolean) : null;
 const port = Number(args.port || 8199);
 
 const { buildMidi, tempo120, trackName, event } = await import(pathToFileURL(path.join(ROOT, 'test', 'smf.js')).href);
@@ -178,6 +179,7 @@ try {
         await page.goto(`http://127.0.0.1:${port}/#/song/${id}/play?i=${part.instrument}`);
         await page.waitForTimeout(notes3d === 'yarg' ? 9000 : 4000); // (the library scan, the song and the models)
         for (const row of part.meta) {
+          if (rowWords && !rowWords.some((w) => row.label.toLowerCase().includes(w))) continue;
           const t = row.time - 0.27; // (the row is a little above the hit line, large and whole)
           await page.evaluate((v) => { const el = document.querySelector('#seek'); el.step = 'any'; el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, t);
           await page.waitForTimeout(700);
