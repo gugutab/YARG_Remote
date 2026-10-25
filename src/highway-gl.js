@@ -414,7 +414,12 @@ void main() {
   float hw = ${'u_half'} * u_laneW; float hh = max(2.0, (u_hit - u_vy) * u_k * u_bar * 0.5); float spark = u_laneW * u_headR * 0.6;
   float up = hh * 3.0 + spark * 2.4, dn = hh * 3.0;
   vec2 off = vec2((c.x - 0.5) * 2.0 * hw * 1.12, mix(-up, dn, c.y));
-  vec2 px = project(0.0, 0.0) + off; gl_Position = (past >= u_lit && k < 1.0) ? clipPos(px) : vec4(2.0, 2.0, 2.0, 1.0); v_y = px.y;
+  // the tilt: the road narrows away from the player, so the corners of the burst go in by the road's own ratio at their height; the pattern keeps its rectangular coordinates (v_p) and so
+  // is drawn as the same trapezoid as the road, its ends following the angle of the highway (nothing changes in the side view, where the road does not narrow)
+  float sc0 = scaleAt(0.0); float perPx = max(1.0, (u_hit - u_vy) * u_k * sc0 * sc0);
+  float dd = clamp(-off.y / perPx, -0.3, 2.0);
+  vec2 offT = vec2(off.x * scaleAt(dd) / sc0, off.y);
+  vec2 px = project(0.0, 0.0) + offT; gl_Position = (past >= u_lit && k < 1.0) ? clipPos(px) : vec4(2.0, 2.0, 2.0, 1.0); v_y = px.y;
   v_p = off; v_k = k; v_hw = hw; v_hh = hh; v_spark = spark; v_seed = b1.w; v_col = b1.rgb;
 }`, `${FS_HEAD}in vec2 v_p; in float v_k, v_hw, v_hh, v_spark, v_seed, v_y; in vec3 v_col; out vec4 o;
 vec3 tintW(vec3 c, float a) { return mix(c, vec3(1.0), a); }
