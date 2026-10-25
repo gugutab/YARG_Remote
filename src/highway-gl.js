@@ -308,7 +308,7 @@ void main() {
   float x0, x1; vec4 col;
   if (a_i < -1.5) { x0 = u_half - ${(FILL_BORDER_LANES * 0.4).toFixed(3)}; x1 = u_half + ${FILL_BORDER_LANES.toFixed(3)}; col = u_edge; }
   else if (a_i < -0.5) { x0 = -u_half - ${FILL_BORDER_LANES.toFixed(3)}; x1 = -u_half + ${(FILL_BORDER_LANES * 0.4).toFixed(3)}; col = u_edge; }
-  else { int l = int(a_i); x0 = a_i - u_half; x1 = a_i + 1.0 - u_half; col = vec4(mix(u_lc[l], vec3(1.0), 0.3 + 0.45 * u_flash[l]), 1.0); }
+  else { int l = int(a_i); x0 = a_i - u_half; x1 = a_i + 1.0 - u_half; vec3 cc = mix(u_lc[l], vec3(1.0), 0.3 - 0.22 * u_flash[l]) * (1.0 + 0.6 * u_flash[l]); col = vec4(cc / max(1.0, max(cc.r, max(cc.g, cc.b))), 1.0); } // (a hit lights the segment up: the colour gets stronger and brighter, hue kept, not whiter)
   float d = (c.y - 0.5) * u_bar * HITBAR_K; // (twice as deep as the pedal / open bars: the coloured part of the hit area, and the end indicators with it)
   vec2 px = project(mix(x0, x1, c.x), d); gl_Position = clipPos(px); v_y = px.y; v_col = col;
 }`, FS_COLOR],
