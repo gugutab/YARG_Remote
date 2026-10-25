@@ -281,14 +281,15 @@ void main() {
   o = vec4(v_col * a, a);
 }`],
   // the hit line bar: one segment per lane in the lane's colour (whiter while the lane is hit), over the notes and tails, with a border at each end (instance: lane, or -1 / -2)
-  hitbar: [`${COMMON}in float a_i; uniform float u_bar, u_flash[8]; uniform vec3 u_lc[8]; uniform vec4 u_edge; out vec4 v_col; out float v_y;
+  hitbar: [`${COMMON}const float HITBAR_K = 2.0;
+in float a_i; uniform float u_bar, u_flash[8]; uniform vec3 u_lc[8]; uniform vec4 u_edge; out vec4 v_col; out float v_y;
 void main() {
   vec2 c = vec2(float(gl_VertexID & 1), float((gl_VertexID >> 1) & 1));
   float x0, x1; vec4 col;
   if (a_i < -1.5) { x0 = u_half - ${(FILL_BORDER_LANES * 0.4).toFixed(3)}; x1 = u_half + ${FILL_BORDER_LANES.toFixed(3)}; col = u_edge; }
   else if (a_i < -0.5) { x0 = -u_half - ${FILL_BORDER_LANES.toFixed(3)}; x1 = -u_half + ${(FILL_BORDER_LANES * 0.4).toFixed(3)}; col = u_edge; }
   else { int l = int(a_i); x0 = a_i - u_half; x1 = a_i + 1.0 - u_half; col = vec4(mix(u_lc[l], vec3(1.0), 0.3 + 0.45 * u_flash[l]), 1.0); }
-  float d = (c.y - 0.5) * u_bar;
+  float d = (c.y - 0.5) * u_bar * HITBAR_K; // (twice as deep as the pedal / open bars: the coloured part of the hit area, and the end indicators with it)
   vec2 px = project(mix(x0, x1, c.x), d); gl_Position = clipPos(px); v_y = px.y; v_col = col;
 }`, FS_COLOR],
   // the hit burst: a rounded ripple, a flash and eight sparks on the hit line (drawHitBurst), looping three at a time while a long note is held, plus the glow where

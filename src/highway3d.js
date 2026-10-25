@@ -849,16 +849,16 @@ export function renderLanes3D(hw, t, w, h) {
   if (hw.hitLine) { // a fixed bar across the road at the hit line, drawn over the notes and the tails (they pass underneath), as thick as the pedal / open bars, in the colour of each lane (it lights when a note is hit), with a fixed border at each end; the pads are not drawn
     for (let i = 0; i < lanes; i++) {
       g.fillStyle = tintWhite(colors[i], 0.3 + 0.45 * Math.max(flash[i], barFlash)); // the note's colour under a white overlay (whiter while the lane is hit)
-      quad(g, -barDepth / 2, barDepth / 2, -half + i, -half + i + 1); // (the first and last segments end exactly on the walls of the board)
+      quad(g, -barDepth, barDepth, -half + i, -half + i + 1); // (the first and last segments end exactly on the walls of the board; twice as deep as the pedal / open bars)
       g.fill();
     }
     // the end indicators pass over the coloured bar, a little transparent, in the colour of the open notes or the pedal when the chart has them (white otherwise)
     const hasOpen = (chart.hasOpen ??= chart.notes.some((n) => n.open));
     const edge = chart.drumKind ? (chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick) : hasOpen ? NOTE_PALETTE.open : null;
     g.fillStyle = edge ? withAlpha(edge, 0.8) : HIT_LINE_BORDER_SOFT;
-    quad(g, -barDepth / 2, barDepth / 2, -half - FILL_BORDER_LANES, -half + FILL_BORDER_LANES * 0.4); // (the borders are exactly as deep as the bar)
+    quad(g, -barDepth, barDepth, -half - FILL_BORDER_LANES, -half + FILL_BORDER_LANES * 0.4); // (the borders are exactly as deep as the hit bar)
     g.fill();
-    quad(g, -barDepth / 2, barDepth / 2, half - FILL_BORDER_LANES * 0.4, half + FILL_BORDER_LANES);
+    quad(g, -barDepth, barDepth, half - FILL_BORDER_LANES * 0.4, half + FILL_BORDER_LANES);
     g.fill();
   }
   if (hw.hitAnimation === 'burst') { // the burst: a shockwave ring and a fan of sparks on the hit line when a note arrives (setting highway.hitAnimation); drawn over the hit line
