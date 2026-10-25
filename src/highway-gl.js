@@ -69,6 +69,7 @@ ${UNIFORMS}
 // u_side: 0 the usual view from behind the hit line (a perspective), 1 a view from the side (an elevation without perspective: the depth runs along the screen, to the right, from the
 // hit line at u_sx0; the height is up; the lanes, which would lie on one another, are spread a little up the screen), in between a morph of the two.
 float scaleAt(float d) { return mix(1.0 / (1.0 + u_k * d), 1.0, u_side); }
+vec3 vivid(vec3 c) { float l = dot(c, vec3(0.3, 0.59, 0.11)); return clamp(mix(vec3(l), c, 1.5), 0.0, 1.4); } // (a more saturated version of a colour: the hit animations use it)
 vec2 project(float lx, float d) {
   float p = 1.0 / (1.0 + u_k * d);
   vec2 top = vec2(u_cx + lx * u_flip * u_laneW * p, u_vy + (u_hit - u_vy) * p + (d > 0.0 ? u_c * d * d : 0.0));
@@ -328,7 +329,7 @@ void main() {
   vec2 centre = project(b0.y + 0.5 - u_half, 0.0);
   vec2 off = (c - 0.5) * 2.0 * hs;
   vec2 px = centre + off; gl_Position = alive > 0.5 ? clipPos(px) : vec4(2.0, 2.0, 2.0, 1.0); v_y = px.y;
-  v_p = off; v_k = k; v_rx = rx; v_seed = seed; v_col = b1.rgb; v_rg = rg; v_ell = b0.w;
+  v_p = off; v_k = k; v_rx = rx; v_seed = seed; v_col = vivid(b1.rgb); v_rg = rg; v_ell = b0.w;
   v_glow = (b1.w > 0.5 && j < 0.5) ? 0.5 * amt * (u_held > 0.5 ? 0.85 + 0.15 * sin(u_t * 22.0) : 1.0) : 0.0;
 }`, `${FS_HEAD}in vec2 v_p; in float v_k, v_rx, v_seed, v_glow, v_rg, v_ell, v_y; in vec3 v_col; out vec4 o;
 vec3 tintW(vec3 c, float a) { return mix(c, vec3(1.0), a); }
@@ -351,7 +352,7 @@ void main() {
     vec2 q = v_p / vec2(rx * 3.2, ry * 2.6);
     float lk = (1.0 - k) * (1.0 - k) * smoothstep(0.0, 0.06, k);
     float q2 = dot(q, q);
-    sum += (v_col * 1.7 * exp(-q2 * 1.6) + tintW(v_col, 0.3) * 0.6 * exp(-q2 * 6.0)) * 0.85 * lk;
+    sum += (v_col * 2.0 * exp(-q2 * 1.5) + tintW(v_col, 0.2) * 0.7 * exp(-q2 * 6.0)) * 0.9 * lk;
   }
   float base = floor(mod(v_seed * 1000.0, 97.0));
   for (int i = 0; i < 8; i++) {
@@ -420,7 +421,7 @@ void main() {
   float dd = clamp(-off.y / perPx, -0.3, 2.0);
   vec2 offT = vec2(off.x * scaleAt(dd) / sc0, off.y);
   vec2 px = project(0.0, 0.0) + offT; gl_Position = (past >= u_lit && k < 1.0) ? clipPos(px) : vec4(2.0, 2.0, 2.0, 1.0); v_y = px.y;
-  v_p = off; v_k = k; v_hw = hw; v_hh = hh; v_spark = spark; v_seed = b1.w; v_col = b1.rgb;
+  v_p = off; v_k = k; v_hw = hw; v_hh = hh; v_spark = spark; v_seed = b1.w; v_col = vivid(b1.rgb);
 }`, `${FS_HEAD}in vec2 v_p; in float v_k, v_hw, v_hh, v_spark, v_seed, v_y; in vec3 v_col; out vec4 o;
 vec3 tintW(vec3 c, float a) { return mix(c, vec3(1.0), a); }
 float sdRound(vec2 p, vec2 h, float r) { vec2 q = abs(p) - (h - r); return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
@@ -713,7 +714,7 @@ void main() {
   float r = max(1.2, u_laneW * (0.02 + 0.03 * r3) * (1.0 - 0.6 * k)); // radius in px
   vec2 px = p + (c - 0.5) * 2.0 * r * 1.6;
   gl_Position = alive > 0.5 ? clipPos(px) : vec4(2.0, 2.0, 2.0, 1.0);
-  v_p = (c - 0.5) * 2.0; v_k = k; v_y = px.y; v_r = r; v_col = mix(b1.rgb, vec3(1.0), 0.08 + 0.22 * r2) * 1.15;
+  v_p = (c - 0.5) * 2.0; v_k = k; v_y = px.y; v_r = r; v_col = mix(vivid(b1.rgb), vec3(1.0), 0.04 + 0.14 * r2) * 1.2;
 }`, `${FS_HEAD}in vec2 v_p; in float v_k, v_y, v_r; in vec3 v_col; out vec4 o;
 void main() {
   float d = length(v_p); // 1 at the edge of the quad, whose half size is 1.6 radii
