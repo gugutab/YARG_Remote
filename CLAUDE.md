@@ -780,3 +780,4 @@ Only checked by synthetic test, headless run or code reading:
 - Notes view star power lyrics: the gold ring is a little thinner (2 x max(1.5, 0.05 x size) beyond the dark outline; karaoke keeps 0.07).
 - HOPO notes (3D models): the white side strips are an emissive white (`role` 2 in the solid shader: 0.9-1.0 lit white + 0.3, so it clips to pure white) instead of the shaded cream.
 - Tap notes (3D models): the dark middle is opaque black: the halo added over the glass (`glow` pass) is 20% for the tap kind, the dark core of the glass tube is applied after the reflections, and the dome's core carries less of the lane colour.
+- Hit area (3D models): a hit note vanishes with an effect over 0.14 s (it swells by 28%, flashes white and fades; was a shrink in 0.1 s) and the hit burst gets a coloured light, a soft glow of the lane colour with a whiter core over the hit point (`burst` fragment shader, in quickly and out by 0.45 s).

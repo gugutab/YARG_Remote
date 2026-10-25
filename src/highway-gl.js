@@ -326,6 +326,12 @@ void main() {
     float cw = rx * 1.05 * (0.6 + 0.5 * e), ch = ry * 0.68 * (0.6 + 0.5 * e);
     sum += tintW(v_col, 0.7) * (1.0 - smoothstep(-0.5, 0.5, sdShape(v_p, vec2(cw, ch)))) * 0.55 * env * env;
   }
+  { // the light of the hit: a soft glow of the lane's colour over the hit point (its core a little whiter), in quickly and fading out
+    vec2 q = v_p / vec2(rx * 3.2, ry * 2.6);
+    float lk = (1.0 - k) * (1.0 - k) * smoothstep(0.0, 0.06, k);
+    float q2 = dot(q, q);
+    sum += (v_col * 1.15 * exp(-q2 * 1.6) + tintW(v_col, 0.65) * 0.5 * exp(-q2 * 6.0)) * 0.8 * lk;
+  }
   float base = floor(mod(v_seed * 1000.0, 97.0));
   for (int i = 0; i < 8; i++) {
     float fi = float(i);
@@ -429,10 +435,10 @@ void main() {
   // along the lane, its depth along the road (in depth units) and its height lifted on the screen by the perspective scale at its depth, so the model gets a true perspective.
   // Lit by a fixed light above and in front: a texture of the model gives the metal its brushed look, the lane's colour tints the middle. Instances (time, lane, length, 0) + (r, g, b, 0).
   solid: [`${COMMON}in vec3 m_pos; in vec3 m_nrm; in vec2 m_uv; in float m_role; in vec4 s0; in vec4 s1; uniform vec3 u_msz; uniform float u_mbase, u_malpha, u_mscale;
-out vec2 v_uv; out vec3 v_n, v_lane, v_mp; out float v_role, v_y, v_d, v_a, v_sp;
+out vec2 v_uv; out vec3 v_n, v_lane, v_mp; out float v_role, v_y, v_d, v_a, v_sp, v_van;
 void main() {
-  float past = u_t - (s0.x + s0.z); float kx = clamp(past / 0.1, 0.0, 1.0); float sh = 1.0 - 0.5 * kx;
-  bool gone = past > 0.1 || (s0.z > 0.0 && u_t >= s0.x);
+  float past = u_t - (s0.x + s0.z); float kx = clamp(past / 0.14, 0.0, 1.0); float sh = 1.0 + 0.28 * (1.0 - (1.0 - kx) * (1.0 - kx)); // (a hit note vanishes: it swells, flashes white and fades, in 0.14 s)
+  bool gone = past > 0.14 || (s0.z > 0.0 && u_t >= s0.x);
   float d = clamp((s0.x - u_t) / u_win, 0.0, 1.0);
   float hs = u_headR / ${HEAD_R.toFixed(2)};
   float x = s0.y + 0.5 - u_half + m_pos.x * u_msz.x * sh * hs * u_mscale;
@@ -444,8 +450,8 @@ void main() {
   vec4 clip = clipPos(px); clip.z = clamp(dep * 1.7 - 0.1 - hgt * 0.3, -0.99, 0.99); // (nearer and higher wins the depth test)
   gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clip; v_y = px.y; v_d = d;
   v_uv = m_uv; v_n = vec3(m_nrm.x, -m_nrm.y, m_nrm.z); v_lane = s1.rgb; v_role = m_role; v_mp = m_pos; v_sp = s1.w;
-  v_a = clamp((1.0 - d) / 0.14, 0.0, 1.0) * u_malpha;
-}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane, v_mp; in float v_role, v_y, v_d, v_a, v_sp; uniform float u_mcel, u_mtoon, u_mcym, u_mmetal, u_mglass, u_mcymst; out vec4 o;
+  v_a = clamp((1.0 - d) / 0.14, 0.0, 1.0) * u_malpha * (1.0 - kx * kx); v_van = past > 0.0 ? kx : 0.0;
+}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane, v_mp; in float v_role, v_y, v_d, v_a, v_sp, v_van; uniform float u_mcel, u_mtoon, u_mcym, u_mmetal, u_mglass, u_mcymst; out vec4 o;
 // The middle of a note (YARG's RectangularNote shader graph, material NoteMiddle): the base map times a darkness mask that drifts with time (a soft cloud: gradient noise,
 // scale -2.8 / speed 0.4 / tiling 1.1 x 1.3 in the material; here a value noise of two octaves), times the lane's colour, over which the shine map is laid with the opacity
 // shine amount x its alpha (0.1); a small emission of the colour (0.1). The metal is the base map under the light, smoothness 0.5.
@@ -631,6 +637,7 @@ void main() {
   else c = vec3(0.04) * (0.6 + 0.8 * lam) + vec3(1.0) * sp * 0.3; // the dark of a tap
   c = mix(c, vec3(0.10, 0.14, 0.24), u_fog * 0.5 * smoothstep(0.1, 1.0, v_d)); // (the fog of the other effect, when it is on)
   c = mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))), 0.94 * u_dim); // (a disabled note, the replayed stretch: almost no colour)
+  c = mix(c, vec3(1.0), 0.75 * smoothstep(0.0, 0.35, v_van) * (1.0 - v_van)); // (the white flash of a note vanishing)
   float a = v_a * edgeFade(v_y);
   o = vec4(c * a, a);
 }`],
