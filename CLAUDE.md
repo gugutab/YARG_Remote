@@ -778,3 +778,4 @@ Only checked by synthetic test, headless run or code reading:
 - Karaoke sung-part colouring: each letter is drawn once, in the voice colour left of the sung edge and in white right of it, with the edge snapped to a device pixel (was: the coloured letter drawn over a white one, clipped at a fractional pixel, which left white fringes and a cut inside a pixel).
 - Notes view star power lyrics: the karaoke look replaces the glow: the dark outline next to the letters and a ring of `SP_LYRIC_GOLD` outside it (dimmer once sung); `lyricRow` draws in passes over the words on screen (rings, outlines, fills). `spGlow` is gone.
 - Notes view star power lyrics: the gold ring is a little thinner (2 x max(1.5, 0.05 x size) beyond the dark outline; karaoke keeps 0.07).
+- HOPO notes (3D models): the white side strips are an emissive white (`role` 2 in the solid shader: 0.9-1.0 lit white + 0.3, so it clips to pure white) instead of the shaded cream.

@@ -626,7 +626,7 @@ void main() {
       c = lamp + vec3(1.0) * pow(max(dot(N, H), 0.0), 20.0) * 0.3;
     }
   }
-  else if (v_role < 2.5) c = mix(vec3(1.0), v_lane, 0.12) * (0.68 + 0.32 * lam); // the white of a HOPO
+  else if (v_role < 2.5) c = mix(vec3(1.0), v_lane, 0.03) * (0.9 + 0.1 * lam) + vec3(0.3); // the white of a HOPO: a lit strip, whiter and stronger than the shaded surface it had (it lights over 1, so it reads as light)
   else c = vec3(0.04) * (0.6 + 0.8 * lam) + vec3(1.0) * sp * 0.3; // the dark of a tap
   c = mix(c, vec3(0.10, 0.14, 0.24), u_fog * 0.5 * smoothstep(0.1, 1.0, v_d)); // (the fog of the other effect, when it is on)
   c = mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))), 0.94 * u_dim); // (a disabled note, the replayed stretch: almost no colour)
