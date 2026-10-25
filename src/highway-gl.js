@@ -97,6 +97,23 @@ float edgeFade(float y) {
 const FS_COLOR = `${FS_HEAD}in vec4 v_col; in float v_y; uniform float u_noFade; out vec4 o;
 void main() { float a = v_col.a * (u_noFade > 1.5 ? topFade(v_y) : mix(edgeFade(v_y), 1.0, u_noFade)); o = vec4(v_col.rgb * a, a); } // (u_noFade: 0 the whole fade, 1 none, 2 the far edge only: the dark base reaches the bottom of the pane)`;
 
+// The bands: the flat colour, except for the sustain of an open note (the purple over the whole road), which moves like the tails of the notes do: chevrons (Vs pointing away
+// from the hit line, as in the flow tails) run up it, and while it is held the whole band swells in waves (WAVE_LEN 0.45 s, WAVE_PERIOD 0.6 s) and the chevrons are stronger.
+const FS_BAND = `${FS_HEAD}in vec4 v_col; in float v_y, v_open, v_ahead, v_lat, v_left, v_held; uniform float u_noFade; out vec4 o;
+void main() {
+  float a = v_col.a * (u_noFade > 1.5 ? topFade(v_y) : mix(edgeFade(v_y), 1.0, u_noFade));
+  vec3 c = v_col.rgb;
+  if (v_open > 0.5) {
+    float x = (v_ahead + 0.45 * abs(v_lat) - u_t * 0.9) / 0.3; float f = fract(x);
+    float stripe = smoothstep(0.0, 0.12, f) * (1.0 - smoothstep(0.12, 0.3, f));
+    float wave = v_held > 0.5 ? 1.0 + 0.3 * sin(6.2831853 * (v_ahead / 0.45 - u_t / 0.6)) : 1.0;
+    float k = 0.45 + 0.55 * v_held;
+    a *= wave * (0.7 + 1.1 * k * stripe) * min(1.0, max(v_left, 0.0) / 0.1 + 0.0);
+    c = mix(c, vec3(1.0), 0.45 * k * stripe);
+  }
+  o = vec4(c * a, a);
+}`;
+
 // The road in relief (the effect "relief"): the road and lane stripes (the faint white quads) get fine grooves along the lanes, a bevelled plate every half second of the
 // song that scrolls with the notes, and a sheen that slides up the board; all of it only changes how much light the faint quads add.
 const FS_FLAT = `${FS_HEAD}in vec4 v_col; in float v_y; in vec2 v_g; uniform float u_noFade; out vec4 o;
@@ -129,7 +146,7 @@ void main() {
   vec4 col = u_bc[2 - kind]; v_col = vec4(col.rgb, col.a * u_board);
 }`, FS_COLOR],
   // bands (star power, solo, fills, big rock ending, roll columns, borders): a strip from the start to the end, one instance each (t0, t1, x, half width) + colour + (alpha slot)
-  bands: [`${COMMON}in vec4 a_t; in vec4 a_col; in vec4 a_x; uniform float u_mul[${MUL_SLOTS}]; out vec4 v_col; out float v_y;
+  bands: [`${COMMON}in vec4 a_t; in vec4 a_col; in vec4 a_x; uniform float u_mul[${MUL_SLOTS}]; out vec4 v_col; out float v_y, v_open, v_ahead, v_lat, v_left, v_held;
 void main() {
   int id = gl_VertexID; float side = ((id & 1) == 0) ? -1.0 : 1.0; float u = float(id >> 1) / ${(BAND_ROWS - 1).toFixed(1)};
   float lo = a_x.y > 0.5 ? 0.0 : ${ROAD_NEAR.toFixed(2)}; // (an open note's sustain starts at the hit line)
@@ -138,7 +155,8 @@ void main() {
   vec2 c = project(a_t.z, d); float w = u_laneW * a_t.w * scaleAt(d);
   vec2 px = c + stripSide() * (side * w); gl_Position = (df <= dn) ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(px); v_y = px.y;
   v_col = vec4(a_col.rgb, a_col.a * u_mul[int(a_x.x)] * u_board);
-}`, FS_COLOR],
+  v_open = a_x.y; v_ahead = d * u_win; v_lat = side; v_left = a_t.y - u_t; v_held = (u_t >= a_t.x && u_t <= a_t.y) ? 1.0 : 0.0;
+}`, FS_BAND],
   // sustains, in the app's "flow" style: a strip of segments from the head to the end, tapered (TAIL_TAPER_POWER 3, never thinner than 0.3), swelling in waves while held
   // (WAVE_LEN 0.45 s, WAVE_PERIOD 0.6 s, WAVE_AMP 0.26), with a rounded tip. One instance each (t0, t1, lane, 0) + colour, drawn once per pass (halo, body, core, spine,
   // chevrons: u_mult is the half width factor, u_pass = alpha (-1: the body's 0.6 + 0.3 held), white mix, held only, chevron pass)
