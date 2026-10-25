@@ -503,10 +503,11 @@ void main() {
         if (v_uv.x < -1.5) { float core = 1.0 - smoothstep(0.12, 0.38, u); c = mix(c, v_uv.x < -2.5 ? ink : vec3(1.0), core); }
         c += env * (0.12 + 0.75 * fres) + vec3(1.0) * box * 0.95;
       }
+      if (v_uv.x < -2.5) { float dk = toon ? step(u, 0.34) : 1.0 - smoothstep(0.22, 0.46, u); c = mix(c, ink, dk); } // a tap's dark middle: opaque black over the glass's reflections and tint
       float glint = dot(N, normalize(L + vec3(-0.25, 0.1, 0.0)));
       if (!gloss) c += vec3(0.7) * (toon ? step(0.93, glint) * (u > 0.3 ? 1.0 : 0.0) : pow(max(glint, 0.0), 60.0) * 0.8); // the glint
     } else if (v_role < 2.5) c = vec3(1.0); // the white core of a HOPO (dome)
-    else c = mix(ink, v_lane * 0.35, step(0.55, v_uv.x)); // the dark core of a tap (dome)
+    else c = mix(ink, v_lane * 0.12, step(0.55, v_uv.x)); // the dark core of a tap (dome)
     c = min(c, vec3(1.0));
   }
   else if (v_role < 0.5) { // the metal (the style is a choice: fx.metal): the base map's baked shading kept for the form, a studio reflected on it, a highlight, and a brushing that goes from none to strong
@@ -1484,10 +1485,10 @@ export class GLBoard {
     if (fx.solid && models && fx.glow > 0 && !ghostPass) { // the glow of the lit glass: a halo of the lane's colour round each note with a model, added
       gl.blendFunc(gl.ONE, gl.ONE);
       use('glow');
-      gl.uniform1f(pr.u.u_gain, fx.glow);
       for (const [kind, sol] of Object.entries(d.solid)) {
         const mesh = models[kind];
         if (!mesh || kind[0] === 'c') continue; // (no glow on the cymbals)
+        gl.uniform1f(pr.u.u_gain, fx.glow * (kind === 't' ? 0.2 : 1)); // (a tap's dark middle: the halo, added over the glass, would tint it, so it keeps only a faint one)
         const sFrom = lowerBound(sol.times, t - 0.12), sTo = lowerBound(sol.times, t + win);
         if (sTo <= sFrom) continue;
         const first = sol.count - sTo;
