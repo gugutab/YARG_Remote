@@ -1422,6 +1422,19 @@ export class GLBoard {
       this.inst(gl.TRIANGLE_STRIP, 0, 4, d.pads.count);
     }
 
+    // the hit line bar, under the notes and tails (they pass over it, below the effects): a segment per lane (whiter while it is hit) and a border at each end (the open note / pedal colour when the chart has them)
+    if (o.hitLine && !ghostPass) {
+      use('hitbar');
+      gl.uniform1fv(pr.u.u_flash, d.flash);
+      gl.uniform3fv(pr.u.u_lc, d.lc);
+      const edge = d.drums ? (chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick) : d.hasOpen ? NOTE_PALETTE.open : null;
+      const e = edge ? rgba(withAlpha(edge, 0.8)) : rgba(HIT_LINE_BORDER_SOFT);
+      gl.uniform4f(pr.u.u_edge, e[0], e[1], e[2], e[3]);
+      if (!d.hitIdx) { d.hitIdx = this.buffer(f32([...Array(lanes).keys(), -1, -2])); }
+      this.vao(d, 'hitbar', () => { gl.bindBuffer(gl.ARRAY_BUFFER, d.hitIdx); this.attrib(pr, 'a_i', 1, 4, 0, 1); });
+      this.inst(gl.TRIANGLE_STRIP, 0, 4, lanes + 2);
+    }
+
     // the pedal / open bars (under the sustains and the heads), far ones first
     {
       const bl = d.bars, bFrom2 = lowerBound(bl.times, t - bl.maxLen - 0.12), bTo2 = lowerBound(bl.times, t + win);
@@ -1515,19 +1528,6 @@ export class GLBoard {
         this.vao(d, 'actB', () => { gl.bindBuffer(gl.ARRAY_BUFFER, d.actB.buf); this.attrib(pr, 'a0', 4, 16, aFrom * 16, 1); });
         this.inst(gl.TRIANGLE_STRIP, 0, 4, aTo - aFrom);
       }
-    }
-
-    // the hit line bar over the notes and tails: a segment per lane (whiter while it is hit) and a border at each end (the open note / pedal colour when the chart has them)
-    if (o.hitLine && !ghostPass) {
-      use('hitbar');
-      gl.uniform1fv(pr.u.u_flash, d.flash);
-      gl.uniform3fv(pr.u.u_lc, d.lc);
-      const edge = d.drums ? (chart.drumKind === 'five' ? NOTE_PALETTE.kick5 : NOTE_PALETTE.kick) : d.hasOpen ? NOTE_PALETTE.open : null;
-      const e = edge ? rgba(withAlpha(edge, 0.8)) : rgba(HIT_LINE_BORDER_SOFT);
-      gl.uniform4f(pr.u.u_edge, e[0], e[1], e[2], e[3]);
-      if (!d.hitIdx) { d.hitIdx = this.buffer(f32([...Array(lanes).keys(), -1, -2])); }
-      this.vao(d, 'hitbar', () => { gl.bindBuffer(gl.ARRAY_BUFFER, d.hitIdx); this.attrib(pr, 'a_i', 1, 4, 0, 1); });
-      this.inst(gl.TRIANGLE_STRIP, 0, 4, lanes + 2);
     }
 
     if (ghostPass) { gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); this.drawn += drawn; return drawn; }
