@@ -670,7 +670,8 @@ void main() {
   }
   else if (role < 2.5) c = mix(vec3(1.0), v_lane, 0.03) * (0.9 + 0.1 * lam) + vec3(0.3); // the white of a HOPO: a lit strip, whiter and stronger than the shaded surface it had (it lights over 1, so it reads as light)
   else if (u_mvar > 2.5 && u_mvar < 3.5) c = vec3(0.04) * (0.6 + 0.8 * lam); // a circle tap's middle: the same black as the rectangular tap's
-  else if (u_mvar > 0.5 && u_mvar < 2.5) c = vec3(0.96) * (0.8 + 0.2 * lam) + vec3(0.22) * step(1.5, u_mvar); // a circle note's middle: matte white, a HOPO's lit
+  else if (u_mvar > 0.5 && u_mvar < 1.5) c = (v_sp > 0.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.78, 0.80, 0.84)) * (0.8 + 0.2 * lam); // a plain circle note's top: matte silver, gold in star power, as the rim under it
+  else if (u_mvar > 1.5 && u_mvar < 2.5) c = vec3(0.96) * (0.8 + 0.2 * lam) + vec3(0.22); // a HOPO's: a lit white
   else if (u_mvar > 3.5) c = vec3(0.96) * (0.8 + 0.2 * lam); // (an accent's and a ghost's: matte white)
   else c = vec3(0.04) * (0.6 + 0.8 * lam) + vec3(1.0) * sp * 0.3; // the dark of a tap
   c = mix(c, vec3(0.10, 0.14, 0.24), u_fog * 0.5 * smoothstep(0.1, 1.0, v_d)); // (the fog of the other effect, when it is on)
