@@ -12,6 +12,7 @@
     "start": "node server.mjs",
     "start:static": "python -m http.server 8080 --bind 127.0.0.1",
     "test": "node --test test/*.test.js",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "note-sheet": "node scripts/note-sheet.mjs"
   }
 }
