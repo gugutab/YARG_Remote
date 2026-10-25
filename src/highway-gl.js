@@ -520,10 +520,11 @@ void main() {
   float dr = 0.0, dlam = lam, dspec = 0.0;
   if (u_mvar > 0.5 && role > 2.5 && role < 3.5) {
     vec2 pp = v_mp.xy / (u_mrim * ${CIRCLE_MIDDLE.toFixed(2)}); dr = min(length(pp), 1.0);
-    vec3 Nd = normalize(vec3(pp.x * 0.85, -pp.y * 0.85, sqrt(max(1.0 - dr * dr * 0.7, 0.08))));
-    dlam = max(dot(Nd, L), 0.0); dspec = pow(max(dot(Nd, H), 0.0), 22.0);
+    // (a shallow cap: at its edge it leans as much as the coloured ring does there, 0.3 outward in the model, so the two meet without a step, and it flattens to the top)
+    vec3 Nd = normalize(vec3(pp.x * 0.3, -pp.y * 0.3, 1.0));
+    dlam = max(dot(Nd, L), 0.0); dspec = pow(max(dot(Nd, H), 0.0), 30.0);
   }
-  float domeShade = 0.5 + 0.7 * dlam - 0.3 * smoothstep(0.75, 1.0, dr);
+  float domeShade = 0.62 + 0.45 * dlam - 0.08 * smoothstep(0.7, 1.0, dr);
   vec3 c;
   if (u_mcel > 0.5) { // our own look: toon (u_mtoon 1: three tones of light, a hard highlight, an ink line on the silhouettes, the middle a lit gem in bands of colour) or smooth (0: the same shapes, soft gradients)
     bool toon = u_mtoon > 0.5 && u_mtoon < 1.5, gloss = u_mtoon > 1.5; // (u_mtoon: 0 smooth, 1 toon, 2 glossy)
@@ -677,9 +678,9 @@ void main() {
     }
   }
   else if (role < 2.5) c = mix(vec3(1.0), v_lane, 0.03) * (0.9 + 0.1 * lam) + vec3(0.3); // the white of a HOPO: a lit strip, whiter and stronger than the shaded surface it had (it lights over 1, so it reads as light)
-  else if (u_mvar > 2.5 && u_mvar < 3.5) c = vec3(0.04) * (0.6 + 0.8 * lam) + vec3(0.5) * dspec * 0.3; // a circle tap's middle: the same black as the rectangular tap's (a faint highlight on it)
-  else if (u_mvar > 0.5 && u_mvar < 1.5) c = (v_sp > 0.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.78, 0.80, 0.84)) * domeShade + vec3(1.0) * dspec * 0.45; // a plain circle note's top: a silver dome, gold in star power, as the rim under it
-  else if (u_mvar > 1.5 && u_mvar < 2.5) c = vec3(0.96) * (0.7 + 0.3 * dlam) * (1.0 - 0.18 * smoothstep(0.75, 1.0, dr)) + vec3(0.22) + vec3(1.0) * dspec * 0.4; // a HOPO's: a lit white dome
+  else if (u_mvar > 2.5 && u_mvar < 3.5) c = vec3(0.04) * (0.6 + 0.8 * lam) + vec3(0.5) * dspec * 0.22; // a circle tap's middle: the same black as the rectangular tap's (a faint highlight on it)
+  else if (u_mvar > 0.5 && u_mvar < 1.5) c = (v_sp > 0.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.78, 0.80, 0.84)) * domeShade + vec3(1.0) * dspec * 0.3; // a plain circle note's top: a silver dome, gold in star power, as the rim under it
+  else if (u_mvar > 1.5 && u_mvar < 2.5) c = vec3(0.96) * (0.7 + 0.3 * dlam) * (1.0 - 0.06 * smoothstep(0.7, 1.0, dr)) + vec3(0.22) + vec3(1.0) * dspec * 0.3; // a HOPO's: a lit white dome
   else if (u_mvar > 3.5) c = vec3(0.96) * domeShade + vec3(1.0) * dspec * 0.3; // (an accent's and a ghost's: a white dome)
   else c = vec3(0.04) * (0.6 + 0.8 * lam) + vec3(1.0) * sp * 0.3; // the dark of a tap
   c = mix(c, vec3(0.10, 0.14, 0.24), u_fog * 0.5 * smoothstep(0.1, 1.0, v_d)); // (the fog of the other effect, when it is on)
