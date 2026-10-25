@@ -110,7 +110,7 @@ void main() {
     float width = 0.28 + 0.1 * sin(ph + 1.3 + abs(v_lat)); // (the inner edge of the glow wavers as well)
     float edge = smoothstep(1.0 - width, 1.0, abs(v_lat));
     float glow = edge * (0.35 + 0.65 * wave) * k;
-    a *= (0.9 + 0.9 * glow) * smoothstep(0.0, 0.6, v_left); // (the band fades out softly over its last 0.6 s)
+    a *= (0.9 + 0.9 * glow) * smoothstep(0.0, 0.6, v_left - v_ahead); // (the END of the band fades out softly, over its last 0.6 s of length, while the rest of it keeps its colour)
     c = mix(c, vec3(1.0), 0.4 * glow);
   }
   o = vec4(c * a, a);
