@@ -53,7 +53,8 @@ function rgba(css) {
 export function glUnsupported(hw, chart) {
   if (chart && chart.mode !== 'lanes') return 'mode';
   if (hw.view !== '3d') return 'view';
-  if (hw.noteStyle !== 'rect') return 'noteStyle';
+  // (the circle notes, 'round', are drawn by the board too, as the ghost cymbal's model in the lane colours, when the notes have models)
+  if (hw.noteStyle !== 'rect' && !(hw.noteStyle === 'round' && (hw._notes3d === 'own' || (hw._notes3d === 'yarg' && hw.glModels === 'ready')))) return 'noteStyle';
   if (hw.hitAnimation !== 'burst') return 'hitAnimation';
   if (hw.tailStyle !== 'flow') return 'tailStyle';
   if (hw.loopEnd !== null) return 'loop'; // (the replayed stretch after a rewind is no case: its notes are left out of the chart the board gets, see Highway.viewChart)
@@ -461,7 +462,7 @@ void main() {
   // kind of note, drawn instanced (one instance per note, `divisor` 1) with the depth buffer on, so the faces hide one another. Each vertex is placed like the road: its width
   // along the lane, its depth along the road (in depth units) and its height lifted on the screen by the perspective scale at its depth, so the model gets a true perspective.
   // Lit by a fixed light above and in front: a texture of the model gives the metal its brushed look, the lane's colour tints the middle. Instances (time, lane, length, 0) + (r, g, b, 0).
-  solid: [`${COMMON}in vec3 m_pos; in vec3 m_nrm; in vec2 m_uv; in float m_role; in vec4 s0; in vec4 s1; uniform vec3 u_msz; uniform float u_mbase, u_malpha, u_mscale;
+  solid: [`${COMMON}in vec3 m_pos; in vec3 m_nrm; in vec2 m_uv; in float m_role; in vec4 s0; in vec4 s1; uniform vec3 u_msz; uniform float u_mbase, u_malpha, u_mscale, u_mvar;
 out vec2 v_uv; out vec3 v_n, v_lane, v_mp; out float v_role, v_y, v_d, v_a, v_sp, v_van;
 void main() {
   float past = u_t - s0.x; float kx = clamp(past / 0.14, 0.0, 1.0); float sh = 1.0 + 0.28 * (1.0 - (1.0 - kx) * (1.0 - kx)); // (a hit note vanishes: it swells, flashes white and fades, in 0.14 s; the head of a long one too, its tail goes on)
@@ -477,6 +478,8 @@ void main() {
   vec4 clip = clipPos(px); clip.z = clamp(dep * 1.7 - 0.1 - hgt * 0.3, -0.99, 0.99); // (nearer and higher wins the depth test)
   gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clip; v_y = px.y; v_d = d;
   v_uv = m_uv; v_n = vec3(m_nrm.x, -m_nrm.y, m_nrm.z); v_lane = s1.rgb; v_role = m_role; v_mp = m_pos; v_sp = s1.w;
+  // the circle notes (the ghost cymbal's model) change colours only, by the kind of note: 1 HOPO (a white ring), 2 tap (a nearly black ring with a hint of the colour), 3 accent (a stronger, lighter ring), 4 ghost (a dimmer one)
+  if (u_mvar > 0.5) { if (u_mvar < 1.5) v_lane = mix(v_lane, vec3(1.0), 0.88); else if (u_mvar < 2.5) v_lane = mix(vec3(0.05, 0.05, 0.07), v_lane, 0.22); else if (u_mvar < 3.5) v_lane = min(v_lane * 1.3 + 0.18, vec3(1.0)); else v_lane *= 0.5; }
   v_a = clamp((1.0 - d) / 0.14, 0.0, 1.0) * u_malpha * (1.0 - kx * kx); v_van = past > 0.0 ? kx : 0.0;
 }`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane, v_mp; in float v_role, v_y, v_d, v_a, v_sp, v_van; uniform float u_mcel, u_mtoon, u_mcym, u_mmetal, u_mglass, u_mcymst; out vec4 o;
 // The middle of a note (YARG's RectangularNote shader graph, material NoteMiddle): the base map times a darkness mask that drifts with time (a soft cloud: gradient noise,
@@ -1505,6 +1508,7 @@ export class GLBoard {
       this.inst(gl.TRIANGLE_STRIP, 0, 4, nTo - nFrom);
     }
     const drawn = Math.max(0, nTo - nFrom);
+    const round = !!o.roundNotes; // circle notes: every note but the cymbals is drawn with the ghost cymbal's model, in the lane colour
     if (fx.solid && models) { // the models of the notes, with the depth buffer (cleared inside this pane's scissor)
       gl.clear(gl.DEPTH_BUFFER_BIT);
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
@@ -1512,7 +1516,8 @@ export class GLBoard {
       gl.activeTexture(gl.TEXTURE1);
       gl.uniform1i(pr.u.u_mtex, 1); gl.uniform1i(pr.u.u_mshine, 2);
       for (const [kind, sol] of Object.entries(d.solid)) {
-        const mesh = models[kind];
+        const asRound = round && kind[0] !== 'c';
+        const mesh = models[asRound ? 'cg' : kind];
         if (!mesh) continue;
         const sFrom = lowerBound(sol.times, t - 0.12), sTo = lowerBound(sol.times, t + win);
         if (sTo <= sFrom) continue;
@@ -1521,8 +1526,9 @@ export class GLBoard {
         gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, mesh.shine); gl.activeTexture(gl.TEXTURE1);
         gl.uniform1f(pr.u.u_mcel, mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mcym, mesh.cym && !mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mmetal, fx.metal || 0); gl.uniform1f(pr.u.u_mglass, fx.glass || 0); gl.uniform1f(pr.u.u_mcymst, fx.cymbal || 0); gl.uniform1f(pr.u.u_mtoon, fx.shade === 'glossy' ? 2 : fx.shade === 'smooth' || fx.cel === false ? 0 : 1);
         gl.uniform2f(pr.u.u_mnoise, mesh.cym ? 0.62 : 1.0, 0.7); // (the middle's noise speed: the note 0.4, the cymbal 0.25, relative to the note; its minimum darkness)
-        gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, mesh.alpha); gl.uniform1f(pr.u.u_mscale, mesh.cym ? (o.cymbalScale ?? 1) : 1);
-        this.vao(d, `solid_${kind}`, () => {
+        gl.uniform1f(pr.u.u_mvar, asRound ? ({ h: 1, t: 2, a: 3, g: 4 }[kind] ?? 0) : 0);
+        gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, mesh.alpha); gl.uniform1f(pr.u.u_mscale, mesh.cym && !asRound ? (o.cymbalScale ?? 1) : 1);
+        this.vao(d, `solid_${kind}${asRound ? 'r' : ''}`, () => {
           gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
           this.attrib(pr, 'm_pos', 3, 36, 0, 0); this.attrib(pr, 'm_nrm', 3, 36, 12, 0); this.attrib(pr, 'm_uv', 2, 36, 24, 0); this.attrib(pr, 'm_role', 1, 36, 32, 0);
           gl.bindBuffer(gl.ARRAY_BUFFER, sol.buf);

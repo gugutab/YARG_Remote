@@ -933,6 +933,7 @@ export class Highway {
     fx.metal = look.metal; fx.glass = look.glass; fx.cymbal = look.cymbal; fx.glow = look.glow; fx.particles = look.sparks; fx.fog = look.fog; fx.shade = 'cel';
     o.fx = fx;
     o.cymbalScale = this._cymbalScale;
+    o.roundNotes = this.noteStyle === 'round';
     o.ghost = pane.replayGhost ?? null; // (the disabled notes of a replay, drawn dim over the pane)
     this.glBoard.drawPane(chart, t, { x, y, w: pw, h: ph }, o);
   }
