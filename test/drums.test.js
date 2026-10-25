@@ -150,7 +150,8 @@ test('a roll lane with no notes in it stays as a free roll over every pad when i
     { tick: 6240, pitch: 97, len: 120 },
   ]);
   const chart = buildChart(midi, DRUMS, EXPERT);
-  assert.equal(chart.rolls.length, 1);
-  assert.deepEqual([chart.rolls[0].free, chart.rolls[0].type, chart.rolls[0].lanes], [true, 'trill', [...Array(chart.lanes).keys()]]);
-  assert.ok(Math.abs(chart.rolls[0].end - chart.rolls[0].start - 2) < 0.01);
+  assert.equal(chart.rolls.length, 0, 'a free roll over the pads is a big-rock-ending style span, not a roll column');
+  assert.equal(chart.freeBre.length, 1);
+  assert.deepEqual([chart.freeBre[0].free, chart.freeBre[0].kind], [true, 'bre']);
+  assert.ok(Math.abs(chart.freeBre[0].end - chart.freeBre[0].start - 2) < 0.01);
 });

@@ -605,6 +605,14 @@ export const noteColor = (n, colors) => (n.sp ? starPowerColor(noteLaneColor(n, 
 export const kickBarColor = (n, chart) => (n.open ? NOTE_PALETTE.open : chart.drumKind === 'five' ? (n.doubleKick ? NOTE_PALETTE.doubleKick5 : NOTE_PALETTE.kick5) : n.doubleKick ? NOTE_PALETTE.doubleKick : NOTE_PALETTE.kick);
 
 // The spans of `list` (chart.fills, chart.rolls) whose `key` is `value`, filtered once per chart instead of on every frame.
+// The spans of a big rock ending: the real ones (fills of kind 'bre') and the free roll lanes of the drums (`chart.freeBre`), which are drawn and animated the same way, sorted by start.
+export function breSpans(chart) {
+  const fills = spansOfKind(chart, chart.fills, 'kind', 'bre');
+  if (!chart.freeBre?.length) return fills;
+  if (chart.breAll?.src !== fills) chart.breAll = { src: fills, spans: [...fills, ...chart.freeBre].sort((a, b) => a.start - b.start) };
+  return chart.breAll.spans;
+}
+
 export function spansOfKind(chart, list, key, value) {
   const byKey = (chart.spanKinds ??= new Map()); // key -> (value -> { src, spans }); no "key:value" string per call
   let cache = byKey.get(key);

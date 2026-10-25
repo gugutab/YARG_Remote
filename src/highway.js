@@ -60,6 +60,7 @@ import {
   noteShape,
   fillHalo,
   spansOfKind,
+  breSpans,
   fillTailHalo,
   noteScale,
   setCymbalSize,
@@ -1642,7 +1643,7 @@ export class Highway {
     for (let i = 0; i < FILL_KINDS.length; i++) {
       if (FILL_KINDS[i] === 'fill' && !this.fillBand) continue;
       if (FILL_KINDS[i] === 'bre' && this.breBand === 'off') continue;
-      const spans = spansOfKind(chart, FILL_KINDS[i] === 'fill' ? chart.fillBands ?? chart.fills : chart.fills, 'kind', FILL_KINDS[i]); // (fills without their own activation chord are not shown, like YARG)
+      const spans = FILL_KINDS[i] === 'bre' ? breSpans(chart) : spansOfKind(chart, FILL_KINDS[i] === 'fill' ? chart.fillBands ?? chart.fills : chart.fills, 'kind', FILL_KINDS[i]); // (fills without their own activation chord are not shown, like YARG)
       if (FILL_KINDS[i] === 'bre') { // the big rock ending: every lane in its own colour, pulsing (see breAlpha)
         const cols = chart.laneColors || NOTE_PALETTE.lanes;
         const pulseBre = this.breBand === 'pulse';

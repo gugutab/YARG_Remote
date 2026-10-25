@@ -17,7 +17,7 @@
 import { projection3D } from './highway3d.js';
 import { GLVocals } from './vocals-gl.js';
 import {
-  drawYNote, drawCymbalFace, YNOTE_SIDE_3D, NOTE_RECT_W, NOTE_RECT_H, NOTE_PALETTE, noteColor, withAlpha, spansOfKind, breAlpha, ynoteVersion,
+  drawYNote, drawCymbalFace, YNOTE_SIDE_3D, NOTE_RECT_W, NOTE_RECT_H, NOTE_PALETTE, noteColor, withAlpha, spansOfKind, breSpans, breAlpha, ynoteVersion,
   HIT_Y, HIT_FLASH_SEC, FILL_ACTIVATION, BAR_FLASH_SEC, BAND_BORDERS, FILL_COLORS, FILL_BORDER, FILL_BORDER_LANES, FILL_STRONG, ROLL_LEAD_SEC, ROLL_COLUMN_ALPHA, HIT_LINE_BORDER_SOFT, TAPER_GAIN, NOTE_TRI_W, NOTE_TRI_H, NOTE_TRI_ROUND, NOTE_RECT_ROUND,
 } from './gfx.js';
 
@@ -1137,7 +1137,7 @@ export class GLBoard {
       }
     }
     if (o.breBand !== 'off') {
-      const bre = spansOfKind(chart, chart.fills, 'kind', 'bre'); // every lane in its own colour, pulsing (the alpha slot of lane l, see drawPane)
+      const bre = breSpans(chart); // every lane in its own colour, pulsing (the alpha slot of lane l, see drawPane)
       for (let l = 0; l < d.lanes && l < MUL_SLOTS - 1; l++) {
         const c = rgba(d.colors[l] || d.colors[0]);
         for (const s of bre) add(s.start, s.end, -half + l, -half + l + 1, [c[0], c[1], c[2], 1], l);
@@ -1162,7 +1162,7 @@ export class GLBoard {
     out.forEach((r, i) => data.set(r, i * 12));
     let maxLen = 0;
     for (const r of out) maxLen = Math.max(maxLen, r[1] - r[0]);
-    return { buf: this.buffer(data), count: out.length, starts: Float32Array.from(out, (r) => r[0]), maxLen, bre: chart.fills?.some((s) => s.kind === 'bre') };
+    return { buf: this.buffer(data), count: out.length, starts: Float32Array.from(out, (r) => r[0]), maxLen, bre: chart.fills?.some((s) => s.kind === 'bre') || chart.freeBre?.length > 0 };
   }
 
   freeData(d) {

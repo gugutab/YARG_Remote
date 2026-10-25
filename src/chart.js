@@ -417,10 +417,12 @@ function buildDrumChart(midi, track, kind, difficulty, timed, toSec, settings) {
   const valid = validRolls(spans, notes, !extended && kind !== 'five');
   // Roll lanes with no notes in them: YARG drops them (nothing to validate), but the original games show them as a lane to hit freely (Free Bird's ending, 15 s of drums), so they
   // stay as free rolls over every pad (a kick roll over the kick), when they last at least FREE_ROLL_MIN_SEC.
-  const free = spans.filter((r) => !valid.includes(r) && r.end - r.start >= FREE_ROLL_MIN_SEC && !notes.some((n) => n.time > r.start + 0.15 && n.time < r.end - 0.15))
-    .map((r) => Object.assign(r, { lanes: r.type === 'kick' ? [-1] : [...Array(lanes).keys()], free: true }));
-  const rolls = [...valid, ...free].sort((x, y) => x.start - y.start);
-  const chart = { mode: 'lanes', lanes, laneColors, laneKinds: extended ? EXTENDED_DRUM_LANES.map((l) => (l.cymbal ? 'cymbal' : 'tom')) : null, drumKind: kind, notes, rolls, ...commonParts(midi, track, toSec, settings, 'drums') };
+  const free = spans.filter((r) => !valid.includes(r) && r.end - r.start >= FREE_ROLL_MIN_SEC && !notes.some((n) => n.time > r.start + 0.15 && n.time < r.end - 0.15));
+  // A free kick roll stays a roll (over the kick); the others go over every pad, drawn and animated like a big rock ending (`freeBre`; the real BRE spans in `fills` also mark the coda).
+  const freeKick = free.filter((r) => r.type === 'kick').map((r) => Object.assign(r, { lanes: [-1], free: true }));
+  const freeBre = free.filter((r) => r.type !== 'kick').map((r) => ({ start: r.start, end: r.end, kind: 'bre', free: true }));
+  const rolls = [...valid, ...freeKick].sort((x, y) => x.start - y.start);
+  const chart = { mode: 'lanes', lanes, laneColors, laneKinds: extended ? EXTENDED_DRUM_LANES.map((l) => (l.cymbal ? 'cymbal' : 'tom')) : null, drumKind: kind, notes, rolls, freeBre, ...commonParts(midi, track, toSec, settings, 'drums') };
   markFillNotes(chart);
   return chart;
 }
