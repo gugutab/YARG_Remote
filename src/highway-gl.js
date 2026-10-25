@@ -101,6 +101,8 @@ void main() { float a = v_col.a * (u_noFade > 1.5 ? topFade(v_y) : mix(edgeFade(
 
 // The bands: the flat colour, except for the sustain of an open note (the purple over the whole road), whose two sides breathe: a soft glow along each edge that rolls up the
 // band in slow waves (WAVE_LEN 0.8 s, 0.9 s per cycle), a little wider and brighter while the note is held; the middle stays calm.
+const rimOf = (data) => { let r = 0; for (let i = 0; i < data.length; i += 9) r = Math.max(r, Math.hypot(data[i], data[i + 1])); return r; }; // (the largest distance of a vertex from the model's axis: a circle note's middle is measured against it)
+const CIRCLE_MIDDLE = 0.40; // (a circle note: the radius of the white / black middle, as a share of the model's, was about 0.5)
 const FS_BAND = `${FS_HEAD}in vec4 v_col; in float v_y, v_open, v_ahead, v_lat, v_left, v_held; uniform float u_noFade; out vec4 o;
 void main() {
   float a = v_col.a * (u_noFade > 1.5 ? topFade(v_y) : mix(edgeFade(v_y), 1.0, u_noFade));
@@ -478,10 +480,10 @@ void main() {
   vec4 clip = clipPos(px); clip.z = clamp(dep * 1.7 - 0.1 - hgt * 0.3, -0.99, 0.99); // (nearer and higher wins the depth test)
   gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clip; v_y = px.y; v_d = d;
   v_uv = m_uv; v_n = vec3(m_nrm.x, -m_nrm.y, m_nrm.z); v_lane = s1.rgb; v_role = m_role; v_mp = m_pos; v_sp = s1.w;
-  // the circle notes (the ghost cymbal's model; u_mvar = 1 + the kind: 0 plain, 1 HOPO, 2 tap, 3 accent, 4 ghost) change colours only: a white middle, and the ring in the lane colour, white for a HOPO, nearly black with a hint of the colour for a tap, stronger and lighter for an accent, dimmer for a ghost
-  if (u_mvar > 1.5) { if (u_mvar < 2.5) v_lane = mix(v_lane, vec3(1.0), 0.88); else if (u_mvar < 3.5) v_lane = mix(vec3(0.05, 0.05, 0.07), v_lane, 0.22); else if (u_mvar < 4.5) v_lane = min(v_lane * 1.3 + 0.18, vec3(1.0)); else v_lane *= 0.5; }
+  // the circle notes (the ghost cymbal's model; u_mvar = 1 + the kind: 0 plain, 1 HOPO, 2 tap, 3 accent, 4 ghost) change colours only: a white middle, and the ring in the lane colour (a HOPO and a tap like the plain one, with white light over them: the glow pass), stronger and lighter for an accent, dimmer for a ghost; a tap's middle is the rectangular tap's black
+  if (u_mvar > 3.5) { if (u_mvar < 4.5) v_lane = min(v_lane * 1.3 + 0.18, vec3(1.0)); else v_lane *= 0.5; }
   v_a = clamp((1.0 - d) / 0.14, 0.0, 1.0) * u_malpha * (1.0 - kx * kx); v_van = past > 0.0 ? kx : 0.0;
-}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane, v_mp; in float v_role, v_y, v_d, v_a, v_sp, v_van; uniform float u_mvar, u_mcel, u_mtoon, u_mcym, u_mmetal, u_mglass, u_mcymst; out vec4 o;
+}`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane, v_mp; in float v_role, v_y, v_d, v_a, v_sp, v_van; uniform float u_mvar, u_mrim, u_mcel, u_mtoon, u_mcym, u_mmetal, u_mglass, u_mcymst; out vec4 o;
 // The middle of a note (YARG's RectangularNote shader graph, material NoteMiddle): the base map times a darkness mask that drifts with time (a soft cloud: gradient noise,
 // scale -2.8 / speed 0.4 / tiling 1.1 x 1.3 in the material; here a value noise of two octaves), times the lane's colour, over which the shine map is laid with the opacity
 // shine amount x its alpha (0.1); a small emission of the colour (0.1). The metal is the base map under the light, smoothness 0.5.
@@ -507,6 +509,9 @@ void metalStyle(float k, out vec3 tint, out float refl, out float spec, out floa
 }
 float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hash2(i), hash2(i + vec2(1.0, 0.0)), f.x), mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), f.x), f.y); }
 void main() {
+  float role = v_role;
+  // a circle note (the ghost cymbal's model; u_mvar > 0.5): the middle is a little smaller and the coloured ring wider than the model's, by the distance to the axis
+  if (u_mvar > 0.5 && role > 0.5 && role < 3.5) role = length(v_mp.xy) / u_mrim < ${CIRCLE_MIDDLE.toFixed(2)} ? 3.0 : 1.0;
   float g = texture(u_mtex, v_uv).r;
   vec3 Vc = normalize(mix(vec3(0.0, -0.55, 0.83), vec3(-0.95, 0.0, 0.3), u_side)); // (the direction to the camera: above and in front, or from the side of the lane 0 in the side view)
   vec3 N = normalize(v_n); vec3 L = normalize(mix(vec3(-0.25, -0.5, 0.85), vec3(-0.75, -0.2, 0.65), u_side)); vec3 H = normalize(L + Vc);
@@ -522,13 +527,13 @@ void main() {
     float rim = 1.0 - max(dot(N, Vc), 0.0);
     vec3 ink = vec3(0.025, 0.03, 0.07);
     float hard = toon ? step(0.975, dot(N, H)) : pow(max(dot(N, H), 0.0), 48.0) * 0.7;
-    if (v_role < 0.5 || v_role > 3.5) { // the shell: steel (a gold bezel on an accent)
-      vec3 base = v_role > 6.5 ? vec3(0.30, 0.32, 0.37) : v_role > 3.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.74, 0.76, 0.80); // (the cups light grey, the base dark grey, a gold cup on an accent)
+    if (role < 0.5 || role > 3.5) { // the shell: steel (a gold bezel on an accent)
+      vec3 base = role > 6.5 ? vec3(0.30, 0.32, 0.37) : role > 3.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.74, 0.76, 0.80); // (the cups light grey, the base dark grey, a gold cup on an accent)
       c = base * tone + vec3(0.55) * hard;
       c = mix(c, v_lane * 0.5 * tone, 0.1); // (a hint of the lane's colour on the metal)
       if (toon) { if (rim > 0.82) c = ink; } else c *= mix(0.55, 1.0, smoothstep(0.0, 0.5, 1.0 - rim));
-      if (gloss) { vec3 mb = v_role > 6.5 ? vec3(0.30, 0.32, 0.37) : v_role > 3.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.74, 0.76, 0.80); c = mb * (0.25 + 0.3 * tone) + env * mb * (0.45 + 0.9 * fres) + vec3(1.0) * box * 0.9; } // polished metal: the studio tinted by the metal
-    } else if (v_role < 1.5) { // the gem: lit from inside, from a hot core to a darker edge
+      if (gloss) { vec3 mb = role > 6.5 ? vec3(0.30, 0.32, 0.37) : role > 3.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.74, 0.76, 0.80); c = mb * (0.25 + 0.3 * tone) + env * mb * (0.45 + 0.9 * fres) + vec3(1.0) * box * 0.9; } // polished metal: the studio tinted by the metal
+    } else if (role < 1.5) { // the gem: lit from inside, from a hot core to a darker edge
       float cv = max(dot(N, Vc), 0.0);
       float u = v_uv.x < 0.0 ? max(sqrt(max(1.0 - cv * cv, 0.0)), smoothstep(0.86, 1.0, abs(v_uv.y))) : v_uv.x; // (the glass tube: by how its surface faces the camera, darker at the caps)
       if (toon) c = u < 0.55 ? mix(v_lane, vec3(1.0), 0.1) : u < 0.86 ? v_lane * 0.92 : u < 0.96 ? v_lane * 0.6 : ink;
@@ -542,11 +547,11 @@ void main() {
       if (v_uv.x < -2.5) { float dk = toon ? step(u, 0.34) : 1.0 - smoothstep(0.22, 0.46, u); c = mix(c, ink, dk); } // a tap's dark middle: opaque black over the glass's reflections and tint
       float glint = dot(N, normalize(L + vec3(-0.25, 0.1, 0.0)));
       if (!gloss) c += vec3(0.7) * (toon ? step(0.93, glint) * (u > 0.3 ? 1.0 : 0.0) : pow(max(glint, 0.0), 60.0) * 0.8); // the glint
-    } else if (v_role < 2.5) c = vec3(1.0); // the white core of a HOPO (dome)
+    } else if (role < 2.5) c = vec3(1.0); // the white core of a HOPO (dome)
     else c = mix(ink, v_lane * 0.12, step(0.55, v_uv.x)); // the dark core of a tap (dome)
     c = min(c, vec3(1.0));
   }
-  else if (v_role < 0.5) { // the metal (the style is a choice: fx.metal): the base map's baked shading kept for the form, a studio reflected on it, a highlight, and a brushing that goes from none to strong
+  else if (role < 0.5) { // the metal (the style is a choice: fx.metal): the base map's baked shading kept for the form, a studio reflected on it, a highlight, and a brushing that goes from none to strong
     float capFace = step(0.6, abs(N.x));
     float rr = length(v_mp.yz), ang = atan(v_mp.y, v_mp.z);
     // The brushing: value noise, fast across the lines and slow along them, in two octaves. Each octave fades out where a pixel covers more than about one of its cells (fwidth),
@@ -570,7 +575,7 @@ void main() {
     c += vec3(1.0) * (pow(max(dot(N, H), 0.0), sexp) * spec + aniso * (0.12 + brush * 0.9));
     c *= 1.0 + (0.07 + brush * 0.9) * (lines - 0.5);
   }
-  else if (v_role < 1.5) { // the glass, lit from inside (the style is a choice: fx.glass)
+  else if (role < 1.5) { // the glass, lit from inside (the style is a choice: fx.glass)
     vec2 q = v_uv * vec2(1.1, 1.3) * 7.0 + vec2(u_t * 0.4, u_t * 0.25) * u_mnoise.x;
     float cloud = mix(u_mnoise.y, 1.0, 0.65 * vnoise(q) + 0.35 * vnoise(q * 2.3 + 11.0)); // (the darkness mask of the material, here only a gentle modulation)
     float face = clamp(dot(N, Vc), 0.0, 1.0);
@@ -663,8 +668,10 @@ void main() {
       c = lamp + vec3(1.0) * pow(max(dot(N, H), 0.0), 20.0) * 0.3;
     }
   }
-  else if (v_role < 2.5) c = mix(vec3(1.0), v_lane, 0.03) * (0.9 + 0.1 * lam) + vec3(0.3); // the white of a HOPO: a lit strip, whiter and stronger than the shaded surface it had (it lights over 1, so it reads as light)
-  else if (u_mvar > 0.5 && u_mvar < 2.5 || u_mvar > 3.5) c = vec3(0.96) * (0.8 + 0.2 * lam); // a circle note's middle: white
+  else if (role < 2.5) c = mix(vec3(1.0), v_lane, 0.03) * (0.9 + 0.1 * lam) + vec3(0.3); // the white of a HOPO: a lit strip, whiter and stronger than the shaded surface it had (it lights over 1, so it reads as light)
+  else if (u_mvar > 2.5 && u_mvar < 3.5) c = vec3(0.04) * (0.6 + 0.8 * lam); // a circle tap's middle: the same black as the rectangular tap's
+  else if (u_mvar > 0.5 && u_mvar < 2.5) c = vec3(0.96) * (0.8 + 0.2 * lam) + vec3(0.22) * step(1.5, u_mvar); // a circle note's middle: matte white, a HOPO's lit
+  else if (u_mvar > 3.5) c = vec3(0.96) * (0.8 + 0.2 * lam); // (an accent's and a ghost's: matte white)
   else c = vec3(0.04) * (0.6 + 0.8 * lam) + vec3(1.0) * sp * 0.3; // the dark of a tap
   c = mix(c, vec3(0.10, 0.14, 0.24), u_fog * 0.5 * smoothstep(0.1, 1.0, v_d)); // (the fog of the other effect, when it is on)
   c = mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))), 0.94 * u_dim); // (a disabled note, the replayed stretch: almost no colour)
@@ -675,7 +682,7 @@ void main() {
 
   // the effect "glow": a soft halo of the lane's colour around the lit glass of every note with a model (and its spill on the road), added to the picture: a quad per note (the
   // instances of the solid models), a falloff computed per pixel. u_gsz = (half width in lanes, half height in lanes, the height of the glass above the road in lanes, 0)
-  glow: [`${COMMON}in vec4 s0; in vec4 s1; uniform vec4 u_gsz; out vec2 v_p; out vec3 v_col; out float v_k, v_y;
+  glow: [`${COMMON}in vec4 s0; in vec4 s1; uniform vec4 u_gsz; uniform float u_gwhite; out vec2 v_p; out vec3 v_col; out float v_k, v_y;
 void main() {
   vec2 c = vec2(float(gl_VertexID & 1), float((gl_VertexID >> 1) & 1));
   float past = u_t - s0.x; float kx = clamp(past / 0.1, 0.0, 1.0); float sh = 1.0 - 0.5 * kx;
@@ -685,7 +692,7 @@ void main() {
   vec2 hs = vec2(u_gsz.x, u_gsz.y) * u_laneW * sc * (u_headR / ${HEAD_R.toFixed(2)}) * sh * 2.1; // (the halo reaches well past the glass)
   vec2 px = centre + (c - 0.5) * 2.0 * hs;
   gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(px);
-  v_p = (c - 0.5) * 2.0; v_col = s1.rgb; v_y = px.y; v_k = clamp((1.0 - d) / 0.14, 0.0, 1.0) * (1.0 - kx);
+  v_p = (c - 0.5) * 2.0; v_col = mix(s1.rgb, vec3(1.0), u_gwhite); v_y = px.y; v_k = clamp((1.0 - d) / 0.14, 0.0, 1.0) * (1.0 - kx);
 }`, `${FS_HEAD}uniform float u_gain; in vec2 v_p; in vec3 v_col; in float v_k, v_y; out vec4 o;
 void main() {
   float r = length(v_p * vec2(1.0, 1.15));
@@ -1007,7 +1014,7 @@ export class GLBoard {
       const half = cym ? 0.44 / m.size[0] : 0.435 / 3.85; // (a note's half width is 0.435 lanes, a cymbal's radius 0.44; the HOPO and tap models are narrower on their own)
       let minZ = Infinity;
       for (let i = 0; i < n; i++) minZ = Math.min(minZ, m.pos[i * 3 + 2]);
-      this.meshes[kind] = { buf: this.buffer(data), count: n, tex: texs[m.tex], shine: texs[`${m.tex}Shine`] ?? texs[m.tex], cym, msz: [half, half * 0.053, cym && noteHeight ? (noteHeight * CYMBAL_HEIGHT) / zSpan(m) : half * 0.8], base: minZ, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1, glow: cym ? [0.3, 0.34, noteHeight * CYMBAL_HEIGHT * 0.6] : [0.27, 0.26, noteHeight * 0.45] }; // (a cymbal is flatter than a note; glow: the halo's half width, half height and the height of the glass, in lanes)
+      this.meshes[kind] = { rim: rimOf(data), buf: this.buffer(data), count: n, tex: texs[m.tex], shine: texs[`${m.tex}Shine`] ?? texs[m.tex], cym, msz: [half, half * 0.053, cym && noteHeight ? (noteHeight * CYMBAL_HEIGHT) / zSpan(m) : half * 0.8], base: minZ, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1, glow: cym ? [0.3, 0.34, noteHeight * CYMBAL_HEIGHT * 0.6] : [0.27, 0.26, noteHeight * 0.45] }; // (a cymbal is flatter than a note; glow: the halo's half width, half height and the height of the glass, in lanes)
     }
   }
 
@@ -1026,7 +1033,7 @@ export class GLBoard {
       const data = new Float32Array(n * 9);
       for (let i = 0; i < n; i++) data.set([m.pos[i * 3], m.pos[i * 3 + 1], m.pos[i * 3 + 2], m.nrm[i * 3], m.nrm[i * 3 + 1], m.nrm[i * 3 + 2], m.uv[i * 2], m.uv[i * 2 + 1], m.role[i]], i * 9);
       const half = kind[0] === 'c' ? 0.44 : 0.435 / (L + 1.0); // (a note's half width, the cups included, is 0.435 lanes, a cymbal's radius 0.44)
-      this.ownMeshes[kind] = { buf: this.buffer(data), count: n, tex, shine: tex, cel: true, cym: kind[0] === 'c', msz: [half, half * 0.053, half * (kind[0] === 'c' ? 0.8 : 1.0)], base: 0, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1, glow: kind[0] === 'c' ? [0.3, 0.34, 0.06] : [0.27, 0.26, 0.12] };
+      this.ownMeshes[kind] = { rim: rimOf(data), buf: this.buffer(data), count: n, tex, shine: tex, cel: true, cym: kind[0] === 'c', msz: [half, half * 0.053, half * (kind[0] === 'c' ? 0.8 : 1.0)], base: 0, alpha: kind === 'g' || kind === 'cg' ? 0.55 : 1, glow: kind[0] === 'c' ? [0.3, 0.34, 0.06] : [0.27, 0.26, 0.12] };
     }
   }
 
@@ -1527,6 +1534,7 @@ export class GLBoard {
         gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, mesh.shine); gl.activeTexture(gl.TEXTURE1);
         gl.uniform1f(pr.u.u_mcel, mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mcym, mesh.cym && !mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mmetal, fx.metal || 0); gl.uniform1f(pr.u.u_mglass, fx.glass || 0); gl.uniform1f(pr.u.u_mcymst, fx.cymbal || 0); gl.uniform1f(pr.u.u_mtoon, fx.shade === 'glossy' ? 2 : fx.shade === 'smooth' || fx.cel === false ? 0 : 1);
         gl.uniform2f(pr.u.u_mnoise, mesh.cym ? 0.62 : 1.0, 0.7); // (the middle's noise speed: the note 0.4, the cymbal 0.25, relative to the note; its minimum darkness)
+        gl.uniform1f(pr.u.u_mrim, mesh.rim || 1);
         gl.uniform1f(pr.u.u_mvar, asRound ? 1 + ({ h: 1, t: 2, a: 3, g: 4 }[kind] ?? 0) : 0);
         gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, asRound ? (kind === 'g' ? 0.8 : 1) : mesh.alpha); gl.uniform1f(pr.u.u_mscale, mesh.cym && !asRound ? (o.cymbalScale ?? 1) : 1); // (a circle note is opaque: the ghost cymbal's model is see-through, and the tail would show through it)
         this.vao(d, `solid_${kind}${asRound ? 'r' : ''}`, () => {
@@ -1547,7 +1555,11 @@ export class GLBoard {
       for (const [kind, sol] of Object.entries(d.solid)) {
         const mesh = models[kind];
         if (!mesh || kind[0] === 'c') continue; // (no glow on the cymbals)
-        gl.uniform1f(pr.u.u_gain, fx.glow * (kind === 't' ? 0.2 : 1)); // (a tap's dark middle: the halo, added over the glass, would tint it, so it keeps only a faint one)
+        // a tap's dark middle: the halo, added over the glass, would tint it, so it keeps only a faint one; a circle note: the plain one does not light its white top, a HOPO and a tap
+        // have a white light over them
+        const rl = round && kind[0] !== 'c';
+        gl.uniform1f(pr.u.u_gain, fx.glow * (rl ? (kind === 'h' ? 1 : kind === 't' ? 0.35 : 0.2) : kind === 't' ? 0.2 : 1));
+        gl.uniform1f(pr.u.u_gwhite, rl && (kind === 'h' || kind === 't') ? 0.9 : 0);
         const sFrom = lowerBound(sol.times, t - 0.12), sTo = lowerBound(sol.times, t + win);
         if (sTo <= sFrom) continue;
         const first = sol.count - sTo;

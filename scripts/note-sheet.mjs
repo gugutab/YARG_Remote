@@ -1,5 +1,5 @@
 // A contact sheet of every kind of note the app draws, with its variations, rendered by the app itself (WebGL, in a real browser), as one PNG.
-//   node scripts/note-sheet.mjs [--out _shots/note-sheet.png] [--styles rect,round] [--notes3d yarg|own|off] [--scale 2] [--cols 3]
+//   node scripts/note-sheet.mjs [--out _shots/note-sheet.png] [--styles rect,round] [--notes3d yarg|own|off] [--scale 2] [--cols 3] [--tile 350]
 //        [--only guitar,drums-five,drums-pro] [--rows "HOPO,Tap,Open"] [--executable <path to chrome>] [--playwright <dir of playwright-core>] [--keep] [--port 8199]
 // It writes two small synthetic songs to a temporary folder (a guitar and a 5-lane drum chart; a Pro drum chart), serves them with the app's own server.mjs, opens each instrument in
 // each note style (--rows keeps only the rows whose label contains one of the words, to show just the notes a change touches), pauses on one row of notes at a time (a row = one kind of note across the lanes) and takes a picture of the board. The pictures are put in a labelled grid.
@@ -24,6 +24,7 @@ const cols = Number(args.cols || 3);
 const only = args.only ? String(args.only).split(',') : null;
 const rowWords = args.rows ? String(args.rows).toLowerCase().split(',').map((s) => s.trim()).filter(Boolean) : null;
 const port = Number(args.port || 8199);
+const tw = Number(args.tile || 350); // (the width of a picture in the sheet; --tile 700 for the full size)
 
 const { buildMidi, tempo120, trackName, event } = await import(pathToFileURL(path.join(ROOT, 'test', 'smf.js')).href);
 
@@ -198,11 +199,11 @@ try {
 fs.mkdirSync(path.dirname(out), { recursive: true });
 const groups = [...new Set(tiles.map((t) => t.group))];
 const html = `<!doctype html><meta charset="utf-8"><body style="margin:0;background:#0b0e14;color:#e6e9ef;font:14px system-ui">
-${groups.map((g) => `<h2 style="margin:18px 16px 8px;font-size:18px">${g}</h2><div style="display:grid;grid-template-columns:repeat(${cols},350px);gap:10px;padding:0 16px">${
-  tiles.filter((t) => t.group === g).map((t) => `<figure style="margin:0;background:#11151d;border-radius:6px;overflow:hidden"><img style="display:block;width:350px;height:150px" src="data:image/png;base64,${t.buf.toString('base64')}"><figcaption style="padding:4px 8px">${t.title}</figcaption></figure>`).join('')}</div>`).join('')}
+${groups.map((g) => `<h2 style="margin:18px 16px 8px;font-size:18px">${g}</h2><div style="display:grid;grid-template-columns:repeat(${cols},${tw}px);gap:10px;padding:0 16px">${
+  tiles.filter((t) => t.group === g).map((t) => `<figure style="margin:0;background:#11151d;border-radius:6px;overflow:hidden"><img style="display:block;width:${tw}px;height:${Math.round(tw * 300 / 700)}px" src="data:image/png;base64,${t.buf.toString('base64')}"><figcaption style="padding:4px 8px">${t.title}</figcaption></figure>`).join('')}</div>`).join('')}
 </body>`;
 const b2 = await pw.chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
-const p2 = await b2.newPage({ viewport: { width: 16 + cols * 360 + 16, height: 400 }, deviceScaleFactor: 1 });
+const p2 = await b2.newPage({ viewport: { width: 16 + cols * (tw + 10) + 16, height: 400 }, deviceScaleFactor: 1 });
 await p2.setContent(html);
 await p2.screenshot({ path: out, fullPage: true });
 await b2.close();
