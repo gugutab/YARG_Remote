@@ -222,14 +222,14 @@ void main() {
   float past = u_t - (a0.x + (bar ? a2.x : 0.0)); float kx = clamp(past / 0.1, 0.0, 1.0); float e = easeOut(kx); // (a bar goes at the end of its sustain, the head of a long note at its hit)
   bool gone = u_pad < 0.5 && (past > 0.1 || (u_solid > 0.5 && !bar)); // (a note with a model has no sprite, cymbals included)
   float sc = scaleAt(d); vec2 size;
-  float bth = max(2.0, (u_hit - u_vy) * u_k * sc * sc * u_bar * (1.0 - 0.55 * e));
+  float bth = max(2.0, (u_hit - u_vy) * u_k * sc * sc * u_bar * (bar ? 1.7 : 1.0) * (1.0 - 0.55 * e)); // (a bar is 1.7 times as deep as its setting: it is rounded now, and a thin one shows no volume)
   if (bar) size = vec2(a2.z * u_laneW * sc + 4.0, bth + 2.0 * max(1.0, 2.0 * sc) + 2.0); // (the bar is drawn in the fragment shader: the fill and its two edge lines)
   else size = (a1.xy - a0.zw) * u_atlas * (u_laneW * u_headR * sc / ${REF_RX.toFixed(1)}) * a1.zw * (u_pad > 0.5 ? 1.0 : 1.0 - 0.5 * kx) * (u_pad < 0.5 && a2.w > 0.5 ? u_cymsc : 1.0); // (a2.w 1: a cymbal, smaller by highway.cymbalSize)
   vec2 off = (c - 0.5) * size;
-  if (u_taper > 0.0 && !bar && u_pad < 0.5) { // (the effect "taper": the far edge of a note is narrower than its near edge, as the road is)
+  if (u_pad < 0.5 && (bar || u_taper > 0.0)) { // (the effect "taper": the far edge of a note is narrower than its near edge, as the road is; a bar always follows the road, so its ends lie along the rails)
     float dd = 0.5 * size.y / max(1.0, (u_hit - u_vy) * u_k * sc * sc);
     float ratio = scaleAt(d + (c.y < 0.5 ? dd : -dd)) / sc;
-    off.x *= 1.0 + u_taper * (ratio - 1.0);
+    off.x *= 1.0 + (bar ? 1.0 : u_taper) * (ratio - 1.0);
   }
   vec2 px = centre + off; gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clipPos(px); v_y = px.y; v_d = d;
   v_uv = bar ? mix(a0.zw, a1.xy, 0.5) : mix(a0.zw, a1.xy, c);
@@ -243,16 +243,19 @@ void main() {
   if (v_bar > 0.5) { // a kick / open bar: the fill (whiter at the hit), a lit far edge and a darker near edge (highway3d.js), lines max(1, 2 scale) wide
     vec3 base = texture(u_tex, v_uv).rgb / max(texture(u_tex, v_uv).a, 1e-3);
     float hh = 0.5 * v_bh, lw = max(1.0, 2.0 * v_sc), ay = abs(v_o.y);
-    float inX = clamp(v_hw - abs(v_o.x) + 0.5, 0.0, 1.0);
+    // a rounded bar (a half cylinder lying across the road): rounded corners, a crown near the far edge that catches the light, a darker front below it
+    float r = min(hh, 3.5 * max(1.0, v_sc * 1.6));
+    vec2 q = abs(v_o) - (vec2(v_hw, hh) - r);
+    float sd = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+    float cover = clamp(0.5 - sd, 0.0, 1.0);
+    float u = clamp((v_o.y + hh) / max(2.0 * hh, 1.0), 0.0, 1.0); // 0 at the far edge, 1 at the near one
+    float diff = cos((u - 0.32) * 1.6);
+    float crown = pow(max(cos((u - 0.26) * 6.0), 0.0), 8.0);
+    float lip = smoothstep(0.78, 0.98, u); // the front face, in shade
     vec3 col = mix(base, vec3(1.0), v_white);
-    float fillC = clamp(hh - ay + 0.5, 0.0, 1.0);
-    float farC = clamp(0.5 * lw - abs(v_o.y + hh) + 0.5, 0.0, 1.0);
-    float nearC = clamp(0.5 * lw - abs(v_o.y - hh) + 0.5, 0.0, 1.0);
-    vec3 rgb = col * fillC;
-    float a = fillC;
-    rgb = mix(rgb, mix(base, vec3(1.0), 0.65), farC); a = max(a, farC);
-    rgb = mix(rgb, base * 0.6, nearC); a = max(a, nearC);
-    a *= inX * v_a * edgeFade(v_y);
+    vec3 rgb = col * (0.5 + 0.62 * diff) * (1.0 - 0.38 * lip) + vec3(1.0) * crown * 0.42 * (1.0 - v_white * 0.5);
+    rgb += mix(base, vec3(1.0), 0.7) * 0.22 * smoothstep(0.1, 0.0, u); // a rim light on the far edge
+    float a = cover * v_a * edgeFade(v_y);
     o = vec4(rgb * a, a);
     return;
   }
