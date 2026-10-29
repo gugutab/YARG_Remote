@@ -515,11 +515,7 @@ float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 *
 void main() {
   float role = v_role; vec3 vl = v_lane;
   // a circle note (the ghost cymbal's model; u_mvar > 0.5): the middle is a little smaller and the coloured ring wider than the model's, by the distance to the axis
-  float rr = length(v_mp.xy) / u_mrim;
-  if (u_mvar > 0.5 && u_mvar < 9.5 && role > 0.5 && role < 3.5) role = rr < ${CIRCLE_MIDDLE.toFixed(2)} ? 3.0 : 1.0;
-  // a cymbal (u_mvar 10 plain, 11 accent, 12 ghost): chrome with the old cymbal's coloured part on it: the whole cone (0.74 of the radius), for an accent a smaller cone in a white ring, for a
-  // ghost a dark middle in a ring of the colour
-  if (u_mvar > 9.5) role = u_mvar < 10.5 ? (rr < 0.74 ? 3.0 : 0.0) : u_mvar < 11.5 ? (rr < 0.58 ? 3.0 : rr < 0.76 ? 1.0 : 0.0) : (rr < 0.55 ? 3.0 : rr < 0.68 ? 1.0 : 0.0);
+  if (u_mvar > 0.5 && role > 0.5 && role < 3.5) role = length(v_mp.xy) / u_mrim < ${CIRCLE_MIDDLE.toFixed(2)} ? 3.0 : 1.0;
   if (u_mvar > 10.5 && u_mvar < 11.5 && role < 1.5 && role > 0.5) vl = vec3(0.96); // (an accent cymbal: a white ring round the coloured dome)
   float g = texture(u_mtex, v_uv).r;
   vec3 Vc = normalize(mix(vec3(0.0, -0.55, 0.83), vec3(-0.95, 0.0, 0.3), u_side)); // (the direction to the camera: above and in front, or from the side of the lane 0 in the side view)
@@ -528,8 +524,7 @@ void main() {
   // the middle of a circle note is flat in the model: it is shaded as a low dome (a normal that leans outward by the distance to the axis), with a soft highlight and a darker rim
   float dr = 0.0, dlam = lam, dspec = 0.0;
   if (u_mvar > 0.5 && role > 2.5 && role < 3.5) {
-    float domeR = u_mvar < 9.5 ? ${CIRCLE_MIDDLE.toFixed(2)} : u_mvar < 10.5 ? 0.74 : u_mvar < 11.5 ? 0.58 : 0.55; // (the radius of the middle, as a share of the model's)
-    vec2 pp = v_mp.xy / (u_mrim * domeR); dr = min(length(pp), 1.0);
+    vec2 pp = v_mp.xy / (u_mrim * ${CIRCLE_MIDDLE.toFixed(2)}); dr = min(length(pp), 1.0);
     // (a shallow cap: at its edge it leans as much as the coloured ring does there, 0.3 outward in the model, so the two meet without a step, and it flattens to the top)
     vec3 Nd = normalize(vec3(pp.x * (u_mvar > 9.5 ? 0.75 : 0.3), -pp.y * (u_mvar > 9.5 ? 0.75 : 0.3), 1.0));
     dlam = max(dot(Nd, L), 0.0); dspec = pow(max(dot(Nd, H), 0.0), 30.0);
