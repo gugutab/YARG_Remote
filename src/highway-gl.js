@@ -484,8 +484,7 @@ void main() {
   gl_Position = gone ? vec4(2.0, 2.0, 2.0, 1.0) : clip; v_y = px.y; v_d = d;
   v_uv = m_uv; v_n = vec3(m_nrm.x, -m_nrm.y, m_nrm.z); v_lane = s1.rgb; v_role = m_role; v_mp = m_pos; v_sp = s1.w;
   // the circle notes (the ghost cymbal's model; u_mvar = 1 + the kind: 0 plain, 1 HOPO, 2 tap, 3 accent, 4 ghost) change colours only: a white middle, and the ring in the lane colour (a HOPO and a tap like the plain one, with white light over them: the glow pass), stronger and lighter for an accent, dimmer for a ghost; a tap's middle is the rectangular tap's black
-  if (u_mvar > 3.5 && u_mvar < 9.5) { if (u_mvar < 4.5) v_lane = min(v_lane * 1.3 + 0.18, vec3(1.0)); else v_lane *= 0.5; }
-  if (u_mvar > 11.5) v_lane *= 0.7; // (a ghost cymbal: a dimmer colour)
+  if (u_mvar > 3.5) { if (u_mvar < 4.5) v_lane = min(v_lane * 1.3 + 0.18, vec3(1.0)); else v_lane *= 0.5; }
   v_a = clamp((1.0 - d) / 0.14, 0.0, 1.0) * u_malpha * (1.0 - kx * kx); v_van = past > 0.0 ? kx : 0.0;
 }`, `${FS_HEAD}uniform sampler2D u_mtex, u_mshine; uniform vec2 u_mnoise; in vec2 v_uv; in vec3 v_n, v_lane, v_mp; in float v_role, v_y, v_d, v_a, v_sp, v_van; uniform float u_mvar, u_mrim, u_mcel, u_mtoon, u_mcym, u_mmetal, u_mglass, u_mcymst; out vec4 o;
 // The middle of a note (YARG's RectangularNote shader graph, material NoteMiddle): the base map times a darkness mask that drifts with time (a soft cloud: gradient noise,
@@ -513,10 +512,9 @@ void metalStyle(float k, out vec3 tint, out float refl, out float spec, out floa
 }
 float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hash2(i), hash2(i + vec2(1.0, 0.0)), f.x), mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), f.x), f.y); }
 void main() {
-  float role = v_role; vec3 vl = v_lane;
+  float role = v_role;
   // a circle note (the ghost cymbal's model; u_mvar > 0.5): the middle is a little smaller and the coloured ring wider than the model's, by the distance to the axis
   if (u_mvar > 0.5 && role > 0.5 && role < 3.5) role = length(v_mp.xy) / u_mrim < ${CIRCLE_MIDDLE.toFixed(2)} ? 3.0 : 1.0;
-  if (u_mvar > 10.5 && u_mvar < 11.5 && role < 1.5 && role > 0.5) vl = vec3(0.96); // (an accent cymbal: a white ring round the coloured dome)
   float g = texture(u_mtex, v_uv).r;
   vec3 Vc = normalize(mix(vec3(0.0, -0.55, 0.83), vec3(-0.95, 0.0, 0.3), u_side)); // (the direction to the camera: above and in front, or from the side of the lane 0 in the side view)
   vec3 N = normalize(v_n); vec3 L = normalize(mix(vec3(-0.25, -0.5, 0.85), vec3(-0.75, -0.2, 0.65), u_side)); vec3 H = normalize(L + Vc);
@@ -526,7 +524,7 @@ void main() {
   if (u_mvar > 0.5 && role > 2.5 && role < 3.5) {
     vec2 pp = v_mp.xy / (u_mrim * ${CIRCLE_MIDDLE.toFixed(2)}); dr = min(length(pp), 1.0);
     // (a shallow cap: at its edge it leans as much as the coloured ring does there, 0.3 outward in the model, so the two meet without a step, and it flattens to the top)
-    vec3 Nd = normalize(vec3(pp.x * (u_mvar > 9.5 ? 0.75 : 0.3), -pp.y * (u_mvar > 9.5 ? 0.75 : 0.3), 1.0));
+    vec3 Nd = normalize(vec3(pp.x * 0.3, -pp.y * 0.3, 1.0));
     dlam = max(dot(Nd, L), 0.0); dspec = pow(max(dot(Nd, H), 0.0), 30.0);
   }
   float domeShade = 0.62 + 0.45 * dlam - 0.08 * smoothstep(0.7, 1.0, dr);
@@ -544,17 +542,17 @@ void main() {
     if (role < 0.5 || role > 3.5) { // the shell: steel (a gold bezel on an accent)
       vec3 base = role > 6.5 ? vec3(0.30, 0.32, 0.37) : role > 3.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.74, 0.76, 0.80); // (the cups light grey, the base dark grey, a gold cup on an accent)
       c = base * tone + vec3(0.55) * hard;
-      c = mix(c, vl * 0.5 * tone, 0.1); // (a hint of the lane's colour on the metal)
+      c = mix(c, v_lane * 0.5 * tone, 0.1); // (a hint of the lane's colour on the metal)
       if (toon) { if (rim > 0.82) c = ink; } else c *= mix(0.55, 1.0, smoothstep(0.0, 0.5, 1.0 - rim));
       if (gloss) { vec3 mb = role > 6.5 ? vec3(0.30, 0.32, 0.37) : role > 3.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.74, 0.76, 0.80); c = mb * (0.25 + 0.3 * tone) + env * mb * (0.45 + 0.9 * fres) + vec3(1.0) * box * 0.9; } // polished metal: the studio tinted by the metal
     } else if (role < 1.5) { // the gem: lit from inside, from a hot core to a darker edge
       float cv = max(dot(N, Vc), 0.0);
       float u = v_uv.x < 0.0 ? max(sqrt(max(1.0 - cv * cv, 0.0)), smoothstep(0.86, 1.0, abs(v_uv.y))) : v_uv.x; // (the glass tube: by how its surface faces the camera, darker at the caps)
-      if (toon) c = u < 0.55 ? mix(vl, vec3(1.0), 0.1) : u < 0.86 ? vl * 0.92 : u < 0.96 ? vl * 0.6 : ink;
-      else c = mix(vl * 0.72, mix(vl, vec3(1.0), 0.22), pow(1.0 - smoothstep(0.0, 1.0, u), 0.8)) * (1.0 - 0.35 * smoothstep(0.9, 1.0, u));
+      if (toon) c = u < 0.55 ? mix(v_lane, vec3(1.0), 0.1) : u < 0.86 ? v_lane * 0.92 : u < 0.96 ? v_lane * 0.6 : ink;
+      else c = mix(v_lane * 0.72, mix(v_lane, vec3(1.0), 0.22), pow(1.0 - smoothstep(0.0, 1.0, u), 0.8)) * (1.0 - 0.35 * smoothstep(0.9, 1.0, u));
       if (v_uv.x < -1.5) { float core = toon ? step(u, 0.3) : 1.0 - smoothstep(0.12, 0.38, u); c = mix(c, v_uv.x < -2.5 ? ink : vec3(1.0), core); } // the core of a HOPO (white) or a tap (dark)
       if (gloss) { // glass: the light inside, a bright edge where it turns away, the studio reflected on it
-        c = mix(vl * 0.6, mix(vl, vec3(1.0), 0.75), pow(1.0 - smoothstep(0.0, 1.0, u), 1.2)) * (1.0 - 0.3 * smoothstep(0.9, 1.0, u));
+        c = mix(v_lane * 0.6, mix(v_lane, vec3(1.0), 0.75), pow(1.0 - smoothstep(0.0, 1.0, u), 1.2)) * (1.0 - 0.3 * smoothstep(0.9, 1.0, u));
         if (v_uv.x < -1.5) { float core = 1.0 - smoothstep(0.12, 0.38, u); c = mix(c, v_uv.x < -2.5 ? ink : vec3(1.0), core); }
         c += env * (0.12 + 0.75 * fres) + vec3(1.0) * box * 0.95;
       }
@@ -562,7 +560,7 @@ void main() {
       float glint = dot(N, normalize(L + vec3(-0.25, 0.1, 0.0)));
       if (!gloss) c += vec3(0.7) * (toon ? step(0.93, glint) * (u > 0.3 ? 1.0 : 0.0) : pow(max(glint, 0.0), 60.0) * 0.8); // the glint
     } else if (role < 2.5) c = vec3(1.0); // the white core of a HOPO (dome)
-    else c = mix(ink, vl * 0.12, step(0.55, v_uv.x)); // the dark core of a tap (dome)
+    else c = mix(ink, v_lane * 0.12, step(0.55, v_uv.x)); // the dark core of a tap (dome)
     c = min(c, vec3(1.0));
   }
   else if (role < 0.5) { // the metal (the style is a choice: fx.metal): the base map's baked shading kept for the form, a studio reflected on it, a highlight, and a brushing that goes from none to strong
@@ -578,7 +576,7 @@ void main() {
     vec3 tint; float refl, spec, sexp, brush, lift;
     float mk = v_sp > 0.5 ? 3.0 : u_mmetal; // (star power: the frame turns to satin gold)
     metalStyle(mk, tint, refl, spec, sexp, brush, lift);
-    if (mk > 14.5) tint = mix(tint, vl * 1.15, 0.7); // (anodized aluminium: tinted by the lane)
+    if (mk > 14.5) tint = mix(tint, v_lane * 1.15, 0.7); // (anodized aluminium: tinted by the lane)
     float baked = mix(g, 1.0, lift);
     vec3 Rm = reflect(-Vc, N);
     float sky = smoothstep(-0.3, 0.8, Rm.z);
@@ -605,7 +603,7 @@ void main() {
       float cs = u_mcymst; // 1 reflective metal, 2 brass, 3 chrome mirror, 4 hammered, 5 anodized, 6 pearl metal
       vec3 Nm = N;
       if (cs > 3.5 && cs < 4.5) { vec2 hp = v_mp.xy * 9.0; Nm = normalize(N + 0.45 * vec3(vnoise(hp) - 0.5, vnoise(hp + 7.3) - 0.5, 0.0)); } // (hammered: dimples bend the normal)
-      vec3 tint = cs < 1.5 ? mix(vl, vec3(1.0), 0.18) : cs < 2.5 ? mix(vl, vec3(0.95, 0.78, 0.38), 0.5) : cs < 3.5 ? mix(vec3(1.0), vl, 0.45) : cs < 4.5 ? mix(vl, vec3(1.0), 0.18) : cs < 5.5 ? vl * 1.05 : mix(vl, vec3(1.0), 0.45);
+      vec3 tint = cs < 1.5 ? mix(v_lane, vec3(1.0), 0.18) : cs < 2.5 ? mix(v_lane, vec3(0.95, 0.78, 0.38), 0.5) : cs < 3.5 ? mix(vec3(1.0), v_lane, 0.45) : cs < 4.5 ? mix(v_lane, vec3(1.0), 0.18) : cs < 5.5 ? v_lane * 1.05 : mix(v_lane, vec3(1.0), 0.45);
       if (cs > 5.5) tint = mix(tint, 0.5 + 0.5 * cos(6.2831853 * (face * 1.3 + vec3(0.0, 0.33, 0.67))), 0.35); // (pearl: the hue turns with the angle)
       float reflMix = cs < 1.5 ? 0.55 : cs < 2.5 ? 0.5 : cs < 3.5 ? 0.8 : cs < 4.5 ? 0.55 : cs < 5.5 ? 0.25 : 0.5;
       vec3 Rm = reflect(-Vc, Nm); float sky = smoothstep(-0.2, 0.9, Rm.z);
@@ -613,82 +611,80 @@ void main() {
       vec3 body = tint * (0.35 + 0.65 * (0.5 + 0.5 * lam)) * (0.85 + (cs > 4.5 && cs < 5.5 ? 0.5 : 0.3) * lathe);
       c = mix(body, env * tint * 1.25, reflMix);
       c += vec3(1.0) * (an * 0.5 * (0.6 + 0.8 * lathe) + pow(max(dot(Nm, H), 0.0), 36.0) * 0.5);
-      c += vl * 0.2 * pow(1.0 - face, 2.0);
+      c += v_lane * 0.2 * pow(1.0 - face, 2.0);
     } else if (gv < 0.5) { // lamp: a saturated light, hottest where we look straight into it, gathering at the edge, with the cloud and the shine map's streak on it
-      vec3 lamp = vl * (0.62 + 0.9 * core);
+      vec3 lamp = v_lane * (0.62 + 0.9 * core);
       lamp = mix(lamp, vec3(1.0), 0.3 * core * core);
       lamp *= mix(0.72, 1.0, (u_mcym > 0.5 ? 1.0 : g) * cloud);
-      lamp += vl * 0.55 * pow(1.0 - face, 2.5);
+      lamp += v_lane * 0.55 * pow(1.0 - face, 2.5);
       lamp = mix(lamp, vec3(1.0), (u_mcym > 0.5 ? 0.0 : 0.5) * texture(u_mshine, v_uv).a);
       c = lamp + vec3(1.0) * sp * 0.45; // (self-lit: the scene's light only adds a highlight)
     } else if (gv < 1.5) { // neon tube: a thin white-hot core, saturated colour, dark at the edge
-      vec3 lamp = vl * (0.5 + 1.3 * core);
+      vec3 lamp = v_lane * (0.5 + 1.3 * core);
       lamp = mix(lamp, vec3(1.0), smoothstep(0.55, 0.9, core));
       lamp *= 0.35 + 0.65 * smoothstep(0.0, 0.4, face);
       c = lamp + vec3(1.0) * sp * 0.3;
     } else if (gv < 2.5) { // frosted: milky, soft, lighter than the lane's colour
-      vec3 base = mix(vl, vec3(1.0), 0.5);
+      vec3 base = mix(v_lane, vec3(1.0), 0.5);
       vec3 lamp = base * (0.78 + 0.3 * core);
-      lamp = mix(lamp, vl, 0.25 * (1.0 - core));
+      lamp = mix(lamp, v_lane, 0.25 * (1.0 - core));
       lamp *= 0.9 + 0.1 * cloud;
       c = lamp + vec3(1.0) * pow(max(dot(N, H), 0.0), 14.0) * 0.2;
     } else if (gv < 3.5) { // crystal: facets in steps of how much the glass faces us, with bright edges between them
       float fq = floor(face * 5.0) / 5.0;
-      vec3 lamp = vl * (0.5 + 0.95 * fq);
+      vec3 lamp = v_lane * (0.5 + 0.95 * fq);
       float fe = 1.0 - smoothstep(0.0, 0.05, min(fract(face * 5.0), 1.0 - fract(face * 5.0)));
       lamp += vec3(1.0) * 0.25 * fe;
       lamp = mix(lamp, vec3(1.0), 0.35 * step(0.8, face));
       c = lamp + vec3(1.0) * sp * 0.4;
     } else if (gv < 4.5) { // candy gel: deep and glossy, dark at the edge, a hard highlight and a reflection
-      vec3 lamp = vl * (0.42 + 0.7 * core);
+      vec3 lamp = v_lane * (0.42 + 0.7 * core);
       lamp = pow(lamp, vec3(0.9));
       lamp *= mix(0.55, 1.0, smoothstep(0.0, 0.5, face));
       float fres = pow(1.0 - face, 3.0);
-      c = lamp + vec3(1.0) * (pow(max(dot(N, H), 0.0), 70.0) * 1.2 + pow(max(dot(reflect(-Vc, N), L), 0.0), 30.0) * 0.25) + vl * 0.15 * fres;
+      c = lamp + vec3(1.0) * (pow(max(dot(N, H), 0.0), 70.0) * 1.2 + pow(max(dot(reflect(-Vc, N), L), 0.0), 30.0) * 0.25) + v_lane * 0.15 * fres;
     } else if (gv < 5.5) { // ember: hot spots drifting in a darker glow
       float heat = smoothstep(0.35, 0.85, vnoise(q * 1.6 + 3.0));
-      vec3 hot = mix(vl, vec3(1.0, 0.92, 0.65), 0.75);
-      vec3 lamp = mix(vl * 0.5, hot, heat) * (0.6 + 0.8 * core);
-      lamp += vl * 0.4 * pow(1.0 - face, 2.0);
+      vec3 hot = mix(v_lane, vec3(1.0, 0.92, 0.65), 0.75);
+      vec3 lamp = mix(v_lane * 0.5, hot, heat) * (0.6 + 0.8 * core);
+      lamp += v_lane * 0.4 * pow(1.0 - face, 2.0);
       c = lamp + vec3(1.0) * sp * 0.3;
     } else if (gv < 6.5) { // jelly: thick and translucent, brighter at the edge where the light goes through it, a soft broad highlight
-      vec3 lamp = vl * (0.55 + 0.55 * smoothstep(0.0, 0.7, face));
-      lamp += vl * 0.6 * pow(1.0 - face, 1.5);
+      vec3 lamp = v_lane * (0.55 + 0.55 * smoothstep(0.0, 0.7, face));
+      lamp += v_lane * 0.6 * pow(1.0 - face, 1.5);
       c = lamp + vec3(1.0) * pow(max(dot(N, H), 0.0), 16.0) * 0.5;
     } else if (gv < 7.5) { // acrylic: flat saturated plastic, a crisp small highlight, a thin bright rim
-      vec3 lamp = vl * (0.8 + 0.2 * core);
+      vec3 lamp = v_lane * (0.8 + 0.2 * core);
       c = lamp + vec3(1.0) * (pow(max(dot(N, H), 0.0), 90.0) * 1.1 + 0.25 * pow(1.0 - face, 4.0));
     } else if (gv < 8.5) { // gemstone: deep, banded in facets, the hue turning towards the edge, a sparkle
       float fq = floor(face * 3.0) / 3.0;
-      vec3 lamp = vl * (0.45 + 0.9 * pow(face, 1.5));
-      lamp = mix(lamp, vl.gbr * (0.45 + 0.6 * fq), (1.0 - face) * 0.35);
+      vec3 lamp = v_lane * (0.45 + 0.9 * pow(face, 1.5));
+      lamp = mix(lamp, v_lane.gbr * (0.45 + 0.6 * fq), (1.0 - face) * 0.35);
       lamp += vec3(1.0) * step(0.96, fract(sin(floor(face * 9.0) * 91.7 + floor(v_uv.x * 6.0) * 37.1) * 43758.5453)) * 0.5;
       c = lamp + vec3(1.0) * sp * 0.5;
     } else if (gv < 9.5) { // stained glass: cells of slightly different colour with dark leads between them, lit from behind
       vec2 cu = v_uv * 8.0; vec2 cid = floor(cu);
       float hcell = fract(sin(dot(cid, vec2(127.1, 311.7))) * 43758.5453);
       float edge = min(min(fract(cu.x), 1.0 - fract(cu.x)), min(fract(cu.y), 1.0 - fract(cu.y)));
-      vec3 lamp = vl * (0.65 + 0.35 * hcell) * (0.7 + 0.6 * core);
+      vec3 lamp = v_lane * (0.65 + 0.35 * hcell) * (0.7 + 0.6 * core);
       lamp = mix(lamp, vec3(0.04), 0.85 * (1.0 - smoothstep(0.0, 0.07, edge)));
       c = lamp + vec3(1.0) * sp * 0.3;
     } else if (gv < 10.5) { // iridescent: the colour shifts with the angle like an oil film
       vec3 irid = 0.5 + 0.5 * cos(6.2831853 * (face * 1.2 + vec3(0.0, 0.33, 0.67)));
-      vec3 lamp = mix(vl, irid, 0.5) * (0.7 + 0.6 * core);
+      vec3 lamp = mix(v_lane, irid, 0.5) * (0.7 + 0.6 * core);
       c = lamp + vec3(1.0) * sp * 0.4;
     } else { // pearl: a pale pearly colour with soft bands of sheen
-      vec3 lamp = mix(vl, vec3(1.0), 0.55) * (0.8 + 0.2 * core);
+      vec3 lamp = mix(v_lane, vec3(1.0), 0.55) * (0.8 + 0.2 * core);
       lamp += vec3(0.06) * sin(face * 14.0);
       lamp = mix(lamp, 0.5 + 0.5 * cos(6.2831853 * (face + vec3(0.0, 0.33, 0.67))), 0.1);
       c = lamp + vec3(1.0) * pow(max(dot(N, H), 0.0), 20.0) * 0.3;
     }
   }
-  else if (role < 2.5) c = mix(vec3(1.0), vl, 0.03) * (0.9 + 0.1 * lam) + vec3(0.3); // the white of a HOPO: a lit strip, whiter and stronger than the shaded surface it had (it lights over 1, so it reads as light)
-  else if (u_mvar > 9.5 && u_mvar < 11.5) c = vl * (0.55 + 0.75 * dlam) * (1.0 - 0.12 * smoothstep(0.7, 1.0, dr)) + vec3(1.0) * dspec * 0.45; // a cymbal's top: the coloured dome (the cone of the old cymbal) over the circle note's base
-  else if (u_mvar > 11.5) c = vec3(0.045) * (0.6 + 0.8 * dlam) + vec3(0.5) * dspec * 0.2; // (a ghost cymbal: a dark middle in the coloured ring)
+  else if (role < 2.5) c = mix(vec3(1.0), v_lane, 0.03) * (0.9 + 0.1 * lam) + vec3(0.3); // the white of a HOPO: a lit strip, whiter and stronger than the shaded surface it had (it lights over 1, so it reads as light)
   else if (u_mvar > 2.5 && u_mvar < 3.5) c = vec3(0.04) * (0.6 + 0.8 * lam) + vec3(0.5) * dspec * 0.22; // a circle tap's middle: the same black as the rectangular tap's (a faint highlight on it)
   else if (u_mvar > 0.5 && u_mvar < 1.5) c = (v_sp > 0.5 ? vec3(1.0, 0.78, 0.28) : vec3(0.78, 0.80, 0.84)) * domeShade + vec3(1.0) * dspec * 0.3; // a plain circle note's top: a silver dome, gold in star power, as the rim under it
   else if (u_mvar > 1.5 && u_mvar < 2.5) c = vec3(0.96) * (0.7 + 0.3 * dlam) * (1.0 - 0.06 * smoothstep(0.7, 1.0, dr)) + vec3(0.22) + vec3(1.0) * dspec * 0.3; // a HOPO's: a lit white dome
-  else if (u_mvar > 3.5 && u_mvar < 9.5) c = vec3(0.96) * domeShade + vec3(1.0) * dspec * 0.3; // (an accent's and a ghost's: a white dome)
+  else if (u_mvar > 3.5) c = vec3(0.96) * domeShade + vec3(1.0) * dspec * 0.3; // (an accent's and a ghost's: a white dome)
   else c = vec3(0.04) * (0.6 + 0.8 * lam) + vec3(1.0) * sp * 0.3; // the dark of a tap
   c = mix(c, vec3(0.10, 0.14, 0.24), u_fog * 0.5 * smoothstep(0.1, 1.0, v_d)); // (the fog of the other effect, when it is on)
   c = mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))), 0.94 * u_dim); // (a disabled note, the replayed stretch: almost no colour)
@@ -1542,8 +1538,7 @@ export class GLBoard {
       gl.uniform1i(pr.u.u_mtex, 1); gl.uniform1i(pr.u.u_mshine, 2);
       for (const [kind, sol] of Object.entries(d.solid)) {
         const asRound = round && kind[0] !== 'c';
-        const cym = kind[0] === 'c'; // a cymbal is the circle note's model (the ghost cymbal's: chrome rim, coloured ring) with the coloured dome of the old cymbal on top
-        const mesh = models[asRound || cym ? 'cg' : kind];
+        const mesh = models[asRound ? 'cg' : kind];
         if (!mesh) continue;
         const sFrom = lowerBound(sol.times, t - 0.12), sTo = lowerBound(sol.times, t + win);
         if (sTo <= sFrom) continue;
@@ -1553,9 +1548,9 @@ export class GLBoard {
         gl.uniform1f(pr.u.u_mcel, mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mcym, mesh.cym && !mesh.cel ? 1 : 0); gl.uniform1f(pr.u.u_mmetal, fx.metal || 0); gl.uniform1f(pr.u.u_mglass, fx.glass || 0); gl.uniform1f(pr.u.u_mcymst, fx.cymbal || 0); gl.uniform1f(pr.u.u_mtoon, fx.shade === 'glossy' ? 2 : fx.shade === 'smooth' || fx.cel === false ? 0 : 1);
         gl.uniform2f(pr.u.u_mnoise, mesh.cym ? 0.62 : 1.0, 0.7); // (the middle's noise speed: the note 0.4, the cymbal 0.25, relative to the note; its minimum darkness)
         gl.uniform1f(pr.u.u_mrim, mesh.rim || 1);
-        gl.uniform1f(pr.u.u_mvar, asRound ? 1 + ({ h: 1, t: 2, a: 3, g: 4 }[kind] ?? 0) : cym ? ({ ca: 11, cg: 12 }[kind] ?? 10) : 0);
-        gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, asRound || cym ? (kind === 'g' || kind === 'cg' ? 0.8 : 1) : mesh.alpha); gl.uniform1f(pr.u.u_mscale, mesh.cym && (!asRound || d.drums) ? (o.cymbalScale ?? 1) : 1); // (on the drums a circle note is as big as a cymbal: both take the cymbal size setting) // (a circle note is opaque: the ghost cymbal's model is see-through, and the tail would show through it)
-        this.vao(d, `solid_${kind}${asRound ? 'r' : ''}${cym ? 'c' : ''}`, () => {
+        gl.uniform1f(pr.u.u_mvar, asRound ? 1 + ({ h: 1, t: 2, a: 3, g: 4 }[kind] ?? 0) : 0);
+        gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, asRound ? (kind === 'g' ? 0.8 : 1) : mesh.alpha); gl.uniform1f(pr.u.u_mscale, mesh.cym && (!asRound || d.drums) ? (o.cymbalScale ?? 1) : 1); // (on the drums a circle note is as big as a cymbal: both take the cymbal size setting) // (a circle note is opaque: the ghost cymbal's model is see-through, and the tail would show through it)
+        this.vao(d, `solid_${kind}${asRound ? 'r' : ''}`, () => {
           gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
           this.attrib(pr, 'm_pos', 3, 36, 0, 0); this.attrib(pr, 'm_nrm', 3, 36, 12, 0); this.attrib(pr, 'm_uv', 2, 36, 24, 0); this.attrib(pr, 'm_role', 1, 36, 32, 0);
           gl.bindBuffer(gl.ARRAY_BUFFER, sol.buf);
