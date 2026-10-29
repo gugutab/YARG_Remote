@@ -585,7 +585,7 @@ export const setCymbalSize = (v) => { cymbalSize = v; };
 export const noteScale = (n) => (n.cymbal ? cymbalSize : 1) * (n.hopo ? HOPO_SCALE : n.ghost ? GHOST_SCALE : 1);
 
 // Star power notes: a white overlay at 50% over the lane colour (the colour and the centre still show through; it was 80%, too washed out).
-export const STAR_POWER_OVERLAY = 0.5;
+export const STAR_POWER_OVERLAY = 0.25; // how much white a star power note's colour is mixed with (was 0.5)
 const starPowerColors = new Map(); // hex -> result (a handful of lane colours: the string was rebuilt for every star power note on every frame)
 export function starPowerColor(hex) {
   let out = starPowerColors.get(hex);
