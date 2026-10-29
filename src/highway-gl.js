@@ -1549,7 +1549,7 @@ export class GLBoard {
         gl.uniform2f(pr.u.u_mnoise, mesh.cym ? 0.62 : 1.0, 0.7); // (the middle's noise speed: the note 0.4, the cymbal 0.25, relative to the note; its minimum darkness)
         gl.uniform1f(pr.u.u_mrim, mesh.rim || 1);
         gl.uniform1f(pr.u.u_mvar, asRound ? 1 + ({ h: 1, t: 2, a: 3, g: 4 }[kind] ?? 0) : 0);
-        gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, asRound ? (kind === 'g' ? 0.8 : 1) : mesh.alpha); gl.uniform1f(pr.u.u_mscale, mesh.cym && !asRound ? (o.cymbalScale ?? 1) : 1); // (a circle note is opaque: the ghost cymbal's model is see-through, and the tail would show through it)
+        gl.uniform3f(pr.u.u_msz, mesh.msz[0], mesh.msz[1], mesh.msz[2]); gl.uniform1f(pr.u.u_mbase, mesh.base); gl.uniform1f(pr.u.u_malpha, asRound ? (kind === 'g' ? 0.8 : 1) : mesh.alpha); gl.uniform1f(pr.u.u_mscale, mesh.cym && (!asRound || d.drums) ? (o.cymbalScale ?? 1) : 1); // (on the drums a circle note is as big as a cymbal: both take the cymbal size setting) // (a circle note is opaque: the ghost cymbal's model is see-through, and the tail would show through it)
         this.vao(d, `solid_${kind}${asRound ? 'r' : ''}`, () => {
           gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
           this.attrib(pr, 'm_pos', 3, 36, 0, 0); this.attrib(pr, 'm_nrm', 3, 36, 12, 0); this.attrib(pr, 'm_uv', 2, 36, 24, 0); this.attrib(pr, 'm_role', 1, 36, 32, 0);
